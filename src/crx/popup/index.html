@@ -81,6 +81,88 @@
                         <input keyboard-type="password" type="password" id="api-key" autocomplete="off">
                         <input type="checkbox" id="show-api-key" class="show-api-key-toggle" >
                     </li>
+                    <li>
+                        <label for="model">Model</label>
+                        <select id="model">
+                            <option value="gpt-5.1">gpt-5.1</option>
+                            <option value="gpt-5.2">gpt-5.2</option>
+                            <option value="gpt-5.3">gpt-5.3</option>
+                            <option value="gpt-5.4">gpt-5.4</option>
+                            <option value="gpt-5.2-chat-latest">gpt-5.2-chat-latest</option>
+                            <option value="gpt-5.3-chat-latest">gpt-5.3-chat-latest</option>
+                            <option value="gpt-5.3-instant">gpt-5.3-instant</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                    </li>
+                    <li id="custom-model-row">
+                        <label for="custom-model">Custom Model</label>
+                        <input keyboard-type="text" type="text" id="custom-model" placeholder="provider/model-or-id" autocomplete="off">
+                    </li>
+                    <li>
+                        <label for="default-reasoning-effort">Reasoning Effort</label>
+                        <select id="default-reasoning-effort">
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </li>
+                    <li class="settings-grid-full">
+                        <details>
+                            <summary><strong>Advanced AI settings</strong></summary>
+                            <ul>
+                                <li>
+                                    <label for="default-verbosity">Verbosity</label>
+                                    <select id="default-verbosity">
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                    </select>
+                                </li>
+                                <li>
+                                    <label for="max-output-tokens">Max Output Tokens</label>
+                                    <input keyboard-type="number" type="number" id="max-output-tokens" placeholder="400000">
+                                </li>
+                                <li>
+                                    <label for="context-truncation">Context Truncation</label>
+                                    <select id="context-truncation">
+                                        <option value="disabled">Disabled</option>
+                                        <option value="auto">Auto</option>
+                                    </select>
+                                </li>
+                                <li>
+                                    <label for="prompt-cache-retention">Prompt Cache Retention</label>
+                                    <select id="prompt-cache-retention">
+                                        <option value="in-memory">In-memory</option>
+                                        <option value="24h">24h</option>
+                                    </select>
+                                </li>
+                                <li>
+                                    <label for="max-tool-calls">Max Tool Calls</label>
+                                    <input keyboard-type="number" type="number" id="max-tool-calls" placeholder="8">
+                                </li>
+                                <li>
+                                    <label for="parallel-tool-calls">Parallel Tool Calls</label>
+                                    <input type="checkbox" id="parallel-tool-calls" class="settings-grid-input" >
+                                </li>
+                                <li>
+                                    <label for="timeout-low">Timeout Low (ms)</label>
+                                    <input keyboard-type="number" type="number" id="timeout-low" placeholder="60000">
+                                </li>
+                                <li>
+                                    <label for="timeout-medium">Timeout Medium (ms)</label>
+                                    <input keyboard-type="number" type="number" id="timeout-medium" placeholder="300000">
+                                </li>
+                                <li>
+                                    <label for="timeout-high">Timeout High (ms)</label>
+                                    <input keyboard-type="number" type="number" id="timeout-high" placeholder="900000">
+                                </li>
+                                <li>
+                                    <label for="max-retries">Max Retries</label>
+                                    <input keyboard-type="number" type="number" id="max-retries" placeholder="2">
+                                </li>
+                            </ul>
+                        </details>
+                    </li>
                     <li class="settings-grid-full">
                         <label>MCP Servers</label>
                         <p id="mcp-validation-error" class="mcp-error" aria-live="polite"></p>

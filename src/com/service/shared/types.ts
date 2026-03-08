@@ -3,7 +3,7 @@ import type { DataKind, DataContext } from "../model/GPT-Config";
 
 export type { DataKind, DataContext };
 
-export type AIConfig = { apiKey?: string; baseUrl?: string; model?: string; mcp?: MCPConfig[] };
+export type AIConfig = { apiKey?: string; baseUrl?: string; model?: string; customModel?: string; mcp?: MCPConfig[] };
 
 export type RecognitionMode = "auto" | "image" | "text" | "structured" | "mixed";
 

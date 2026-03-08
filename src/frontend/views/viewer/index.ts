@@ -15,6 +15,8 @@ import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shell
 import type { BaseViewOptions } from "../types";
 import { createViewState } from "../types";
 import { writeText as writeClipboardText } from "@rs-core/modules/Clipboard";
+import { loadSettings } from "@rs-com/config/Settings";
+import type { MarkdownExtensionRule } from "@rs-com/config/SettingsTypes";
 
 // Import the md-view web component from fl.ui
 import "fest/fl-ui";
@@ -32,6 +34,45 @@ const INLINE_CODE_PATTERN = /`[^`\n]+`/g;
 const SANITIZE_OPTIONS = {
     FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "applet", "link", "meta", "base", "form", "noscript", "template"],
     FORBID_CONTENTS: ["script", "style", "iframe", "object", "embed", "applet", "noscript", "template"]
+};
+const DEFAULT_MARKDOWN_EXTENSION_FLAGS = "g";
+const VIEWER_CSS_LAYER_ORDER = [
+    "rs-md-base",
+    "rs-md-system",
+    "rs-md-modules",
+    "rs-md-user",
+    "rs-md-print",
+    "rs-md-user-print"
+] as const;
+
+type ViewerMarkdownSettings = {
+    preset: "default" | "classic" | "compact" | "paper";
+    fontFamily: "system" | "sans" | "serif" | "mono";
+    fontSizePx: number;
+    lineHeight: number;
+    contentMaxWidthPx: number;
+    printScale: number;
+    page: {
+        size: "auto" | "A4" | "Letter" | "Legal" | "A5";
+        orientation: "portrait" | "landscape";
+        marginMm: number;
+    };
+    modules: {
+        typography: boolean;
+        tables: boolean;
+        codeBlocks: boolean;
+        blockquotes: boolean;
+        media: boolean;
+        printBreaks: boolean;
+    };
+    plugins: {
+        smartTypography: boolean;
+        softBreaksAsBr: boolean;
+        externalLinksNewTab: boolean;
+    };
+    customCss: string;
+    printCss: string;
+    extensions: MarkdownExtensionRule[];
 };
 
 function maskCodeSegments(markdown: string): { masked: string; restore: (value: string) => string } {
@@ -231,6 +272,37 @@ export class ViewerView implements View {
     private isViewVisible = false;
     private isPointerInView = false;
     private sourceUrl: string | null = null;
+    private customSheet: CSSStyleSheet | null = null;
+    private markdownSettings: ViewerMarkdownSettings = {
+        preset: "default",
+        fontFamily: "system",
+        fontSizePx: 16,
+        lineHeight: 1.7,
+        contentMaxWidthPx: 860,
+        printScale: 1,
+        page: {
+            size: "auto",
+            orientation: "portrait",
+            marginMm: 12
+        },
+        modules: {
+            typography: true,
+            tables: true,
+            codeBlocks: true,
+            blockquotes: true,
+            media: true,
+            printBreaks: true
+        },
+        plugins: {
+            smartTypography: false,
+            softBreaksAsBr: false,
+            externalLinksNewTab: true
+        },
+        customCss: "",
+        printCss: "",
+        extensions: []
+    };
+    private markdownSettingsPromise: Promise<void> | null = null;
 
     lifecycle: ViewLifecycle = {
         onMount: () => this.onMount(),
@@ -244,6 +316,7 @@ export class ViewerView implements View {
         this.options = options;
         this.shellContext = options.shellContext;
         this.sourceUrl = this.normalizeSourceUrl(options.source);
+        this.markdownSettingsPromise = this.loadMarkdownSettings();
 
         // Load initial content
         const savedState = this.stateManager.load();
@@ -265,27 +338,37 @@ export class ViewerView implements View {
             <div class="view-viewer">
                 <div class="view-viewer__toolbar" data-viewer-toolbar>
                     <div class="view-viewer__toolbar-left">
-                        <button class="view-viewer__btn" data-action="open" type="button" title="Open file">
-                            <ui-icon icon="folder-open" icon-style="duotone"></ui-icon>
-                            <span>Open</span>
-                        </button>
-                    </div>
-                    <div class="view-viewer__toolbar-right">
-                        <button class="view-viewer__btn" data-action="copy" type="button" title="Copy raw content">
-                            <ui-icon icon="copy" icon-style="duotone"></ui-icon>
-                            <span>Copy</span>
-                        </button>
+                        
                         <button class="view-viewer__btn" data-action="toggle-raw" type="button" title="Toggle raw/rendered view">
                             <ui-icon icon="code" icon-style="duotone"></ui-icon>
                             <span>Raw</span>
                         </button>
-                        <button class="view-viewer__btn" data-action="copy-rendered" type="button" title="Copy rendered text">
-                            <ui-icon icon="text-t" icon-style="duotone"></ui-icon>
-                            <span>Copy text</span>
+                        <button class="view-viewer__btn" data-action="copy" type="button" title="Copy raw content">
+                            <ui-icon icon="copy" icon-style="duotone"></ui-icon>
+                            <span>Copy</span>
                         </button>
                         <button class="view-viewer__btn" data-action="download" type="button" title="Download as markdown">
                             <ui-icon icon="download" icon-style="duotone"></ui-icon>
                             <span>Download</span>
+                        </button>
+                    </div>
+                    <div class="view-viewer__toolbar-right">
+                        
+                        <button class="view-viewer__btn" data-action="attach" type="button" title="Attach to Work Center">
+                            <ui-icon icon="lightning" icon-style="duotone"></ui-icon>
+                            <span>Attach</span>
+                        </button>
+                        <button class="view-viewer__btn" data-action="open-style-settings" type="button" title="Markdown styling, modules, plugins">
+                            <ui-icon icon="paint-roller" icon-style="duotone"></ui-icon>
+                            <span>Style</span>
+                        </button>
+                        <button class="view-viewer__btn" data-action="open" type="button" title="Open file">
+                            <ui-icon icon="folder-open" icon-style="duotone"></ui-icon>
+                            <span>Open</span>
+                        </button>
+                        <button class="view-viewer__btn" data-action="copy-rendered" type="button" title="Copy rendered text">
+                            <ui-icon icon="text-t" icon-style="duotone"></ui-icon>
+                            <span>Copy text</span>
                         </button>
                         <button class="view-viewer__btn" data-action="export-docx" type="button" title="Export as DOCX">
                             <ui-icon icon="file-doc" icon-style="duotone"></ui-icon>
@@ -294,10 +377,6 @@ export class ViewerView implements View {
                         <button class="view-viewer__btn" data-action="print" type="button" title="Print content">
                             <ui-icon icon="printer" icon-style="duotone"></ui-icon>
                             <span>Print</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="attach" type="button" title="Attach to Work Center">
-                            <ui-icon icon="lightning" icon-style="duotone"></ui-icon>
-                            <span>Attach</span>
                         </button>
                     </div>
                 </div>
@@ -395,6 +474,7 @@ export class ViewerView implements View {
                 const sanitized = DOMPurify?.sanitize?.((html || "")?.trim?.() || "", SANITIZE_OPTIONS) || "";
                 renderTarget.innerHTML = sanitized;
                 this.resolveRelativeResourceUrls(renderTarget);
+                this.applyRenderedLinkBehavior(renderTarget);
                 console.log('[ViewerView] Markdown rendered successfully');
             };
 
@@ -403,8 +483,10 @@ export class ViewerView implements View {
                 renderTarget.innerHTML = `<div style="color: red; padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 4px;">Error parsing markdown: ${(error as any)?.message}</div>`;
             };
 
+            const pluginProcessed = this.applyMarkdownPlugins((content || "")?.trim?.() || "");
+            const processedContent = this.applyCustomMarkdownExtensions(pluginProcessed);
             getMarkedParser()
-                .then((parse) => parse((content || "")?.trim?.() || ""))
+                .then((parse) => parse(processedContent))
                 .then(handleParsed)
                 .catch(handleError);
         } catch (error) {
@@ -560,6 +642,9 @@ export class ViewerView implements View {
                     if (renderTarget) {
                         this.handlePrint(renderTarget);
                     }
+                    break;
+                case "open-style-settings":
+                    this.handleOpenStyleSettings();
                     break;
                 case "attach":
                     this.handleAttachToWorkCenter();
@@ -741,6 +826,19 @@ export class ViewerView implements View {
         this.showMessage("Content attached to Work Center");
     }
 
+    private handleOpenStyleSettings(): void {
+        try {
+            this.shellContext?.navigate("settings", {
+                tab: "markdown",
+                focus: "style"
+            });
+            this.showMessage("Opened Markdown style settings");
+        } catch (error) {
+            console.warn("[Viewer] Failed to open style settings:", error);
+            this.showMessage("Failed to open style settings");
+        }
+    }
+
     private handleFileDrop(e: DragEvent): void {
         const file = e.dataTransfer?.files?.[0];
         if (file && (file.type.includes("text") || file.name.endsWith(".md"))) {
@@ -871,6 +969,328 @@ export class ViewerView implements View {
         }
     }
 
+    private normalizeMarkdownExtensionFlags(rawFlags?: string): string {
+        const normalized = (rawFlags || DEFAULT_MARKDOWN_EXTENSION_FLAGS)
+            .split("")
+            .filter((flag, index, array) =>
+                /[dgimsuvy]/.test(flag) && array.indexOf(flag) === index)
+            .join("");
+        return normalized || DEFAULT_MARKDOWN_EXTENSION_FLAGS;
+    }
+
+    private applyCustomMarkdownExtensions(markdown: string): string {
+        const source = markdown || "";
+        const rules = Array.isArray(this.markdownSettings.extensions)
+            ? this.markdownSettings.extensions
+            : [];
+        if (rules.length === 0 || !source) return source;
+
+        let result = source;
+        for (const rule of rules) {
+            if (!rule || rule.enabled === false) continue;
+            const pattern = (rule.pattern || "").trim();
+            if (!pattern) continue;
+            try {
+                const regex = new RegExp(pattern, this.normalizeMarkdownExtensionFlags(rule.flags));
+                result = result.replace(regex, rule.replacement ?? "");
+            } catch (error) {
+                console.warn("[Viewer] Skipping invalid markdown extension rule:", {
+                    id: rule.id,
+                    pattern,
+                    flags: rule.flags,
+                    error
+                });
+            }
+        }
+        return result;
+    }
+
+    private applyMarkdownPlugins(markdown: string): string {
+        let result = markdown || "";
+        if (!result) return result;
+
+        if (this.markdownSettings.plugins.smartTypography) {
+            result = result
+                .replace(/\.\.\./g, "&hellip;")
+                .replace(/(^|[^\-])---([^\-]|$)/g, "$1&mdash;$2")
+                .replace(/(^|[^\-])--([^\-]|$)/g, "$1&ndash;$2");
+        }
+
+        if (this.markdownSettings.plugins.softBreaksAsBr) {
+            result = result.replace(/([^\n])\n(?!\n)/g, "$1  \n");
+        }
+
+        return result;
+    }
+
+    private getFontFamilyFromPreset(): string {
+        const preset = this.markdownSettings.fontFamily;
+        if (preset === "serif") return "Georgia, Cambria, 'Times New Roman', Times, serif";
+        if (preset === "mono") return "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace";
+        if (preset === "sans") return "Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+        return "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+    }
+
+    private applyRenderedLinkBehavior(root: HTMLElement): void {
+        const links = Array.from(root.querySelectorAll("a[href]")) as HTMLAnchorElement[];
+        for (const link of links) {
+            const href = (link.getAttribute("href") || "").trim();
+            if (!href) continue;
+            const isHash = href.startsWith("#");
+            const isExternal = /^(https?:)?\/\//i.test(href);
+            if (this.markdownSettings.plugins.externalLinksNewTab && isExternal && !isHash) {
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+            } else {
+                if (link.target === "_blank") link.removeAttribute("target");
+                if (link.rel === "noopener noreferrer") link.removeAttribute("rel");
+            }
+        }
+    }
+
+    private createLayerBlock(layerName: string, cssText: string): string {
+        const body = (cssText || "").trim();
+        if (!body) return "";
+        return `@layer ${layerName} {\n${body}\n}`;
+    }
+
+    private normalizeUserCssForLayer(layerName: string, cssText: string): string {
+        const trimmed = (cssText || "").trim();
+        if (!trimmed) return "";
+        if (trimmed.startsWith("@layer")) return trimmed;
+        return this.createLayerBlock(layerName, trimmed);
+    }
+
+    private getPresetVariablesCss(): string {
+        const preset = this.markdownSettings.preset;
+        if (preset === "classic") {
+            return `
+                --md-letter-spacing: 0;
+                --md-h1-size: 2.05em;
+                --md-h2-size: 1.65em;
+                --md-p-margin: 1.05em;
+            `;
+        }
+        if (preset === "compact") {
+            return `
+                --md-letter-spacing: -0.01em;
+                --md-h1-size: 1.8em;
+                --md-h2-size: 1.45em;
+                --md-p-margin: 0.72em;
+            `;
+        }
+        if (preset === "paper") {
+            return `
+                --md-letter-spacing: 0.005em;
+                --md-h1-size: 2em;
+                --md-h2-size: 1.6em;
+                --md-p-margin: 0.95em;
+            `;
+        }
+        return `
+            --md-letter-spacing: 0;
+            --md-h1-size: 1.95em;
+            --md-h2-size: 1.55em;
+            --md-p-margin: 0.9em;
+        `;
+    }
+
+    private buildCustomStyleText(): string {
+        const pageSize = this.markdownSettings.page.size || "auto";
+        const pageOrientation = this.markdownSettings.page.orientation || "portrait";
+        const pageMargin = Number.isFinite(this.markdownSettings.page.marginMm)
+            ? Math.max(5, Math.min(40, this.markdownSettings.page.marginMm))
+            : 12;
+        const printScale = Number.isFinite(this.markdownSettings.printScale)
+            ? Math.max(0.5, Math.min(1.5, this.markdownSettings.printScale))
+            : 1;
+        const fontSizePx = Number.isFinite(this.markdownSettings.fontSizePx)
+            ? Math.max(12, Math.min(26, this.markdownSettings.fontSizePx))
+            : 16;
+        const lineHeight = Number.isFinite(this.markdownSettings.lineHeight)
+            ? Math.max(1.1, Math.min(2.2, this.markdownSettings.lineHeight))
+            : 1.7;
+        const maxWidth = Number.isFinite(this.markdownSettings.contentMaxWidthPx)
+            ? Math.max(500, Math.min(1400, this.markdownSettings.contentMaxWidthPx))
+            : 860;
+
+        const systemCss = `
+            .view-viewer .markdown-viewer-content {
+                font-family: ${this.getFontFamilyFromPreset()};
+                font-size: ${fontSizePx}px;
+                line-height: ${lineHeight};
+                letter-spacing: var(--md-letter-spacing, 0);
+                max-width: ${maxWidth}px;
+                margin-inline: auto;
+                padding: 1rem 1.1rem 3rem;
+            }
+
+            .view-viewer .markdown-viewer-content h1 { font-size: var(--md-h1-size, 1.95em); }
+            .view-viewer .markdown-viewer-content h2 { font-size: var(--md-h2-size, 1.55em); }
+            .view-viewer .markdown-viewer-content p,
+            .view-viewer .markdown-viewer-content li {
+                margin-block: var(--md-p-margin, 0.9em);
+            }
+
+            .view-viewer .markdown-viewer-content {
+                ${this.getPresetVariablesCss()}
+            }
+        `;
+
+        const modulesCss = `
+            ${this.markdownSettings.modules.typography ? "" : `
+            .view-viewer .markdown-viewer-content p,
+            .view-viewer .markdown-viewer-content li {
+                margin-block: 0.35em;
+            }
+            .view-viewer .markdown-viewer-content h1,
+            .view-viewer .markdown-viewer-content h2,
+            .view-viewer .markdown-viewer-content h3 {
+                margin-block: 0.45em;
+            }`}
+
+            ${this.markdownSettings.modules.codeBlocks ? `
+            .view-viewer .markdown-viewer-content pre {
+                border-radius: 10px;
+                padding: 0.8rem 1rem;
+                overflow-x: auto;
+            }
+            .view-viewer .markdown-viewer-content code {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+                font-size: 0.92em;
+            }` : ""}
+
+            ${this.markdownSettings.modules.tables ? `
+            .view-viewer .markdown-viewer-content table {
+                inline-size: 100%;
+                border-collapse: collapse;
+                margin: 1rem 0;
+            }
+            .view-viewer .markdown-viewer-content th,
+            .view-viewer .markdown-viewer-content td {
+                border: 1px solid color-mix(in oklab, currentColor 18%, transparent);
+                padding: 0.45rem 0.6rem;
+                text-align: left;
+                vertical-align: top;
+            }` : ""}
+
+            ${this.markdownSettings.modules.blockquotes ? `
+            .view-viewer .markdown-viewer-content blockquote {
+                border-inline-start: 4px solid color-mix(in oklab, currentColor 30%, transparent);
+                padding-inline: 1rem;
+                margin-inline: 0;
+            }` : ""}
+
+            ${this.markdownSettings.modules.media ? `
+            .view-viewer .markdown-viewer-content img,
+            .view-viewer .markdown-viewer-content video {
+                max-inline-size: 100%;
+                border-radius: 8px;
+                display: block;
+                margin-inline: auto;
+            }` : ""}
+        `;
+
+        const builtInPrintCss = `
+            @media print {
+                .view-viewer .markdown-viewer-content {
+                    zoom: ${printScale};
+                }
+                ${this.markdownSettings.modules.printBreaks ? `
+                .view-viewer .markdown-viewer-content h1,
+                .view-viewer .markdown-viewer-content h2,
+                .view-viewer .markdown-viewer-content h3 {
+                    break-after: avoid-page;
+                    break-inside: avoid;
+                }
+                .view-viewer .markdown-viewer-content pre,
+                .view-viewer .markdown-viewer-content table,
+                .view-viewer .markdown-viewer-content blockquote {
+                    break-inside: avoid;
+                }` : ""}
+            }
+        `;
+
+        const screenCss = (this.markdownSettings.customCss || "").trim();
+        const userPrintCss = (this.markdownSettings.printCss || "").trim();
+        const pageCss = pageSize !== "auto"
+            ? `@page { size: ${pageSize} ${pageOrientation}; margin: ${pageMargin}mm; }`
+            : "";
+
+        const chunks: string[] = [
+            `@layer ${VIEWER_CSS_LAYER_ORDER.join(", ")};`,
+            this.createLayerBlock("rs-md-system", systemCss),
+            this.createLayerBlock("rs-md-modules", modulesCss),
+            this.normalizeUserCssForLayer("rs-md-user", screenCss),
+            this.createLayerBlock("rs-md-print", `${builtInPrintCss}\n${pageCss}`),
+            this.normalizeUserCssForLayer(
+                "rs-md-user-print",
+                userPrintCss ? `@media print {\n${userPrintCss}\n}` : ""
+            )
+        ].filter(Boolean);
+
+        return chunks.join("\n\n");
+    }
+
+    private applyCustomStyles(): void {
+        if (this.customSheet) {
+            removeAdopted(this.customSheet);
+            this.customSheet = null;
+        }
+
+        const styleText = this.buildCustomStyleText();
+        if (!styleText) return;
+
+        try {
+            this.customSheet = loadAsAdopted(styleText) as CSSStyleSheet;
+        } catch (error) {
+            console.warn("[Viewer] Failed to load custom markdown styles:", error);
+            this.customSheet = null;
+        }
+    }
+
+    private async loadMarkdownSettings(): Promise<void> {
+        try {
+            const settings = await loadSettings();
+            const markdown = settings?.appearance?.markdown;
+            this.markdownSettings = {
+                preset: (markdown?.preset || "default") as ViewerMarkdownSettings["preset"],
+                fontFamily: (markdown?.fontFamily || "system") as ViewerMarkdownSettings["fontFamily"],
+                fontSizePx: Number(markdown?.fontSizePx ?? 16),
+                lineHeight: Number(markdown?.lineHeight ?? 1.7),
+                contentMaxWidthPx: Number(markdown?.contentMaxWidthPx ?? 860),
+                printScale: Number(markdown?.printScale ?? 1),
+                page: {
+                    size: (markdown?.page?.size || "auto") as ViewerMarkdownSettings["page"]["size"],
+                    orientation: (markdown?.page?.orientation || "portrait") as ViewerMarkdownSettings["page"]["orientation"],
+                    marginMm: Number(markdown?.page?.marginMm ?? 12)
+                },
+                modules: {
+                    typography: (markdown?.modules?.typography ?? true) !== false,
+                    tables: (markdown?.modules?.tables ?? true) !== false,
+                    codeBlocks: (markdown?.modules?.codeBlocks ?? true) !== false,
+                    blockquotes: (markdown?.modules?.blockquotes ?? true) !== false,
+                    media: (markdown?.modules?.media ?? true) !== false,
+                    printBreaks: (markdown?.modules?.printBreaks ?? true) !== false
+                },
+                plugins: {
+                    smartTypography: Boolean(markdown?.plugins?.smartTypography),
+                    softBreaksAsBr: Boolean(markdown?.plugins?.softBreaksAsBr),
+                    externalLinksNewTab: (markdown?.plugins?.externalLinksNewTab ?? true) !== false
+                },
+                customCss: (markdown?.customCss || "").trim(),
+                printCss: (markdown?.printCss || "").trim(),
+                extensions: Array.isArray(markdown?.extensions)
+                    ? markdown.extensions
+                    : []
+            };
+            this.applyCustomStyles();
+            this.onRefresh();
+        } catch (error) {
+            console.warn("[Viewer] Failed to load markdown settings:", error);
+        }
+    }
+
     // ========================================================================
     // LIFECYCLE METHODS
     // ========================================================================
@@ -878,6 +1298,8 @@ export class ViewerView implements View {
     private onMount(): void {
         console.log("[Viewer] Mounted");
         this._sheet ??= loadAsAdopted(style) as CSSStyleSheet;
+        this.applyCustomStyles();
+        void this.markdownSettingsPromise;
         this.isViewVisible = true;
     }
 
@@ -888,12 +1310,18 @@ export class ViewerView implements View {
         this.isPointerInView = false;
         this.pasteController?.abort();
         this.pasteController = null;
+        if (this.customSheet) {
+            removeAdopted(this.customSheet);
+            this.customSheet = null;
+        }
         removeAdopted(this._sheet!);
         this.element = null;
     }
 
     private onShow(): void {
         this._sheet ??= loadAsAdopted(style) as CSSStyleSheet;
+        this.applyCustomStyles();
+        this.markdownSettingsPromise = this.loadMarkdownSettings();
         this.isViewVisible = true;
         console.log("[Viewer] Shown");
     }

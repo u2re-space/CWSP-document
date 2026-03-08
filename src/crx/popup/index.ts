@@ -41,7 +41,34 @@ type CollectMcpRowsResult = {
     mcp: MCPConfig[];
     errors: string[];
 };
-type PopupSettings = { ai?: { apiKey?: string; baseUrl?: string; model?: string; responseLanguage?: ResponseLanguage; translateResults?: boolean; generateSvgGraphics?: boolean; mcp?: MCPConfig[] }; [k: string]: unknown };
+type PopupSettings = {
+    ai?: {
+        apiKey?: string;
+        baseUrl?: string;
+        model?: string;
+        customModel?: string;
+        defaultReasoningEffort?: "low" | "medium" | "high";
+        defaultVerbosity?: "low" | "medium" | "high";
+        maxOutputTokens?: number;
+        contextTruncation?: "disabled" | "auto";
+        promptCacheRetention?: "in-memory" | "24h";
+        maxToolCalls?: number;
+        parallelToolCalls?: boolean;
+        requestTimeout?: { low?: number; medium?: number; high?: number };
+        maxRetries?: number;
+        responseLanguage?: ResponseLanguage;
+        translateResults?: boolean;
+        generateSvgGraphics?: boolean;
+        mcp?: MCPConfig[];
+    };
+    [k: string]: unknown
+};
+
+const parseNumberOrDefault = (value: string | undefined, fallback: number): number => {
+    const parsed = Number((value || "").trim());
+    if (!Number.isFinite(parsed)) return fallback;
+    return parsed;
+};
 
 const sanitizeMcpConfig = (raw: MCPConfig): MCPConfig => ({
     id: (raw?.id || `mcp-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`).toString().trim(),
@@ -432,21 +459,73 @@ const initSettingsUI = () => {
     const langSel = document.getElementById("response-language") as HTMLSelectElement;
     const translateCb = document.getElementById("translate-results") as HTMLInputElement;
     const svgCb = document.getElementById("generate-svg") as HTMLInputElement;
+    const modelSel = document.getElementById("model") as HTMLSelectElement;
+    const customModelRow = document.getElementById("custom-model-row") as HTMLLIElement;
+    const customModelInput = document.getElementById("custom-model") as HTMLInputElement;
+    const defaultReasoningEffort = document.getElementById("default-reasoning-effort") as HTMLSelectElement;
+    const defaultVerbosity = document.getElementById("default-verbosity") as HTMLSelectElement;
+    const maxOutputTokens = document.getElementById("max-output-tokens") as HTMLInputElement;
+    const contextTruncation = document.getElementById("context-truncation") as HTMLSelectElement;
+    const promptCacheRetention = document.getElementById("prompt-cache-retention") as HTMLSelectElement;
+    const maxToolCalls = document.getElementById("max-tool-calls") as HTMLInputElement;
+    const parallelToolCalls = document.getElementById("parallel-tool-calls") as HTMLInputElement;
+    const timeoutLow = document.getElementById("timeout-low") as HTMLInputElement;
+    const timeoutMedium = document.getElementById("timeout-medium") as HTMLInputElement;
+    const timeoutHigh = document.getElementById("timeout-high") as HTMLInputElement;
+    const maxRetries = document.getElementById("max-retries") as HTMLInputElement;
     const mcpList = document.getElementById("mcp-config-list") as HTMLDivElement;
     const addMcpBtn = document.getElementById("mcp-add") as HTMLButtonElement;
     const importBtn = document.getElementById("mcp-import") as HTMLButtonElement;
     const exportBtn = document.getElementById("mcp-export") as HTMLButtonElement;
     const importFileInput = document.getElementById("mcp-import-file") as HTMLInputElement;
 
+    const syncCustomModelVisibility = () => {
+        const isCustom = (modelSel?.value || "").trim() === "custom";
+        if (customModelRow) customModelRow.hidden = !isCustom;
+        if (customModelInput) customModelInput.disabled = !isCustom;
+    };
+    modelSel?.addEventListener("change", syncCustomModelVisibility);
+    customModelInput?.addEventListener("focus", () => {
+        if (!modelSel) return;
+        modelSel.value = "custom";
+        syncCustomModelVisibility();
+    });
+
     // Load
     loadSettings().then((s) => {
         if (apiUrl) apiUrl.value = (s.ai?.baseUrl || "").trim();
         if (apiKey) apiKey.value = (s.ai?.apiKey || "").trim();
+        const storedModel = (s.ai?.model || "gpt-5.2").trim();
+        if (modelSel) {
+            const hasOption = Array.from(modelSel.options).some((opt) => opt.value === storedModel);
+            if (storedModel === "custom") {
+                modelSel.value = "custom";
+                if (customModelInput) customModelInput.value = (s.ai?.customModel || "").trim();
+            } else if (hasOption) {
+                modelSel.value = storedModel;
+                if (customModelInput) customModelInput.value = (s.ai?.customModel || "").trim();
+            } else {
+                modelSel.value = "custom";
+                if (customModelInput) customModelInput.value = (s.ai?.customModel || storedModel).trim();
+            }
+        }
+        if (defaultReasoningEffort) defaultReasoningEffort.value = (s.ai?.defaultReasoningEffort || "medium") as any;
+        if (defaultVerbosity) defaultVerbosity.value = (s.ai?.defaultVerbosity || "medium") as any;
+        if (maxOutputTokens) maxOutputTokens.value = String(s.ai?.maxOutputTokens ?? 400000);
+        if (contextTruncation) contextTruncation.value = (s.ai?.contextTruncation || "disabled") as any;
+        if (promptCacheRetention) promptCacheRetention.value = (s.ai?.promptCacheRetention || "in-memory") as any;
+        if (maxToolCalls) maxToolCalls.value = String(s.ai?.maxToolCalls ?? 8);
+        if (parallelToolCalls) parallelToolCalls.checked = (s.ai?.parallelToolCalls ?? true) !== false;
+        if (timeoutLow) timeoutLow.value = String(s.ai?.requestTimeout?.low ?? 60000);
+        if (timeoutMedium) timeoutMedium.value = String(s.ai?.requestTimeout?.medium ?? 300000);
+        if (timeoutHigh) timeoutHigh.value = String(s.ai?.requestTimeout?.high ?? 900000);
+        if (maxRetries) maxRetries.value = String(s.ai?.maxRetries ?? 2);
         if (langSel) langSel.value = s.ai?.responseLanguage || "auto";
         if (translateCb) translateCb.checked = s.ai?.translateResults || false;
         if (svgCb) svgCb.checked = s.ai?.generateSvgGraphics || false;
         renderMcpRows(mcpList, s.ai?.mcp || []);
         setMcpValidationError("");
+        syncCustomModelVisibility();
     }).catch(console.warn);
 
     addMcpBtn?.addEventListener("click", () => {
@@ -530,6 +609,21 @@ const initSettingsUI = () => {
             ai: {
                 apiKey: apiKey?.value?.trim() || "",
                 baseUrl: apiUrl?.value?.trim() || "",
+                model: modelSel?.value?.trim?.() || "gpt-5.2",
+                customModel: (modelSel?.value || "") === "custom" ? (customModelInput?.value?.trim?.() || "") : "",
+                defaultReasoningEffort: (defaultReasoningEffort?.value as any) || "medium",
+                defaultVerbosity: (defaultVerbosity?.value as any) || "medium",
+                maxOutputTokens: parseNumberOrDefault(maxOutputTokens?.value, 400000),
+                contextTruncation: (contextTruncation?.value as any) || "disabled",
+                promptCacheRetention: (promptCacheRetention?.value as any) || "in-memory",
+                maxToolCalls: parseNumberOrDefault(maxToolCalls?.value, 8),
+                parallelToolCalls: (parallelToolCalls?.checked ?? true) !== false,
+                requestTimeout: {
+                    low: parseNumberOrDefault(timeoutLow?.value, 60000),
+                    medium: parseNumberOrDefault(timeoutMedium?.value, 300000),
+                    high: parseNumberOrDefault(timeoutHigh?.value, 900000),
+                },
+                maxRetries: parseNumberOrDefault(maxRetries?.value, 2),
                 responseLanguage: (langSel?.value as ResponseLanguage) || "auto",
                 translateResults: translateCb?.checked || false,
                 generateSvgGraphics: svgCb?.checked || false,
@@ -547,6 +641,7 @@ const initSettingsUI = () => {
     // Trim on change
     apiUrl?.addEventListener("change", () => { apiUrl.value = apiUrl.value.trim(); });
     apiKey?.addEventListener("change", () => { apiKey.value = apiKey.value.trim(); });
+    customModelInput?.addEventListener("change", () => { customModelInput.value = customModelInput.value.trim(); });
 
     // Toggle key visibility
     showKey?.addEventListener("click", () => { if (apiKey) apiKey.type = showKey.checked ? "text" : "password"; });

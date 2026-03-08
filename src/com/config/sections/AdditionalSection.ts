@@ -58,6 +58,34 @@ export const AdditionalSection: SectionConfig = {
             ]
         },
         {
+            key: "markdown-viewer",
+            label: "Markdown Viewer",
+            description: "User-defined markdown rendering and print styles.",
+            fields: [
+                {
+                    path: "appearance.markdown.customCss",
+                    label: "Custom CSS (screen/view)",
+                    type: "textarea",
+                    placeholder: ".markdown-viewer-content h1 { color: var(--color-primary); }",
+                    helper: "Applied to markdown viewer while browsing documents."
+                },
+                {
+                    path: "appearance.markdown.printCss",
+                    label: "Custom CSS (print)",
+                    type: "textarea",
+                    placeholder: ".markdown-viewer-content { font-size: 12pt; }",
+                    helper: "Wrapped in @media print when printing markdown."
+                },
+                {
+                    path: "appearance.markdown.extensions",
+                    label: "Extensions JSON",
+                    type: "textarea",
+                    placeholder: "[{\"pattern\":\"==(.+?)==\",\"replacement\":\"<mark>$1</mark>\",\"flags\":\"g\",\"enabled\":true}]",
+                    helper: "JSON array of regex replacement rules applied before markdown parsing."
+                }
+            ]
+        },
+        {
             key: "grid-layout",
             label: "Grid Layout",
             description: "Configure the home screen grid layout.",

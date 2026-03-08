@@ -99,12 +99,28 @@
         transition:
             background-color var(--motion-normal, 0.2s ease),
             border-color var(--motion-normal, 0.2s ease);
+
+        select {
+            min-block-size: 0px !important;
+            block-size: fit-content !important;
+            max-block-size: min(2rem, 100%) !important;
+            box-sizing: border-box !important;
+            padding-block: 0.125rem !important;
+        }
     }
 
     .app-shell__nav-left,
     .app-shell__nav-right {
         display: flex;
         align-items: center;
+
+        select {
+            min-block-size: 0px !important;
+            block-size: fit-content !important;
+            max-block-size: min(2rem, 100%) !important;
+            box-sizing: border-box !important;
+            padding-block: 0.125rem !important;
+        }
     }
 
     .app-shell__nav-left {

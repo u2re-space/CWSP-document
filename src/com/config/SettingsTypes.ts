@@ -70,6 +70,44 @@ export type CustomInstruction = {
 
 export type ResponseLanguage = "en" | "ru" | "auto" | "follow";
 export type SpeechRecognitionLanguage = "ru" | "en" | "en-GB" | "en-US";
+export type ReasoningEffort = "low" | "medium" | "high";
+export type ResponseVerbosity = "low" | "medium" | "high";
+export type ContextTruncation = "disabled" | "auto";
+export type PromptCacheRetention = "in-memory" | "24h";
+export type MarkdownStylePreset = "default" | "classic" | "compact" | "paper";
+export type MarkdownFontFamilyPreset = "system" | "sans" | "serif" | "mono";
+export type MarkdownPageSize = "auto" | "A4" | "Letter" | "Legal" | "A5";
+export type MarkdownPageOrientation = "portrait" | "landscape";
+export type MarkdownExtensionRule = {
+    id?: string;
+    pattern: string;
+    replacement: string;
+    flags?: string;
+    enabled?: boolean;
+};
+export type MarkdownStyleModules = {
+    typography?: boolean;
+    tables?: boolean;
+    codeBlocks?: boolean;
+    blockquotes?: boolean;
+    media?: boolean;
+    printBreaks?: boolean;
+};
+export type MarkdownStylePlugins = {
+    smartTypography?: boolean;
+    softBreaksAsBr?: boolean;
+    externalLinksNewTab?: boolean;
+};
+
+export const BUILTIN_AI_MODELS = [
+    "gpt-5.1",
+    "gpt-5.2",
+    "gpt-5.3",
+    "gpt-5.4",
+    "gpt-5.2-chat-latest",
+    "gpt-5.3-chat-latest",
+    "gpt-5.3-instant"
+] as const;
 
 const defaultSpeechLanguage = (): SpeechRecognitionLanguage => {
     const fallback: SpeechRecognitionLanguage = "en-US";
@@ -103,6 +141,13 @@ export type AppSettings = {
         baseUrl?: string;
         model?: string;
         customModel?: string;
+        defaultReasoningEffort?: ReasoningEffort;
+        defaultVerbosity?: ResponseVerbosity;
+        maxOutputTokens?: number;
+        contextTruncation?: ContextTruncation;
+        promptCacheRetention?: PromptCacheRetention;
+        maxToolCalls?: number;
+        parallelToolCalls?: boolean;
         mcp?: MCPConfig[];
         shareTargetMode?: "analyze" | "recognize";
         /** When true (default), share-target / launch-queue will auto run AI and copy result to clipboard. */
@@ -135,6 +180,24 @@ export type AppSettings = {
         theme?: "light" | "dark" | "auto";
         fontSize?: "small" | "medium" | "large";
         color?: string;
+        markdown?: {
+            customCss?: string;
+            printCss?: string;
+            extensions?: MarkdownExtensionRule[];
+            preset?: MarkdownStylePreset;
+            fontFamily?: MarkdownFontFamilyPreset;
+            fontSizePx?: number;
+            lineHeight?: number;
+            contentMaxWidthPx?: number;
+            printScale?: number;
+            page?: {
+                size?: MarkdownPageSize;
+                orientation?: MarkdownPageOrientation;
+                marginMm?: number;
+            };
+            modules?: MarkdownStyleModules;
+            plugins?: MarkdownStylePlugins;
+        };
     };
     speech?: {
         language?: SpeechRecognitionLanguage;
@@ -167,6 +230,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
         baseUrl: "",
         model: "gpt-5.2",
         customModel: "",
+        defaultReasoningEffort: "medium",
+        defaultVerbosity: "medium",
+        maxOutputTokens: 400000,
+        contextTruncation: "disabled",
+        promptCacheRetention: "in-memory",
+        maxToolCalls: 8,
+        parallelToolCalls: true,
         mcp: [],
         shareTargetMode: "recognize",
         autoProcessShared: true,
@@ -194,7 +264,36 @@ export const DEFAULT_SETTINGS: AppSettings = {
     appearance: {
         theme: "auto",
         fontSize: "medium",
-        color: ""
+        color: "",
+        markdown: {
+            customCss: "",
+            printCss: "",
+            extensions: [],
+            preset: "default",
+            fontFamily: "system",
+            fontSizePx: 16,
+            lineHeight: 1.7,
+            contentMaxWidthPx: 860,
+            printScale: 1,
+            page: {
+                size: "auto",
+                orientation: "portrait",
+                marginMm: 12
+            },
+            modules: {
+                typography: true,
+                tables: true,
+                codeBlocks: true,
+                blockquotes: true,
+                media: true,
+                printBreaks: true
+            },
+            plugins: {
+                smartTypography: false,
+                softBreaksAsBr: false,
+                externalLinksNewTab: true
+            }
+        }
     },
     speech: {
         language: defaultSpeechLanguage()

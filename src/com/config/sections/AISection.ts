@@ -1,4 +1,4 @@
-import type { SectionConfig } from "@rs-com/config/SettingsTypes";
+import { BUILTIN_AI_MODELS, type SectionConfig } from "@rs-com/config/SettingsTypes";
 
 //
 export const AISection: SectionConfig = {
@@ -18,13 +18,7 @@ export const AISection: SectionConfig = {
                     label: "Model",
                     type: "select",
                     options: [
-                        { value: "gpt-5.1", label: "gpt-5.1" },
-                        { value: "gpt-5.2", label: "gpt-5.2" },
-                        { value: "gpt-5.3", label: "gpt-5.3" },
-                        { value: "gpt-5.2-chat-latest", label: "gpt-5.2-chat-latest" },
-                        { value: "gpt-5.3-chat-latest", label: "gpt-5.3-chat-latest" },
-                        { value: "gpt-5.3-instant", label: "gpt-5.3-instant" },
-                        { value: "gpt-5.4", label: "gpt-5.4" },
+                        ...BUILTIN_AI_MODELS.map((model) => ({ value: model, label: model })),
                         { value: "custom", label: "Custom..." }
                     ]
                 }
@@ -36,6 +30,59 @@ export const AISection: SectionConfig = {
             description: "Provide a fully-qualified model identifier.",
             fields: [
                 { path: "ai.customModel", label: "Model identifier", type: "text", placeholder: "provider/model" }
+            ]
+        },
+        {
+            key: "advanced-runtime",
+            label: "Advanced Runtime",
+            description: "Default effort/verbosity, token limits, context, retries, and tool-call caps.",
+            collapsible: true,
+            startOpen: false,
+            fields: [
+                {
+                    path: "ai.defaultReasoningEffort",
+                    label: "Default reasoning effort",
+                    type: "select",
+                    options: [
+                        { value: "low", label: "Low" },
+                        { value: "medium", label: "Medium" },
+                        { value: "high", label: "High" }
+                    ]
+                },
+                {
+                    path: "ai.defaultVerbosity",
+                    label: "Default verbosity",
+                    type: "select",
+                    options: [
+                        { value: "low", label: "Low" },
+                        { value: "medium", label: "Medium" },
+                        { value: "high", label: "High" }
+                    ]
+                },
+                { path: "ai.maxOutputTokens", label: "Max output tokens", type: "text", placeholder: "400000" },
+                {
+                    path: "ai.contextTruncation",
+                    label: "Context truncation",
+                    type: "select",
+                    options: [
+                        { value: "disabled", label: "Disabled" },
+                        { value: "auto", label: "Auto" }
+                    ]
+                },
+                {
+                    path: "ai.promptCacheRetention",
+                    label: "Prompt cache retention",
+                    type: "select",
+                    options: [
+                        { value: "in-memory", label: "In-memory" },
+                        { value: "24h", label: "24h" }
+                    ]
+                },
+                { path: "ai.maxToolCalls", label: "Max tool calls", type: "text", placeholder: "8" },
+                { path: "ai.requestTimeout.low", label: "Timeout low (ms)", type: "text", placeholder: "60000" },
+                { path: "ai.requestTimeout.medium", label: "Timeout medium (ms)", type: "text", placeholder: "300000" },
+                { path: "ai.requestTimeout.high", label: "Timeout high (ms)", type: "text", placeholder: "900000" },
+                { path: "ai.maxRetries", label: "Max retries", type: "text", placeholder: "2" }
             ]
         },
         {

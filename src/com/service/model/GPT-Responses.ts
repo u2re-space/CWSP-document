@@ -38,29 +38,29 @@ export const DEFAULT_REQUEST_TIMEOUTS = {
 export const DEFAULT_MAX_RETRIES = 2;
 export const RETRY_DELAY = 2000; // 2 seconds
 
+const getRuntimeAiSettings = (): Record<string, any> => {
+    return ((globalThis as any).runtimeSettings as any)?.ai || {};
+};
+
+const normalizeDurationMs = (value: unknown, fallback: number): number => {
+    if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return fallback;
+    // Backward-compatible: treat small values as seconds.
+    if (value < 1000) return value * 1000;
+    return value;
+};
+
 /**
  * Get timeout configuration from settings or use defaults
  */
 function getTimeoutConfig(effort: "low" | "medium" | "high"): { timeout: number; maxRetries: number } {
-    try {
-        // Try to get settings from runtime or load them
-        const settings = ((globalThis as any).runtimeSettings as any)?.ai ||
-                        require("../../config/RuntimeSettings").getRuntimeSettings?.()?.ai ||
-                        require("../../config/Settings").loadSettings?.()?.ai;
+    const settings = getRuntimeAiSettings();
+    const timeoutSettings = settings?.requestTimeout;
+    const maxRetries = typeof settings?.maxRetries === "number"
+        ? Math.max(0, Math.floor(settings.maxRetries))
+        : DEFAULT_MAX_RETRIES;
 
-        const timeoutSettings = settings?.requestTimeout;
-        const maxRetries = settings?.maxRetries ?? DEFAULT_MAX_RETRIES;
-
-        const timeout = timeoutSettings?.[effort] ?? DEFAULT_REQUEST_TIMEOUTS[effort]; // Already in ms
-
-        return { timeout, maxRetries };
-    } catch {
-        // Fallback to defaults if settings can't be loaded
-        return {
-            timeout: DEFAULT_REQUEST_TIMEOUTS[effort],
-            maxRetries: DEFAULT_MAX_RETRIES
-        };
-    }
+    const timeout = normalizeDurationMs(timeoutSettings?.[effort], DEFAULT_REQUEST_TIMEOUTS[effort]);
+    return { timeout, maxRetries };
 }
 
 // Optimized base64 encoding with memory safety
@@ -405,16 +405,34 @@ export class GPTResponses {
             ? STRICT_JSON_INSTRUCTIONS
             : undefined;
 
+        const runtimeAi = getRuntimeAiSettings();
+        const configuredMaxTokens = typeof runtimeAi?.maxOutputTokens === "number" && Number.isFinite(runtimeAi.maxOutputTokens)
+            ? Math.max(1, Math.floor(runtimeAi.maxOutputTokens))
+            : undefined;
+
         const requestBody: any = {
             model: this.model,
             tools: Array.from(this?.tools?.values?.() || [])?.filter?.((tool: any) => !!tool),
             input: filteredInput,
             reasoning: { "effort": effort },
             text: { verbosity: verbosity },
-            max_output_tokens: options?.maxTokens || 400000,
+            max_output_tokens: options?.maxTokens || configuredMaxTokens || 400000,
             previous_response_id: (this.responseId = (prevResponseId || this?.responseId)),
             instructions: jsonInstructions
         };
+
+        if (runtimeAi?.contextTruncation === "auto" || runtimeAi?.contextTruncation === "disabled") {
+            requestBody.truncation = runtimeAi.contextTruncation;
+        }
+        if (runtimeAi?.promptCacheRetention === "in-memory" || runtimeAi?.promptCacheRetention === "24h") {
+            requestBody.prompt_cache_retention = runtimeAi.promptCacheRetention;
+        }
+        if (typeof runtimeAi?.maxToolCalls === "number" && Number.isFinite(runtimeAi.maxToolCalls)) {
+            requestBody.max_tool_calls = Math.max(1, Math.floor(runtimeAi.maxToolCalls));
+        }
+        if (typeof runtimeAi?.parallelToolCalls === "boolean") {
+            requestBody.parallel_tool_calls = runtimeAi.parallelToolCalls;
+        }
 
         // Add temperature if specified
         /*if (options?.temperature !== undefined) {

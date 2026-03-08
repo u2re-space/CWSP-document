@@ -6,7 +6,7 @@ import { createCustomInstructionsPanel } from "@rs-frontend/items/CustomInstruct
 
 //
 import type { AppSettings, FieldConfig, SectionConfig, SectionKey, MCPConfig, GridShape } from "@rs-com/config/SettingsTypes";
-import { DEFAULT_SETTINGS } from "@rs-com/config/SettingsTypes";
+import { BUILTIN_AI_MODELS, DEFAULT_SETTINGS } from "@rs-com/config/SettingsTypes";
 import { applyGridSettings, type GridLayoutSettings } from "@rs-core/storage/StateStorage";
 
 //
@@ -549,7 +549,7 @@ export const Settings = async () => {
         if (!modelSelectEl) return;
         const storedModel = settings.ai?.model ?? DEFAULT_SETTINGS.ai?.model ?? "gpt-5.2";
         const storedCustom = settings.ai?.customModel ?? DEFAULT_SETTINGS.ai?.customModel ?? "gpt-5.4";
-        if (["gpt-5.4", "gpt-5.1", "gpt-5.2", "gpt-5.3", "gpt-5.2-chat-latest", "gpt-5.3-chat-latest", "gpt-5.3-instant"].includes(storedModel)) {
+        if (BUILTIN_AI_MODELS.includes(storedModel as (typeof BUILTIN_AI_MODELS)[number])) {
             modelSelectEl.value = storedModel;
             if (customModelInput) customModelInput.value = storedCustom ?? "";
         } else if (storedModel === "custom") {

@@ -4,6 +4,8 @@ import { loadInlineStyle, preloadStyle } from "fest/dom";
 import { ViewRegistry } from "../shared/registry";
 import { showToast } from "@rs-frontend/items/Toast";
 import { withViewTransition, getTransitionDirection } from "../shared/view-transitions";
+import { loadSettings, saveSettings } from "@rs-com/config/Settings";
+import { applyTheme as applyAppTheme } from "@rs-core/utils/Theme";
 
 //
 import "fest/fl-ui";
@@ -34,6 +36,8 @@ export abstract class ShellBase implements Shell {
     protected rootElement: HTMLElement | null = null;
     protected contentContainer: HTMLElement | null = null;
     protected toolbarContainer: HTMLElement | null = null;
+    protected toolbarViewSlot: HTMLElement | null = null;
+    protected toolbarThemeSlot: HTMLElement | null = null;
     protected statusContainer: HTMLElement | null = null;
 
     // View cache
@@ -42,6 +46,7 @@ export abstract class ShellBase implements Shell {
 
     // Mounted state
     protected mounted = false;
+    protected themeSelectElement: HTMLSelectElement | null = null;
 
     // ========================================================================
     // ABSTRACT METHODS (to be implemented by concrete shells)
@@ -89,9 +94,10 @@ export abstract class ShellBase implements Shell {
         this.contentContainer = this.rootElement.querySelector("[data-shell-content]") || this.rootElement;
         this.toolbarContainer = this.rootElement.querySelector("[data-shell-toolbar]");
         this.statusContainer = this.rootElement.querySelector("[data-shell-status]");
+        this.ensureToolbarChrome();
 
         // Apply initial theme
-        this.applyTheme(this.theme.value);
+        this.applyTheme(this.getThemeRefValue());
 
         // Mount to container
         container.replaceChildren(this.rootElement);
@@ -220,8 +226,9 @@ export abstract class ShellBase implements Shell {
     }
 
     setTheme(theme: ShellTheme): void {
-        this.theme.value = theme;
+        (this.theme as any).value = theme;
         this.applyTheme(theme);
+        this.syncThemeToolbarControls();
     }
 
     getContext(): ShellContext {
@@ -231,7 +238,7 @@ export abstract class ShellBase implements Shell {
             goBack: () => this.goBack(),
             showMessage: (msg, duration) => this.showMessage(msg, duration),
             navigationState: this.navigationState,
-            theme: this.theme.value,
+            theme: this.getThemeRefValue(),
             layout: this.layout,
             getContentContainer: () => this.contentContainer!,
             getToolbarContainer: () => this.toolbarContainer,
@@ -354,6 +361,10 @@ export abstract class ShellBase implements Shell {
         }
     }
 
+    protected getThemeRefValue(): ShellTheme {
+        return (this.theme as any)?.value as ShellTheme;
+    }
+
     /**
      * Go back in navigation history
      */
@@ -396,13 +407,110 @@ export abstract class ShellBase implements Shell {
      * Set the current view's toolbar
      */
     protected setViewToolbar(toolbar: HTMLElement | null): void {
+        this.ensureToolbarChrome();
+        if (!this.toolbarViewSlot) return;
+        this.toolbarViewSlot.replaceChildren();
+        if (toolbar) this.toolbarViewSlot.appendChild(toolbar);
+    }
+
+    private ensureToolbarChrome(): void {
         if (!this.toolbarContainer) return;
+        if (this.toolbarViewSlot && this.toolbarThemeSlot) return;
 
-        // Clear existing toolbar content
         this.toolbarContainer.replaceChildren();
+        this.toolbarContainer.style.display = "flex";
+        this.toolbarContainer.style.alignItems = "center";
+        this.toolbarContainer.style.justifyContent = "space-between";
+        this.toolbarContainer.style.gap = "0.5rem";
+        this.toolbarContainer.style.flexWrap = "wrap";
 
-        if (toolbar) {
-            this.toolbarContainer.appendChild(toolbar);
+        const themeSlot = document.createElement("div");
+        themeSlot.className = "shell-theme-controls";
+        themeSlot.setAttribute("data-shell-toolbar-theme", "true");
+        themeSlot.style.display = "inline-flex";
+        themeSlot.style.alignItems = "center";
+        themeSlot.style.gap = "0.35rem";
+
+        const label = document.createElement("span");
+        label.textContent = "Theme";
+        label.style.fontSize = "0.8rem";
+        label.style.opacity = "0.8";
+
+        const select = document.createElement("select");
+        select.setAttribute("aria-label", "Theme mode");
+        select.innerHTML = `
+            <option value="auto">Auto</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+        `;
+        select.addEventListener("change", () => {
+            void this.applyThemeMode(select.value as "auto" | "light" | "dark");
+        });
+
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.textContent = "Toggle";
+        toggle.title = "Quick toggle light/dark";
+        toggle.setAttribute("aria-label", "Toggle light or dark mode");
+        toggle.addEventListener("click", () => {
+            const current = this.getThemeModeFromShellTheme();
+            const next = current === "dark" ? "light" : "dark";
+            void this.applyThemeMode(next);
+        });
+
+        themeSlot.append(/*label,*/ select/*, toggle*/);
+
+        const viewSlot = document.createElement("div");
+        viewSlot.className = "shell-view-toolbar-slot";
+        viewSlot.setAttribute("data-shell-toolbar-view", "true");
+        viewSlot.style.display = "inline-flex";
+        viewSlot.style.alignItems = "center";
+        viewSlot.style.gap = "0.5rem";
+        viewSlot.style.flex = "1 1 auto";
+        viewSlot.style.justifyContent = "flex-end";
+
+        this.toolbarContainer.append(themeSlot, viewSlot);
+        this.toolbarThemeSlot = themeSlot;
+        this.toolbarViewSlot = viewSlot;
+        this.themeSelectElement = select;
+        this.syncThemeToolbarControls();
+    }
+
+    private getThemeModeFromShellTheme(): "auto" | "light" | "dark" {
+        const theme = this.getThemeRefValue();
+        const id = (theme?.id || "").toLowerCase();
+        if (id === "dark" || theme?.colorScheme === "dark") return "dark";
+        if (id === "light" || theme?.colorScheme === "light") return "light";
+        return "auto";
+    }
+
+    private createShellTheme(mode: "auto" | "light" | "dark"): ShellTheme {
+        if (mode === "dark") return { id: "dark", name: "Dark", colorScheme: "dark" };
+        if (mode === "light") return { id: "light", name: "Light", colorScheme: "light" };
+        return { id: "auto", name: "Auto", colorScheme: "auto" };
+    }
+
+    private syncThemeToolbarControls(): void {
+        const mode = this.getThemeModeFromShellTheme();
+        if (this.themeSelectElement) this.themeSelectElement.value = mode;
+    }
+
+    private async applyThemeMode(mode: "auto" | "light" | "dark"): Promise<void> {
+        this.setTheme(this.createShellTheme(mode));
+        try {
+            const current = await loadSettings();
+            const saved = await saveSettings({
+                ...current,
+                appearance: {
+                    ...(current.appearance || {}),
+                    theme: mode
+                }
+            });
+            applyAppTheme(saved);
+            this.showMessage(`Theme: ${mode}`);
+        } catch (error) {
+            console.warn(`[${this.id}] Failed to save theme mode:`, error);
+            this.showMessage("Theme updated for current session");
         }
     }
 

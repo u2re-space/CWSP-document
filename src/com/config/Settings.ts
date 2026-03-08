@@ -196,7 +196,26 @@ export const loadSettings = async (): Promise<AppSettings> => {
                 },
                 webdav: { ...DEFAULT_SETTINGS.webdav, ...(stored as any)?.webdav },
                 timeline: { ...DEFAULT_SETTINGS.timeline, ...(stored as any)?.timeline },
-                appearance: { ...DEFAULT_SETTINGS.appearance, ...(stored as any)?.appearance },
+                appearance: {
+                    ...DEFAULT_SETTINGS.appearance,
+                    ...(stored as any)?.appearance,
+                    markdown: {
+                        ...(DEFAULT_SETTINGS.appearance?.markdown || {}),
+                        ...((stored as any)?.appearance?.markdown || {}),
+                        page: {
+                            ...(DEFAULT_SETTINGS.appearance?.markdown?.page || {}),
+                            ...((stored as any)?.appearance?.markdown?.page || {})
+                        },
+                        modules: {
+                            ...(DEFAULT_SETTINGS.appearance?.markdown?.modules || {}),
+                            ...((stored as any)?.appearance?.markdown?.modules || {})
+                        },
+                        plugins: {
+                            ...(DEFAULT_SETTINGS.appearance?.markdown?.plugins || {}),
+                            ...((stored as any)?.appearance?.markdown?.plugins || {})
+                        }
+                    }
+                },
                 speech: { ...DEFAULT_SETTINGS.speech, ...(stored as any)?.speech },
                 grid: { ...DEFAULT_SETTINGS.grid, ...(stored as any)?.grid }
             };
@@ -275,7 +294,27 @@ export const saveSettings = async (settings: AppSettings) => {
         appearance: {
             ...(DEFAULT_SETTINGS.appearance || {}),
             ...(current.appearance || {}),
-            ...(settings.appearance || {})
+            ...(settings.appearance || {}),
+            markdown: {
+                ...(DEFAULT_SETTINGS.appearance?.markdown || {}),
+                ...(current.appearance?.markdown || {}),
+                ...(settings.appearance?.markdown || {}),
+                page: {
+                    ...(DEFAULT_SETTINGS.appearance?.markdown?.page || {}),
+                    ...(current.appearance?.markdown?.page || {}),
+                    ...(settings.appearance?.markdown?.page || {})
+                },
+                modules: {
+                    ...(DEFAULT_SETTINGS.appearance?.markdown?.modules || {}),
+                    ...(current.appearance?.markdown?.modules || {}),
+                    ...(settings.appearance?.markdown?.modules || {})
+                },
+                plugins: {
+                    ...(DEFAULT_SETTINGS.appearance?.markdown?.plugins || {}),
+                    ...(current.appearance?.markdown?.plugins || {}),
+                    ...(settings.appearance?.markdown?.plugins || {})
+                }
+            }
         },
         speech: {
             ...(DEFAULT_SETTINGS.speech || {}),

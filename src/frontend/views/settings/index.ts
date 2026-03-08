@@ -194,6 +194,7 @@ export class SettingsView implements View {
 
         this.element = createSettingsView({
             isExtension: false,
+            initialTab: options?.params?.tab || options?.params?.focus,
             onTheme: (theme) => {
                 const nextTheme = theme as "auto" | "light" | "dark";
                 this.applyShellTheme(nextTheme);

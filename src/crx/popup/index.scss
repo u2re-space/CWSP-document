@@ -46,6 +46,12 @@
 
     body[data-crx-page="popup"] {
 
+        #settings-form, section {
+            inline-size: stretch;
+            max-inline-size: stretch;
+            container-type: inline-size;
+        }
+
         *,
         *::before,
         *::after {
@@ -108,10 +114,17 @@
             padding: 0;
             list-style: none;
             display: grid;
+            grid-auto-flow: row;
             grid-template-columns: [label] max-content [input] 1fr [checkbox] max-content;
+            grid-template-rows: minmax(0px, max-content);
             gap: 8px;
-            inline-size: 100%;
             align-items: center;
+            place-content: center;
+            place-items: center;
+            inline-size: stretch;
+            max-inline-size: stretch;
+            container-type: inline-size;
+            grid-column: 1 / -1;
         }
 
         .settings-grid-input {
@@ -120,6 +133,9 @@
 
         .settings-grid-full {
             grid-column: 1 / -1;
+            max-inline-size: stretch;
+            inline-size: stretch;
+            container-type: inline-size;
         }
 
         .settings-save-row {
@@ -131,14 +147,33 @@
             display: grid;
             grid-column: 1 / -1;
             grid-template-columns: subgrid;
+            grid-template-rows: minmax(0px, max-content);
+            grid-auto-flow: column dense;
             gap: 8px;
-            inline-size: 100%;
             align-items: center;
+            max-inline-size: stretch;
+            inline-size: stretch;
+            container-type: inline-size;
+
+            & > * {
+                grid-row: 1 / 1 span;
+            }
+            
+            &.settings-grid-full {
+                grid-auto-flow: row dense;
+
+                & > * {
+                    grid-row: auto;
+                    grid-column: 1 / -1;
+                }
+            }
         }
 
         // Form elements
         label {
             grid-column: label;
+            grid-column: 1 / 1 span;
+            grid-row: 1 / 1 span;
             font-size: 12px;
             font-weight: 650;
             opacity: 92%;
@@ -147,9 +182,15 @@
             text-overflow: ellipsis;
         }
 
+        .mcp-row {
+            label { grid-row: auto; }
+            & > * { grid-row: auto; }
+        }
+
         input[type="url"],
         input[type="password"],
-        input[type="text"] {
+        input[type="text"],
+        input[type="number"] {
             grid-column: input;
             inline-size: 100%;
             padding: 8px 10px;
@@ -205,7 +246,12 @@
             }
         }
 
+        #show-api-key {
+            justify-self: end;
+        }
+
         .show-api-key-toggle {
+            justify-self: end;
             --for-hide-icon: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZ2h0PSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBjbGFzcz0ibHVjaWRlIGx1Y2lkZS1leWUtaWNvbiBsdWNpZGUtZXllIj48cGF0aCBkPSJNMi4wNjIgMTIuMzQ4YTEgMSAwIDAgMSAwLS42OTYgMTAuNzUgMTAuNzUgMCAwIDEgMTkuODc2IDAgMSAxIDAgMCAxIDAgLjY5NiAxMC43NSAxMC43NSAwIDAgMS0xOS44NzYgMCIvPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjMiLz48L3N2Zz4=');
             --for-show-icon: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZ2h0PSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJsdWNpZGUgbHVjaWRlLWV5ZS1jbG9zZWQtaWNvbiBsdWNpZGUtZXllLWNsb3NlZCI+PHBhdGggZD0ibTE1IDE4LS43MjItMy4yNSIvPjxwYXRoIGQ9Ik0yIDhhMTAuNjQ1IDEwLjY0NSAwIDAgMCAyMCAwIi8+PHBhdGggZD0ibTIwIDE1LTEuNzI2LTIuMDUiLz48cGF0aCBkPSJtNCAxNSAxLjcyNi0yLjA1Ii8+PHBhdGggZD0ibTkgMTggLjcyMi0zLjI1Ii8+PC9zdmc+');
         }

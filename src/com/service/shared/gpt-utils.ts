@@ -52,6 +52,13 @@ const configureMcpTools = async (gpt: GPTResponses, mcpConfigs: unknown): Promis
 	}
 };
 
+const resolveConfiguredModel = (model?: string, customModel?: string): string => {
+	const selected = String(model || "").trim();
+	const custom = String(customModel || "").trim();
+	if (selected === "custom") return custom || DEFAULT_MODEL;
+	return selected || custom || DEFAULT_MODEL;
+};
+
 export const getGPTInstance = async (config?: AIConfig): Promise<GPTResponses | null> => {
 	const settings = await loadSettings();
 	const apiKey = config?.apiKey || settings?.ai?.apiKey;
@@ -61,7 +68,10 @@ export const getGPTInstance = async (config?: AIConfig): Promise<GPTResponses | 
 	}
 
 	const baseUrl = config?.baseUrl || settings?.ai?.baseUrl || DEFAULT_API_URL;
-	const model = config?.model || settings?.ai?.model || DEFAULT_MODEL;
+	const model = resolveConfiguredModel(
+		config?.model || settings?.ai?.model,
+		config?.customModel || settings?.ai?.customModel
+	);
 
 	const gpt = createGPTInstance(apiKey, baseUrl, model);
 	await configureMcpTools(gpt, config?.mcp ?? settings?.ai?.mcp);
