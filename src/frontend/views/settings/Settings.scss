@@ -155,14 +155,14 @@
             align-items: center;
             gap: var(--space-sm);
             padding-block-start: var(--spacing-sm, 8px);
-            justify-content: flex-start;
             inline-size: stretch;
-            flex-direction: row;
+            flex-direction: column;
             flex-wrap: nowrap;
 
             place-content: center;
             place-items: center;
-            justify-content: space-between;
+            align-items: start;
+            align-content: start;
             max-inline-size: stretch;
 
             h2 {
@@ -175,11 +175,39 @@
             }
         }
 
+        .settings-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding-block-start: var(--spacing-sm, 8px);
+            inline-size: stretch;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            padding-inline: var(--spacing-md, 16px);
+
+            place-content: center;
+            place-items: center;
+            justify-content: space-between;
+            max-inline-size: stretch;
+
+            h2 {
+                flex-grow: 1;
+                flex-shrink: 1;
+                flex-basis: fit-content;
+                margin-inline-end: var(--spacing-sm, 10px);
+                padding-inline: var(--spacing-md, 16px);
+                text-align: start;
+                padding-block: var(--spacing-md, 16px);
+            }
+        }
+
         .settings-tab-actions {
             display: flex;
             flex-wrap: nowrap;
             gap: var(--space-xs);
             align-items: center;
+            inline-size: stretch;
+            container-type: inline-size;
         }
 
         .settings-tab-btn {
@@ -252,6 +280,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            pointer-events: none;
         }
 
         .ext-note {
