@@ -20,6 +20,11 @@ export const AISection: SectionConfig = {
                     options: [
                         { value: "gpt-5.1", label: "gpt-5.1" },
                         { value: "gpt-5.2", label: "gpt-5.2" },
+                        { value: "gpt-5.3", label: "gpt-5.3" },
+                        { value: "gpt-5.2-chat-latest", label: "gpt-5.2-chat-latest" },
+                        { value: "gpt-5.3-chat-latest", label: "gpt-5.3-chat-latest" },
+                        { value: "gpt-5.3-instant", label: "gpt-5.3-instant" },
+                        { value: "gpt-5.4", label: "gpt-5.4" },
                         { value: "custom", label: "Custom..." }
                     ]
                 }
