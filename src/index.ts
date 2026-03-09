@@ -278,7 +278,7 @@ export default async function index(mountElement: HTMLElement) {
         // Initialize broadcast receivers
         initReceivers();
         handleShareTarget();
-        await initServiceWorker();
+        // SW is initialized by initPWA(); avoid dual SW managers causing update loops.
         await setupLaunchQueueConsumer();
 
         try {

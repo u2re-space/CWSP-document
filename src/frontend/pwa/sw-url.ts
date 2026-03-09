@@ -28,8 +28,9 @@ export const getServiceWorkerCandidates = (): string[] => {
     const env = (import.meta as any)?.env;
     const isDev = Boolean(env?.DEV);
 
-    // Dev: VitePWA injectManifest serves /sw.js.
-    if (isDev) return ["/sw.js"];
+    // Dev: vite-plugin-pwa injectManifest serves /dev-sw.js?dev-sw.
+    // Keep /sw.js as fallback because setups can vary.
+    if (isDev) return ["/dev-sw.js?dev-sw", "/sw.js"];
 
     // Prod: support both root and /apps/cw/ (Fastify may expose one or both).
     return ["/sw.js", "/apps/cw/sw.js"];
@@ -42,7 +43,7 @@ export const ensureServiceWorkerRegistered = async (): Promise<ServiceWorkerRegi
     // Prefer existing registration.
     try {
         const existing = await navigator.serviceWorker.getRegistration("/");
-        if (existing) return existing;
+        if (existing?.active || existing?.waiting || existing?.installing) return existing;
     } catch {
         // ignore
     }
@@ -61,8 +62,21 @@ export const ensureServiceWorkerRegistered = async (): Promise<ServiceWorkerRegi
                 updateViaCache: "none",
             });
         } catch (e) {
-            // Try next candidate.
-            console.warn("[SW] Registration attempt failed for", url, e);
+            // Do NOT retry dev worker as classic script: it is module-only.
+            if (url.includes("/dev-sw.js?dev-sw")) {
+                console.warn("[SW] Module registration failed for dev worker", url, e);
+                continue;
+            }
+            // Fallback for classic workers (legacy /sw.js setups).
+            try {
+                return await navigator.serviceWorker.register(url, {
+                    scope,
+                    updateViaCache: "none",
+                });
+            } catch (e2) {
+                // Try next candidate.
+                console.warn("[SW] Registration attempt failed for", url, e, e2);
+            }
         }
     }
 

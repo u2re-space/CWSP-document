@@ -248,6 +248,8 @@ const extractRequestIdentity = (req: FastifyRequest): {
     sourceHint: string;
     token: string;
     forwarded: string;
+    protocol: string;
+    sourceHeaderHint: string;
 } => {
     const body = ((req as any).body || {}) as Record<string, any>;
     const headers = (req.headers || {}) as Record<string, any>;

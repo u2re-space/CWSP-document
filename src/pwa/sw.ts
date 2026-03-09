@@ -18,7 +18,7 @@ import {
 } from './lib/ShareTargetUtils';
 import { BROADCAST_CHANNELS, MESSAGE_TYPES, STORAGE_KEYS, ROUTE_HASHES, COMPONENTS } from '@rs-com/config/Names';
 import { summarizeForLog } from '@rs-com/core/LogSanitizer';
-import { isUserScopePath, toUserRelativePath } from "fest/core";
+import * as FestCore from "fest/core";
 
 // ============================================================================
 // SERVICE WORKER CONTENT ASSOCIATION SYSTEM
@@ -444,8 +444,60 @@ const safeCachesMatch = async (requestLike: RequestInfo | URL | null | undefined
     }
 };
 
+const safeIsUserScopePath = (pathname: string): boolean => {
+    try {
+        const fn = (FestCore as any)?.isUserScopePath;
+        if (typeof fn === "function") return fn(pathname);
+    } catch {}
+    return pathname === "/user" || pathname.startsWith("/user/");
+};
+
+const safeToUserRelativePath = (pathname: string): string => {
+    try {
+        const fn = (FestCore as any)?.toUserRelativePath;
+        if (typeof fn === "function") return fn(pathname);
+    } catch {}
+    const normalized = String(pathname || "").trim().replace(/\/+/g, "/");
+    if (normalized === "/user") return "";
+    if (normalized.startsWith("/user/")) return normalized.slice("/user/".length);
+    return normalized.replace(/^\/+/, "");
+};
+
 const toUserOpfsPath = (pathname: string): string => {
-    return toUserRelativePath(pathname);
+    try {
+        return decodeURIComponent(safeToUserRelativePath(pathname));
+    } catch {
+        return safeToUserRelativePath(pathname);
+    }
+};
+
+const USER_OPFS_RESPONSE_HEADERS = {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+    "Pragma": "no-cache",
+    "Expires": "0",
+    "X-Source": "opfs-user"
+};
+
+const isOpfsNotFoundError = (error: any): boolean => {
+    return error?.name === "NotFoundError" || /not found/i.test(String(error?.message || ""));
+};
+
+const jsonUserOpfsResponse = (payload: any, status = 200): Response => {
+    return new Response(JSON.stringify(payload), {
+        status,
+        headers: USER_OPFS_RESPONSE_HEADERS
+    });
+};
+
+const userOpfsNotFoundResponse = (pathname: string, method = "GET"): Response => {
+    return jsonUserOpfsResponse({
+        ok: false,
+        error: "OPFS_NOT_FOUND",
+        status: 404,
+        method,
+        path: pathname
+    }, 404);
 };
 
 const readUserOpfsFile = async (pathname: string): Promise<File | null> => {
@@ -484,6 +536,47 @@ const listUserOpfsEntries = async (pathname: string): Promise<Array<{ name: stri
     } catch {
         return [];
     }
+};
+
+const writeUserOpfsFile = async (pathname: string, request: Request): Promise<{ path: string; size: number; type: string; }> => {
+    const relPath = toUserOpfsPath(pathname);
+    const parts = relPath.split("/").filter(Boolean);
+    const explicitName = new URL(request.url).searchParams.get("name")?.trim()
+        || request.headers.get("X-File-Name")?.trim()
+        || request.headers.get("X-Filename")?.trim();
+
+    const isDirectoryTarget = pathname.endsWith("/") || !parts.length;
+    const fileName = isDirectoryTarget ? explicitName : parts.pop();
+    if (!fileName) throw new Error("Missing filename. Provide it in path or ?name=.");
+
+    let dir = await navigator.storage.getDirectory();
+    for (const part of parts) {
+        dir = await dir.getDirectoryHandle(part, { create: true });
+    }
+
+    const blob = await request.blob();
+    const handle = await dir.getFileHandle(fileName, { create: true });
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return {
+        path: `${pathname.replace(/\/+$/, "")}/${fileName}`.replace(/\/+/g, "/"),
+        size: blob.size,
+        type: blob.type || "application/octet-stream"
+    };
+};
+
+const deleteUserOpfsEntry = async (pathname: string, recursive = true): Promise<void> => {
+    const relPath = toUserOpfsPath(pathname).replace(/\/+$/g, "");
+    const parts = relPath.split("/").filter(Boolean);
+    if (!parts.length) throw new Error("Refusing to delete /user root.");
+    const entryName = parts.pop() as string;
+
+    let dir = await navigator.storage.getDirectory();
+    for (const part of parts) {
+        dir = await dir.getDirectoryHandle(part, { create: false });
+    }
+    await dir.removeEntry(entryName, { recursive });
 };
 
 async function getStoredCacheKeys(): Promise<CacheKeyEntry[]> {
@@ -1108,6 +1201,7 @@ registerRoute(
 registerRoute(
     ({ url }) => {
         const host = url?.hostname || '';
+        const pathname = url?.pathname || '';
         const isPrivateIp = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) && (
             host.startsWith('10.') ||
             host.startsWith('192.168.') ||
@@ -1115,9 +1209,14 @@ registerRoute(
             host.startsWith('127.')
         );
         const isLocalHost = host === 'localhost' || host.endsWith('.local');
-        const isSocketIoPath = (url?.pathname || '').startsWith('/socket.io/');
+        const isSocketIoPath = pathname.startsWith('/socket.io/');
+        const isControlPath =
+            pathname.startsWith('/api/') ||
+            pathname === '/lna-probe' ||
+            isSocketIoPath;
 
-        return isSocketIoPath || isPrivateIp || isLocalHost;
+        // Avoid swallowing app/view and /user/* requests on private-host deployments.
+        return isControlPath && (isPrivateIp || isLocalHost);
     },
     new NetworkOnly({
         fetchOptions: {
@@ -1147,11 +1246,13 @@ setDefaultHandler(new StaleWhileRevalidate({
 
 // Assets (JS/CSS)
 registerRoute(
-    ({ request }) => (
-        request?.destination === 'script' ||
-        request?.destination === 'style' ||
-        request?.destination === 'worker' ||
-        request?.url?.trim?.().toLowerCase?.()?.match?.(/(\.m?js|\.css)$/)
+    ({ url, request }) => (
+        !safeIsUserScopePath(url?.pathname || "") && (
+            request?.destination === 'script' ||
+            request?.destination === 'style' ||
+            request?.destination === 'worker' ||
+            request?.url?.trim?.().toLowerCase?.()?.match?.(/(\.m?js|\.css)$/)
+        )
     ),
     new NetworkFirst({
         cacheName: 'assets-cache',
@@ -1171,7 +1272,13 @@ registerRoute(
 
 // Images
 registerRoute(
-    ({ request }) => (request?.destination === 'image' || request?.url?.trim?.().toLowerCase?.()?.match?.(/(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.svg)$/i)),
+    ({ url, request }) => (
+        !safeIsUserScopePath(url?.pathname || "") &&
+        (
+            request?.destination === 'image' ||
+            request?.url?.trim?.().toLowerCase?.()?.match?.(/(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.svg)$/i)
+        )
+    ),
     new StaleWhileRevalidate({
         cacheName: 'image-cache',
         fetchOptions: {
@@ -1392,40 +1499,91 @@ registerRoute(
     }
 );
 
-// Serve /user/* from OPFS in service worker context.
-registerRoute(
-    ({ url, request }) => isUserScopedPath(url?.pathname || "") && request?.method === 'GET',
-    async ({ url }) => {
-        const pathname = url?.pathname || "";
+// Serve /user/* from OPFS in service worker context (GET/POST/PUT/DELETE).
+const isUserOpfsRoute = ({ url }: any): boolean => safeIsUserScopePath(url?.pathname || "");
+
+const handleUserOpfsGet = async ({ url }: any): Promise<Response> => {
+    const pathname = url?.pathname || "";
+    try {
         if (pathname.endsWith("/") || pathname === "/user") {
             const entries = await listUserOpfsEntries(pathname);
-            return new Response(JSON.stringify({ path: pathname, entries }), {
-                headers: {
-                    "Content-Type": "application/json",
-                    "Cache-Control": "no-store"
-                }
-            });
+            return jsonUserOpfsResponse({ ok: true, method: "GET", path: pathname, entries });
         }
 
         const file = await readUserOpfsFile(pathname);
-        if (!file) {
-            return new Response(JSON.stringify({ error: "Not found", path: pathname }), {
-                status: 404,
-                headers: { "Content-Type": "application/json" }
-            });
-        }
+        if (!file) return userOpfsNotFoundResponse(pathname, "GET");
 
         return new Response(file, {
             headers: {
                 "Content-Type": file.type || "application/octet-stream",
                 "Content-Length": String(file.size),
                 "X-Source": "opfs-user",
-                "Cache-Control": "no-store"
+                "Cache-Control": "no-store",
+                "Pragma": "no-cache",
+                "Expires": "0"
             }
         });
-    },
-    "GET"
-);
+    } catch (error: any) {
+        if (isOpfsNotFoundError(error)) return userOpfsNotFoundResponse(pathname, "GET");
+        return jsonUserOpfsResponse({
+            ok: false,
+            error: "OPFS_GET_FAILED",
+            status: 500,
+            method: "GET",
+            path: pathname,
+            message: String(error?.message || error)
+        }, 500);
+    }
+};
+
+const handleUserOpfsWrite = async ({ url, request }: any, method: "POST" | "PUT"): Promise<Response> => {
+    const pathname = url?.pathname || "";
+    try {
+        const saved = await writeUserOpfsFile(pathname, request);
+        return jsonUserOpfsResponse({
+            ok: true,
+            method,
+            path: pathname,
+            saved
+        }, method === "POST" ? 201 : 200);
+    } catch (error: any) {
+        const status = /missing filename/i.test(String(error?.message || "")) ? 400 : 500;
+        return jsonUserOpfsResponse({
+            ok: false,
+            error: status === 400 ? "OPFS_BAD_REQUEST" : "OPFS_WRITE_FAILED",
+            status,
+            method,
+            path: pathname,
+            message: String(error?.message || error)
+        }, status);
+    }
+};
+
+const handleUserOpfsDelete = async ({ url, request }: any): Promise<Response> => {
+    const pathname = url?.pathname || "";
+    try {
+        const recursive = new URL(request.url).searchParams.get("recursive") !== "false";
+        await deleteUserOpfsEntry(pathname, recursive);
+        return jsonUserOpfsResponse({ ok: true, method: "DELETE", path: pathname, deleted: true });
+    } catch (error: any) {
+        if (isOpfsNotFoundError(error)) return userOpfsNotFoundResponse(pathname, "DELETE");
+        const status = /refusing to delete \/user root/i.test(String(error?.message || "")) ? 400 : 500;
+        return jsonUserOpfsResponse({
+            ok: false,
+            error: status === 400 ? "OPFS_BAD_REQUEST" : "OPFS_DELETE_FAILED",
+            status,
+            method: "DELETE",
+            path: pathname,
+            message: String(error?.message || error)
+        }, status);
+    }
+};
+
+registerRoute(isUserOpfsRoute, handleUserOpfsGet, "GET");
+registerRoute(isUserOpfsRoute, (args: any) => handleUserOpfsWrite(args, "POST"), "POST");
+registerRoute(isUserOpfsRoute, (args: any) => handleUserOpfsWrite(args, "PUT"), "PUT");
+registerRoute(isUserOpfsRoute, (args: any) => handleUserOpfsWrite(args, "PUT"), "PATCH");
+registerRoute(isUserOpfsRoute, handleUserOpfsDelete, "DELETE");
 
 // Phosphor Icons Proxy (for PWA offline support)
 const PHOSPHOR_ICON_STYLES = new Set(['thin', 'light', 'regular', 'bold', 'fill', 'duotone']);
@@ -1543,17 +1701,92 @@ registerRoute(
     }
 );
 
-// fallback to app-shell for document request
-setCatchHandler(({ event }: any): Promise<Response> => {
-    switch (event?.request?.destination) {
-        case 'document':
-            return safeCachesMatch("/")?.then?.((r: any) => {
-                return r ? Promise.resolve(r) : Promise.resolve(Response.error());
-            })
-        default:
-            return Promise.resolve(Response.error());
+const OFFLINE_DOC_CANDIDATES = ["/", "/index.html", "/viewer", "/workcenter", "/explorer", "/settings"];
+const OFFLINE_WARMUP_PATHS = ["/", "/viewer", "/workcenter", "/explorer", "/settings"];
+
+const createOfflineDocumentResponse = (pathname = "/"): Response => {
+    const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Offline</title>
+  <style>
+    body { margin: 0; font: 14px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; background: #0f1115; color: #d8deea; display: grid; min-height: 100vh; place-items: center; }
+    .box { max-width: 640px; padding: 20px; border: 1px solid #2a3040; border-radius: 10px; background: #141925; }
+    code { color: #b7d4ff; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h3>Offline fallback</h3>
+    <p>Service worker is active, but this route is not available in cache.</p>
+    <p>Path: <code>${pathname}</code></p>
+    <p>Reconnect once to warm cache for this view.</p>
+  </div>
+</body>
+</html>`;
+    return new Response(html, {
+        status: 200,
+        headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-Source": "sw-offline-fallback"
+        }
+    });
+};
+
+const resolveOfflineNavigationResponse = async (pathname = "/"): Promise<Response> => {
+    for (const candidate of OFFLINE_DOC_CANDIDATES) {
+        const hit = await safeCachesMatch(candidate);
+        if (hit) return hit;
     }
-})
+    return createOfflineDocumentResponse(pathname);
+};
+
+const warmupOfflineNavigationCache = async (reason: "install" | "activate"): Promise<void> => {
+    try {
+        const cache = await caches.open("default-cache");
+        for (const path of OFFLINE_WARMUP_PATHS) {
+            try {
+                const request = new Request(new URL(path, self.location.origin).toString(), {
+                    method: "GET",
+                    credentials: "same-origin",
+                    cache: "no-store"
+                });
+                const response = await fetch(request);
+                if (!response?.ok) {
+                    console.warn(`[SW] Warmup skipped (non-ok): ${path} status=${response?.status}`);
+                    continue;
+                }
+                await cache.put(request, response.clone());
+            } catch (entryError) {
+                console.warn(`[SW] Warmup failed for ${path}:`, entryError);
+            }
+        }
+        console.log(`[SW] Offline navigation warmup completed (${reason})`);
+    } catch (error) {
+        console.warn(`[SW] Offline navigation warmup failed (${reason}):`, error);
+    }
+};
+
+// fallback to app-shell for document requests
+setCatchHandler(({ event }: any): Promise<Response> => {
+    if (event?.request?.destination === 'document') {
+        const pathname = (() => {
+            try { return new URL(event?.request?.url || "").pathname || "/"; } catch { return "/"; }
+        })();
+        if (safeIsUserScopePath(pathname)) {
+            const url = (() => {
+                try { return new URL(event?.request?.url || ""); } catch { return new URL(self.location.origin); }
+            })();
+            return handleUserOpfsGet({ url, request: event?.request, event })
+                .catch(() => userOpfsNotFoundResponse(pathname, "GET"));
+        }
+        return resolveOfflineNavigationResponse(pathname);
+    }
+    return Promise.resolve(Response.error());
+});
 
 // Notifications
 self.addEventListener?.('notificationclick', (event: any) => {
@@ -1582,7 +1815,10 @@ self.addEventListener?.('notificationclick', (event: any) => {
 // Handle service worker lifecycle events
 self.addEventListener?.('install', (e: any) => {
     console.log('[SW] Installing new service worker...');
-    e?.waitUntil?.((self as any)?.skipWaiting?.());
+    e?.waitUntil?.(Promise.all([
+        (self as any)?.skipWaiting?.(),
+        warmupOfflineNavigationCache("install")
+    ]));
 });
 
 self.addEventListener?.('activate', (e: any) => {
@@ -1592,6 +1828,7 @@ self.addEventListener?.('activate', (e: any) => {
             (self as any).clients?.claim?.(),
             // Enable Navigation Preload if supported
             (self as any).registration?.navigationPreload?.enable?.() ?? Promise.resolve(),
+            warmupOfflineNavigationCache("activate"),
             // Notify clients about activation
             notifyClients('sw-activated')
         ]) ?? Promise.resolve()
@@ -1696,7 +1933,53 @@ registerRoute(
 // Fallback: Manual fetch event handler for share target (in case workbox routing fails)
 self.addEventListener?.('fetch', (event: any) => {
     const request = event?.request ?? event?.event?.request ?? event;
-    const requestUrl = new URL(request?.url || '');
+    if (!request?.url) return;
+    const requestUrl = new URL(request.url);
+
+    // Hard fallback for /user/* so requests never escape to backend
+    // when Workbox routing order/matching is affected.
+    if (safeIsUserScopePath(requestUrl.pathname)) {
+        const method = String(request.method || "GET").toUpperCase();
+        if (method === "GET") {
+            event?.respondWith?.(handleUserOpfsGet({ url: requestUrl, request, event }));
+            return;
+        }
+        if (method === "POST") {
+            event?.respondWith?.(handleUserOpfsWrite({ url: requestUrl, request, event }, "POST"));
+            return;
+        }
+        if (method === "PUT" || method === "PATCH") {
+            event?.respondWith?.(handleUserOpfsWrite({ url: requestUrl, request, event }, "PUT"));
+            return;
+        }
+        if (method === "DELETE") {
+            event?.respondWith?.(handleUserOpfsDelete({ url: requestUrl, request, event }));
+            return;
+        }
+        if (method === "OPTIONS") {
+            event?.respondWith?.(new Response(null, {
+                status: 204,
+                headers: {
+                    "Cache-Control": "no-store",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, X-File-Name, X-Filename",
+                    "X-Source": "opfs-user"
+                }
+            }));
+            return;
+        }
+        event?.respondWith?.(jsonUserOpfsResponse({
+            ok: false,
+            error: "OPFS_METHOD_NOT_ALLOWED",
+            status: 405,
+            method,
+            path: requestUrl.pathname
+        }, 405));
+        return;
+    }
+
     if (isShareTargetUrl(requestUrl.pathname) && request?.method === 'POST') {
         console.log('[ShareTarget] Manual fetch handler triggered');
         event?.respondWith?.(handleShareTargetRequest(request));
@@ -2060,7 +2343,7 @@ registerRoute(
 registerRoute(
     ({ url }) => {
         const pathname = url?.pathname;
-        return pathname && (
+        return pathname && !safeIsUserScopePath(pathname) && (
             pathname.endsWith('.js') ||
             pathname.endsWith('.css') ||
             pathname.endsWith('.svg') ||
@@ -2073,7 +2356,7 @@ registerRoute(
 
 // Use preload response for navigation when available
 registerRoute(
-    ({ request }) => request.mode === 'navigate',
+    ({ url, request }) => request.mode === 'navigate' && !safeIsUserScopePath(url?.pathname || ""),
     async ({ event, request }: any) => {
         try {
             const preloadPromise = event?.preloadResponse
@@ -2094,9 +2377,17 @@ registerRoute(
             return networkResponse;
         } catch (error) {
             console.warn('[SW] Navigation fetch failed:', error);
-            // Fall back to cache
-            const cached = await safeCachesMatch('/');
-            return cached || Response.error();
+            const pathname = (() => {
+                try { return new URL(request?.url || "").pathname || "/"; } catch { return "/"; }
+            })();
+            if (safeIsUserScopePath(pathname)) {
+                const url = (() => {
+                    try { return new URL(request?.url || ""); } catch { return new URL(self.location.origin); }
+                })();
+                return await handleUserOpfsGet({ url, request, event })
+                    .catch(() => userOpfsNotFoundResponse(pathname, "GET"));
+            }
+            return await resolveOfflineNavigationResponse(pathname);
         }
     }
 );

@@ -77,6 +77,7 @@ let _swRegistration: ServiceWorkerRegistration | null = null;
 let _swInitPromise: Promise<ServiceWorkerRegistration | null> | null = null;
 let _swControllerReloadBound = false;
 let _swReloadPending = false;
+let _swUpdateInterval: number | null = null;
 let _swOptions: { immediate?: boolean, onRegistered?: () => void, onRegisterError?: (error: any) => void } = {
     immediate: false,
     onRegistered: () => {
@@ -93,8 +94,12 @@ const bindControllerChangeReload = () => {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (_swReloadPending) return;
         _swReloadPending = true;
-        console.log('[PWA] Service worker controller changed, reloading app');
-        globalThis.location.reload();
+        console.log('[PWA] Service worker controller changed');
+        globalThis?.dispatchEvent?.(new CustomEvent('sw-controller-changed'));
+        // Reload only when explicitly requested by caller.
+        if (_swOptions?.immediate === true) {
+            globalThis.location.reload();
+        }
     });
 };
 
@@ -111,6 +116,8 @@ const activateWaitingWorker = (registration: ServiceWorkerRegistration, reason: 
  * This ensures share target and other PWA features work correctly
  */
 export const initServiceWorker = async (_options: { immediate?: boolean, onRegistered?: () => void, onRegisterError?: (error: any) => void } = _swOptions): Promise<ServiceWorkerRegistration | null> => {
+    _swOptions = { ..._swOptions, ...(_options || {}) };
+
     // Return cached promise if already initializing
     if (_swInitPromise) return _swInitPromise;
 
@@ -137,7 +144,7 @@ export const initServiceWorker = async (_options: { immediate?: boolean, onRegis
             // In dev, aggressively activate updated SW to avoid stale Workbox routes breaking Vite module fetches.
             // This prevents "Failed to fetch dynamically imported module: /src/..." when an old SW is still controlling the page.
             try {
-                if (registration.waiting) {
+                if (_swOptions?.immediate === true && registration.waiting) {
                     activateWaitingWorker(registration, 'initial');
                 }
             } catch (e) {
@@ -153,7 +160,7 @@ export const initServiceWorker = async (_options: { immediate?: boolean, onRegis
                             console.log('[PWA] New service worker available');
                             showToast({ message: 'App update available', kind: 'info' });
                             try {
-                                if (!activateWaitingWorker(registration, 'updatefound') && viteEnv?.DEV) {
+                                if (_swOptions?.immediate === true && !activateWaitingWorker(registration, 'updatefound') && viteEnv?.DEV) {
                                     // In dev, try one more time after a micro-delay while waiting worker settles.
                                     globalThis.setTimeout(() => {
                                         try {
@@ -172,9 +179,13 @@ export const initServiceWorker = async (_options: { immediate?: boolean, onRegis
             });
 
             // Check for updates periodically (every 30 minutes)
-            setInterval(() => {
+            if (_swUpdateInterval) {
+                globalThis?.clearInterval?.(_swUpdateInterval);
+                _swUpdateInterval = null;
+            }
+            _swUpdateInterval = globalThis?.setInterval?.(() => {
                 registration?.update?.().catch?.(console.warn);
-            }, 30 * 60 * 1000);
+            }, 30 * 60 * 1000) as unknown as number | null;
 
             console.log('[PWA] Service worker registered successfully');
             return registration;

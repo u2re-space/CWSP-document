@@ -4,6 +4,25 @@
 
 import { ensureServiceWorkerRegistered } from "./sw-url";
 
+const IS_DEV = Boolean((import.meta as any)?.env?.DEV);
+const AUTO_RELOAD_COOLDOWN_MS = 2 * 60 * 1000;
+const RELOAD_GUARD_KEY = "cw:pwa:last-auto-reload-at";
+
+const shouldSkipAutoReloadNow = (): boolean => {
+    if (IS_DEV) return true;
+    try {
+        const now = Date.now();
+        const last = Number(globalThis?.sessionStorage?.getItem?.(RELOAD_GUARD_KEY) || "0");
+        if (Number.isFinite(last) && now - last < AUTO_RELOAD_COOLDOWN_MS) {
+            return true;
+        }
+        globalThis?.sessionStorage?.setItem?.(RELOAD_GUARD_KEY, String(now));
+    } catch {
+        // ignore storage errors and continue
+    }
+    return false;
+};
+
 // Utility function to check if running as Chrome extension
 const isExtension = () => {
     try {
@@ -92,12 +111,13 @@ class AssetUpdateManager {
         if (this.isChecking) return [];
         this.isChecking = true;
 
-        const criticalAssets = [
-            './choice.js',
-            './sw.js',
-            './favicon.svg',
-            './favicon.png'
-        ];
+        const criticalAssets = IS_DEV
+            ? [] // Dev server + injectManifest can cause noisy update signals.
+            : [
+                './choice.js',
+                './favicon.svg',
+                './favicon.png'
+            ];
 
         const updatedAssets: string[] = [];
 
@@ -212,6 +232,23 @@ class ServiceWorkerUpdateManager {
     private registration: ServiceWorkerRegistration | null = null;
     private updateToast: HTMLElement | null = null;
 
+    private async waitForController(timeoutMs = 4000): Promise<boolean> {
+        if (navigator.serviceWorker.controller) return true;
+        return await new Promise<boolean>((resolve) => {
+            let done = false;
+            const finish = (value: boolean) => {
+                if (done) return;
+                done = true;
+                try { navigator.serviceWorker.removeEventListener('controllerchange', onChange); } catch {}
+                clearTimeout(timer);
+                resolve(value);
+            };
+            const onChange = () => finish(Boolean(navigator.serviceWorker.controller));
+            const timer = setTimeout(() => finish(Boolean(navigator.serviceWorker.controller)), timeoutMs);
+            navigator.serviceWorker.addEventListener('controllerchange', onChange, { once: true });
+        });
+    }
+
     async register(): Promise<ServiceWorkerRegistration | null> {
         if (!('serviceWorker' in navigator) || isExtension()) {
             return null;
@@ -219,6 +256,12 @@ class ServiceWorkerUpdateManager {
 
         try {
             this.registration = await ensureServiceWorkerRegistered();
+            if (!this.registration) {
+                console.warn('[SW] Service worker registration skipped: no valid script candidate');
+                return null;
+            }
+            await navigator.serviceWorker.ready.catch(() => undefined);
+            await this.waitForController().catch(() => false);
             console.log('[SW] Service worker registered successfully');
 
             this.setupUpdateListeners();
@@ -439,12 +482,16 @@ export const initPWA = async () => {
             console.log('[PWA] Assets updated:', updatedAssets);
 
             // Force reload if critical assets were updated
-            const criticalAssets = ['choice.js', 'sw.js'];
+            const criticalAssets = ['choice.js'];
             const criticalUpdated = updatedAssets.some((asset: string) =>
                 criticalAssets.some(critical => asset.includes(critical))
             );
 
             if (criticalUpdated) {
+                if (shouldSkipAutoReloadNow()) {
+                    console.log('[PWA] Auto reload suppressed (dev or cooldown)');
+                    return;
+                }
                 console.log('[PWA] Critical assets updated, reloading...');
                 showReloadNotification();
             }
