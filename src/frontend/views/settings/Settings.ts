@@ -260,6 +260,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
       <label class="field">
         <span>Default reasoning effort</span>
         <select class="form-select" data-field="ai.defaultReasoningEffort">
+            <option value="none">None</option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
             <option value="high">High</option>
@@ -609,7 +610,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         .then((s) => {
             if (apiUrl) apiUrl.value = (s?.ai?.baseUrl || "").trim();
             if (apiKey) apiKey.value = (s?.ai?.apiKey || "").trim();
-            const savedModel = (s?.ai?.model || "gpt-5.2").trim();
+            const savedModel = (s?.ai?.model || "gpt-5.4").trim();
             const savedCustomModel = (s?.ai?.customModel || "").trim();
             if (model) {
                 const hasBuiltin = BUILTIN_AI_MODELS.includes(savedModel as (typeof BUILTIN_AI_MODELS)[number]);
@@ -617,7 +618,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                     model.value = "custom";
                     if (customModel) customModel.value = savedCustomModel || savedModel;
                 } else {
-                    model.value = hasBuiltin ? savedModel : "gpt-5.2";
+                    model.value = hasBuiltin ? savedModel : "gpt-5.4";
                     if (customModel) customModel.value = savedCustomModel;
                 }
                 syncCustomModelVisibility();
@@ -750,7 +751,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                 ai: {
                     baseUrl: apiUrl?.value?.trim?.() || "",
                     apiKey: apiKey?.value?.trim?.() || "",
-                    model: (model?.value || "gpt-5.2") as any,
+                    model: (model?.value || "gpt-5.4") as any,
                     customModel: model?.value === "custom" ? (customModel?.value?.trim?.() || "") : "",
                     defaultReasoningEffort: (defaultReasoningEffort?.value as any) || "medium",
                     defaultVerbosity: (defaultVerbosity?.value as any) || "medium",

@@ -52,7 +52,7 @@ const normalizeDurationMs = (value: unknown, fallback: number): number => {
 /**
  * Get timeout configuration from settings or use defaults
  */
-function getTimeoutConfig(effort: "low" | "medium" | "high"): { timeout: number; maxRetries: number } {
+function getTimeoutConfig(effort: "none" | "low" | "medium" | "high"): { timeout: number; maxRetries: number } {
     const settings = getRuntimeAiSettings();
     const timeoutSettings = settings?.requestTimeout;
     const maxRetries = typeof settings?.maxRetries === "number"
@@ -94,7 +94,7 @@ export const toBase64 = (bytes: Uint8Array): string => {
 
 //
 export type RequestOptions = {
-    effort?: "low" | "medium" | "high";
+    effort?: "none" | "low" | "medium" | "high";
     verbosity?: "low" | "medium" | "high";
     temperature?: number;
     maxTokens?: number;
@@ -233,7 +233,7 @@ export class GPTResponses {
     private apiKey: string;
     private apiSecret: string;
     private apiUrl: string = "https://api.proxyapi.ru/openai/v1";
-    private model: string = "gpt-5.2";
+    private model: string = "gpt-5.4";
     private responseId?: string | null = null;
 
     protected pending: any[] = [];
@@ -376,7 +376,7 @@ export class GPTResponses {
 
     //
     async sendRequest(
-        effort: "low" | "medium" | "high" = "low",
+        effort: "none" | "low" | "medium" | "high" = "low",
         verbosity: "low" | "medium" | "high" = "low",
         prevResponseId: string | null = null,
         options: RequestOptions = {}
@@ -956,7 +956,7 @@ export const createGPTInstance = (
         apiKey,
         apiUrl || "https://api.proxyapi.ru/openai/v1",
         "",
-        model || "gpt-5.2"
+        model || "gpt-5.4"
     );
 }
 

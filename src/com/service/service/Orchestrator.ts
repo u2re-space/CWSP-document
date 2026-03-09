@@ -45,7 +45,7 @@ export type OrchestratorConfig = {
     baseUrl?: string;
     model?: string;
 	mcp?: MCPConfig[];
-    defaultEffort?: "low" | "medium" | "high";
+    defaultEffort?: "none" | "low" | "medium" | "high";
     defaultVerbosity?: "low" | "medium" | "high";
     cacheEnabled?: boolean;
     maxRetries?: number;

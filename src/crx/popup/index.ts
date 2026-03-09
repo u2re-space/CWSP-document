@@ -47,7 +47,7 @@ type PopupSettings = {
         baseUrl?: string;
         model?: string;
         customModel?: string;
-        defaultReasoningEffort?: "low" | "medium" | "high";
+        defaultReasoningEffort?: "none" | "low" | "medium" | "high";
         defaultVerbosity?: "low" | "medium" | "high";
         maxOutputTokens?: number;
         contextTruncation?: "disabled" | "auto";
@@ -495,7 +495,7 @@ const initSettingsUI = () => {
     loadSettings().then((s) => {
         if (apiUrl) apiUrl.value = (s.ai?.baseUrl || "").trim();
         if (apiKey) apiKey.value = (s.ai?.apiKey || "").trim();
-        const storedModel = (s.ai?.model || "gpt-5.2").trim();
+        const storedModel = (s.ai?.model || "gpt-5.4").trim();
         if (modelSel) {
             const hasOption = Array.from(modelSel.options).some((opt) => opt.value === storedModel);
             if (storedModel === "custom") {
@@ -609,7 +609,7 @@ const initSettingsUI = () => {
             ai: {
                 apiKey: apiKey?.value?.trim() || "",
                 baseUrl: apiUrl?.value?.trim() || "",
-                model: modelSel?.value?.trim?.() || "gpt-5.2",
+                model: modelSel?.value?.trim?.() || "gpt-5.4",
                 customModel: (modelSel?.value || "") === "custom" ? (customModelInput?.value?.trim?.() || "") : "",
                 defaultReasoningEffort: (defaultReasoningEffort?.value as any) || "medium",
                 defaultVerbosity: (defaultVerbosity?.value as any) || "medium",

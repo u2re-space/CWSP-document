@@ -70,7 +70,7 @@ export type CustomInstruction = {
 
 export type ResponseLanguage = "en" | "ru" | "auto" | "follow";
 export type SpeechRecognitionLanguage = "ru" | "en" | "en-GB" | "en-US";
-export type ReasoningEffort = "low" | "medium" | "high";
+export type ReasoningEffort = "none" | "low" | "medium" | "high";
 export type ResponseVerbosity = "low" | "medium" | "high";
 export type ContextTruncation = "disabled" | "auto";
 export type PromptCacheRetention = "in-memory" | "24h";
@@ -106,6 +106,7 @@ export const BUILTIN_AI_MODELS = [
     "gpt-5.4",
     "gpt-5.2-chat-latest",
     "gpt-5.3-chat-latest",
+    "gpt-5.4-chat-latest",
     "gpt-5.3-instant"
 ] as const;
 

@@ -547,7 +547,7 @@ export const Settings = async () => {
 
     const applyModelSelection = (settings: AppSettings) => {
         if (!modelSelectEl) return;
-        const storedModel = settings.ai?.model ?? DEFAULT_SETTINGS.ai?.model ?? "gpt-5.2";
+        const storedModel = settings.ai?.model ?? DEFAULT_SETTINGS.ai?.model ?? "gpt-5.4";
         const storedCustom = settings.ai?.customModel ?? DEFAULT_SETTINGS.ai?.customModel ?? "gpt-5.4";
         if (BUILTIN_AI_MODELS.includes(storedModel as (typeof BUILTIN_AI_MODELS)[number])) {
             modelSelectEl.value = storedModel;

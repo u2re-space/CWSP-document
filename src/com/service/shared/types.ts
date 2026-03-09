@@ -55,7 +55,7 @@ export type RecognizeResult = {
 };
 
 export type ExtendedRecognizeOptions = {
-	effort?: "low" | "medium" | "high";
+	effort?: "none" | "low" | "medium" | "high";
 	verbosity?: "low" | "medium" | "high";
 	context?: DataContext;
 	extractEntities?: boolean;
@@ -67,7 +67,7 @@ export type ExtendedRecognizeOptions = {
 export type RecognizeByInstructionsOptions = {
 	customInstruction?: string;
 	useActiveInstruction?: boolean;
-	recognitionEffort?: "low" | "medium" | "high";
+	recognitionEffort?: "none" | "low" | "medium" | "high";
 	recognitionVerbosity?: "low" | "medium" | "high";
 };
 
@@ -109,14 +109,14 @@ export type ProcessDataWithInstructionOptions = {
 		cacheResults?: boolean;
 		forceRefresh?: boolean;
 	};
-	processingEffort?: "low" | "medium" | "high";
+	processingEffort?: "none" | "low" | "medium" | "high";
 	processingVerbosity?: "low" | "medium" | "high";
 	customInstruction?: string;
 	useActiveInstruction?: boolean;
 	includeImageRecognition?: boolean;
 	maxProcessingStages?: number;
 	dataType?: "auto" | "text" | "markdown" | "image" | "svg" | "json" | "xml" | "code";
-	recognitionEffort?: "low" | "medium" | "high";
+	recognitionEffort?: "none" | "low" | "medium" | "high";
 	recognitionVerbosity?: "low" | "medium" | "high";
 };
 
