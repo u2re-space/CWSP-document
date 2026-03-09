@@ -1,8 +1,0 @@
-{
-    "version": 2,
-    "core": {
-        "endpointIDs": "fs:./clients.json",
-        "gateways": "fs:./gateways.json",
-        "network": "fs:./network.json"
-    }
-}
