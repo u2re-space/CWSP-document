@@ -119,8 +119,14 @@ export class WorkCenterStateManager {
                     autoAction: parsed.autoAction || false,
                     selectedInstruction: parsed.selectedInstruction || "",
                     outputFormat: parsed.outputFormat || "auto",
-                    activeInputTab: parsed.activeInputTab || "prompt",
-                    activeResultsTab: parsed.activeResultsTab || "output",
+                    activeInputTab: ((): WorkCenterState["activeInputTab"] => {
+                        const tab = String(parsed.activeInputTab || "prompt");
+                        return tab === "attachments" || tab === "prompt" ? tab : "prompt";
+                    })(),
+                    activeResultsTab: ((): WorkCenterState["activeResultsTab"] => {
+                        const tab = String(parsed.activeResultsTab || "output");
+                        return tab === "pipeline" || tab === "history" || tab === "output" ? tab : "output";
+                    })(),
                     selectedLanguage: parsed.selectedLanguage || "auto",
                     selectedTemplate: parsed.selectedTemplate || "",
                     recognitionFormat: parsed.recognitionFormat || "auto",

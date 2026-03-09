@@ -108,14 +108,62 @@ export class WorkCenterShareTarget {
         try {
             let filesAdded = 0;
             let textAdded = false;
+            const fileFingerprint = (file: File): string =>
+                `${String(file.name || '').trim().toLowerCase()}::${Number(file.size || 0)}::${String(file.type || '').trim().toLowerCase()}`;
+            const seenFingerprints = new Set<string>((state.files || []).map(fileFingerprint));
+            const pushUniqueFile = (file: File): boolean => {
+                const key = fileFingerprint(file);
+                if (seenFingerprints.has(key)) return false;
+                seenFingerprints.add(key);
+                state.files.push(file);
+                return true;
+            };
+            const normalizeIncomingFile = async (raw: unknown): Promise<File | null> => {
+                if (!raw) return null;
+                if (raw instanceof File) return raw;
+                if (raw instanceof Blob) {
+                    return new File([raw], `shared-${Date.now()}`, { type: raw.type || 'application/octet-stream' });
+                }
+                const candidate = raw as Record<string, unknown>;
+                if (candidate?.blob instanceof Blob) {
+                    const blob = candidate.blob as Blob;
+                    const name = typeof candidate.name === 'string' && candidate.name.trim()
+                        ? candidate.name
+                        : `shared-${Date.now()}`;
+                    const lastModified = Number(candidate.lastModified || Date.now());
+                    return new File([blob], name, {
+                        type: String(candidate.type || blob.type || 'application/octet-stream'),
+                        lastModified: Number.isFinite(lastModified) ? lastModified : Date.now()
+                    });
+                }
+                return null;
+            };
 
             // Handle files/images from share target
-            if (inputData.files && Array.isArray(inputData.files)) {
+            const incomingFiles = Array.isArray(inputData.files) ? inputData.files : [];
+            if (incomingFiles.length > 0) {
                 for (const file of inputData.files) {
-                    if (file instanceof File) {
-                        state.files.push(file);
+                    const normalized = await normalizeIncomingFile(file);
+                    if (normalized && pushUniqueFile(normalized)) {
                         filesAdded++;
                     }
+                }
+            }
+
+            // Fallback hydration: metadata says files exist but payload has no usable File objects.
+            if (filesAdded === 0 && Number(inputData?.fileCount || 0) > 0) {
+                try {
+                    const cached = await consumeCachedShareTargetPayload({ clear: false });
+                    const cachedFiles = Array.isArray(cached?.files) ? cached.files : [];
+                    if (cachedFiles.length > 0) {
+                        for (const cachedFile of cachedFiles) {
+                            if (cachedFile instanceof File && pushUniqueFile(cachedFile)) {
+                                filesAdded++;
+                            }
+                        }
+                    }
+                } catch (cacheError) {
+                    console.warn('[WorkCenter] Failed to hydrate cached share files:', cacheError);
                 }
             }
 
@@ -124,9 +172,10 @@ export class WorkCenterShareTarget {
                 // Create a text file from the shared text
                 const textBlob = new Blob([inputData.text], { type: 'text/plain' });
                 const textFile = new File([textBlob], 'shared-text.txt', { type: 'text/plain' });
-                state.files.push(textFile);
-                filesAdded++;
-                textAdded = true;
+                if (pushUniqueFile(textFile)) {
+                    filesAdded++;
+                    textAdded = true;
+                }
             }
 
             // Handle URLs
@@ -134,8 +183,9 @@ export class WorkCenterShareTarget {
                 // Create a text file containing the URL
                 const urlBlob = new Blob([inputData.url], { type: 'text/plain' });
                 const urlFile = new File([urlBlob], 'shared-url.txt', { type: 'text/plain' });
-                state.files.push(urlFile);
-                filesAdded++;
+                if (pushUniqueFile(urlFile)) {
+                    filesAdded++;
+                }
             }
 
             // Handle base64 encoded data
@@ -145,8 +195,9 @@ export class WorkCenterShareTarget {
                         namePrefix: "shared",
                         uriComponent: true
                     });
-                    state.files.push(asset.file);
-                    filesAdded++;
+                    if (pushUniqueFile(asset.file)) {
+                        filesAdded++;
+                    }
                 } catch (error) {
                     console.warn('[WorkCenter] Failed to decode base64 data:', error);
                 }
@@ -161,6 +212,8 @@ export class WorkCenterShareTarget {
 
             // Notify about file changes for toolbar updates
             if (filesAdded > 0 || textAdded) {
+                // Bring attachments tab to front for share-target/launch-queue inputs.
+                state.activeInputTab = 'attachments';
                 this.deps.onFilesChanged?.();
             }
 
@@ -297,12 +350,23 @@ export class WorkCenterShareTarget {
         try {
             const files = await fetchCachedShareFiles(cacheKey || "latest");
             if (files.length > 0) {
+                const fileFingerprint = (file: File): string =>
+                    `${String(file.name || '').trim().toLowerCase()}::${Number(file.size || 0)}::${String(file.type || '').trim().toLowerCase()}`;
+                const seenFingerprints = new Set<string>((state.files || []).map(fileFingerprint));
+                let added = 0;
                 for (const file of files) {
+                    if (!(file instanceof File)) continue;
+                    const key = fileFingerprint(file);
+                    if (seenFingerprints.has(key)) continue;
+                    seenFingerprints.add(key);
                     console.log("[WorkCenter] Adding cached file:", file.name);
                     state.files.push(file);
+                    added++;
                 }
-                this.deps.onFilesChanged?.();
-                this.deps.showMessage?.(`Added ${files.length} cached file(s) from share-target`);
+                if (added > 0) {
+                    this.deps.onFilesChanged?.();
+                    this.deps.showMessage?.(`Added ${added} cached file(s) from share-target`);
+                }
             }
         } catch (error) {
             console.warn('[WorkCenter] Failed to retrieve cached files:', error);

@@ -12,6 +12,7 @@ import { initWebSocket, onWSConnectionChange } from './network/websocket';
 import { initSpeechRecognition, initAiButton } from './input/speech';
 import { initAirButton } from './ui/air-button';
 import { initRelativeOrientation } from './input/sensor/relative-orientation';
+import { stopRelativeOrientation } from './input/sensor/relative-orientation';
 import { initVirtualKeyboard, setRemoteKeyboardEnabled } from './input/virtual-keyboard';
 import { initClipboardToolbar } from './ui/clipboard-toolbar';
 import { showConfigUI } from './ui/config-ui';
@@ -22,6 +23,18 @@ import { resetMotionBaseline } from './ui/air-button';
 import { resetRelativeOrientationRuntimeState } from './input/sensor/relative-orientation';
 
 let unsubscribeWsKeyboardSync: (() => void) | null = null;
+let airpadInitToken = 0;
+let airpadInitAbort: AbortController | null = null;
+
+export function unmountAirpadRuntime(): void {
+    airpadInitToken += 1;
+    airpadInitAbort?.abort();
+    airpadInitAbort = null;
+    unsubscribeWsKeyboardSync?.();
+    unsubscribeWsKeyboardSync = null;
+    setRemoteKeyboardEnabled(false);
+    stopRelativeOrientation();
+}
 
 // =========================
 // Mount function for routing system
@@ -29,6 +42,10 @@ let unsubscribeWsKeyboardSync: (() => void) | null = null;
 
 export default async function mountAirpad(mountElement: HTMLElement): Promise<void> {
     console.log('[Airpad] Mounting airpad app...');
+    airpadInitToken += 1;
+    airpadInitAbort?.abort();
+    airpadInitAbort = new AbortController();
+    const currentInitToken = airpadInitToken;
 
     loadAsAdopted(stylesheet);
 
@@ -160,14 +177,14 @@ export default async function mountAirpad(mountElement: HTMLElement): Promise<vo
     `);
 
     // Initialize the airpad functionality
-    await initAirpadApp();
+    await initAirpadApp(currentInitToken, airpadInitAbort.signal);
 }
 
 // =========================
 // Internal initialization
 // =========================
 
-async function initAirpadApp(): Promise<void> {
+async function initAirpadApp(initToken: number, signal: AbortSignal): Promise<void> {
     function resetMotionRuntime() {
         resetMotionAccum();
         resetMotionBaseline();
@@ -227,18 +244,18 @@ function initLogOverlay() {
         toggle.setAttribute('aria-expanded', 'false');
     };
 
-    toggle.addEventListener('click', openOverlay);
-    close?.addEventListener('click', closeOverlay);
+    toggle.addEventListener('click', openOverlay, { signal });
+    close?.addEventListener('click', closeOverlay, { signal });
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
             closeOverlay();
         }
-    });
+    }, { signal });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && overlay.classList.contains('open')) {
             closeOverlay();
         }
-    });
+    }, { signal });
     }
 
 function initHintOverlay() {
@@ -262,18 +279,18 @@ function initHintOverlay() {
         toggle.setAttribute('aria-expanded', 'false');
     };
 
-    toggle.addEventListener('click', openOverlay);
-    close?.addEventListener('click', closeOverlay);
+    toggle.addEventListener('click', openOverlay, { signal });
+    close?.addEventListener('click', closeOverlay, { signal });
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
             closeOverlay();
         }
-    });
+    }, { signal });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && overlay.classList.contains('open')) {
             closeOverlay();
         }
-    });
+    }, { signal });
 }
 
     function initAdaptiveHintPanel() {
@@ -316,6 +333,7 @@ function initHintOverlay() {
     };
 
     scheduleIdle(async () => {
+    if (signal.aborted || initToken !== airpadInitToken) return;
     // PWA: register Service Worker (auto-update)
     try {
         initServiceWorker({

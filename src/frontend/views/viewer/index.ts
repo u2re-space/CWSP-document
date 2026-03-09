@@ -1401,6 +1401,8 @@ export class ViewerView implements View {
                 source?: string;
                 path?: string;
                 src?: string;
+                file?: File;
+                files?: File[];
             };
         };
 
@@ -1417,6 +1419,20 @@ export class ViewerView implements View {
             if (!opened) {
                 const fallbackContent = `> Failed to load markdown from:\n> ${source}`;
                 this.setContent(fallbackContent, msg.data.filename, source);
+            }
+            return;
+        }
+
+        const fileCandidate = (msg.data?.file instanceof File
+            ? msg.data.file
+            : (Array.isArray(msg.data?.files) ? msg.data?.files.find((f): f is File => f instanceof File) : null));
+        if (fileCandidate) {
+            try {
+                const text = await fileCandidate.text();
+                const source = msg.data?.source || msg.data?.src || msg.data?.path || fileCandidate.name;
+                this.setContent(text || "", msg.data?.filename || fileCandidate.name, source);
+            } catch (error) {
+                console.warn("[Viewer] Failed to read markdown file payload:", error);
             }
         }
     }

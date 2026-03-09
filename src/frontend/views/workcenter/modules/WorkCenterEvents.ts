@@ -266,6 +266,7 @@ export class WorkCenterEvents {
         if (!this.container) return;
 
         const promptInput = this.container.querySelector('.prompt-input') as HTMLTextAreaElement;
+        if (!promptInput) return;
         promptInput.addEventListener('input', async () => {
             this.state.currentPrompt = promptInput.value;
             const { WorkCenterStateManager } = await import('./WorkCenterState');
@@ -287,6 +288,7 @@ export class WorkCenterEvents {
         if (!this.container) return;
 
         const voiceBtn = this.container.querySelector('[data-action="voice-input"]') as HTMLButtonElement;
+        if (!voiceBtn) return;
         voiceBtn.addEventListener('mousedown', () => this.voice.startVoiceRecording(this.state));
         voiceBtn.addEventListener('mouseup', () => {
             this.voice.stopVoiceRecording(this.state);
@@ -303,6 +305,7 @@ export class WorkCenterEvents {
 
         // Format selector
         const formatSelect = this.container.querySelector('.format-select') as HTMLSelectElement;
+        if (!formatSelect) return;
         formatSelect.addEventListener('change', async () => {
             const newFormat = formatSelect.value as "auto" | "markdown" | "json" | "text" | "raw" | "html" | "code";
             this.state.outputFormat = newFormat;
@@ -321,6 +324,7 @@ export class WorkCenterEvents {
 
         // Language selector
         const languageSelect = this.container.querySelector('.language-select') as HTMLSelectElement;
+        if (!languageSelect) return;
         languageSelect.addEventListener('change', async () => {
             this.state.selectedLanguage = languageSelect.value as "auto" | "en" | "ru";
             const { WorkCenterStateManager } = await import('./WorkCenterState');
@@ -330,6 +334,7 @@ export class WorkCenterEvents {
 
         // Recognition format selector
         const recognitionSelect = this.container.querySelector('.recognition-select') as HTMLSelectElement;
+        if (!recognitionSelect) return;
         recognitionSelect.addEventListener('change', async () => {
             this.state.recognitionFormat = recognitionSelect.value as "auto" | "markdown" | "html" | "text" | "json" | "most-suitable" | "most-optimized" | "most-legibility";
             const { WorkCenterStateManager } = await import('./WorkCenterState');
@@ -339,6 +344,7 @@ export class WorkCenterEvents {
 
         // Processing format selector
         const processingSelect = this.container.querySelector('.processing-select') as HTMLSelectElement;
+        if (!processingSelect) return;
         processingSelect.addEventListener('change', async () => {
             this.state.processingFormat = processingSelect.value as "markdown" | "html" | "json" | "text" | "typescript" | "javascript" | "python" | "java" | "cpp" | "csharp" | "php" | "ruby" | "go" | "rust" | "xml" | "yaml" | "css" | "scss";
             const { WorkCenterStateManager } = await import('./WorkCenterState');
@@ -351,6 +357,7 @@ export class WorkCenterEvents {
         if (!this.container) return;
 
         const autoCheckbox = this.container.querySelector('.auto-action-checkbox') as HTMLInputElement;
+        if (!autoCheckbox) return;
         autoCheckbox.addEventListener('change', async () => {
             this.state.autoAction = autoCheckbox.checked;
             const { WorkCenterStateManager } = await import('./WorkCenterState');
@@ -494,7 +501,7 @@ export class WorkCenterEvents {
 
     private switchInputTab(tab: string): void {
         if (!this.container) return;
-        if (!["instruction", "prompt", "attachments"].includes(tab)) return;
+        if (!["prompt", "attachments"].includes(tab)) return;
 
         this.state.activeInputTab = tab as WorkCenterState["activeInputTab"];
         this.container.querySelector('[data-input-tabs]')?.setAttribute('data-active-tab', tab);

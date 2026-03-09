@@ -32,8 +32,10 @@ export class WorkCenterView implements View {
     private deps: WorkCenterDependencies;
     private initializedFromOptions = false;
     private lastOutputText = "";
+    private pendingRenderAfterMount = false;
     private resultObserver: MutationObserver | null = null;
     private _sheet: CSSStyleSheet | null = null;
+    private readonly autoFileFingerprints = new Set<string>();
 
     lifecycle: ViewLifecycle = {
         onMount: () => this.onMount(),
@@ -85,7 +87,8 @@ export class WorkCenterView implements View {
     addFiles(files: File[]): void {
         const state = this.manager?.getState();
         if (!state || files.length === 0) return;
-        state.files.push(...files);
+        const added = this.appendUniqueAutoFiles(state.files, files);
+        if (added <= 0) return;
         this.requestRender();
         this.emitFilesChanged();
     }
@@ -151,11 +154,24 @@ export class WorkCenterView implements View {
         if (!state) return;
 
         if (Array.isArray(this.options.initialFiles) && this.options.initialFiles.length > 0) {
-            state.files.push(...this.options.initialFiles);
+            this.appendUniqueAutoFiles(state.files, this.options.initialFiles);
         }
         if (typeof this.options.initialPrompt === "string" && this.options.initialPrompt.trim()) {
             state.currentPrompt = this.options.initialPrompt;
         }
+    }
+
+    private appendUniqueAutoFiles(target: File[], incoming: File[]): number {
+        let added = 0;
+        for (const file of incoming) {
+            if (!(file instanceof File)) continue;
+            const key = `${String(file.name || "").trim().toLowerCase()}::${Number(file.size || 0)}::${String(file.type || "").trim().toLowerCase()}`;
+            if (this.autoFileFingerprints.has(key)) continue;
+            this.autoFileFingerprints.add(key);
+            target.push(file);
+            added++;
+        }
+        return added;
     }
 
     private syncPromptInputFromState(): void {
@@ -192,11 +208,25 @@ export class WorkCenterView implements View {
 
     private requestRender(): void {
         if (!this.manager || !this.element) return;
-        const parent = this.element.parentElement;
-        const next = this.manager.renderWorkCenterView();
-        if (parent) {
-            parent.replaceChild(next, this.element);
+        const currentElement = this.element;
+        const parent = currentElement.parentElement;
+        if (!parent) {
+            // During cold-start share/launch bootstrap, messages can arrive before the
+            // rendered node is actually attached by the shell. Re-rendering now would
+            // rebind manager containers to a detached tree and make visible UI inert.
+            this.pendingRenderAfterMount = true;
+            return;
         }
+        const next = this.manager.renderWorkCenterView();
+
+        // Preserve shell visibility markers on root replacement.
+        const activeViewMarker = currentElement.getAttribute("data-view");
+        if (activeViewMarker) {
+            next.setAttribute("data-view", activeViewMarker);
+        }
+        next.hidden = currentElement.hidden;
+
+        parent.replaceChild(next, currentElement);
         this.element = next;
         this.syncPromptInputFromState();
         this.setupProcessResultObserver();
@@ -223,6 +253,10 @@ export class WorkCenterView implements View {
 
     private onShow(): void {
         this._sheet ??= loadAsAdopted(workcenterStyles) as CSSStyleSheet;
+        if (this.pendingRenderAfterMount) {
+            this.pendingRenderAfterMount = false;
+            this.requestRender();
+        }
     }
 
     private onHide(): void {

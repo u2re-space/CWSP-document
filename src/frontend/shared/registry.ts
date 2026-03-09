@@ -142,6 +142,36 @@ export const ShellRegistry = new ShellRegistryClass();
  * Registry for view components
  */
 class ViewRegistryClass {
+    private resolveViewFactory(module: Record<string, unknown>): ViewFactory | null {
+        const candidates = [
+            module?.default,
+            module?.createView,
+            module?.createAirpadView,
+            module?.createWorkCenterView,
+            module?.createViewerView,
+            module?.createExplorerView,
+            module?.createSettingsView,
+            module?.createHistoryView
+        ];
+
+        for (const candidate of candidates) {
+            if (typeof candidate === "function") {
+                return candidate as ViewFactory;
+            }
+        }
+
+        const values = Object.values(module || {});
+        for (const value of values) {
+            // Support class exports like `export class AirpadView implements View`
+            if (typeof value === "function" && value.prototype && typeof (value as any).prototype.render === "function") {
+                const ViewClass = value as new (options?: Parameters<ViewFactory>[0]) => View;
+                return (options?: Parameters<ViewFactory>[0]) => new ViewClass(options);
+            }
+        }
+
+        return null;
+    }
+
     private views = new Map<ViewId, ViewRegistration>();
     private loadedViews = new Map<ViewId, View>();
     private viewReceiveCleanup = new Map<ViewId, () => void>();
@@ -183,9 +213,9 @@ class ViewRegistryClass {
         }
 
         const module = await registration.loader();
-        const factory: ViewFactory = (module as any).default || (module as any).createView;
+        const factory = this.resolveViewFactory(module as unknown as Record<string, unknown>);
 
-        if (typeof factory !== "function") {
+        if (!factory) {
             throw new Error(`Invalid view module: ${id}`);
         }
 

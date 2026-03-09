@@ -192,6 +192,18 @@ export class BootLoader {
         console.log("[BootLoader] Starting boot sequence:", config);
         
         try {
+            // If bootstrap runs more than once in the same document (cold-start retries,
+            // SW handoffs, etc.), dispose previous shell instance to avoid stale handlers.
+            if (this.shellInstance) {
+                try {
+                    ShellRegistry.unload(this.shellInstance.id);
+                } catch (error) {
+                    console.warn("[BootLoader] Failed to unload previous shell:", error);
+                } finally {
+                    this.shellInstance = null;
+                }
+            }
+
             // Establish canonical cascade layer order before any stylesheet loads.
             initializeLayers();
 
@@ -224,8 +236,11 @@ export class BootLoader {
                 await this.initChannels(config.channels);
             }
             
-            // Phase 6: Navigate to Default View
-            await shell.navigate(config.defaultView);
+            // Phase 6: Navigate to Default View (avoid duplicate first navigation)
+            const currentView = (shell.currentView as any)?.value;
+            if (currentView !== config.defaultView) {
+                await shell.navigate(config.defaultView);
+            }
             
             // Mark as ready
             this.setPhase("ready");

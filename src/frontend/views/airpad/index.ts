@@ -11,6 +11,7 @@ import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shell
 import type { BaseViewOptions } from "../types";
 import { disconnectWS } from "./network/websocket";
 import { setRemoteKeyboardEnabled } from "./input/virtual-keyboard";
+import { unmountAirpadRuntime } from "./main";
 
 // @ts-ignore
 import style from "./airpad.scss?inline";
@@ -56,6 +57,12 @@ export class AirpadView implements View {
         if (options) {
             this.options = { ...this.options, ...options };
             this.shellContext = options.shellContext || this.shellContext;
+        }
+
+        // If the view root is being re-created (e.g. after shell cache refresh),
+        // drop previous runtime state so the new container does not stay on loader forever.
+        if (this.initialized) {
+            this.cleanup();
         }
 
         this._sheet = loadAsAdopted(style) as CSSStyleSheet;
@@ -127,10 +134,12 @@ export class AirpadView implements View {
     }
 
     private cleanup(): void {
+        unmountAirpadRuntime();
         setRemoteKeyboardEnabled(false);
         disconnectWS();
         this.unlockOrientationForAirpad();
         this.initialized = false;
+        this.initPromise = null;
     }
 
     private async lockOrientationForAirpad(): Promise<void> {

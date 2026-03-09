@@ -385,6 +385,10 @@ const routeToTransferView = async (
         nextUrl.pathname = resolved.routePath;
         nextUrl.search = "";
         nextUrl.hash = "";
+        if (pending) {
+            // Cold-start handoff: force cache-backed share bootstrap on next load.
+            nextUrl.searchParams.set("shared", "1");
+        }
         console.log("[ViewTransfer] Navigating to resolved route:", nextUrl.toString());
         globalThis.location.href = nextUrl.toString();
     } else {
@@ -712,6 +716,8 @@ const tryServerSideProcessing = async (shareData: ShareDataInput): Promise<boole
 export const handleShareTarget = () => {
     const params = new URLSearchParams(globalThis?.location?.search);
     const shared = params.get("shared");
+    const hasExplicitSharedFlow = shared === "1" || shared === "true" || shared === "test";
+    let routedFromSessionPending = false;
 
     // Handle URL params from server-side share handler
     if (shared === "1" || shared === "true") {
@@ -745,7 +751,7 @@ export const handleShareTarget = () => {
 
         if (content || type === 'file') {
             console.log("[ShareTarget] Processing from URL params");
-            routeToTransferView(shareFromParams, "share-target").catch((error) => {
+            routeToTransferView(shareFromParams, "share-target", undefined, true).catch((error) => {
                 console.warn("[ShareTarget] Route transfer failed, falling back to processing:", error);
                 processShareTargetData(shareFromParams, true);
             });
@@ -808,12 +814,83 @@ export const handleShareTarget = () => {
             sessionStorage.removeItem("rs-pending-share");
             const shareData = JSON.parse(pendingData) as ShareDataInput;
             console.log("[ShareTarget] Found pending share in sessionStorage:", summarizeForLog(shareData));
+            routedFromSessionPending = true;
             routeToTransferView(shareData, "pending", undefined, true).catch((error) => {
                 console.warn("[ShareTarget] Pending transfer routing failed:", error);
             });
         }
     } catch (e) {
         // Ignore sessionStorage errors
+    }
+
+    // Recovery path for cold/fresh starts where OS/file launch happened but
+    // neither URL params nor session pending marker survived.
+    if (!hasExplicitSharedFlow && !routedFromSessionPending) {
+        void (async () => {
+            try {
+                let cachedPayload: CachedShareTargetPayload | null = null;
+                let meta: Record<string, unknown> = {};
+                let files: File[] = [];
+                let expectedFileCount = 0;
+
+                // On cold start, metadata can appear before file blobs are fully written to cache.
+                // Retry a few short times so we don't dispatch a "fileCount>0 but files=[]" payload.
+                for (let attempt = 1; attempt <= 4; attempt++) {
+                    cachedPayload = await consumeCachedShareTargetPayload({ clear: false });
+                    meta = (cachedPayload?.meta && typeof cachedPayload.meta === "object")
+                        ? (cachedPayload.meta as Record<string, unknown>)
+                        : {};
+                    files = Array.isArray(cachedPayload?.files) ? cachedPayload.files : [];
+                    expectedFileCount = Number(meta?.fileCount || 0);
+
+                    if (expectedFileCount <= 0 || files.length > 0) break;
+                    await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 200 * attempt));
+                }
+
+                const timestamp = Number(meta?.timestamp || Date.now());
+                const ageMs = Date.now() - timestamp;
+
+                // Keep this bootstrap narrow to avoid replaying stale payloads.
+                if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > 5 * 60 * 1000) return;
+
+                const transferPayload: ShareDataInput = {
+                    title: typeof meta?.title === "string" ? meta.title : undefined,
+                    text: typeof meta?.text === "string" ? meta.text : undefined,
+                    url: typeof meta?.url === "string" ? meta.url : undefined,
+                    files,
+                    fileCount: files.length || expectedFileCount,
+                    imageCount: Number(meta?.imageCount || 0),
+                    timestamp,
+                    source: "cached-bootstrap"
+                };
+
+                if (
+                    !transferPayload.text &&
+                    !transferPayload.url &&
+                    !transferPayload.title &&
+                    (transferPayload.fileCount ?? 0) <= 0
+                ) {
+                    return;
+                }
+
+                console.log("[ShareTarget] Bootstrap recovery from cached payload:", summarizeForLog({
+                    source: transferPayload.source,
+                    fileCount: transferPayload.fileCount,
+                    imageCount: transferPayload.imageCount,
+                    hasText: !!transferPayload.text,
+                    hasUrl: !!transferPayload.url,
+                    ageMs
+                }));
+
+                const delivered = await routeToTransferView(transferPayload, "pending", undefined, true);
+                const hasBinaryPayload = Array.isArray(transferPayload.files) && transferPayload.files.length > 0;
+                if (delivered && !hasBinaryPayload) {
+                    await consumeCachedShareTargetPayload({ clear: true }).catch(() => null);
+                }
+            } catch (error) {
+                console.warn("[ShareTarget] Cached bootstrap recovery failed:", error);
+            }
+        })();
     }
 
     // Listen for real-time share target broadcasts from service worker
@@ -956,10 +1033,18 @@ export const setupLaunchQueueConsumer = async () => {
                             try {
                                 // Check if we have permission to access the file
                                 if ('queryPermission' in fileHandle) {
-                                    const permission = await (fileHandle as any).queryPermission();
+                                    let permission = await (fileHandle as any).queryPermission({ mode: 'read' });
                                     console.log('[LaunchQueue] File handle permission:', permission);
+                                    if (permission === 'prompt' && 'requestPermission' in fileHandle) {
+                                        try {
+                                            permission = await (fileHandle as any).requestPermission({ mode: 'read' });
+                                            console.log('[LaunchQueue] File handle permission requested:', permission);
+                                        } catch (permissionError) {
+                                            console.warn('[LaunchQueue] requestPermission failed:', permissionError);
+                                        }
+                                    }
                                     if (permission !== 'granted') {
-                                        console.warn('[LaunchQueue] No permission to access file:', fileHandle.name);
+                                        console.warn('[LaunchQueue] No permission to access file:', fileHandle.name, permission);
                                         failedHandles.push(fileHandle);
                                         continue;
                                     }

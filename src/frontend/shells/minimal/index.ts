@@ -19,7 +19,7 @@ import style from "./minimal.scss?inline";
 // Side effect: register icon component
 import "fest/icon";
 import { ShellBase } from "../shell";
-import { isEnabledView, pickEnabledView } from "../../config/views";
+import { isEnabledView } from "../../config/views";
 
 // ============================================================================
 // NAVIGATION ITEMS
@@ -154,24 +154,6 @@ export class MinimalShell extends ShellBase {
 
         // Setup path-based navigation
         this.setupPopstateNavigation();
-
-        // Determine initial view from pathname or default to "viewer"
-        const initialView = this.getInitialView();
-        await this.navigate(initialView);
-    }
-
-    private getInitialView(): ViewId {
-        if (typeof globalThis === "undefined") return pickEnabledView("viewer");
-
-        // Get view from pathname (e.g., /viewer, /settings, /workcenter)
-        const pathname = globalThis?.location?.pathname?.replace(/^\//, "").toLowerCase();
-
-        if (pathname && isValidNavViewId(pathname)) {
-            return pathname;
-        }
-
-        // Default to viewer
-        return pickEnabledView("viewer", MAIN_NAV_ITEMS[0]?.id || "viewer");
     }
 }
 

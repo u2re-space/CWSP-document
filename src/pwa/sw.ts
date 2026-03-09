@@ -654,8 +654,14 @@ async function broadcastToClients(type: string, data: any): Promise<void> {
 // @ts-ignore
 const manifest = self.__WB_MANIFEST;
 if (manifest) {
+    const filteredManifest = manifest.filter((entry: any) => {
+        const url = typeof entry === "string" ? entry : String(entry?.url || "");
+        // icon.ico is non-critical and intermittently 408s in some deploys;
+        // keep SW install resilient by excluding it from hard precache.
+        return !/\/pwa\/icons\/icon\.ico(?:$|\?)/i.test(url);
+    });
     cleanupOutdatedCaches();
-    precacheAndRoute(manifest);
+    precacheAndRoute(filteredManifest);
 }
 
 // Broadcast channel names (using centralized naming system)

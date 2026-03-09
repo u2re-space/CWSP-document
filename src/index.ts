@@ -246,6 +246,31 @@ const showErrorState = (mountElement: HTMLElement, error: any, retryFn?: () => v
     }
 };
 
+const withTimeout = async <T>(
+    task: Promise<T>,
+    label: string,
+    timeoutMs: number,
+    fallback: T,
+    options: { warnOnTimeout?: boolean } = {}
+): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const warnOnTimeout = options.warnOnTimeout !== false;
+    try {
+        return await Promise.race<T>([
+            task,
+            new Promise<T>((resolve) => {
+                timer = setTimeout(() => {
+                    const log = warnOnTimeout ? console.warn : console.info;
+                    log(`[Index] ${label} timed out after ${timeoutMs}ms`);
+                    resolve(fallback);
+                }, timeoutMs);
+            })
+        ]);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+};
+
 // ============================================================================
 // MAIN INDEX FUNCTION
 // ============================================================================
@@ -279,16 +304,21 @@ export default async function index(mountElement: HTMLElement) {
         initReceivers();
         handleShareTarget();
         // SW is initialized by initPWA(); avoid dual SW managers causing update loops.
-        await setupLaunchQueueConsumer();
+        await withTimeout(setupLaunchQueueConsumer(), "setupLaunchQueueConsumer", 2500, undefined);
 
         try {
-            await checkPendingShareData();
+            await withTimeout(checkPendingShareData(), "checkPendingShareData", 2500, null);
         } catch (e) {
             console.warn('[Index] Pending share data check failed:', e);
         }
 
-        await pwaPromise;
-        console.log('[Index] PWA initialization complete');
+        void withTimeout(pwaPromise, "initPWA", 5000, null, { warnOnTimeout: false })
+            .then(() => {
+                console.log('[Index] PWA initialization complete');
+            })
+            .catch((error) => {
+                console.warn('[Index] PWA initialization failed (non-blocking):', error);
+            });
 
         // Get current route
         const pathname = getNormalizedPathname();

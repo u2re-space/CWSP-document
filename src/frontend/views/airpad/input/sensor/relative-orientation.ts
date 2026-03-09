@@ -36,6 +36,8 @@ import { isWSConnected } from '../../network/websocket';
 
 
 let relSensor: any = null;
+let fallbackOrientationActive = false;
+let fallbackHandler: ((event: DeviceOrientationEvent) => void) | null = null;
 
 // Orientation state
 let lastQuat: [number, number, number, number] | null = null;
@@ -46,6 +48,23 @@ export function resetRelativeOrientationRuntimeState() {
     lastQuat = null;
     smoothedDelta = vec3Zero();
     dynamicMaxStepPx = REL_ORIENT_MAX_STEP;
+}
+
+export function stopRelativeOrientation(): void {
+    try {
+        if (relSensor) {
+            relSensor.stop?.();
+        }
+    } catch {
+        // ignore sensor stop errors
+    }
+    relSensor = null;
+
+    if (fallbackOrientationActive && fallbackHandler) {
+        globalThis.removeEventListener("deviceorientation", fallbackHandler as EventListener);
+    }
+    fallbackOrientationActive = false;
+    fallbackHandler = null;
 }
 
 // Quaternion helpers
@@ -193,8 +212,55 @@ function handleReading(quat: number[], dt: number): Vector3 {
 }
 
 export function initRelativeOrientation() {
+    stopRelativeOrientation();
+
+    const startDeviceOrientationFallback = () => {
+        if (fallbackOrientationActive) return;
+        let lastTs = performance.now();
+        let lastEuler = { x: 0, y: 0, z: 0 };
+
+        fallbackHandler = (event: DeviceOrientationEvent) => {
+            const now = performance.now();
+            const dt = Math.max(0.00001, (now - lastTs) / 1000);
+            lastTs = now;
+
+            const alpha = Number(event.alpha ?? 0);
+            const beta = Number(event.beta ?? 0);
+            const gamma = Number(event.gamma ?? 0);
+            const current = { x: beta, y: gamma, z: alpha };
+            const deltaDeg = {
+                x: current.x - lastEuler.x,
+                y: current.y - lastEuler.y,
+                z: current.z - lastEuler.z
+            };
+            lastEuler = current;
+
+            // Convert small Euler deltas to radians and reuse the same motion queue.
+            const mapped = mapAndScale({
+                x: (deltaDeg.x * Math.PI) / 180,
+                y: (deltaDeg.y * Math.PI) / 180,
+                z: (deltaDeg.z * Math.PI) / 180
+            }, clampPxRadiusFromDeltaVec({
+                x: (deltaDeg.x * Math.PI) / 180,
+                y: (deltaDeg.y * Math.PI) / 180,
+                z: (deltaDeg.z * Math.PI) / 180
+            }, dt));
+
+            if (getAirState && getAirState() !== 'AIR_MOVE') return;
+            if (!isWSConnected()) return;
+            if (aiModeActive) return;
+            if (vec3IsNearZero(mapped, MOTION_JITTER_EPS)) return;
+            enqueueMotion(mapped.x, mapped.y, mapped.z);
+        };
+
+        globalThis.addEventListener("deviceorientation", fallbackHandler as EventListener, { passive: true });
+        fallbackOrientationActive = true;
+        log("RelativeOrientation fallback active (deviceorientation)");
+    };
+
     if (!(window as any).RelativeOrientationSensor ) {
         log('RelativeOrientationSensor API is not supported.');
+        startDeviceOrientationFallback();
         return;
     }
 
@@ -226,6 +292,7 @@ export function initRelativeOrientation() {
 
     relSensor.addEventListener('error', (event: any) => {
         log('RelativeOrientationSensor error: ' + ((event?.error?.message) || event?.message || event));
+        startDeviceOrientationFallback();
     });
 
     try {

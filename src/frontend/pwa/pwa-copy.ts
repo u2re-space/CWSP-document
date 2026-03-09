@@ -161,6 +161,11 @@ const checkPendingClipboardOperations = async (): Promise<void> => {
 
         console.log('[PWA-Copy] Checking for pending clipboard operations...');
         const response = await fetch('/clipboard/pending');
+        const responseType = String(response.headers.get('content-type') || '').toLowerCase();
+        if (!response.ok || !responseType.includes('application/json')) {
+            console.log('[PWA-Copy] Pending clipboard endpoint is unavailable in this context, skipping');
+            return;
+        }
         const data = await response.json();
 
         if (data.operations && Array.isArray(data.operations) && data.operations.length > 0) {

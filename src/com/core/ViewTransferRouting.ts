@@ -1,4 +1,4 @@
-import { sendMessage, type UnifiedMessage } from "@rs-com/core/UnifiedMessaging";
+import { sendMessage, enqueuePendingMessage, type UnifiedMessage } from "@rs-com/core/UnifiedMessaging";
 import { summarizeForLog } from "@rs-com/core/LogSanitizer";
 
 export type ViewTransferSource = "share-target" | "launch-queue" | "pending" | "clipboard";
@@ -140,7 +140,10 @@ export const dispatchViewTransfer = async (
     payload: ViewTransferPayload
 ): Promise<{ delivered: boolean; resolved: ViewTransferResolved }> => {
     const resolved = resolveViewTransfer(payload);
-    const message: Omit<UnifiedMessage, "id" | "source"> & { source?: string } = {
+    const files = Array.isArray(payload.files) ? payload.files : [];
+    const hasBinaryPayload = resolved.contentType === "image" || resolved.contentType === "file";
+    const message: UnifiedMessage = {
+        id: crypto.randomUUID(),
         type: resolved.messageType,
         destination: resolved.destination,
         contentType: resolved.contentType,
@@ -156,7 +159,34 @@ export const dispatchViewTransfer = async (
         metadata: message.metadata
     }));
 
-    const delivered = await sendMessage(message);
-    console.log("[ViewTransfer] Message delivery status:", { delivered, destination: resolved.destination, routePath: resolved.routePath });
+    let queuedAsPending = false;
+    if (payload.pending && !hasBinaryPayload) {
+        try {
+            // Keep pending transport JSON-safe: markdown/text/url flows can be replayed
+            // without binary `File[]` payload because text/url is already hydrated.
+            const pendingMessage: UnifiedMessage = {
+                ...message,
+                data: {
+                    ...(message.data || {}),
+                    files: []
+                }
+            };
+            enqueuePendingMessage(resolved.destination, pendingMessage);
+            queuedAsPending = true;
+        } catch (error) {
+            console.warn("[ViewTransfer] Failed to enqueue pending message:", error);
+        }
+    }
+
+    const deliveredNow = await sendMessage(message);
+    const delivered = deliveredNow || queuedAsPending;
+    console.log("[ViewTransfer] Message delivery status:", {
+        deliveredNow,
+        queuedAsPending,
+        hasBinaryPayload,
+        delivered,
+        destination: resolved.destination,
+        routePath: resolved.routePath
+    });
     return { delivered, resolved };
 };

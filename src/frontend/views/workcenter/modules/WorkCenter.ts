@@ -114,6 +114,7 @@ export class WorkCenterManager {
     private results: WorkCenterResults;
     private history: WorkCenterHistory;
     private events: WorkCenterEvents;
+    private processedMessageIds = new Set<string>();
 
     constructor(dependencies: WorkCenterDependencies) {
         this.deps = dependencies;
@@ -216,6 +217,17 @@ export class WorkCenterManager {
      */
     async handleExternalMessage(message: any): Promise<void> {
         if (!message) return;
+        const messageId = typeof message?.id === "string" ? message.id : "";
+        if (messageId) {
+            if (this.processedMessageIds.has(messageId)) {
+                return;
+            }
+            this.processedMessageIds.add(messageId);
+            if (this.processedMessageIds.size > 256) {
+                const [first] = this.processedMessageIds;
+                if (first) this.processedMessageIds.delete(first);
+            }
+        }
 
         // Share-target messages should update both attachments and results pipeline.
         if (message.type === 'share-target-input' && message.data) {

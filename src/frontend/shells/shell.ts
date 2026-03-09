@@ -43,6 +43,7 @@ export abstract class ShellBase implements Shell {
     // View cache
     protected loadedViews = new Map<ViewId, { view: View; element: HTMLElement }>();
     protected currentViewElement: HTMLElement | null = null;
+    protected navigationToken = 0;
 
     // Mounted state
     protected mounted = false;
@@ -110,13 +111,11 @@ export abstract class ShellBase implements Shell {
         if (!this.mounted) return;
 
         // Cleanup views
-        for (const [viewId, { view }] of this.loadedViews) {
-            if (view.lifecycle?.onUnmount) {
-                try {
-                    view.lifecycle.onUnmount();
-                } catch (e) {
-                    console.warn(`[${this.id}] View ${viewId} unmount error:`, e);
-                }
+        for (const [viewId] of this.loadedViews) {
+            try {
+                ViewRegistry.unload(viewId);
+            } catch (e) {
+                console.warn(`[${this.id}] View ${viewId} unmount error:`, e);
             }
         }
         this.loadedViews.clear();
@@ -135,6 +134,7 @@ export abstract class ShellBase implements Shell {
 
     async navigate(viewId: ViewId, params?: Record<string, string>): Promise<void> {
         console.log(`[${this.id}] Navigating to: ${viewId}`, params);
+        const navToken = ++this.navigationToken;
 
         // Capture previous view BEFORE updating state (needed for direction + onHide)
         const previousView = this.navigationState.currentView;
@@ -170,6 +170,7 @@ export abstract class ShellBase implements Shell {
         // Load and render view (load happens outside the transition to avoid blocking it)
         try {
             const element = await this.loadView(viewId, params);
+            if (navToken !== this.navigationToken) return;
             await this.renderViewWithTransition(element);
         } catch (error) {
             console.error(`[${this.id}] Failed to load view ${viewId}:`, error);
@@ -181,9 +182,15 @@ export abstract class ShellBase implements Shell {
         // Check cache first
         const cached = this.loadedViews.get(viewId);
         if (cached) {
-            // Call onShow lifecycle
-            if (cached.view.lifecycle?.onShow) {
-                cached.view.lifecycle.onShow();
+            // Some views may replace their own root element during internal rerenders.
+            // If the cached root got detached, refresh cache with a new render result.
+            if (!cached.element.isConnected) {
+                const refreshed = cached.view.render({
+                    shellContext: this.getContext(),
+                    params
+                });
+                this.loadedViews.set(viewId, { view: cached.view, element: refreshed });
+                return refreshed;
             }
             // Update toolbar if view has one
             if (cached.view.getToolbar && this.toolbarContainer) {
@@ -217,9 +224,6 @@ export abstract class ShellBase implements Shell {
         // Call lifecycle
         if (view.lifecycle?.onMount) {
             await view.lifecycle.onMount();
-        }
-        if (view.lifecycle?.onShow) {
-            view.lifecycle.onShow();
         }
 
         return element;
@@ -310,6 +314,7 @@ export abstract class ShellBase implements Shell {
     protected async renderViewWithTransition(element: HTMLElement): Promise<void> {
         if (!this.contentContainer) {
             this.renderView(element);
+            this.invokeCurrentViewOnShow();
             return;
         }
 
@@ -336,6 +341,7 @@ export abstract class ShellBase implements Shell {
                 types: [direction, `to-${this.currentView.value}`],
             },
         );
+        this.invokeCurrentViewOnShow();
     }
 
     /**
@@ -534,6 +540,7 @@ export abstract class ShellBase implements Shell {
         if (typeof window === "undefined" || typeof window == "undefined") return;
 
         globalThis?.addEventListener?.("popstate", (event) => {
+            const navToken = ++this.navigationToken;
             // Get view from pathname
             const pathname = globalThis?.location?.pathname?.replace(/^\//, "").toLowerCase();
             const viewId = (event.state?.viewId || pathname || "viewer") as ViewId;
@@ -548,10 +555,21 @@ export abstract class ShellBase implements Shell {
                 this.currentView.value = viewId;
 
                 this.loadView(viewId, event.state?.params).then(element => {
+                    if (navToken !== this.navigationToken) return;
                     return this.renderViewWithTransition(element);
                 }).catch(console.error);
             }
         });
+    }
+
+    private invokeCurrentViewOnShow(): void {
+        const entry = this.loadedViews.get(this.currentView.value);
+        if (!entry?.view?.lifecycle?.onShow) return;
+        try {
+            entry.view.lifecycle.onShow();
+        } catch (error) {
+            console.warn(`[${this.id}] View ${this.currentView.value} onShow error:`, error);
+        }
     }
 
     /**

@@ -263,7 +263,7 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             injectManifest: {
                 injectionPoint: "self.__WB_MANIFEST",
                 maximumFileSizeToCacheInBytes: 1024 * 1024 * 16,
-                globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
+                globPatterns: ['**/*.{js,css,html,png,svg,json}'],
             },
             includeAssets: [
                 resolve(__dirname, './src/pwa/icons/icon.svg')

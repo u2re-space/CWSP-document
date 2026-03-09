@@ -128,6 +128,25 @@ const VIEW_HASH_MAPPING = {
     'rich-editor': '#rich-editor'
 } as const;
 
+const PATH_VIEW_MAPPING: Record<string, ShellView> = {
+    "viewer": "markdown-viewer",
+    "editor": "markdown-editor",
+    "rich-editor": "rich-editor",
+    "workcenter": "workcenter",
+    "settings": "settings",
+    "history": "history",
+    "explorer": "file-explorer",
+};
+
+const getViewFromPathname = (): ShellView | null => {
+    if (typeof window === "undefined") return null;
+    const segment = (globalThis?.location?.pathname || "")
+        .replace(/^\/+|\/+$/g, "")
+        .toLowerCase();
+    if (!segment) return null;
+    return PATH_VIEW_MAPPING[segment] || null;
+};
+
 
 
 // Use the new safe localStorage helper
@@ -272,7 +291,8 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
 
     // Determine initial view based on content availability
     const hasExistingContent = globalThis?.localStorage?.getItem?.("rs-markdown") || options.initialMarkdown;
-    const defaultView = options.initialView || (hasExistingContent ? "markdown-viewer" : "file-picker");
+    const routeView = getViewFromPathname();
+    const defaultView = options.initialView || routeView || (hasExistingContent ? "markdown-viewer" : "file-picker");
 
     /**
      * Create unified messaging handler for view switching
@@ -285,6 +305,11 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
             render();
         }
     });
+
+    const isAttachmentMessage = (msg: any): boolean => {
+        const type = String(msg?.type || "").trim().toLowerCase();
+        return type === "content-attach" || type === "file-attach";
+    };
 
     /**
      * Work center attachment logic (extracted for reuse)
@@ -304,20 +329,25 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
                 setViewHash('workcenter');
             }
 
-            // Convert content to file-like object
-            let fileToAttach: File | null = null;
+            // Convert payload to one or more file-like objects
+            const filesToAttach: File[] = [];
             try {
                 if (msg.data.file instanceof File) {
-                    fileToAttach = msg.data.file;
+                    filesToAttach.push(msg.data.file);
+                } else if (Array.isArray(msg.data.files)) {
+                    const validFiles = msg.data.files.filter((file: unknown): file is File => file instanceof File);
+                    if (validFiles.length > 0) {
+                        filesToAttach.push(...validFiles);
+                    }
                 } else if (msg.data.blob instanceof Blob) {
                     const filename = msg.data.filename || `attachment-${Date.now()}.${msg.contentType === 'markdown' ? 'md' : 'txt'}`;
-                    fileToAttach = new File([msg.data.blob], filename, { type: msg.data.blob.type });
+                    filesToAttach.push(new File([msg.data.blob], filename, { type: msg.data.blob.type }));
                 } else if (msg.data.text || msg.data.content) {
                     const content = msg.data.text || msg.data.content;
                     const textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
                     const filename = msg.data.filename || `content-${Date.now()}.${msg.contentType === 'markdown' ? 'md' : 'txt'}`;
                     const mimeType = msg.contentType === 'markdown' ? 'text/markdown' : 'text/plain';
-                    fileToAttach = new File([textContent], filename, { type: mimeType });
+                    filesToAttach.push(new File([textContent], filename, { type: mimeType }));
                     console.log('[Shell] Created file for attachment:', { filename, mimeType, size: textContent.length });
                 }
             } catch (error) {
@@ -326,7 +356,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
                 return;
             }
 
-            if (!fileToAttach) {
+            if (filesToAttach.length === 0) {
                 console.warn('[Shell] No valid file content found in message');
                 return;
             }
@@ -337,7 +367,10 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
             }
 
             // Wait for work center to be loaded and attach content
-            await attachToWorkCenterWhenReady(fileToAttach, state, showStatusMessage);
+            for (const fileToAttach of filesToAttach) {
+                // eslint-disable-next-line no-await-in-loop
+                await attachToWorkCenterWhenReady(fileToAttach, state, showStatusMessage);
+            }
 
         } finally {
             workCenterAttachmentInProgress = false;
@@ -389,7 +422,9 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
     const state = {
         // Core app state
         view: defaultView as ShellView,
-        markdown: /*safeJsonParse<string>*/(localStorage.getItem("rs-markdown")/*, DEFAULT_MD*/) ?? options.initialMarkdown ?? DEFAULT_MD,
+        markdown: typeof options.initialMarkdown === "string"
+            ? options.initialMarkdown
+            : ((localStorage.getItem("rs-markdown") ?? DEFAULT_MD) as string),
         editing: false,
         busy: false,
         message: "",
@@ -477,7 +512,8 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
                 state.view = 'markdown-viewer';
                 setViewHash('markdown-viewer');
                 persistMarkdown();
-                // Don't call render() immediately to prevent loops - let hash change trigger it
+                // Path-based navigation may not trigger hash-driven re-rendering.
+                render();
                 showStatusMessage("Content loaded in viewer");
             }
         }
@@ -490,9 +526,13 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
         canHandle: (msg: any) => msg.destination === 'workcenter',
         handle: async (msg: any) => {
             const instance = state.managers?.workCenter?.instance;
-            if (instance?.handleExternalMessage) {
+            if (instance) {
                 try {
-                    await instance.handleExternalMessage(msg);
+                    if (isAttachmentMessage(msg)) {
+                        await handleWorkCenterAttachment(msg, state, setViewHash, render, showStatusMessage, true);
+                    } else if (instance?.handleExternalMessage) {
+                        await instance.handleExternalMessage(msg);
+                    }
                 } catch (e) {
                     console.error('[Shell] WorkCenter message handling failed:', e);
                 }
@@ -1310,22 +1350,22 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
                         state.view = 'markdown-viewer';
                         setViewHash('markdown-viewer');
                         persistMarkdown();
-                        // Don't call render() - let hash change trigger it to prevent loops
+                        render();
                         showStatusMessage("Content loaded in viewer");
                     }
                 } else if (message.type === 'content-attach') {
                     // Handle content attachment for work center
                     handleWorkCenterAttachment(message, state, setViewHash, render, showStatusMessage);
                 } else if (message.type === 'navigation') {
-                    // Handle navigation messages (avoid render calls to prevent loops)
+                    // Handle navigation messages.
                     if (message.destination === 'settings') {
                         state.view = 'settings';
                         setViewHash('settings');
-                        // Don't call render() - let hash change trigger it
+                        render();
                     } else if (message.destination === 'history') {
                         state.view = 'history';
                         setViewHash('history');
-                        // Don't call render() - let hash change trigger it
+                        render();
                     }
                 }
             });
@@ -1340,11 +1380,11 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
                     if (message.destination === 'settings') {
                         state.view = 'settings';
                         setViewHash('settings');
-                        // Don't call render() - let hash change trigger it to prevent loops
+                        render();
                     } else if (message.destination === 'history') {
                         state.view = 'history';
                         setViewHash('history');
-                        // Don't call render() - let hash change trigger it to prevent loops
+                        render();
                     }
                 }
             });
@@ -1887,11 +1927,26 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
                         const pendingMessages = initializeComponent('workcenter-manager');
 
                         // Process any pending messages directly in work center logic
-                        // Use skipRender to prevent loops during initialization
+                        // Prefer WorkCenter's unified external-message handler so
+                        // share-target and content-share message variants are replayed
+                        // with the same logic as live messages.
                         for (const message of pendingMessages) {
                             console.log(`[WorkCenter] Processing pending message:`, message);
-                            // Process the attachment with skipRender=true to prevent loops
-                            handleWorkCenterAttachment(message, state, setViewHash, render, showStatusMessage, true);
+                            try {
+                                if (isAttachmentMessage(message)) {
+                                    // eslint-disable-next-line no-await-in-loop
+                                    await handleWorkCenterAttachment(message, state, setViewHash, render, showStatusMessage, true);
+                                } else if (state.managers.workCenter.instance?.handleExternalMessage) {
+                                    // eslint-disable-next-line no-await-in-loop
+                                    await state.managers.workCenter.instance.handleExternalMessage(message);
+                                } else {
+                                    // Legacy fallback for raw attachment packets.
+                                    // eslint-disable-next-line no-await-in-loop
+                                    await handleWorkCenterAttachment(message, state, setViewHash, render, showStatusMessage, true);
+                                }
+                            } catch (error) {
+                                console.warn('[WorkCenter] Failed to replay pending message:', error);
+                            }
                         }
                     }
 
