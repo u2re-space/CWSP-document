@@ -15,6 +15,7 @@ import { showToast, initOverlay } from "@rs-frontend/main/overlay";
 import { initToastReceiver } from "@rs-frontend/items/Toast";
 import { initClipboardReceiver } from "@rs-core/modules/Clipboard";
 import { copyAsHTML, copyAsMathML, copyAsMarkdown, copyAsTeX } from "@rs-core/document/Conversion";
+import { isUserScopePath, toUserRelativePath } from "fest/core";
 
 // Content-script modules
 import "./copy";           // COPY_HACK handler
@@ -88,13 +89,10 @@ const copyOps = new Map<string, (el: HTMLElement) => unknown>([
     ["copy-as-html", copyAsHTML],
 ]);
 
-const USER_FS_BRIDGE_PREFIX = "/user/";
-
 const toUserFsPath = (rawPath: string): string => {
     const value = String(rawPath || "").trim();
-    if (!value.startsWith(USER_FS_BRIDGE_PREFIX)) return "";
-    const stripped = value.slice(USER_FS_BRIDGE_PREFIX.length);
-    return stripped.replace(/^\/+/, "");
+    if (!isUserScopePath(value)) return "";
+    return toUserRelativePath(value);
 };
 
 const encodeArrayBufferBase64 = (buffer: ArrayBuffer): string => {

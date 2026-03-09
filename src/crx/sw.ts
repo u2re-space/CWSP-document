@@ -23,6 +23,7 @@ import { executionCore } from "@rs-com/service/misc/ExecutionCore";
 import type { ActionContext, ActionInput } from "@rs-com/service/misc/ActionHistory";
 import { crxMessaging, registerCrxHandler, broadcastToCrxTabs } from "../com/core/CrxMessaging";
 import { CRX_SOLVE_AND_ANSWER_INSTRUCTION, CRX_WRITE_CODE_INSTRUCTION, CRX_EXTRACT_CSS_INSTRUCTION } from "@rs-com/core/BuiltInAI";
+import { isUserScopePath } from "fest/core";
 
 // ---------------------------------------------------------------------------
 // Environment detection
@@ -1008,7 +1009,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         if (message?.type === "crx:user-fs:request") {
             const action = (message?.action || "").trim();
             const path = (message?.path || "").trim();
-            if (!path.startsWith("/user/")) {
+            if (!isUserScopePath(path)) {
                 sendResponse({ ok: false, error: "Only /user/* path is supported" });
                 return;
             }
@@ -1026,11 +1027,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
         if (message?.type === "crx:user-fs:fetch") {
             const path = (message?.path || "").trim();
-            if (!path.startsWith("/user/")) {
+            if (!isUserScopePath(path)) {
                 sendResponse({ ok: false, status: 400, error: "Only /user/* path is supported" });
                 return;
             }
-            if (path.endsWith("/")) {
+            if (path.endsWith("/") || path === "/user") {
                 const listed = await requestUserFsViaActiveTab({ action: "list", path });
                 sendResponse({
                     ok: Boolean(listed?.ok),

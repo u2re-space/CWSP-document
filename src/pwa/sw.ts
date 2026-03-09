@@ -18,6 +18,7 @@ import {
 } from './lib/ShareTargetUtils';
 import { BROADCAST_CHANNELS, MESSAGE_TYPES, STORAGE_KEYS, ROUTE_HASHES, COMPONENTS } from '@rs-com/config/Names';
 import { summarizeForLog } from '@rs-com/core/LogSanitizer';
+import { isUserScopePath, toUserRelativePath } from "fest/core";
 
 // ============================================================================
 // SERVICE WORKER CONTENT ASSOCIATION SYSTEM
@@ -444,9 +445,7 @@ const safeCachesMatch = async (requestLike: RequestInfo | URL | null | undefined
 };
 
 const toUserOpfsPath = (pathname: string): string => {
-    const raw = (pathname || "").replace(/^\/user/, "");
-    const normalized = raw.replace(/\/+/g, "/").trim();
-    return normalized.startsWith("/") ? normalized.slice(1) : normalized;
+    return toUserRelativePath(pathname);
 };
 
 const readUserOpfsFile = async (pathname: string): Promise<File | null> => {
@@ -1395,10 +1394,10 @@ registerRoute(
 
 // Serve /user/* from OPFS in service worker context.
 registerRoute(
-    ({ url, request }) => url?.pathname?.startsWith('/user/') && request?.method === 'GET',
+    ({ url, request }) => isUserScopedPath(url?.pathname || "") && request?.method === 'GET',
     async ({ url }) => {
         const pathname = url?.pathname || "";
-        if (pathname.endsWith("/")) {
+        if (pathname.endsWith("/") || pathname === "/user") {
             const entries = await listUserOpfsEntries(pathname);
             return new Response(JSON.stringify({ path: pathname, entries }), {
                 headers: {
