@@ -6,6 +6,7 @@ import { loadSettings, saveSettings } from "@rs-com/config/Settings";
 import { BUILTIN_AI_MODELS, type AppSettings, type MCPConfig } from "@rs-com/config/SettingsTypes";
 import { applyTheme } from "@rs-core/utils/Theme";
 import { setString, StorageKeys } from "../../../core/storage";
+import { navigateToView } from "../../main/routing";
 import { createCustomInstructionsEditor } from "../../items/CustomInstructionsEditor";
 import { loadAsAdopted } from "fest/dom";
 
@@ -529,9 +530,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     const openExplorerPath = (path: string) => {
         try {
             setString(StorageKeys.EXPLORER_PATH, path);
-            if (typeof window !== "undefined") {
-                globalThis?.history?.replaceState?.(null, "", "#explorer");
-            }
+            navigateToView("explorer");
             const channel = new BroadcastChannel("file-explorer");
             channel.postMessage({
                 type: "content-explorer",

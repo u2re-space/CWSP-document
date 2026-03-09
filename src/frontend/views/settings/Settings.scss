@@ -56,6 +56,14 @@
             pointer-events: auto;
         }
 
+        textarea {
+            container-type: inline-size;
+            resize: block;
+            inline-size: stretch;
+            max-inline-size: stretch;
+            box-sizing: border-box;
+        }
+
         h2 {
             margin: 0;
             font-size: var(--text-xl, 20px);
@@ -122,6 +130,8 @@
             margin-block-start: var(--space-xs, 8px);
             display: flex;
             justify-content: flex-start;
+            flex-direction: row;
+            flex-wrap: wrap;
         }
 
         .mcp-section {

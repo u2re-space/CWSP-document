@@ -1360,7 +1360,9 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
                     if (state.view !== 'file-explorer') {
                         state.view = 'file-explorer';
                         setViewHash('file-explorer');
-                        // Don't call render() - let hash change trigger it
+                        // In path-based navigation there may be no hashchange event.
+                        // Render immediately so /explorer transitions are visible.
+                        render();
                     }
 
                     // Process explorer action
