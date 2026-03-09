@@ -6,7 +6,7 @@
  * Uses the <md-view> web component for encapsulated rendering.
  */
 
-import { H, normalizeDataAsset, parseDataUrl, isBase64Like } from "fest/lure";
+import { H, normalizeDataAsset, parseDataUrl, isBase64Like, openDirectory, provide } from "fest/lure";
 import { ref, affected } from "fest/object";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
 import DOMPurify from 'dompurify';
@@ -273,6 +273,7 @@ export class ViewerView implements View {
     private isPointerInView = false;
     private sourceUrl: string | null = null;
     private customSheet: CSSStyleSheet | null = null;
+    private userStyleModules: { screenCss: string; printCss: string } = { screenCss: "", printCss: "" };
     private markdownSettings: ViewerMarkdownSettings = {
         preset: "default",
         fontFamily: "system",
@@ -1211,8 +1212,14 @@ export class ViewerView implements View {
             }
         `;
 
-        const screenCss = (this.markdownSettings.customCss || "").trim();
-        const userPrintCss = (this.markdownSettings.printCss || "").trim();
+        const screenCss = [this.userStyleModules.screenCss, (this.markdownSettings.customCss || "").trim()]
+            .map((value) => (value || "").trim())
+            .filter(Boolean)
+            .join("\n\n");
+        const userPrintCss = [this.userStyleModules.printCss, (this.markdownSettings.printCss || "").trim()]
+            .map((value) => (value || "").trim())
+            .filter(Boolean)
+            .join("\n\n");
         const pageCss = pageSize !== "auto"
             ? `@page { size: ${pageSize} ${pageOrientation}; margin: ${pageMargin}mm; }`
             : "";
@@ -1230,6 +1237,38 @@ export class ViewerView implements View {
         ].filter(Boolean);
 
         return chunks.join("\n\n");
+    }
+
+    private async loadUserStyleModules(): Promise<void> {
+        const result = { screenCss: "", printCss: "" };
+        try {
+            const dir = openDirectory(null, "/user/styles/", { create: true });
+            await dir;
+            const entries = await Array.fromAsync(dir.entries?.() ?? []);
+            const names = entries
+                .map((entry: any) => String(entry?.[0] || "").trim())
+                .filter((name) => !!name && name.toLowerCase().endsWith(".css"))
+                .sort((a, b) => a.localeCompare(b));
+
+            const screenChunks: string[] = [];
+            const printChunks: string[] = [];
+            for (const name of names) {
+                const file = await provide(`/user/styles/${name}`).catch(() => null);
+                const cssText = file ? await file.text().catch(() => "") : "";
+                if (!cssText.trim()) continue;
+                if (name.toLowerCase().endsWith(".print.css")) {
+                    printChunks.push(`/* ${name} */\n${cssText}`);
+                } else {
+                    screenChunks.push(`/* ${name} */\n${cssText}`);
+                }
+            }
+
+            result.screenCss = screenChunks.join("\n\n").trim();
+            result.printCss = printChunks.join("\n\n").trim();
+        } catch (error) {
+            console.warn("[Viewer] Failed to load /user/styles modules:", error);
+        }
+        this.userStyleModules = result;
     }
 
     private applyCustomStyles(): void {
@@ -1284,6 +1323,7 @@ export class ViewerView implements View {
                     ? markdown.extensions
                     : []
             };
+            await this.loadUserStyleModules();
             this.applyCustomStyles();
             this.onRefresh();
         } catch (error) {

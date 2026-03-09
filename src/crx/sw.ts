@@ -123,6 +123,27 @@ const getChronologicalActiveTab = async () => {
     return lastKnownActiveTab ? { ...lastKnownActiveTab } : null;
 };
 
+const decodeBase64ToUint8 = (base64: string): Uint8Array => {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+};
+
+const requestUserFsViaActiveTab = async (payload: { action: "list" | "read-file"; path: string }) => {
+    const active = await getChronologicalActiveTab();
+    if (!active?.tabId || active.tabId < 0) {
+        throw new Error("No active tab available for /user bridge");
+    }
+    return chrome.tabs.sendMessage(active.tabId, {
+        type: "crx-user-fs-bridge",
+        action: payload.action,
+        path: payload.path
+    });
+};
+
 // ---------------------------------------------------------------------------
 // Clipboard shortcut
 // ---------------------------------------------------------------------------
@@ -984,21 +1005,79 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             return;
         }
 
+        if (message?.type === "crx:user-fs:request") {
+            const action = (message?.action || "").trim();
+            const path = (message?.path || "").trim();
+            if (!path.startsWith("/user/")) {
+                sendResponse({ ok: false, error: "Only /user/* path is supported" });
+                return;
+            }
+            if (action === "list") {
+                sendResponse(await requestUserFsViaActiveTab({ action: "list", path }));
+                return;
+            }
+            if (action === "read-file") {
+                sendResponse(await requestUserFsViaActiveTab({ action: "read-file", path }));
+                return;
+            }
+            sendResponse({ ok: false, error: `Unknown action: ${action}` });
+            return;
+        }
+
+        if (message?.type === "crx:user-fs:fetch") {
+            const path = (message?.path || "").trim();
+            if (!path.startsWith("/user/")) {
+                sendResponse({ ok: false, status: 400, error: "Only /user/* path is supported" });
+                return;
+            }
+            if (path.endsWith("/")) {
+                const listed = await requestUserFsViaActiveTab({ action: "list", path });
+                sendResponse({
+                    ok: Boolean(listed?.ok),
+                    status: listed?.ok ? 200 : 404,
+                    contentType: "application/json",
+                    bodyText: JSON.stringify(listed?.ok ? { path, entries: listed.entries || [] } : listed)
+                });
+                return;
+            }
+            const read = await requestUserFsViaActiveTab({ action: "read-file", path });
+            if (!read?.ok || !read?.file?.base64) {
+                sendResponse({ ok: false, status: 404, error: read?.error || "File not found" });
+                return;
+            }
+            const bytes = decodeBase64ToUint8(read.file.base64);
+            sendResponse({
+                ok: true,
+                status: 200,
+                contentType: read.file.type || "application/octet-stream",
+                file: {
+                    name: read.file.name,
+                    size: read.file.size,
+                    lastModified: read.file.lastModified
+                },
+                bodyBase64: read.file.base64,
+                bodyBytes: bytes.buffer
+            });
+            return;
+        }
+
         // Markdown loading
-        if (message?.type !== "md:load") return;
-        const src = typeof message.src === "string" ? message.src : "";
-        if (!src) { sendResponse({ ok: false, error: "missing src" }); return; }
-        const fetched = await fetchMarkdownText(src);
-        if (!fetched.ok || !fetched.text) {
-            sendResponse({ ok: false, status: fetched.status, src: fetched.src, error: "fetch-failed" });
+        if (message?.type === "md:load") {
+            const src = typeof message.src === "string" ? message.src : "";
+            if (!src) { sendResponse({ ok: false, error: "missing src" }); return; }
+            const fetched = await fetchMarkdownText(src);
+            if (!fetched.ok || !fetched.text) {
+                sendResponse({ ok: false, status: fetched.status, src: fetched.src, error: "fetch-failed" });
+                return;
+            }
+            if (!isDefinitelyMarkdownResponse(fetched.src, fetched.text, fetched.contentType)) {
+                sendResponse({ ok: false, status: fetched.status, src: fetched.src, error: "not-markdown" });
+                return;
+            }
+            const key = await putMarkdownToSession(fetched.text);
+            sendResponse({ ok: true, status: fetched.status, src: fetched.src, key });
             return;
         }
-        if (!isDefinitelyMarkdownResponse(fetched.src, fetched.text, fetched.contentType)) {
-            sendResponse({ ok: false, status: fetched.status, src: fetched.src, error: "not-markdown" });
-            return;
-        }
-        const key = await putMarkdownToSession(fetched.text);
-        sendResponse({ ok: true, status: fetched.status, src: fetched.src, key });
     })().catch((e) => sendResponse({ ok: false, error: String(e) }));
     return true;
 });

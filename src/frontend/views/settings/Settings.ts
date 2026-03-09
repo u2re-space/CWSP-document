@@ -5,6 +5,7 @@ import { H } from "fest/lure";
 import { loadSettings, saveSettings } from "@rs-com/config/Settings";
 import { BUILTIN_AI_MODELS, type AppSettings, type MCPConfig } from "@rs-com/config/SettingsTypes";
 import { applyTheme } from "@rs-core/utils/Theme";
+import { setString, StorageKeys } from "../../../core/storage";
 import { createCustomInstructionsEditor } from "../../items/CustomInstructionsEditor";
 import { loadAsAdopted } from "fest/dom";
 
@@ -226,6 +227,10 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
   }
 ]'></textarea>
       </label>
+      <div class="mcp-actions">
+        <button class="btn" type="button" data-action="open-user-styles">Open <code>/user/styles/</code> in Explorer</button>
+        <button class="btn" type="button" data-action="open-assets-readonly">Open <code>/assets/</code> (read-only) in Explorer</button>
+      </div>
       <p class="mcp-empty-note">Rules are regex replacements applied before markdown parsing. Invalid JSON is rejected on save. Custom CSS supports explicit <code>@layer</code> blocks for advanced interop.</p>
     </section>
 
@@ -443,9 +448,9 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     const markdownPluginSmartTypography = field('[data-field="appearance.markdown.plugins.smartTypography"]') as HTMLInputElement | null;
     const markdownPluginSoftBreaks = field('[data-field="appearance.markdown.plugins.softBreaksAsBr"]') as HTMLInputElement | null;
     const markdownPluginExternalLinks = field('[data-field="appearance.markdown.plugins.externalLinksNewTab"]') as HTMLInputElement | null;
-    const markdownCustomCss = field('[data-field="appearance.markdown.customCss"]') as HTMLTextAreaElement | null;
-    const markdownPrintCss = field('[data-field="appearance.markdown.printCss"]') as HTMLTextAreaElement | null;
-    const markdownExtensions = field('[data-field="appearance.markdown.extensions"]') as HTMLTextAreaElement | null;
+    const markdownCustomCss = root.querySelector('[data-field="appearance.markdown.customCss"]') as HTMLTextAreaElement | null;
+    const markdownPrintCss = root.querySelector('[data-field="appearance.markdown.printCss"]') as HTMLTextAreaElement | null;
+    const markdownExtensions = root.querySelector('[data-field="appearance.markdown.extensions"]') as HTMLTextAreaElement | null;
     const ntpEnabled = field('[data-field="core.ntpEnabled"]') as HTMLInputElement | null;
     const mcpSection = root.querySelector("[data-mcp-section]") as HTMLElement | null;
     const extSection = root.querySelector('[data-section="extension"]') as HTMLElement | null;
@@ -519,6 +524,28 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         if (!note) return;
         note.textContent = t;
         if (t) setTimeout(() => (note.textContent = ""), 1500);
+    };
+
+    const openExplorerPath = (path: string) => {
+        try {
+            setString(StorageKeys.EXPLORER_PATH, path);
+            if (typeof window !== "undefined") {
+                globalThis?.history?.replaceState?.(null, "", "#explorer");
+            }
+            const channel = new BroadcastChannel("file-explorer");
+            channel.postMessage({
+                type: "content-explorer",
+                data: {
+                    action: "view",
+                    path
+                }
+            });
+            channel.close();
+            setNote(`Explorer: ${path}`);
+        } catch (error) {
+            console.warn("[Settings] Failed to open explorer path:", error);
+            setNote("Failed to open Explorer path.");
+        }
     };
 
     const createMcpRow = (cfg: MCPConfig) => {
@@ -687,6 +714,18 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
             if (mcpSection && !mcpSection.querySelector("[data-mcp-id]")) {
                 renderMcpConfigurations([]);
             }
+            return;
+        }
+
+        const openUserStylesBtn = t?.closest?.('button[data-action="open-user-styles"]') as HTMLButtonElement | null;
+        if (openUserStylesBtn) {
+            openExplorerPath("/user/styles/");
+            return;
+        }
+
+        const openAssetsReadonlyBtn = t?.closest?.('button[data-action="open-assets-readonly"]') as HTMLButtonElement | null;
+        if (openAssetsReadonlyBtn) {
+            openExplorerPath("/assets/");
             return;
         }
 

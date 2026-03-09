@@ -88,6 +88,70 @@ const copyOps = new Map<string, (el: HTMLElement) => unknown>([
     ["copy-as-html", copyAsHTML],
 ]);
 
+const USER_FS_BRIDGE_PREFIX = "/user/";
+
+const toUserFsPath = (rawPath: string): string => {
+    const value = String(rawPath || "").trim();
+    if (!value.startsWith(USER_FS_BRIDGE_PREFIX)) return "";
+    const stripped = value.slice(USER_FS_BRIDGE_PREFIX.length);
+    return stripped.replace(/^\/+/, "");
+};
+
+const encodeArrayBufferBase64 = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+};
+
+const listUserFsDirectory = async (path: string) => {
+    const relPath = toUserFsPath(path);
+    if (relPath === "" && path !== "/user/" && path !== "/user") return { ok: false, error: "Invalid /user path" };
+
+    let dir = await navigator.storage.getDirectory();
+    for (const part of relPath.split("/").filter(Boolean)) {
+        dir = await dir.getDirectoryHandle(part, { create: false });
+    }
+
+    const entries: Array<{ name: string; kind: "file" | "directory" }> = [];
+    for await (const [name, handle] of dir.entries()) {
+        entries.push({ name, kind: handle.kind as "file" | "directory" });
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    return { ok: true, path, entries };
+};
+
+const readUserFsFile = async (path: string) => {
+    const relPath = toUserFsPath(path);
+    if (!relPath || relPath.endsWith("/")) return { ok: false, error: "Invalid file path" };
+
+    const parts = relPath.split("/").filter(Boolean);
+    const filename = parts.pop();
+    if (!filename) return { ok: false, error: "Missing filename" };
+
+    let dir = await navigator.storage.getDirectory();
+    for (const part of parts) {
+        dir = await dir.getDirectoryHandle(part, { create: false });
+    }
+    const fileHandle = await dir.getFileHandle(filename, { create: false });
+    const file = await fileHandle.getFile();
+    const base64 = encodeArrayBufferBase64(await file.arrayBuffer());
+    return {
+        ok: true,
+        path,
+        file: {
+            name: file.name,
+            type: file.type || "application/octet-stream",
+            size: file.size,
+            lastModified: file.lastModified,
+            base64
+        }
+    };
+};
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     // Selection query
     if (msg?.type === "highlight-selection") {
@@ -114,6 +178,27 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
                 console.warn("[Content] Copy operation failed:", e);
                 showToast("Failed to copy");
                 sendResponse({ ok: false });
+            }
+        })();
+        return true;
+    }
+
+    if (msg?.type === "crx-user-fs-bridge") {
+        (async () => {
+            try {
+                const action = String(msg?.action || "").trim();
+                const path = String(msg?.path || "").trim();
+                if (action === "list") {
+                    sendResponse(await listUserFsDirectory(path));
+                    return;
+                }
+                if (action === "read-file") {
+                    sendResponse(await readUserFsFile(path));
+                    return;
+                }
+                sendResponse({ ok: false, error: `Unknown action: ${action}` });
+            } catch (error) {
+                sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
             }
         })();
         return true;

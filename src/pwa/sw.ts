@@ -443,6 +443,50 @@ const safeCachesMatch = async (requestLike: RequestInfo | URL | null | undefined
     }
 };
 
+const toUserOpfsPath = (pathname: string): string => {
+    const raw = (pathname || "").replace(/^\/user/, "");
+    const normalized = raw.replace(/\/+/g, "/").trim();
+    return normalized.startsWith("/") ? normalized.slice(1) : normalized;
+};
+
+const readUserOpfsFile = async (pathname: string): Promise<File | null> => {
+    try {
+        const relPath = toUserOpfsPath(pathname);
+        if (!relPath || relPath.endsWith("/")) return null;
+        const parts = relPath.split("/").filter(Boolean);
+        const filename = parts.pop();
+        if (!filename) return null;
+
+        let dir = await navigator.storage.getDirectory();
+        for (const part of parts) {
+            dir = await dir.getDirectoryHandle(part, { create: false });
+        }
+        const handle = await dir.getFileHandle(filename, { create: false });
+        return await handle.getFile();
+    } catch {
+        return null;
+    }
+};
+
+const listUserOpfsEntries = async (pathname: string): Promise<Array<{ name: string; kind: "file" | "directory" }>> => {
+    try {
+        const relPath = toUserOpfsPath(pathname);
+        let dir = await navigator.storage.getDirectory();
+        for (const part of relPath.split("/").filter(Boolean)) {
+            dir = await dir.getDirectoryHandle(part, { create: false });
+        }
+
+        const entries: Array<{ name: string; kind: "file" | "directory" }> = [];
+        for await (const [name, entry] of dir.entries()) {
+            entries.push({ name, kind: entry.kind as "file" | "directory" });
+        }
+        entries.sort((a, b) => a.name.localeCompare(b.name));
+        return entries;
+    } catch {
+        return [];
+    }
+};
+
 async function getStoredCacheKeys(): Promise<CacheKeyEntry[]> {
     try {
         const db = await openCacheKeysDB();
@@ -1347,6 +1391,41 @@ registerRoute(
             });
         }
     }
+);
+
+// Serve /user/* from OPFS in service worker context.
+registerRoute(
+    ({ url, request }) => url?.pathname?.startsWith('/user/') && request?.method === 'GET',
+    async ({ url }) => {
+        const pathname = url?.pathname || "";
+        if (pathname.endsWith("/")) {
+            const entries = await listUserOpfsEntries(pathname);
+            return new Response(JSON.stringify({ path: pathname, entries }), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "no-store"
+                }
+            });
+        }
+
+        const file = await readUserOpfsFile(pathname);
+        if (!file) {
+            return new Response(JSON.stringify({ error: "Not found", path: pathname }), {
+                status: 404,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+
+        return new Response(file, {
+            headers: {
+                "Content-Type": file.type || "application/octet-stream",
+                "Content-Length": String(file.size),
+                "X-Source": "opfs-user",
+                "Cache-Control": "no-store"
+            }
+        });
+    },
+    "GET"
 );
 
 // Phosphor Icons Proxy (for PWA offline support)
