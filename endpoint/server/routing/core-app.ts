@@ -16,6 +16,10 @@ import { pickEnvBoolLegacy, pickEnvNumberLegacy } from "../lib/env.ts";
 import { parsePortableInteger } from "../lib/parsing.ts";
 import { registerCoreSettingsEndpoints,registerCoreSettingsRoutes } from "./userSettings.ts";
 
+const BOOT_AT_MS = Date.now();
+const SERVICE_NAME = "cws";
+const SERVICE_VERSION = String(process.env.npm_package_version || "unknown");
+
 const PHOSPHOR_STYLES = ["thin", "light", "regular", "bold", "fill", "duotone"] as const;
 type PhosphorStyle = (typeof PHOSPHOR_STYLES)[number];
 
@@ -355,6 +359,12 @@ const registerDebugRequestLogging = async (app: FastifyInstance): Promise<void> 
     });
 };
 
+const noStore = (reply: FastifyReply): void => {
+    reply.header("Cache-Control", "no-store");
+    reply.header("Pragma", "no-cache");
+    reply.header("Expires", "0");
+};
+
 export const registerCoreApp = async (app: FastifyInstance): Promise<void> => {
     loadEndpointDotenv();
     await registerDebugRequestLogging(app);
@@ -460,9 +470,53 @@ export const registerCoreApp = async (app: FastifyInstance): Promise<void> => {
             "/api/broadcast",
             "/api/action",
             "/api/storage",
-            "/api/ws"
+            "/api/ws",
+            "/api/system/status"
         ]
     }));
+
+    app.get("/healthz", async (_req, reply) => {
+        noStore(reply);
+        return reply.code(200).send({
+            ok: true,
+            service: SERVICE_NAME,
+            status: "healthy",
+            version: SERVICE_VERSION,
+            timestamp: new Date().toISOString()
+        });
+    });
+
+    app.get("/readyz", async (_req, reply) => {
+        const diagnostics = {
+            hasFetch: typeof fetch === "function",
+            hasBroadcastChannel: typeof BroadcastChannel !== "undefined",
+            hasCacheApi: typeof caches !== "undefined"
+        };
+        const ready = diagnostics.hasFetch;
+        noStore(reply);
+        return reply.code(ready ? 200 : 503).send({
+            ok: ready,
+            service: SERVICE_NAME,
+            status: ready ? "ready" : "degraded",
+            version: SERVICE_VERSION,
+            diagnostics,
+            timestamp: new Date().toISOString()
+        });
+    });
+
+    app.get("/api/system/status", async (_req, reply) => {
+        const now = Date.now();
+        noStore(reply);
+        return reply.code(200).send({
+            ok: true,
+            service: SERVICE_NAME,
+            version: SERVICE_VERSION,
+            uptimeMs: now - BOOT_AT_MS,
+            pid: process.pid,
+            node: process.version,
+            timestamp: new Date(now).toISOString()
+        });
+    });
 
     app.options("/lna-probe", async (req, reply) => {
         const origin = String((req.headers as any)?.origin || "");
