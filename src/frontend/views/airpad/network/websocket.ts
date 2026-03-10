@@ -37,6 +37,7 @@ let nextWsCandidateOffset = 0;
 const localNetworkPermissionProbeDone = new Set<string>();
 const AUTO_RECONNECT_MAX_ATTEMPTS = 3;
 const AUTO_RECONNECT_BASE_DELAY_MS = 800;
+const AIRPAD_CONNECTION_TYPE = "first-order";
 type WSConnectionHandler = (connected: boolean) => void;
 const wsConnectionHandlers = new Set<WSConnectionHandler>();
 
@@ -934,7 +935,9 @@ export function connectWS() {
         queryParams.__airpad_hop = candidate.host || remoteHost || 'unknown';
         queryParams.__airpad_host = candidate.host || remoteHost || '';
         queryParams.__airpad_target = targetHost || '';
-        queryParams.archetype = "forward-client";
+        // Keep client/server connectionType negotiation aligned with endpoint bridge parser.
+        queryParams.connectionType = AIRPAD_CONNECTION_TYPE;
+        queryParams.archetype = AIRPAD_CONNECTION_TYPE;
         const isSameAsTargetHost = () => {
             if (!routeTarget || !targetHost) return true;
             const normalizedRouteTarget = routeTarget.trim().toLowerCase();
