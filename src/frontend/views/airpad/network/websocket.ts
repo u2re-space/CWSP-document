@@ -35,9 +35,11 @@ type WSConnectCandidate = {
 let lastWsCandidates: WSConnectCandidate[] = [];
 let nextWsCandidateOffset = 0;
 const localNetworkPermissionProbeDone = new Set<string>();
-const AUTO_RECONNECT_MAX_ATTEMPTS = 3;
+// Keep retrying across NAT/Wi-Fi transitions; 0 means unlimited retries.
+const AUTO_RECONNECT_MAX_ATTEMPTS = 0;
 const AUTO_RECONNECT_BASE_DELAY_MS = 800;
-const AIRPAD_CONNECTION_TYPE = "first-order";
+const AIRPAD_CONNECTION_TYPE = "exchanger-initiator";
+const AIRPAD_ARCHETYPE = "first-order";
 type WSConnectionHandler = (connected: boolean) => void;
 const wsConnectionHandlers = new Set<WSConnectionHandler>();
 
@@ -191,9 +193,6 @@ const toSafeObject = (value: unknown): any => {
 const shouldAutoReconnectAfterDisconnect = (reason?: string): boolean => {
     if (!reason) {
         return true;
-    }
-    if (reason === "io server disconnect") {
-        return false;
     }
     if (reason === "io client disconnect" || reason === "forced close") {
         return false;
@@ -935,9 +934,9 @@ export function connectWS() {
         queryParams.__airpad_hop = candidate.host || remoteHost || 'unknown';
         queryParams.__airpad_host = candidate.host || remoteHost || '';
         queryParams.__airpad_target = targetHost || '';
-        // Keep client/server connectionType negotiation aligned with endpoint bridge parser.
+        // Exchanger is the primary AirPad identity; first-order is retained as compatibility archetype.
         queryParams.connectionType = AIRPAD_CONNECTION_TYPE;
-        queryParams.archetype = AIRPAD_CONNECTION_TYPE;
+        queryParams.archetype = AIRPAD_ARCHETYPE;
         const isSameAsTargetHost = () => {
             if (!routeTarget || !targetHost) return true;
             const normalizedRouteTarget = routeTarget.trim().toLowerCase();
@@ -1025,17 +1024,21 @@ export function connectWS() {
             }
 
             const attempt = autoReconnectAttempts + 1;
-            if (!shouldAutoReconnectAfterDisconnect(reason) || attempt > AUTO_RECONNECT_MAX_ATTEMPTS) {
+            const hasMaxAttemptLimit = AUTO_RECONNECT_MAX_ATTEMPTS > 0;
+            if (!shouldAutoReconnectAfterDisconnect(reason) || (hasMaxAttemptLimit && attempt > AUTO_RECONNECT_MAX_ATTEMPTS)) {
                 return;
             }
 
             autoReconnectAttempts = attempt;
-            const delay = AUTO_RECONNECT_BASE_DELAY_MS * attempt;
+            const delay = Math.min(AUTO_RECONNECT_BASE_DELAY_MS * attempt, 5000);
             setTimeout(() => {
                 if (isConnecting || wsConnected || (socket && socket.connected) || (socket as any)?.connecting) {
                     return;
                 }
-                logWsState("auto-reconnect", `attempt=${attempt}/${AUTO_RECONNECT_MAX_ATTEMPTS} reason=${reason || "unknown reason"}`);
+                const attemptLabel = hasMaxAttemptLimit
+                    ? `${attempt}/${AUTO_RECONNECT_MAX_ATTEMPTS}`
+                    : `${attempt}/unlimited`;
+                logWsState("auto-reconnect", `attempt=${attemptLabel} reason=${reason || "unknown reason"}`);
                 connectWS();
             }, delay);
             });
