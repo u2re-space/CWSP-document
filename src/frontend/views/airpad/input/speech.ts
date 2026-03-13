@@ -3,7 +3,7 @@
 // =========================
 
 import { log, getAiButton, getAiStatusEl, getVoiceTextEl } from '../utils/utils';
-import { connectAirPadSession, isAirPadSessionConnected, sendAirPadIntent } from '../network/session';
+import { connectAirPadSession, isAirPadSessionConnected, onAirPadVoiceMessage, sendAirPadIntent } from '../network/session';
 import { loadSettings } from '@rs-com/config/Settings';
 
 let recognition: any = null;
@@ -11,6 +11,7 @@ let aiListening = false;
 export let aiModeActive = false;
 let speechLanguage = 'ru-RU';
 let speechRecognitionInitialized = false;
+let unsubscribeVoiceMessage: (() => void) | null = null;
 
 const normalizeSpeechLanguage = (value: string | undefined): string => {
     const lang = (value || '').trim();
@@ -64,6 +65,13 @@ export function initSpeechRecognition() {
     speechRecognitionInitialized = true;
     void loadSpeechLanguagePreference();
     recognition = setupSpeechRecognition();
+    unsubscribeVoiceMessage?.();
+    unsubscribeVoiceMessage = onAirPadVoiceMessage((message) => {
+        const voiceTextEl = getVoiceTextEl();
+        if (voiceTextEl) {
+            voiceTextEl.textContent = message.text;
+        }
+    });
 
     if (recognition) {
         recognition.onstart = () => {
@@ -117,11 +125,6 @@ export function initSpeechRecognition() {
                 log('Speech: недостаточно слов (нужно >= 2) — не отправляем и не подключаем WS');
                 return;
             }
-
-            const payload = {
-                type: 'voice_command',
-                text: normalized,
-            };
 
             const trySend = (deadline: number) => {
                 if (isAirPadSessionConnected()) {

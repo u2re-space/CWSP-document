@@ -150,7 +150,7 @@ export default async function mountAirpad(mountElement: HTMLElement): Promise<vo
                         <summary>AI-кнопка</summary>
                         <ul>
                             <li>Нажми и держи — идёт распознавание речи.</li>
-                            <li>Отпусти — команда уйдёт как <code>voice_command</code>.</li>
+                            <li>Отпусти — команда уйдёт в endpoint voice pipeline.</li>
                         </ul>
                     </details>
 

@@ -1,52 +1,63 @@
 import type { AirPadClipboardResult, AirPadIntent } from "./intents";
 import {
-    connectLegacySocketIoRail,
-    createLegacySocketIoKeyboardMessage,
-    disconnectLegacySocketIoRail,
-    initLegacySocketIoRail,
-    isLegacySocketIoRailConnected,
-    onLegacySocketIoClipboardUpdate,
-    onLegacySocketIoRailConnectionChange,
-    requestLegacySocketIoClipboardCopy,
-    requestLegacySocketIoClipboardCut,
-    requestLegacySocketIoClipboardPaste,
-    requestLegacySocketIoClipboardRead,
-    sendLegacySocketIoBinary,
-    sendLegacySocketIoIntent
-} from "./rails/legacy-socketio";
+    connectPacketSocketIoRail,
+    createPacketSocketIoKeyboardMessage,
+    disconnectPacketSocketIoRail,
+    initPacketSocketIoRail,
+    isPacketSocketIoRailConnected,
+    onPacketSocketIoClipboardUpdate,
+    onPacketSocketIoRailConnectionChange,
+    requestPacketSocketIoClipboardCopy,
+    requestPacketSocketIoClipboardCut,
+    requestPacketSocketIoClipboardPaste,
+    requestPacketSocketIoClipboardRead,
+    sendPacketSocketIoBinary,
+    sendPacketSocketIoIntent
+} from "./rails/packet-socketio";
+import { onVoiceResult } from "./websocket";
 
 export type AirPadSessionRail = "canonical-session";
+export type AirPadVoiceMessage = {
+    text: string;
+    type: "voice_result" | "voice_error";
+    actions?: unknown[];
+    error?: string;
+};
 
 const ACTIVE_RAIL: AirPadSessionRail = "canonical-session";
 
 export const getAirPadSessionRail = (): AirPadSessionRail => ACTIVE_RAIL;
 
 export const initAirPadSessionTransport = (button: HTMLElement | null): void => {
-    initLegacySocketIoRail(button);
+    initPacketSocketIoRail(button);
 };
 
 export const connectAirPadSession = (): void => {
-    connectLegacySocketIoRail();
+    connectPacketSocketIoRail();
 };
 
 export const disconnectAirPadSession = (): void => {
-    disconnectLegacySocketIoRail();
+    disconnectPacketSocketIoRail();
 };
 
 export const isAirPadSessionConnected = (): boolean => {
-    return isLegacySocketIoRailConnected();
+    return isPacketSocketIoRailConnected();
 };
 
 export const onAirPadSessionConnectionChange = (handler: (connected: boolean) => void): (() => void) => {
-    return onLegacySocketIoRailConnectionChange(handler);
+    return onPacketSocketIoRailConnectionChange(handler);
 };
 
 export const onAirPadRemoteClipboardUpdate = (handler: (text: string, meta?: { source?: string }) => void): (() => void) => {
-    return onLegacySocketIoClipboardUpdate(handler);
+    return onPacketSocketIoClipboardUpdate(handler);
+};
+
+export const onAirPadVoiceMessage = (handler: (message: AirPadVoiceMessage) => void): (() => void) => {
+    return onVoiceResult(handler);
 };
 
 export const sendAirPadIntent = (intent: AirPadIntent): void => {
-    sendLegacySocketIoIntent(intent);
+    sendPacketSocketIoIntent(intent);
 };
 
 export const sendAirPadKeyboardChar = (char: string): void => {
@@ -54,25 +65,25 @@ export const sendAirPadKeyboardChar = (char: string): void => {
 };
 
 export const createAirPadKeyboardMessage = (codePoint: number, flags = 0): ArrayBuffer => {
-    return createLegacySocketIoKeyboardMessage(codePoint, flags);
+    return createPacketSocketIoKeyboardMessage(codePoint, flags);
 };
 
 export const sendAirPadBinaryMessage = (buffer: ArrayBuffer | Uint8Array): void => {
-    sendLegacySocketIoBinary(buffer);
+    sendPacketSocketIoBinary(buffer);
 };
 
 export const requestAirPadClipboardRead = async (): Promise<AirPadClipboardResult> => {
-    return requestLegacySocketIoClipboardRead();
+    return requestPacketSocketIoClipboardRead();
 };
 
 export const requestAirPadClipboardCopy = async (): Promise<AirPadClipboardResult> => {
-    return requestLegacySocketIoClipboardCopy();
+    return requestPacketSocketIoClipboardCopy();
 };
 
 export const requestAirPadClipboardCut = async (): Promise<AirPadClipboardResult> => {
-    return requestLegacySocketIoClipboardCut();
+    return requestPacketSocketIoClipboardCut();
 };
 
 export const requestAirPadClipboardPaste = async (text: string): Promise<AirPadClipboardResult> => {
-    return requestLegacySocketIoClipboardPaste(text);
+    return requestPacketSocketIoClipboardPaste(text);
 };

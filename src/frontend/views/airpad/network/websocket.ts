@@ -1,9 +1,9 @@
 // =========================
-// Legacy Socket.IO Rail
+// Socket.IO Transport
 // =========================
 
 import { io, Socket } from 'socket.io-client';
-import { log, getWsStatusEl, getVoiceTextEl } from '../utils/utils';
+import { log, getWsStatusEl } from '../utils/utils';
 import {
     getRemoteHost,
     getRemoteProtocol,
@@ -47,6 +47,8 @@ const wsConnectionHandlers = new Set<WSConnectionHandler>();
 let lastServerClipboardText = '';
 type ClipboardUpdateHandler = (text: string, meta?: { source?: string }) => void;
 const clipboardHandlers = new Set<ClipboardUpdateHandler>();
+type VoiceResultHandler = (message: { text: string; type: "voice_result" | "voice_error"; actions?: unknown[]; error?: string }) => void;
+const voiceResultHandlers = new Set<VoiceResultHandler>();
 
 type AirPadTransportMode = "plaintext" | "secure";
 type SignedEnvelope = { cipher: string; sig: string; from?: string };
@@ -69,24 +71,30 @@ type NetworkFetchResponse = {
     requestId?: string;
 };
 
+type CoordinatorPacket = {
+    op?: "ask" | "act" | "resolve" | "result" | "error";
+    what?: string;
+    payload?: any;
+    nodes?: string[];
+    uuid?: string;
+    result?: any;
+    error?: any;
+    byId?: string;
+    from?: string;
+    token?: string;
+    timestamp?: number;
+    [key: string]: unknown;
+};
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 let aesKeyCache = new Map<string, CryptoKey>();
 let hmacKeyCache = new Map<string, CryptoKey>();
-
-// Binary message format constants
-export const MSG_TYPE_MOVE = 0;
-export const MSG_TYPE_CLICK = 1;
-export const MSG_TYPE_SCROLL = 2;
-export const MSG_TYPE_MOUSE_DOWN = 3;
-export const MSG_TYPE_MOUSE_UP = 4;
-export const MSG_TYPE_VOICE_COMMAND = 5;
-export const MSG_TYPE_KEYBOARD = 6;
-
-const BUTTON_LEFT = 0;
-const BUTTON_RIGHT = 1;
-const BUTTON_MIDDLE = 2;
-const FLAG_DOUBLE = 0x80;
+const coordinatorPending = new Map<string, {
+    resolve: (value: any) => void;
+    reject: (error: any) => void;
+    timeoutId: ReturnType<typeof globalThis.setTimeout>;
+}>();
 
 export function getWS(): Socket | null {
     return socket;
@@ -113,6 +121,11 @@ export function getLastServerClipboard(): string {
 export function onServerClipboardUpdate(handler: ClipboardUpdateHandler): () => void {
     clipboardHandlers.add(handler);
     return () => clipboardHandlers.delete(handler);
+}
+
+export function onVoiceResult(handler: VoiceResultHandler): () => void {
+    voiceResultHandlers.add(handler);
+    return () => voiceResultHandlers.delete(handler);
 }
 
 function notifyClipboardHandlers(text: string, meta?: { source?: string }) {
@@ -209,6 +222,83 @@ const shouldRotateCandidateOnDisconnect = (reason?: string): boolean => {
 const getSecret = (): string => (getAirPadTransportSecret() || "").trim();
 const getSigningSecret = (): string => (getAirPadSigningSecret() || "").trim();
 const getClientId = (): string => (getAirPadClientId() || "").trim() || "airpad-client";
+const getAuthToken = (): string => (getAirPadAuthToken() || "").trim();
+const parseNodeList = (value: string): string[] => {
+    return Array.from(new Set(
+        value
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+    ));
+};
+const getCoordinatorNodes = (): string[] => {
+    return parseNodeList(getRemoteRouteTarget().trim());
+};
+const nextPacketId = (): string => {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    return `airpad-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+const isCoordinatorPacket = (value: unknown): value is CoordinatorPacket => {
+    return !!value && typeof value === "object" && (
+        "op" in (value as Record<string, unknown>) ||
+        "what" in (value as Record<string, unknown>) ||
+        "uuid" in (value as Record<string, unknown>) ||
+        "result" in (value as Record<string, unknown>) ||
+        "error" in (value as Record<string, unknown>)
+    );
+};
+
+const handleCoordinatorPacket = (packet: CoordinatorPacket): void => {
+    const uuid = typeof packet.uuid === "string" ? packet.uuid : "";
+    if (uuid && coordinatorPending.has(uuid)) {
+        const pending = coordinatorPending.get(uuid);
+        if (pending) {
+            clearTimeout(pending.timeoutId);
+            coordinatorPending.delete(uuid);
+            if (packet.op === "error" || packet.error !== undefined) {
+                pending.reject(packet.error ?? { ok: false, error: "Unknown coordinator error" });
+            } else {
+                pending.resolve(packet.result);
+            }
+        }
+        return;
+    }
+
+    if (packet.what === "clipboard:update") {
+        const clipboardPayload = packet.result ?? packet.payload;
+        const text = typeof clipboardPayload?.text === "string" ? clipboardPayload.text : "";
+        lastServerClipboardText = text;
+        notifyClipboardHandlers(text, { source: clipboardPayload?.source });
+    }
+};
+
+const emitCoordinatorPacket = (packet: CoordinatorPacket): boolean => {
+    if (!socket || !socket.connected) return false;
+    socket.emit("data", packet);
+    return true;
+};
+
+const buildCoordinatorPacket = (
+    op: NonNullable<CoordinatorPacket["op"]>,
+    what: string,
+    payload: any,
+    options: { nodes?: string[]; uuid?: string } = {}
+): CoordinatorPacket => {
+    const clientId = getClientId();
+    const authToken = getAuthToken();
+    return {
+        op,
+        what,
+        payload,
+        nodes: options.nodes ?? getCoordinatorNodes(),
+        uuid: options.uuid,
+        byId: clientId,
+        from: clientId,
+        token: authToken || undefined,
+        timestamp: Date.now()
+    };
+};
 
 const getAesKey = async (secret: string): Promise<CryptoKey | null> => {
     if (!secret || !globalThis.crypto?.subtle) return null;
@@ -474,31 +564,43 @@ async function tryRequestLocalNetworkPermission(origin: string, host: string): P
     }
 }
 
-export function requestClipboardGet(): Promise<{ ok: boolean; text?: string; error?: string }> {
-    return new Promise((resolve) => {
-        if (!socket || !socket.connected) return resolve({ ok: false, error: 'WS not connected' });
-        socket.emit('clipboard:get', (res: any) => resolve(res || { ok: false }));
+export function sendCoordinatorAct(what: string, payload: any, nodes?: string[]): boolean {
+    return emitCoordinatorPacket(buildCoordinatorPacket("act", what, payload, { nodes }));
+}
+
+export function sendCoordinatorAsk(what: string, payload: any, nodes?: string[]): Promise<any> {
+    return new Promise((resolve, reject) => {
+        if (!socket || !socket.connected) {
+            reject({ ok: false, error: "WS not connected" });
+            return;
+        }
+
+        const uuid = nextPacketId();
+        const timeoutId = globalThis.setTimeout(() => {
+            coordinatorPending.delete(uuid);
+            reject({ ok: false, error: `Timeout waiting for ${what}` });
+        }, 12000);
+
+        coordinatorPending.set(uuid, { resolve, reject, timeoutId });
+        emitCoordinatorPacket(buildCoordinatorPacket("ask", what, payload, { nodes, uuid }));
     });
 }
 
-export function requestClipboardCopy(): Promise<{ ok: boolean; text?: string; error?: string }> {
-    return new Promise((resolve) => {
-        if (!socket || !socket.connected) return resolve({ ok: false, error: 'WS not connected' });
-        socket.emit('clipboard:copy', (res: any) => resolve(res || { ok: false }));
-    });
-}
+export function sendCoordinatorRequest(what: string, payload: any, nodes?: string[]): Promise<any> {
+    return new Promise((resolve, reject) => {
+        if (!socket || !socket.connected) {
+            reject({ ok: false, error: "WS not connected" });
+            return;
+        }
 
-export function requestClipboardCut(): Promise<{ ok: boolean; text?: string; error?: string }> {
-    return new Promise((resolve) => {
-        if (!socket || !socket.connected) return resolve({ ok: false, error: 'WS not connected' });
-        socket.emit('clipboard:cut', (res: any) => resolve(res || { ok: false }));
-    });
-}
+        const uuid = nextPacketId();
+        const timeoutId = globalThis.setTimeout(() => {
+            coordinatorPending.delete(uuid);
+            reject({ ok: false, error: `Timeout waiting for ${what}` });
+        }, 12000);
 
-export function requestClipboardPaste(text: string): Promise<{ ok: boolean; error?: string }> {
-    return new Promise((resolve) => {
-        if (!socket || !socket.connected) return resolve({ ok: false, error: 'WS not connected' });
-        socket.emit('clipboard:paste', { text }, (res: any) => resolve(res || { ok: false }));
+        coordinatorPending.set(uuid, { resolve, reject, timeoutId });
+        emitCoordinatorPacket(buildCoordinatorPacket("act", what, payload, { nodes, uuid }));
     });
 }
 
@@ -545,138 +647,23 @@ function setWsStatus(connected: boolean) {
     }
 }
 
-// Create binary message buffer for mouse/scroll (8 bytes)
-// Format: [dx: 2][dy: 2][type: 1][flags: 1][reserved: 2]
-function createMouseMessage(type: number, dx: number = 0, dy: number = 0, flags: number = 0): ArrayBuffer {
-    const buffer = new ArrayBuffer(8);
-    const view = new DataView(buffer);
-
-    view.setInt16(0, Math.round(dx), true);   // dx (signed int16, little-endian)
-    view.setInt16(2, Math.round(dy), true);   // dy (signed int16, little-endian)
-    view.setUint8(4, type);                   // message type
-    view.setUint8(5, flags);                  // flags/button
-    view.setUint16(6, 0, true);               // reserved
-
-    return buffer;
-}
-
-// Create binary message for keyboard (8 bytes)
-// Format: [codePoint: 4][type: 1][flags: 1][reserved: 2]
-export function createKeyboardMessage(codePoint: number, flags: number = 0): ArrayBuffer {
-    const buffer = new ArrayBuffer(8);
-    const view = new DataView(buffer);
-
-    view.setUint32(0, codePoint, true);       // Full Unicode codePoint (little-endian)
-    view.setUint8(4, MSG_TYPE_KEYBOARD);      // message type
-    view.setUint8(5, flags);                  // flags
-    view.setUint16(6, 0, true);               // reserved
-
-    return buffer;
-}
-
-// Helper to determine keyboard flags from character
-function getKeyboardFlags(char: string): number {
-    if (char === '\b' || char === '\u007F') return 1;  // backspace
-    if (char === '\n' || char === '\r') return 2;       // enter
-    if (char === ' ') return 3;                         // space
-    if (char === '\t') return 4;                        // tab
-    return 0;                                           // normal character
-}
-
-// Send keyboard character (exported for use by other modules)
-export function sendKeyboardChar(char: string) {
-    if (!socket || !socket.connected) return;
-
-    const codePoint = char.codePointAt(0) || 0;
-    const flags = getKeyboardFlags(char);
-    const buffer = createKeyboardMessage(codePoint, flags);
-
-    socket.emit('message', new Uint8Array(buffer));
-}
-
-// Send raw binary message (for direct use)
-export function sendBinaryMessage(buffer: ArrayBuffer | Uint8Array) {
-    if (!socket || !socket.connected) return;
-
-    const data = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : buffer;
-    socket.emit('message', data);
-}
-
-export function sendWS(obj: any) {
-    if (!socket || !socket.connected) return;
-
-    let buffer: ArrayBuffer;
-
-    switch (obj.type) {
-        case 'move': {
-            const dx = obj.dx || 0;
-            const dy = obj.dy || 0;
-            buffer = createMouseMessage(MSG_TYPE_MOVE, dx, dy);
-            socket.emit('message', new Uint8Array(buffer));
-            break;
-        }
-        case 'click': {
-            let flags = BUTTON_LEFT;
-            if (obj.button === 'right') flags = BUTTON_RIGHT;
-            else if (obj.button === 'middle') flags = BUTTON_MIDDLE;
-            if (obj.double || obj.count === 2) flags |= FLAG_DOUBLE;
-            buffer = createMouseMessage(MSG_TYPE_CLICK, 0, 0, flags);
-            socket.emit('message', new Uint8Array(buffer));
-            break;
-        }
-        case 'scroll': {
-            const dx = obj.dx || 0;
-            const dy = obj.dy || 0;
-            buffer = createMouseMessage(MSG_TYPE_SCROLL, dx, dy);
-            socket.emit('message', new Uint8Array(buffer));
-            break;
-        }
-        case 'mouse_down': {
-            let flags = BUTTON_LEFT;
-            if (obj.button === 'right') flags = BUTTON_RIGHT;
-            else if (obj.button === 'middle') flags = BUTTON_MIDDLE;
-            buffer = createMouseMessage(MSG_TYPE_MOUSE_DOWN, 0, 0, flags);
-            socket.emit('message', new Uint8Array(buffer));
-            break;
-        }
-        case 'mouse_up': {
-            let flags = BUTTON_LEFT;
-            if (obj.button === 'right') flags = BUTTON_RIGHT;
-            else if (obj.button === 'middle') flags = BUTTON_MIDDLE;
-            buffer = createMouseMessage(MSG_TYPE_MOUSE_UP, 0, 0, flags);
-            socket.emit('message', new Uint8Array(buffer));
-            break;
-        }
-        case 'voice_command': {
-            // Voice commands still need text, so send as JSON
-            socket.emit('message', JSON.stringify(obj));
-            break;
-        }
-        case 'keyboard': {
-            // Use the proper keyboard message format with full Unicode support
-            const char = obj.char || '';
-            const codePoint = obj.codePoint || char.codePointAt(0) || 0;
-            const flags = obj.flags ?? getKeyboardFlags(char);
-            buffer = createKeyboardMessage(codePoint, flags);
-            socket.emit('message', new Uint8Array(buffer));
-            break;
-        }
-        default:
-            // Fallback to JSON for unknown types
-            void emitSignedObjectMessage(obj);
-            break;
-    }
-}
-
 function handleServerMessage(msg: any) {
     if (msg.type === 'voice_result' || msg.type === 'voice_error') {
         const text =
             msg.error ||
             msg.message ||
             ('Actions: ' + JSON.stringify(msg.actions || []));
-        const voiceTextEl = getVoiceTextEl();
-        if (voiceTextEl) {
-            voiceTextEl.textContent = text;
+        for (const handler of voiceResultHandlers) {
+            try {
+                handler({
+                    text,
+                    type: msg.type === "voice_error" ? "voice_error" : "voice_result",
+                    actions: msg.actions,
+                    error: msg.error
+                });
+            } catch {
+                // ignore subscriber errors
+            }
         }
         log('Voice result: ' + text);
     }
@@ -909,8 +896,8 @@ export function connectWS() {
             `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} transport=${candidate.protocol} ` +
             `source=${candidate.source} host=${candidate.host}:${candidate.port} target=${targetHost}:${targetPort}`
         );
-        const authToken = getAirPadAuthToken().trim();
-        const clientId = getAirPadClientId().trim();
+        const authToken = getAuthToken();
+        const clientId = getClientId();
         const handshakeAuth: Record<string, string> = {};
         if (authToken) {
             handshakeAuth.token = authToken;
@@ -998,7 +985,13 @@ export function connectWS() {
             isConnecting = false;
             autoReconnectAttempts = 0;
             setWsStatus(true);
-            socket.emit('hello', { id: getClientId() });
+            socket.emit('hello', {
+                id: clientId,
+                byId: clientId,
+                from: clientId,
+                token: authToken || undefined,
+                nodes: getCoordinatorNodes()
+            });
 
             socket.on('disconnect', (reason?: string) => {
                 logWsState("disconnected", `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${reason || "unknown"}`);
@@ -1010,6 +1003,11 @@ export function connectWS() {
 
             const manual = manualDisconnectRequested;
             manualDisconnectRequested = false;
+            for (const [uuid, pending] of coordinatorPending.entries()) {
+                clearTimeout(pending.timeoutId);
+                pending.reject({ ok: false, error: `Disconnected before response for ${uuid}` });
+                coordinatorPending.delete(uuid);
+            }
             socket = null;
             if (manual) {
                 autoReconnectAttempts = 0;
@@ -1070,6 +1068,16 @@ export function connectWS() {
                 const text = typeof decoded?.text === 'string' ? decoded.text : '';
                 lastServerClipboardText = text;
                 notifyClipboardHandlers(text, { source: decoded?.source });
+            });
+            socket.on("data", async (packet: any) => {
+                const decoded = await unwrapIncomingPayload(packet);
+                if (!isCoordinatorPacket(decoded)) return;
+                handleCoordinatorPacket(decoded);
+            });
+            socket.on("message", async (packet: any) => {
+                const decoded = await unwrapIncomingPayload(packet);
+                if (!isCoordinatorPacket(decoded)) return;
+                handleCoordinatorPacket(decoded);
             });
             socket.on("network.fetch", async (request: NetworkFetchRequest, ack?: (value: NetworkFetchResponse | Error) => void) => {
                 const response = await handleServerNetworkFetchRequest(request);
