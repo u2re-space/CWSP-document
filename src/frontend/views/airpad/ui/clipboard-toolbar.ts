@@ -4,12 +4,12 @@
 
 import { log, getBtnCut, getBtnCopy, getBtnPaste, getClipboardPreviewEl } from '../utils/utils';
 import {
-    onServerClipboardUpdate,
-    requestClipboardCopy,
-    requestClipboardCut,
-    requestClipboardPaste,
-    requestClipboardGet,
-} from '../network/websocket';
+    onAirPadRemoteClipboardUpdate,
+    requestAirPadClipboardCopy,
+    requestAirPadClipboardCut,
+    requestAirPadClipboardPaste,
+    requestAirPadClipboardRead,
+} from '../network/session';
 
 let clipboardToolbarInitialized = false;
 let unsubscribeClipboardUpdate: (() => void) | null = null;
@@ -70,15 +70,15 @@ export function initClipboardToolbar() {
     if (unsubscribeClipboardUpdate) {
         unsubscribeClipboardUpdate();
     }
-    unsubscribeClipboardUpdate = onServerClipboardUpdate((text, meta) => setPreview(text, meta));
+    unsubscribeClipboardUpdate = onAirPadRemoteClipboardUpdate((text, meta) => setPreview(text, meta));
 
     // Best-effort initial fetch (so UI isn't empty)
-    requestClipboardGet().then((res) => {
+    requestAirPadClipboardRead().then((res) => {
         if (res?.ok && typeof res.text === 'string') setPreview(res.text, { source: 'pc' });
     });
 
     btnCopy?.addEventListener('click', async () => {
-        const res = await requestClipboardCopy();
+        const res = await requestAirPadClipboardCopy();
         if (!res?.ok) {
             log('Copy failed: ' + (res?.error || 'unknown'));
             return;
@@ -95,7 +95,7 @@ export function initClipboardToolbar() {
     });
 
     btnCut?.addEventListener('click', async () => {
-        const res = await requestClipboardCut();
+        const res = await requestAirPadClipboardCut();
         if (!res?.ok) {
             log('Cut failed: ' + (res?.error || 'unknown'));
             return;
@@ -117,7 +117,7 @@ export function initClipboardToolbar() {
             return;
         }
 
-        const res = await requestClipboardPaste(text);
+        const res = await requestAirPadClipboardPaste(text);
         if (!res?.ok) {
             log('Paste failed: ' + (res?.error || 'unknown'));
             return;

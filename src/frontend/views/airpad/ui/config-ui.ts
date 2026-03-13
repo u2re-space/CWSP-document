@@ -20,7 +20,7 @@ import {
     getAirPadSigningSecret,
     setAirPadSigningSecret,
 } from '../config/config';
-import { disconnectWS, connectWS, isWSConnected } from '../network/websocket';
+import { connectAirPadSession, disconnectAirPadSession, isAirPadSessionConnected } from '../network/session';
 import { hideKeyboard } from '../input/keyboard/handlers';
 
 function getAirpadHostElement(): Element {
@@ -123,10 +123,10 @@ export function createConfigUI(): HTMLElement {
         setAirPadSigningSecret(signingSecretInput.value);
 
         // Disconnect and reconnect with new settings
-        if (isWSConnected()) {
-            disconnectWS();
+        if (isAirPadSessionConnected()) {
+            disconnectAirPadSession();
         }
-        setTimeout(() => connectWS(), 100);
+        setTimeout(() => connectAirPadSession(), 100);
 
         // Hide overlay
         overlay.style.display = 'none';

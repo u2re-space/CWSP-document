@@ -9,7 +9,7 @@ import { H } from "fest/lure";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
 import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shells/types";
 import type { BaseViewOptions } from "../types";
-import { disconnectWS } from "./network/websocket";
+import { disconnectAirPadSession } from "./network/session";
 import { setRemoteKeyboardEnabled } from "./input/virtual-keyboard";
 import { unmountAirpadRuntime } from "./main";
 
@@ -136,7 +136,7 @@ export class AirpadView implements View {
     private cleanup(): void {
         unmountAirpadRuntime();
         setRemoteKeyboardEnabled(false);
-        disconnectWS();
+            disconnectAirPadSession();
         this.unlockOrientationForAirpad();
         this.initialized = false;
         this.initPromise = null;

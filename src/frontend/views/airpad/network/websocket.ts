@@ -1,5 +1,5 @@
 // =========================
-// Socket.IO with Binary Messages
+// Legacy Socket.IO Rail
 // =========================
 
 import { io, Socket } from 'socket.io-client';

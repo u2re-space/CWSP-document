@@ -1,6 +1,6 @@
 import { log } from '../../utils/utils';
 import { enqueueMotion } from '../../config/motion-state';
-import { isWSConnected } from '../../network/websocket';
+import { isAirPadSessionConnected } from '../../network/session';
 import { aiModeActive } from '../speech';
 import { getAirState } from '../../ui/air-button';
 import {
@@ -234,7 +234,7 @@ export function initRelativeOrientation() {
         lastTs = now;
 
         if (getAirState && getAirState() !== 'AIR_MOVE') return;
-        if (!isWSConnected()) return;
+        if (!isAirPadSessionConnected()) return;
         if (aiModeActive) return;
 
         handleReading(relSensor.quaternion, dt);

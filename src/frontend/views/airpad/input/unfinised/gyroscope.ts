@@ -3,7 +3,7 @@
 // =========================
 
 import { log } from '../../utils/utils';
-import { sendWS, isWSConnected } from '../../network/websocket';
+import { isAirPadSessionConnected } from '../../network/session';
 import { enqueueMotion } from '../../config/motion-state';
 import { aiModeActive } from '../speech';
 import { getAirState, isMotionCalibrated, setMotionCalibrated, resetMotionBaseline } from '../../ui/air-button';
@@ -258,7 +258,7 @@ export function initGyro() {
 
         // Проверяем состояния
         if (getAirState() !== 'AIR_MOVE') { return; }
-        if (!isWSConnected()) return;
+        if (!isAirPadSessionConnected()) return;
         if (aiModeActive) return;
 
         // selection of axes for mouse (as you previously selected axes of accelerometer)

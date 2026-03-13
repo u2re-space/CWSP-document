@@ -3,7 +3,7 @@
 // =========================
 
 import { log, getAiButton, getAiStatusEl, getVoiceTextEl } from '../utils/utils';
-import { sendWS, connectWS, isWSConnected } from '../network/websocket';
+import { connectAirPadSession, isAirPadSessionConnected, sendAirPadIntent } from '../network/session';
 import { loadSettings } from '@rs-com/config/Settings';
 
 let recognition: any = null;
@@ -124,8 +124,8 @@ export function initSpeechRecognition() {
             };
 
             const trySend = (deadline: number) => {
-                if (isWSConnected()) {
-                    sendWS(payload);
+                if (isAirPadSessionConnected()) {
+                    sendAirPadIntent({ type: 'voice.submit', text: normalized });
                     return;
                 }
                 if (Date.now() > deadline) {
@@ -135,12 +135,12 @@ export function initSpeechRecognition() {
                 setTimeout(() => trySend(deadline), 120);
             };
 
-            if (!isWSConnected()) {
+            if (!isAirPadSessionConnected()) {
                 log('Speech: подключаем WS перед отправкой команды');
-                connectWS();
+                connectAirPadSession();
                 trySend(Date.now() + 2000);
             } else {
-                sendWS(payload);
+                sendAirPadIntent({ type: 'voice.submit', text: normalized });
             }
         };
     }

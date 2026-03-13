@@ -3,24 +3,23 @@
 // =========================
 
 import {
-    isWSConnected,
-    sendKeyboardChar as wsSendKeyboardChar,
-    createKeyboardMessage,
-    sendBinaryMessage
-} from '../../network/websocket';
+    createAirPadKeyboardMessage,
+    isAirPadSessionConnected,
+    sendAirPadBinaryMessage,
+    sendAirPadKeyboardChar
+} from '../../network/session';
 
 // Re-export for backward compatibility and direct binary sending
 export function sendKeyboardChar(char: string) {
-    if (!isWSConnected()) return;
+    if (!isAirPadSessionConnected()) return;
 
-    // Use the websocket module's function
-    wsSendKeyboardChar(char);
+    sendAirPadKeyboardChar(char);
 }
 
 // For sending pre-built binary messages (optimization)
 export function sendKeyboardBinary(codePoint: number, flags: number) {
-    if (!isWSConnected()) return;
+    if (!isAirPadSessionConnected()) return;
 
-    const buffer = createKeyboardMessage(codePoint, flags);
-    sendBinaryMessage(buffer);
+    const buffer = createAirPadKeyboardMessage(codePoint, flags);
+    sendAirPadBinaryMessage(buffer);
 }

@@ -8,7 +8,7 @@ import { initServiceWorker } from '@rs-frontend/pwa/sw-handling';
 
 //
 import { log, getBtnConnect } from './utils/utils';
-import { initWebSocket, onWSConnectionChange } from './network/websocket';
+import { initAirPadSessionTransport, onAirPadSessionConnectionChange } from './network/session';
 import { initSpeechRecognition, initAiButton } from './input/speech';
 import { initAirButton } from './ui/air-button';
 import { initRelativeOrientation } from './input/sensor/relative-orientation';
@@ -354,13 +354,13 @@ function initHintOverlay() {
 
     runInitializer('log overlay', () => initLogOverlay());
     runInitializer('hint overlay', () => initHintOverlay());
-    runInitializer('websocket button', () => initWebSocket(getBtnConnect()));
+    runInitializer('websocket button', () => initAirPadSessionTransport(getBtnConnect()));
     runInitializer('speech', () => initSpeechRecognition());
     runInitializer('AI button', () => initAiButton());
     runInitializer('Air button', () => initAirButton());
     runInitializer('virtual keyboard', () => initVirtualKeyboard());
     unsubscribeWsKeyboardSync?.();
-    unsubscribeWsKeyboardSync = onWSConnectionChange((connected) => {
+    unsubscribeWsKeyboardSync = onAirPadSessionConnectionChange((connected) => {
         setRemoteKeyboardEnabled(connected);
     });
     runInitializer('clipboard toolbar', () => initClipboardToolbar());

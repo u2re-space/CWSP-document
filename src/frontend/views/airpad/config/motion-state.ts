@@ -3,7 +3,7 @@
 // =========================
 
 import { MOTION_SEND_INTERVAL, MOTION_JITTER_EPS } from './config';
-import { sendWS } from '../network/websocket';
+import { sendAirPadIntent } from '../network/session';
 
 type MotionAccum = { dx: number; dy: number; dz: number };
 
@@ -22,8 +22,8 @@ function scheduleFlush() {
     flushTimer = globalThis?.setTimeout?.(() => {
         flushTimer = null;
         if (accum.dx === 0 && accum.dy === 0 && accum.dz === 0) return;
-        sendWS({
-            type: 'move',
+        sendAirPadIntent({
+            type: 'pointer.move',
             dx: accum.dx,
             dy: accum.dy,
             dz: accum.dz,

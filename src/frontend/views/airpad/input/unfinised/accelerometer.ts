@@ -3,7 +3,7 @@
 // =========================
 
 import { log } from '../../utils/utils';
-import { isWSConnected } from '../../network/websocket';
+import { isAirPadSessionConnected } from '../../network/session';
 import { enqueueMotion } from '../../config/motion-state';
 import { getAirState, setMotionCalibrated } from '../../ui/air-button';
 import { ACCELEROMETER_DEADZONE, ACCELEROMETER_GAIN, ACCELEROMETER_SMOOTH, ACCELEROMETER_MAX_SAMPLE_COUNT, GRAVITY_CORRECTION_STRENGTH, accelSrcForMouseX, accelSrcForMouseY, accelSrcForMouseZ, accelDirX, accelDirY, accelDirZ } from '../../config/config';
@@ -222,7 +222,7 @@ export function initAccelerometer() {
 
         // Проверяем состояния
         if (getAirState() !== 'AIR_MOVE') { return; }
-        if (!isWSConnected()) return;
+        if (!isAirPadSessionConnected()) return;
         if (aiModeActive) return;
 
         // selection of axes for mouse

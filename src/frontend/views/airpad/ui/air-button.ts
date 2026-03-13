@@ -3,7 +3,7 @@
 // =========================
 
 import { log, getAirButton, getAirStatusEl } from '../utils/utils';
-import { sendWS, connectWS } from '../network/websocket';
+import { connectAirPadSession, sendAirPadIntent } from '../network/session';
 import { checkIsAiModeActive } from '../input/speech';
 import { HOLD_DELAY, TAP_THRESHOLD, MOVE_TAP_THRESHOLD, SWIPE_THRESHOLD } from '../config/config';
 import { onEnterAirMove as gyroOnEnterAirMove } from '../input/unfinised/gyroscope';
@@ -146,7 +146,7 @@ export function enterAirMove(startDrag: boolean = false) {
     // Активируем drag если нужно
     if (startDrag && !dragActive) {
         dragActive = true;
-        sendWS({ type: 'mouse_down', button: 'left' });
+        sendAirPadIntent({ type: 'pointer.down', button: 'left' });
         log('Air: AIR_MOVE + DRAG started (mouse down)');
 
         // Обновляем статус чтобы показать [DRAG]
@@ -164,7 +164,7 @@ function exitAirMove() {
 
     // Если был drag-режим, отпускаем кнопку мыши
     if (dragActive) {
-        sendWS({ type: 'mouse_up', button: 'left' });
+        sendAirPadIntent({ type: 'pointer.up', button: 'left' });
         log('Air: DRAG ended (mouse up)');
         dragActive = false;
     } else {
@@ -176,7 +176,7 @@ function exitAirMove() {
 
 function airOnDown(e: PointerEvent) {
     // Любое действие по air-кнопке пытается поднять WS
-    connectWS();
+    connectAirPadSession();
 
     if (checkIsAiModeActive()) return;
 
@@ -270,11 +270,11 @@ function airOnUp(e: PointerEvent | null) {
                 // Если это был "второй tap" для drag, но пользователь не удержал —
                 // просто делаем обычный клик
                 if (!pendingDragOnHold) {
-                    sendWS({ type: 'click', button: 'left' });
+                    sendAirPadIntent({ type: 'pointer.click', button: 'left' });
                     log('Air: tap → click');
                 } else {
                     // Пользователь сделал tap-tap (без hold) — делаем double-click
-                    sendWS({ type: 'click', button: 'left', count: 2 });
+                    sendAirPadIntent({ type: 'pointer.click', button: 'left', count: 2 });
                     log('Air: tap-tap → double-click');
                     wasCleanTap = false; // Не считаем это за начало нового drag-sequence
                 }
@@ -283,7 +283,7 @@ function airOnUp(e: PointerEvent | null) {
     }
 
     if (shouldClickFromAirMoveGrace) {
-        sendWS({ type: 'click', button: 'left' });
+        sendAirPadIntent({ type: 'pointer.click', button: 'left' });
         log('Air: short hold + small move → click (grace)');
         wasCleanTap = true;
     }
@@ -341,7 +341,7 @@ function startSwipeGesture(dxSurf: number, dySurf: number) {
         lastSwipePos = { x: airDownPos!.x, y: airDownPos!.y };
 
         const initialDelta = Math.round(dySurf * 0.8);
-        sendWS({ type: 'scroll', dx: 0, dy: initialDelta });
+        sendAirPadIntent({ type: 'pointer.scroll', dx: 0, dy: initialDelta });
         log(`Air: swipe ${dySurf > 0 ? 'down' : 'up'} → scroll`);
     } else {
         // Горизонтальный свайп — жест
@@ -349,7 +349,7 @@ function startSwipeGesture(dxSurf: number, dySurf: number) {
         const direction = dxSurf > 0 ? 'right' : 'left';
 
         log(`Air: swipe ${direction}`);
-        sendWS({ type: 'gesture_swipe', direction });
+        sendAirPadIntent({ type: 'gesture.swipe', direction });
 
         resetAirState();
     }
@@ -362,7 +362,7 @@ function continueSwipeGesture(x: number, y: number) {
 
     if (Math.abs(dy) > 2) {
         const delta = Math.round(dy * 0.8);
-        sendWS({ type: 'scroll', dx: 0, dy: delta });
+        sendAirPadIntent({ type: 'pointer.scroll', dx: 0, dy: delta });
         lastSwipePos = { x, y };
     }
 }
@@ -387,7 +387,7 @@ function enterMiddleScrollMode() {
     resetAirState();
 
     // Middle mouse down
-    sendWS({ type: 'mouse_down', button: 'middle' });
+    sendAirPadIntent({ type: 'pointer.down', button: 'middle' });
     log('Neighbor: MIDDLE_SCROLL started (sensors active)');
 
     // Визуальная индикация
@@ -402,7 +402,7 @@ function exitMiddleScrollMode() {
     if (neighborState !== 'MIDDLE_SCROLL') return;
 
     // Middle mouse up
-    sendWS({ type: 'mouse_up', button: 'middle' });
+    sendAirPadIntent({ type: 'pointer.up', button: 'middle' });
     log('Neighbor: MIDDLE_SCROLL ended');
 
     //
@@ -438,7 +438,7 @@ function initNeighborButton() {
         e.preventDefault();
         if (neighborPointerId !== null && neighborPointerId !== e.pointerId) return;
 
-        connectWS();
+        connectAirPadSession();
         if (checkIsAiModeActive()) return;
 
         neighborPointerId = e.pointerId;
@@ -500,7 +500,7 @@ function initNeighborButton() {
                 const dist = Math.hypot(dx, dy);
 
                 if (dist < NEIGHBOR_MOVE_THRESHOLD) {
-                    sendWS({ type: 'click', button: 'right' });
+                    sendAirPadIntent({ type: 'pointer.click', button: 'right' });
                     log('Neighbor: tap → right-click (context menu)');
                 }
             }
@@ -516,7 +516,7 @@ function initNeighborButton() {
     neighborButton.addEventListener('pointercancel', (e) => {
         if (e?.pointerId === neighborPointerId || e?.pointerId == null) {
             if (neighborState === 'MIDDLE_SCROLL') {
-                sendWS({ type: 'mouse_up', button: 'middle' });
+                sendAirPadIntent({ type: 'pointer.up', button: 'middle' });
                 log('Neighbor: middle-scroll cancelled');
             }
 
@@ -593,7 +593,7 @@ export function initAirButton() {
             pointerId = null;
 
             if (dragActive) {
-                sendWS({ type: 'mouse_up', button: 'left' });
+                sendAirPadIntent({ type: 'pointer.up', button: 'left' });
                 dragActive = false;
                 log('Air: drag cancelled (mouse up)');
             }

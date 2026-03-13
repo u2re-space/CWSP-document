@@ -32,7 +32,7 @@ import {
     lerp,
     clamp01,
 } from '../../utils/math';
-import { isWSConnected } from '../../network/websocket';
+import { isAirPadSessionConnected } from '../../network/session';
 
 
 let relSensor: any = null;
@@ -247,7 +247,7 @@ export function initRelativeOrientation() {
             }, dt));
 
             if (getAirState && getAirState() !== 'AIR_MOVE') return;
-            if (!isWSConnected()) return;
+            if (!isAirPadSessionConnected()) return;
             if (aiModeActive) return;
             if (vec3IsNearZero(mapped, MOTION_JITTER_EPS)) return;
             enqueueMotion(mapped.x, mapped.y, mapped.z);
@@ -283,7 +283,7 @@ export function initRelativeOrientation() {
 
         //
         if (getAirState && getAirState() !== 'AIR_MOVE') return;
-        if (!isWSConnected()) return;
+        if (!isAirPadSessionConnected()) return;
         if (aiModeActive) return;
 
         // Accumulate into unified motion queue
