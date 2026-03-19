@@ -622,10 +622,23 @@ function logWsState(event: string, payload: string) {
     log(`[ws-state] event=${event}${trimmedPayload ? ` ${trimmedPayload}` : ""}`);
 }
 
+const WS_STATUS_TLS_HINT_CLASS = 'ws-status-tls-hint';
+
+function setWsStatusTlsHint(originUrl: string) {
+    const wsStatusEl = getWsStatusEl();
+    if (wsStatusEl) {
+        wsStatusEl.textContent = `Untrusted cert — open ${originUrl} in this browser, accept, then retry`;
+        wsStatusEl.classList.add(WS_STATUS_TLS_HINT_CLASS);
+        wsStatusEl.classList.remove('ws-status-ok');
+        wsStatusEl.classList.add('ws-status-bad');
+    }
+}
+
 function setWsStatus(connected: boolean) {
     wsConnected = connected;
     const wsStatusEl = getWsStatusEl();
     if (wsStatusEl) {
+        wsStatusEl.classList.remove(WS_STATUS_TLS_HINT_CLASS);
         if (connected) {
             wsStatusEl.textContent = 'connected';
             wsStatusEl.classList.remove('ws-status-bad');
@@ -891,6 +904,13 @@ export function connectWS() {
             (primaryProtocol === 'https' ? '8443' : '8080');
         const routeTarget = routeTargetForQuery;
         const resolvedRouteTarget = routeTarget || targetHost || "";
+        if (index === 0) {
+            const el = getWsStatusEl();
+            if (el) {
+                el.classList.remove(WS_STATUS_TLS_HINT_CLASS);
+                el.textContent = 'connecting…';
+            }
+        }
         logWsState(
             "connecting",
             `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} transport=${candidate.protocol} ` +
@@ -1112,6 +1132,7 @@ export function connectWS() {
                     "connect-failed",
                     `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${errorMessage} hint=tls-certificate`
                 );
+                setWsStatusTlsHint(url);
                 tryConnect(index + 1, round);
                 return;
             }

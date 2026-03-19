@@ -464,6 +464,15 @@
             color: var(--error);
             border-color: color-mix(in srgb, var(--error), transparent 30%);
         }
+
+        &.ws-status-tls-hint {
+            text-transform: none;
+            letter-spacing: 0;
+            max-inline-size: min(100%, 320px);
+            white-space: normal;
+            line-height: 1.3;
+            font-size: var(--text-xs);
+        }
     }
 
     /* Clipboard preview - Material You card */
