@@ -217,6 +217,12 @@
             --side-action-fix-border: #c88b1a;
             --side-action-fix-hover-bg: #ffdd9e;
             --side-action-fix-active-bg: #ffd187;
+
+            --side-action-reload-bg: #ff9999;
+            --side-action-reload-fg: #ffffff;
+            --side-action-reload-border: #ff9999;
+            --side-action-reload-hover-bg: #ff9999;
+            --side-action-reload-active-bg: #ffb3b3;
         }
     }
 
@@ -265,6 +271,12 @@
         --side-action-fix-border: #c88b1a;
         --side-action-fix-hover-bg: #ffdd9e;
         --side-action-fix-active-bg: #ffd187;
+
+        --side-action-reload-bg: #fa8080;
+        --side-action-reload-fg: #641010;
+        --side-action-reload-border: #ff9999;
+        --side-action-reload-hover-bg: #ffb3b3;
+        --side-action-reload-active-bg: #ff9999;
     }
 }
 
@@ -1759,6 +1771,21 @@
 
         &:active {
             background: var(--side-action-fix-active-bg, var(--side-action-active-bg));
+        }
+    }
+
+    .view-airpad .side-actions-row .side-reload-toggle {
+        background: var(--side-action-reload-bg);
+        color: var(--side-action-reload-fg);
+        border-color: var(--side-action-reload-border);
+        order: 4;
+
+        &:hover {
+            background: var(--side-action-reload-hover-bg, var(--side-action-reload-bg));
+        }
+
+        &:active {
+            background: var(--side-action-reload-active-bg, var(--side-action-active-bg));
         }
     }
 

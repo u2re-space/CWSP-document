@@ -117,6 +117,10 @@ export default async function mountAirpad(mountElement: HTMLElement): Promise<vo
                 aria-label="Reset motion calibration">
                 Fix
             </button>
+            <button type="button" id="btnReload" class="side-log-toggle side-reload-toggle"
+                aria-label="Reload">
+                Reload
+            </button>
         </div>
 
         <div id="logOverlay" class="log-overlay" aria-hidden="true">
@@ -184,7 +188,7 @@ export default async function mountAirpad(mountElement: HTMLElement): Promise<vo
 // Internal initialization
 // =========================
 
-async function initAirpadApp(initToken: number, signal: AbortSignal): Promise<void> {
+async function initAirpadApp(initToken?: number, signal?: AbortSignal): Promise<void> {
     function resetMotionRuntime() {
         resetMotionAccum();
         resetMotionBaseline();
@@ -193,25 +197,25 @@ async function initAirpadApp(initToken: number, signal: AbortSignal): Promise<vo
     }
 
     function initConfigButton() {
-    const existingConfigButton = document.getElementById('btnConfig');
-    if (existingConfigButton) {
-        return;
-    }
+        const existingConfigButton = document.getElementById('btnConfig');
+        if (existingConfigButton) {
+            return;
+        }
 
-    const configButton = document.createElement('button');
-    configButton.id = 'btnConfig';
-    configButton.type = 'button';
-    configButton.className = 'toolbar-btn';
-    configButton.textContent = '⚙️';
-    configButton.title = 'Configuration';
-    configButton.setAttribute('aria-label', 'Configuration');
-    configButton.addEventListener('click', showConfigUI);
+        const configButton = document.createElement('button');
+        configButton.id = 'btnConfig';
+        configButton.type = 'button';
+        configButton.className = 'toolbar-btn';
+        configButton.textContent = '⚙️';
+        configButton.title = 'Configuration';
+        configButton.setAttribute('aria-label', 'Configuration');
+        configButton.addEventListener('click', showConfigUI);
 
-    const bottomToolbar = document.querySelector('.bottom-toolbar');
-    if (bottomToolbar) {
-        bottomToolbar.appendChild(configButton);
+        const bottomToolbar = document.querySelector('.bottom-toolbar');
+        if (bottomToolbar) {
+            bottomToolbar.appendChild(configButton);
+        }
     }
-}
 
     function initMotionResetButton() {
     const resetButton = document.getElementById('btnMotionReset') as HTMLButtonElement | null;
@@ -231,6 +235,17 @@ function initLogOverlay() {
     if (!overlay || !toggle) {
         return;
     }
+
+    const reload = document.getElementById('btnReload');
+    if (!reload) {
+        return;
+    }
+
+    reload.addEventListener('click', () => {
+        try { globalThis?.location?.reload?.(); } catch(e) { console.error(e); } //@ts-ignore
+        try { globalThis?.navigation?.navigate?.('airpad'); } catch(e) { console.error(e); } //@ts-ignore
+        try { globalThis?.navigation?.reload?.(); } catch(e) { console.error(e); } //@ts-ignore
+    });
 
     const openOverlay = () => {
         overlay.classList.add('open');
@@ -312,6 +327,12 @@ function initHintOverlay() {
         compactMedia.addEventListener?.('change', applyHintDensity);
     }
 
+    const initReloadButton = () => {
+        //try { globalThis?.location?.reload?.(); } catch(e) { console.error(e); } //@ts-ignore
+        //try { globalThis?.navigation?.navigate?.('airpad'); } catch(e) { console.error(e); } //@ts-ignore
+        //try { globalThis?.navigation?.reload?.(); } catch(e) { console.error(e); } //@ts-ignore
+    }
+
     const scheduleIdle = (cb: () => void) => {
         if (typeof globalThis.requestIdleCallback === 'function') {
             globalThis.requestIdleCallback(() => cb());
@@ -333,7 +354,7 @@ function initHintOverlay() {
     };
 
     scheduleIdle(async () => {
-    if (signal.aborted || initToken !== airpadInitToken) return;
+    if (signal?.aborted || initToken !== airpadInitToken) return;
     // PWA: register Service Worker (auto-update)
     try {
         initServiceWorker({
@@ -352,8 +373,10 @@ function initHintOverlay() {
     log('Готово. Нажми "WS Connect", затем используй Air/AI кнопки.');
     log('Движение мыши основано только на Gyroscope API (повороты телефона).');
 
+    runInitializer('application', () => initAirpadApp());
     runInitializer('log overlay', () => initLogOverlay());
     runInitializer('hint overlay', () => initHintOverlay());
+    runInitializer('reload button', () => initReloadButton());
     runInitializer('websocket button', () => initAirPadSessionTransport(getBtnConnect()));
     runInitializer('speech', () => initSpeechRecognition());
     runInitializer('AI button', () => initAiButton());
