@@ -1215,11 +1215,15 @@ registerRoute(
             host.startsWith('127.')
         );
         const isLocalHost = host === 'localhost' || host.endsWith('.local');
-        const isSocketIoPath = pathname.startsWith('/socket.io/');
+        const isSocketIoPath = pathname === '/socket.io' || pathname.startsWith('/socket.io/');
         const isControlPath =
             pathname.startsWith('/api/') ||
             pathname === '/lna-probe' ||
             isSocketIoPath;
+
+        // Socket.IO transport must bypass SW caching/proxy on all hosts (LAN + WAN),
+        // otherwise polling/ws handshakes can fail with synthetic SW network errors.
+        if (isSocketIoPath) return true;
 
         // Avoid swallowing app/view and /user/* requests on private-host deployments.
         return isControlPath && (isPrivateIp || isLocalHost);

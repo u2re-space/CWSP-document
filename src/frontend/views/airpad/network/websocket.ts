@@ -32,6 +32,7 @@ type WSConnectCandidate = {
     source: 'remote' | 'page';
     port: string;
     useWebSocketOnly: boolean;
+    preferPollingFirst: boolean;
 };
 let lastWsCandidates: WSConnectCandidate[] = [];
 let nextWsCandidateOffset = 0;
@@ -40,7 +41,7 @@ const localNetworkPermissionProbeDone = new Set<string>();
 const AUTO_RECONNECT_MAX_ATTEMPTS = 0;
 const AUTO_RECONNECT_BASE_DELAY_MS = 800;
 const AIRPAD_CONNECTION_TYPE = "exchanger-initiator";
-const AIRPAD_ARCHETYPE = "first-order";
+const AIRPAD_ARCHETYPE = "server-v2";
 type WSConnectionHandler = (connected: boolean) => void;
 const wsConnectionHandlers = new Set<WSConnectionHandler>();
 
@@ -635,6 +636,18 @@ function setWsStatusTlsHint(originUrl: string) {
     }
 }
 
+/** When the server cert is issued for a hostname, https://&lt;public-ip&gt; fails before the user can "trust" it. */
+function setWsStatusTlsHostnameHint(hostname: string) {
+    const wsStatusEl = getWsStatusEl();
+    if (wsStatusEl) {
+        wsStatusEl.textContent =
+            `TLS name mismatch for raw IP — set Remote host to ${hostname} (name on certificate), keep ports as needed`;
+        wsStatusEl.classList.add(WS_STATUS_TLS_HINT_CLASS);
+        wsStatusEl.classList.remove('ws-status-ok');
+        wsStatusEl.classList.add('ws-status-bad');
+    }
+}
+
 function setWsStatus(connected: boolean) {
     wsConnected = connected;
     const wsStatusEl = getWsStatusEl();
@@ -694,14 +707,37 @@ export function connectWS() {
     const remoteHost = getRemoteHost().trim();
     const resolvedRemoteHost = remoteHost || location.hostname;
     const remoteProtocol = getRemoteProtocol();
+    const isIpv4Literal = (host: string): boolean =>
+        !!host && /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host);
+
     const isPrivateIp = (host: string): boolean => {
         if (!host) return false;
-        if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return false;
+        if (!isIpv4Literal(host)) return false;
         return (
             host.startsWith('10.') ||
             host.startsWith('192.168.') ||
             /^172\.(1[6-9]|2\d|3[01])\./.test(host)
         );
+    };
+
+    /** Prefer hostname (SNI) before public IPv4 for HTTPS — certs rarely include the bare IP. */
+    const reorderHostEntriesForHttps = (
+        entries: Array<{ host: string; source: WSConnectCandidate['source']; preferPort?: string }>
+    ) => {
+        const dns: typeof entries = [];
+        const privateIpv4: typeof entries = [];
+        const publicIpv4: typeof entries = [];
+        for (const e of entries) {
+            if (!isIpv4Literal(e.host)) {
+                dns.push(e);
+            } else if (isPrivateIp(e.host) || e.host === '127.0.0.1') {
+                privateIpv4.push(e);
+            } else {
+                publicIpv4.push(e);
+            }
+        }
+        dns.sort((a, b) => (a.source === 'page' ? 0 : 1) - (b.source === 'page' ? 0 : 1));
+        return [...dns, ...privateIpv4, ...publicIpv4];
     };
 
     const isLikelyPort = (value: string): boolean => /^\d{1,5}$/.test(value);
@@ -770,9 +806,9 @@ export function connectWS() {
     const probeOrigin = `${primaryProtocol}://${probeHost}:${probePort}`;
     void tryRequestLocalNetworkPermission(probeOrigin, probeHost);
     const fallbackProtocol = primaryProtocol === 'https' ? 'http' : 'https';
-    const defaultPortByProtocol = {
-        http: '8080',
-        https: '8443',
+    const defaultPortsByProtocol = {
+        http: ['8080', '80'],
+        https: ['8443', '443'],
     } as const;
     const locationPort = location.port?.trim?.() || '';
 
@@ -797,7 +833,9 @@ export function connectWS() {
             // If protocol is explicit in UI, honor custom port as-is.
             if (remoteProtocol === protocol && !ports.includes(remotePort)) ports.push(remotePort);
         }
-        ports.push(defaultPortByProtocol[protocol]);
+        for (const defaultPort of defaultPortsByProtocol[protocol]) {
+            ports.push(defaultPort);
+        }
         if (locationPort) ports.push(locationPort);
         return ports.filter((port, idx) => ports.indexOf(port) === idx);
     };
@@ -829,23 +867,29 @@ export function connectWS() {
         }
     }
     const candidateHostEntries = Array.from(uniqueHostEntries.values());
+    const httpsOrderedHostEntries = reorderHostEntriesForHttps(candidateHostEntries);
 
     const candidates: WSConnectCandidate[] = [];
     for (const protocol of protocolOrder) {
         // Browsers block active mixed content from HTTPS pages to HTTP endpoints.
         if (location.protocol === 'https:' && protocol === 'http') continue;
-        for (const hostEntry of candidateHostEntries) {
+        const hostList = protocol === 'https' ? httpsOrderedHostEntries : candidateHostEntries;
+        for (const hostEntry of hostList) {
             const { host, source, preferPort } = hostEntry;
             const hostPortOverride = preferPort;
             for (const port of getPortsForProtocol(protocol, hostPortOverride)) {
                 const useWebSocketOnly = location.protocol === "https:" && isPrivateIp(host) && !isLocalPageHost;
+                // External/WAN HTTPS endpoints behind proxies often accept polling first,
+                // while direct websocket upgrade can fail during handshake.
+                const preferPollingFirst = protocol === "https" && !useWebSocketOnly && !isPrivateIp(host);
                 candidates.push({
                     url: `${protocol}://${host}:${port}`,
                     protocol,
                     host,
                     source,
                     port,
-                    useWebSocketOnly
+                    useWebSocketOnly,
+                    preferPollingFirst
                 });
             }
         }
@@ -980,7 +1024,11 @@ export function connectWS() {
             query: queryParams,
             // For public->private HTTPS (PNA), polling triggers fetch preflight restrictions.
             // Prefer WS-only in that scenario.
-            transports: candidate.useWebSocketOnly ? ['websocket'] : ['websocket', 'polling'],
+            transports: candidate.useWebSocketOnly
+                ? ['websocket']
+                : candidate.preferPollingFirst
+                    ? ['polling', 'websocket']
+                    : ['websocket', 'polling'],
             upgrade: !candidate.useWebSocketOnly,
             reconnection: false,
             timeout: 10000,
@@ -1144,6 +1192,32 @@ export function connectWS() {
                     `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${errorMessage} hint=tls-certificate`
                 );
                 setWsStatusTlsHint(url);
+                tryConnect(index + 1, round);
+                return;
+            }
+
+            const publicIpv4Https =
+                candidate.protocol === 'https' &&
+                isIpv4Literal(candidate.host) &&
+                !isPrivateIp(candidate.host) &&
+                candidate.host !== '127.0.0.1';
+            const combinedErr = `${errorMessage} ${String(details)}`;
+            const publicIpTlsLikely =
+                publicIpv4Https &&
+                /xhr poll error|websocket error|certificate|CERT|common name|ssl|tls|failed to fetch|name invalid/i.test(
+                    combinedErr
+                );
+            if (publicIpTlsLikely) {
+                const suggested =
+                    pageHost && !isIpv4Literal(pageHost) && pageHost !== 'localhost' ? pageHost : '';
+                logWsState(
+                    "connect-failed",
+                    `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${errorMessage} ` +
+                        `hint=tls-sni-use-hostname${suggested ? ` suggested_remote=${suggested}` : ""}`
+                );
+                if (suggested) {
+                    setWsStatusTlsHostnameHint(suggested);
+                }
                 tryConnect(index + 1, round);
                 return;
             }
