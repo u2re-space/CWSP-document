@@ -13,6 +13,7 @@ import {
     getAirPadTransportSecret,
     getAirPadSigningSecret,
     getAirPadClientId,
+    getAirPadPeerInstanceId,
 } from '../config/config';
 
 let socket: Socket | null = null;
@@ -918,6 +919,7 @@ export function connectWS() {
         );
         const authToken = getAuthToken();
         const clientId = getClientId();
+        const peerInstanceId = getAirPadPeerInstanceId().trim();
         const handshakeAuth: Record<string, string> = {};
         if (authToken) {
             handshakeAuth.token = authToken;
@@ -925,6 +927,10 @@ export function connectWS() {
         }
         if (clientId) {
             handshakeAuth.clientId = clientId;
+        }
+        if (peerInstanceId) {
+            handshakeAuth.peerInstanceId = peerInstanceId;
+            handshakeAuth.deviceInstanceId = peerInstanceId;
         }
 
         const queryParams: Record<string, string> = {};
@@ -937,6 +943,10 @@ export function connectWS() {
             queryParams.clientId = cleanedClientId;
             queryParams.__airpad_src = cleanedClientId;
             queryParams.__airpad_client = cleanedClientId;
+        }
+        if (peerInstanceId) {
+            queryParams.peerInstanceId = peerInstanceId;
+            queryParams.deviceInstanceId = peerInstanceId;
         }
         queryParams.__airpad_hop = candidate.host || remoteHost || 'unknown';
         queryParams.__airpad_host = candidate.host || remoteHost || '';
@@ -1006,9 +1016,10 @@ export function connectWS() {
             autoReconnectAttempts = 0;
             setWsStatus(true);
             socket.emit('hello', {
-                id: clientId,
+                id: peerInstanceId || clientId,
                 byId: clientId,
                 from: clientId,
+                peerInstanceId: peerInstanceId || undefined,
                 token: authToken || undefined,
                 nodes: getCoordinatorNodes()
             });

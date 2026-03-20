@@ -13,6 +13,8 @@ interface StoredRemoteConfig {
     transportMode?: AirpadTransportMode;
     authToken?: string;
     clientId?: string;
+    /** Stable per-browser tab/install; separates concurrent devices sharing the same clientId/token. */
+    peerInstanceId?: string;
     transportSecret?: string;
     signingSecret?: string;
 }
@@ -109,6 +111,7 @@ function persistRemoteConfig(): void {
             transportMode: remoteConfig.transportMode,
             authToken: remoteConfig.authToken,
             clientId: remoteConfig.clientId,
+            peerInstanceId: remoteConfig.peerInstanceId,
             transportSecret: remoteConfig.transportSecret,
             signingSecret: remoteConfig.signingSecret,
         }));
@@ -116,6 +119,11 @@ function persistRemoteConfig(): void {
         // localStorage unavailable (private mode, SSR, etc.)
     }
 }
+
+const createPeerInstanceId = (): string => {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    return `ap-${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+};
 
 // Remote connection settings.
 // remoteHost describes where to establish the Socket.IO transport (Connect URL).
@@ -135,16 +143,18 @@ const remoteConfig: {
     transportMode: AirpadTransportMode;
     authToken: string;
     clientId: string;
+    peerInstanceId: string;
     transportSecret: string;
     signingSecret: string;
 } = {
     transportMode: stored.transportMode === "secure" ? "secure" : "plaintext",
     authToken: stored.authToken || "",
     clientId: stored.clientId || "",
+    peerInstanceId: toTrimmedString((stored as StoredRemoteConfig).peerInstanceId) || createPeerInstanceId(),
     transportSecret: stored.transportSecret || "",
     signingSecret: stored.signingSecret || "",
 };
-if ((stored as MigratedRemoteConfig)._legacyMigrated === true) {
+if ((stored as MigratedRemoteConfig)._legacyMigrated === true || !(stored as StoredRemoteConfig).peerInstanceId) {
     persistRemoteConfig();
 }
 
@@ -200,6 +210,17 @@ export function getAirPadClientId(): string {
 
 export function setAirPadClientId(clientId: string): void {
     remoteConfig.clientId = clientId || "";
+    persistRemoteConfig();
+}
+
+export function getAirPadPeerInstanceId(): string {
+    const env = readGlobalAirpadValue(["AIRPAD_PEER_INSTANCE_ID", "AIRPAD_DEVICE_ID"]);
+    if (env.trim()) return env.trim();
+    return remoteConfig.peerInstanceId || "";
+}
+
+export function setAirPadPeerInstanceId(id: string): void {
+    remoteConfig.peerInstanceId = toTrimmedString(id) || createPeerInstanceId();
     persistRemoteConfig();
 }
 
