@@ -22,7 +22,8 @@ let isConnecting = false;
 let btnEl: HTMLElement | null = null;
 let wsConnectButton: HTMLElement | null = null;
 let connectAttemptId = 0;
-let activeProbeSocket: Socket | null = null;
+/** Parallel candidate probes — close all on success or disconnect. */
+const activeProbeSockets = new Set<Socket>();
 let manualDisconnectRequested = false;
 let autoReconnectAttempts = 0;
 type WSConnectCandidate = {
@@ -40,6 +41,14 @@ const localNetworkPermissionProbeDone = new Set<string>();
 // Keep retrying across NAT/Wi-Fi transitions; 0 means unlimited retries.
 const AUTO_RECONNECT_MAX_ATTEMPTS = 0;
 const AUTO_RECONNECT_BASE_DELAY_MS = 800;
+/** Socket.IO handshake timeout per candidate (dead hosts fail faster). */
+const AIRPAD_PROBE_IO_TIMEOUT_MS = 4800;
+/** Wall-clock cap per probe if connect_error is slow to fire. */
+const AIRPAD_PROBE_HARD_CAP_MS = AIRPAD_PROBE_IO_TIMEOUT_MS + 800;
+/** Try this many candidates in parallel; first success wins. */
+const AIRPAD_CANDIDATE_PARALLEL = 3;
+/** Coordinator ask/act wait — was 12s, tighter for snappier UI. */
+const AIRPAD_COORDINATOR_TIMEOUT_MS = 8000;
 const AIRPAD_CONNECTION_TYPE = "exchanger-initiator";
 const AIRPAD_ARCHETYPE = "server-v2";
 type WSConnectionHandler = (connected: boolean) => void;
@@ -581,7 +590,7 @@ export function sendCoordinatorAsk(what: string, payload: any, nodes?: string[])
         const timeoutId = globalThis.setTimeout(() => {
             coordinatorPending.delete(uuid);
             reject({ ok: false, error: `Timeout waiting for ${what}` });
-        }, 12000);
+        }, AIRPAD_COORDINATOR_TIMEOUT_MS);
 
         coordinatorPending.set(uuid, { resolve, reject, timeoutId });
         emitCoordinatorPacket(buildCoordinatorPacket("ask", what, payload, { nodes, uuid }));
@@ -599,7 +608,7 @@ export function sendCoordinatorRequest(what: string, payload: any, nodes?: strin
         const timeoutId = globalThis.setTimeout(() => {
             coordinatorPending.delete(uuid);
             reject({ ok: false, error: `Timeout waiting for ${what}` });
-        }, 12000);
+        }, AIRPAD_COORDINATOR_TIMEOUT_MS);
 
         coordinatorPending.set(uuid, { resolve, reject, timeoutId });
         emitCoordinatorPacket(buildCoordinatorPacket("act", what, payload, { nodes, uuid }));
@@ -699,7 +708,7 @@ function handleServerMessage(msg: any) {
 export function connectWS() {
     if (isConnecting) return;
     if (socket && (socket.connected || (socket as any).connecting)) return;
-    if (activeProbeSocket) return;
+    if (activeProbeSockets.size > 0) return;
     connectAttemptId += 1;
     const attemptId = connectAttemptId;
     manualDisconnectRequested = false;
@@ -879,9 +888,9 @@ export function connectWS() {
             const hostPortOverride = preferPort;
             for (const port of getPortsForProtocol(protocol, hostPortOverride)) {
                 const useWebSocketOnly = location.protocol === "https:" && isPrivateIp(host) && !isLocalPageHost;
-                // External/WAN HTTPS endpoints behind proxies often accept polling first,
-                // while direct websocket upgrade can fail during handshake.
-                const preferPollingFirst = protocol === "https" && !useWebSocketOnly && !isPrivateIp(host);
+                // WebSocket-first is faster with server-v2 / same-port TLS; polling first adds a round-trip.
+                // If an environment breaks WS upgrade behind a proxy, set transports manually in a fork.
+                const preferPollingFirst = false;
                 candidates.push({
                     url: `${protocol}://${host}:${port}`,
                     protocol,
@@ -923,44 +932,27 @@ export function connectWS() {
 
     const maxRounds = 3;
     const retryDelayMs = 450;
-    const tryConnect = (index: number, round: number) => {
-        if (attemptId !== connectAttemptId) return;
+    const targetHost = parsedRemoteHost || remoteHost;
+    const targetPort =
+        routeTargetPortForQuery ||
+        parsedRemotePort ||
+        remotePort ||
+        (primaryProtocol === "https" ? "8443" : "8080");
+    const routeTarget = routeTargetForQuery;
+    const resolvedRouteTarget = routeTarget || targetHost || "";
 
-        if (index >= uniqueCandidates.length) {
-            if (round + 1 < maxRounds) {
-                logWsState("retry", `round=${round + 2}/${maxRounds} next=0`);
-                globalThis.setTimeout(() => tryConnect(0, round + 1), retryDelayMs);
-                return;
-            }
-            logWsState("failed", `round=${round + 1}/${maxRounds} all-candidates`);
-            isConnecting = false;
-            setWsStatus(false);
-            updateButtonLabel();
-            return;
-        }
+    const isSameAsTargetHost = (): boolean => {
+        if (!routeTarget || !targetHost) return true;
+        const normalizedRouteTarget = routeTarget.trim().toLowerCase();
+        const normalizedTargetHost = targetHost.trim().toLowerCase();
+        if (!normalizedRouteTarget || !normalizedTargetHost) return true;
+        if (normalizedRouteTarget === normalizedTargetHost) return true;
+        if (normalizedRouteTarget === `l-${normalizedTargetHost}`) return true;
+        return false;
+    };
 
-        const candidate = uniqueCandidates[index];
+    const buildHandshakeForCandidate = (candidate: WSConnectCandidate) => {
         const url = candidate.url;
-        const targetHost = parsedRemoteHost || remoteHost;
-        const targetPort =
-            routeTargetPortForQuery ||
-            parsedRemotePort ||
-            remotePort ||
-            (primaryProtocol === 'https' ? '8443' : '8080');
-        const routeTarget = routeTargetForQuery;
-        const resolvedRouteTarget = routeTarget || targetHost || "";
-        if (index === 0) {
-            const el = getWsStatusEl();
-            if (el) {
-                el.classList.remove(WS_STATUS_TLS_HINT_CLASS);
-                el.textContent = 'connecting…';
-            }
-        }
-        logWsState(
-            "connecting",
-            `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} transport=${candidate.protocol} ` +
-            `source=${candidate.source} host=${candidate.host}:${candidate.port} target=${targetHost}:${targetPort}`
-        );
         const authToken = getAuthToken();
         const clientId = getClientId();
         const peerInstanceId = getAirPadPeerInstanceId().trim();
@@ -992,26 +984,16 @@ export function connectWS() {
             queryParams.peerInstanceId = peerInstanceId;
             queryParams.deviceInstanceId = peerInstanceId;
         }
-        queryParams.__airpad_hop = candidate.host || remoteHost || 'unknown';
-        queryParams.__airpad_host = candidate.host || remoteHost || '';
-        queryParams.__airpad_target = targetHost || '';
-        // Exchanger is the primary AirPad identity; first-order is retained as compatibility archetype.
+        queryParams.__airpad_hop = candidate.host || remoteHost || "unknown";
+        queryParams.__airpad_host = candidate.host || remoteHost || "";
+        queryParams.__airpad_target = targetHost || "";
         queryParams.connectionType = AIRPAD_CONNECTION_TYPE;
         queryParams.archetype = AIRPAD_ARCHETYPE;
-        const isSameAsTargetHost = () => {
-            if (!routeTarget || !targetHost) return true;
-            const normalizedRouteTarget = routeTarget.trim().toLowerCase();
-            const normalizedTargetHost = targetHost.trim().toLowerCase();
-            if (!normalizedRouteTarget || !normalizedTargetHost) return true;
-            if (normalizedRouteTarget === normalizedTargetHost) return true;
-            if (normalizedRouteTarget === `l-${normalizedTargetHost}`) return true;
-            return false;
-        };
-        queryParams.__airpad_via = !isSameAsTargetHost() ? "tunnel" : (candidate.source || 'unknown');
+        queryParams.__airpad_via = !isSameAsTargetHost() ? "tunnel" : candidate.source || "unknown";
         queryParams.__airpad_endpoint = isSameAsTargetHost() ? "1" : "0";
         queryParams.__airpad_target_port = targetPort;
-        queryParams.__airpad_via_port = candidate.port || '';
-        queryParams.__airpad_protocol = candidate.protocol || 'https';
+        queryParams.__airpad_via_port = candidate.port || "";
+        queryParams.__airpad_protocol = candidate.protocol || "https";
         if (resolvedRouteTarget) {
             queryParams.__airpad_route = resolvedRouteTarget;
             if (!routeTarget) {
@@ -1019,65 +1001,47 @@ export function connectWS() {
             }
         }
 
-        const probeSocket = io(url, {
-            auth: handshakeAuth,
-            query: queryParams,
-            // For public->private HTTPS (PNA), polling triggers fetch preflight restrictions.
-            // Prefer WS-only in that scenario.
-            transports: candidate.useWebSocketOnly
-                ? ['websocket']
-                : candidate.preferPollingFirst
-                    ? ['polling', 'websocket']
-                    : ['websocket', 'polling'],
-            upgrade: !candidate.useWebSocketOnly,
-            reconnection: false,
-            timeout: 10000,
-            secure: candidate.protocol === 'https',
-            forceNew: true,
+        return { url, authToken, clientId, peerInstanceId, handshakeAuth, queryParams };
+    };
+
+    const finalizeConnectedSocket = (
+        probeSocket: Socket,
+        candidate: WSConnectCandidate,
+        index: number,
+        url: string,
+        authToken: string,
+        clientId: string,
+        peerInstanceId: string,
+        engine: EngineLike | undefined,
+        onEngineClose: (code?: number, reason?: unknown) => void,
+        onEngineError: (error: unknown) => void
+    ) => {
+        socket = probeSocket;
+        logWsState(
+            "connected",
+            `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} transport=${candidate.protocol} parallel=${AIRPAD_CANDIDATE_PARALLEL}`
+        );
+        isConnecting = false;
+        autoReconnectAttempts = 0;
+        setWsStatus(true);
+        socket.emit("hello", {
+            id: peerInstanceId || clientId,
+            byId: clientId,
+            from: clientId,
+            peerInstanceId: peerInstanceId || undefined,
+            token: authToken || undefined,
+            nodes: getCoordinatorNodes()
         });
-        const engine = (probeSocket as any).io?.engine as EngineLike | undefined;
-        const onEngineClose = (code?: number, reason?: unknown) => {
+
+        socket.on("disconnect", (reason?: string) => {
             logWsState(
-                "engine-close",
-                `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} ` +
-                `code=${code ?? "n/a"} reason=${typeof reason === "string" ? reason : safeJson(reason)} transport=${engine?.transport?.name || "unknown"}`
+                "disconnected",
+                `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${reason || "unknown"}`
             );
-        };
-        const onEngineError = (error: unknown) => {
-            logWsState("engine-error", `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${describeError(error)}`);
-        };
-        engine?.on?.("close", onEngineClose);
-        engine?.on?.("error", onEngineError);
-        activeProbeSocket = probeSocket;
-
-        probeSocket.on('connect', () => {
-            if (attemptId !== connectAttemptId) {
-                probeSocket.removeAllListeners();
-                probeSocket.close();
-                if (activeProbeSocket === probeSocket) activeProbeSocket = null;
-                return;
-            }
-            if (activeProbeSocket === probeSocket) activeProbeSocket = null;
-            socket = probeSocket;
-            logWsState("connected", `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} transport=${candidate.protocol}`);
+            engine?.off?.("close", onEngineClose);
+            engine?.off?.("error", onEngineError);
             isConnecting = false;
-            autoReconnectAttempts = 0;
-            setWsStatus(true);
-            socket.emit('hello', {
-                id: peerInstanceId || clientId,
-                byId: clientId,
-                from: clientId,
-                peerInstanceId: peerInstanceId || undefined,
-                token: authToken || undefined,
-                nodes: getCoordinatorNodes()
-            });
-
-            socket.on('disconnect', (reason?: string) => {
-                logWsState("disconnected", `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${reason || "unknown"}`);
-                engine?.off?.("close", onEngineClose);
-                engine?.off?.("error", onEngineError);
-                isConnecting = false;
-                setWsStatus(false);
+            setWsStatus(false);
             updateButtonLabel();
 
             const manual = manualDisconnectRequested;
@@ -1096,7 +1060,7 @@ export function connectWS() {
             if (shouldRotateCandidateOnDisconnect(reason)) {
                 rotateCandidate();
                 if (lastWsCandidates.length > 1) {
-                    log(`Socket.IO disconnect reason "${reason || 'unknown'}", trying next candidate on reconnect`);
+                    log(`Socket.IO disconnect reason "${reason || "unknown"}", trying next candidate on reconnect`);
                 }
             }
 
@@ -1118,138 +1082,295 @@ export function connectWS() {
                 logWsState("auto-reconnect", `attempt=${attemptLabel} reason=${reason || "unknown reason"}`);
                 connectWS();
             }, delay);
-            });
-
-            socket.on('hello-ack', (data: any) => {
-                if (data?.id) {
-                    const id = String(data.id);
-                    log(`Socket.IO hello ack: ${id}`);
-                }
-            });
-
-            socket.on('connect_error', (error) => {
-                logWsState("socket-connect-error", `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${error?.message || "unknown"}`);
-                isConnecting = false;
-                updateButtonLabel();
-            });
-
-            socket.on('voice_result', async (msg: any) => {
-                const decoded = await unwrapIncomingPayload(msg);
-                handleServerMessage(decoded);
-            });
-            socket.on('voice_error', async (msg: any) => {
-                const decoded = await unwrapIncomingPayload(msg);
-                handleServerMessage(decoded);
-            });
-
-            socket.on('clipboard:update', async (msg: any) => {
-                const decoded = await unwrapIncomingPayload(msg);
-                const text = typeof decoded?.text === 'string' ? decoded.text : '';
-                lastServerClipboardText = text;
-                notifyClipboardHandlers(text, { source: decoded?.source });
-            });
-            socket.on("data", async (packet: any) => {
-                const decoded = await unwrapIncomingPayload(packet);
-                if (!isCoordinatorPacket(decoded)) return;
-                handleCoordinatorPacket(decoded);
-            });
-            socket.on("message", async (packet: any) => {
-                const decoded = await unwrapIncomingPayload(packet);
-                if (!isCoordinatorPacket(decoded)) return;
-                handleCoordinatorPacket(decoded);
-            });
-            socket.on("network.fetch", async (request: NetworkFetchRequest, ack?: (value: NetworkFetchResponse | Error) => void) => {
-                const response = await handleServerNetworkFetchRequest(request);
-                if (typeof ack === "function") {
-                    ack(response);
-                }
-            });
-
-            // Expose socket for virtual keyboard
-            (window as any).__socket = socket;
         });
 
-        probeSocket.on('connect_error', (error) => {
-            if (attemptId !== connectAttemptId) {
-                probeSocket.removeAllListeners();
-                probeSocket.close();
-                if (activeProbeSocket === probeSocket) activeProbeSocket = null;
-                return;
+        socket.on("hello-ack", (data: any) => {
+            if (data?.id) {
+                log(`Socket.IO hello ack: ${String(data.id)}`);
             }
-            probeSocket.removeAllListeners();
-            probeSocket.close();
-            if (activeProbeSocket === probeSocket) activeProbeSocket = null;
-            const details = (error as any)?.description || (error as any)?.context || '';
-            const errorMessage = String((error as any)?.message || error || '');
-            const certLikely =
-                candidate.protocol === 'https' &&
-                isPrivateIp(candidate.host) &&
-                /xhr poll error|websocket error/i.test(errorMessage);
+        });
 
-            if (certLikely) {
-                logWsState(
-                    "connect-failed",
-                    `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${errorMessage} hint=tls-certificate`
-                );
-                setWsStatusTlsHint(url);
-                tryConnect(index + 1, round);
-                return;
-            }
-
-            const publicIpv4Https =
-                candidate.protocol === 'https' &&
-                isIpv4Literal(candidate.host) &&
-                !isPrivateIp(candidate.host) &&
-                candidate.host !== '127.0.0.1';
-            const combinedErr = `${errorMessage} ${String(details)}`;
-            const publicIpTlsLikely =
-                publicIpv4Https &&
-                /xhr poll error|websocket error|certificate|CERT|common name|ssl|tls|failed to fetch|name invalid/i.test(
-                    combinedErr
-                );
-            if (publicIpTlsLikely) {
-                const suggested =
-                    pageHost && !isIpv4Literal(pageHost) && pageHost !== 'localhost' ? pageHost : '';
-                logWsState(
-                    "connect-failed",
-                    `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${errorMessage} ` +
-                        `hint=tls-sni-use-hostname${suggested ? ` suggested_remote=${suggested}` : ""}`
-                );
-                if (suggested) {
-                    setWsStatusTlsHostnameHint(suggested);
-                }
-                tryConnect(index + 1, round);
-                return;
-            }
-
-            if (
-                candidate.useWebSocketOnly &&
-                /xhr poll error|cors|private network|address space|failed fetch/i.test(errorMessage)
-            ) {
-                logWsState(
-                    "connect-failed",
-                    `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${errorMessage} hint=private-network-cors`
-                );
-            }
-
-            tryConnect(index + 1, round);
+        socket.on("connect_error", (error) => {
             logWsState(
-                "connect-failed",
-                `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${errorMessage} details=${details ? safeJson(details) : "none"}`
+                "socket-connect-error",
+                `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${error?.message || "unknown"}`
             );
+            isConnecting = false;
+            updateButtonLabel();
         });
+
+        socket.on("voice_result", async (msg: any) => {
+            const decoded = await unwrapIncomingPayload(msg);
+            handleServerMessage(decoded);
+        });
+        socket.on("voice_error", async (msg: any) => {
+            const decoded = await unwrapIncomingPayload(msg);
+            handleServerMessage(decoded);
+        });
+
+        socket.on("clipboard:update", async (msg: any) => {
+            const decoded = await unwrapIncomingPayload(msg);
+            const text = typeof decoded?.text === "string" ? decoded.text : "";
+            lastServerClipboardText = text;
+            notifyClipboardHandlers(text, { source: decoded?.source });
+        });
+        socket.on("data", async (packet: any) => {
+            const decoded = await unwrapIncomingPayload(packet);
+            if (!isCoordinatorPacket(decoded)) return;
+            handleCoordinatorPacket(decoded);
+        });
+        socket.on("message", async (packet: any) => {
+            const decoded = await unwrapIncomingPayload(packet);
+            if (!isCoordinatorPacket(decoded)) return;
+            handleCoordinatorPacket(decoded);
+        });
+        socket.on("network.fetch", async (request: NetworkFetchRequest, ack?: (value: NetworkFetchResponse | Error) => void) => {
+            const response = await handleServerNetworkFetchRequest(request);
+            if (typeof ack === "function") {
+                ack(response);
+            }
+        });
+
+        (window as any).__socket = socket;
     };
 
-    tryConnect(0, 0);
+    const probeBatch = (startIndex: number, round: number): Promise<boolean> =>
+        new Promise((resolve) => {
+            if (attemptId !== connectAttemptId) {
+                resolve(false);
+                return;
+            }
+            const batch = uniqueCandidates.slice(startIndex, startIndex + AIRPAD_CANDIDATE_PARALLEL);
+            if (!batch.length) {
+                resolve(false);
+                return;
+            }
+
+            if (startIndex === 0 && round === 0) {
+                const el = getWsStatusEl();
+                if (el) {
+                    el.classList.remove(WS_STATUS_TLS_HINT_CLASS);
+                    el.textContent = "connecting…";
+                }
+            }
+
+            let won = false;
+            let settled = false;
+            let deadCount = 0;
+            const batchSize = batch.length;
+            let batchTlsCertUrl: string | null = null;
+            let batchTlsHostname: string | null = null;
+
+            const finishWin = (
+                winner: Socket,
+                candidate: WSConnectCandidate,
+                index: number,
+                url: string,
+                hs: ReturnType<typeof buildHandshakeForCandidate>,
+                engine: EngineLike | undefined,
+                oec: (code?: number, reason?: unknown) => void,
+                oee: (error: unknown) => void
+            ) => {
+                if (settled) return;
+                settled = true;
+                won = true;
+                const clearProbeTimer = (s: Socket) => {
+                    const t = (s as unknown as { __airpadProbeTimer?: ReturnType<typeof globalThis.setTimeout> }).__airpadProbeTimer;
+                    if (t) globalThis.clearTimeout(t);
+                    delete (s as unknown as { __airpadProbeTimer?: ReturnType<typeof globalThis.setTimeout> }).__airpadProbeTimer;
+                };
+                for (const s of [...activeProbeSockets]) {
+                    if (s !== winner) {
+                        clearProbeTimer(s);
+                        s.removeAllListeners();
+                        s.close();
+                        activeProbeSockets.delete(s);
+                    }
+                }
+                clearProbeTimer(winner);
+                activeProbeSockets.delete(winner);
+                finalizeConnectedSocket(winner, candidate, index, url, hs.authToken, hs.clientId, hs.peerInstanceId, engine, oec, oee);
+                resolve(true);
+            };
+
+            const finishAllDead = () => {
+                if (settled || won) return;
+                deadCount++;
+                if (deadCount < batchSize) return;
+                settled = true;
+                if (batchTlsCertUrl) {
+                    setWsStatusTlsHint(batchTlsCertUrl);
+                } else if (batchTlsHostname) {
+                    setWsStatusTlsHostnameHint(batchTlsHostname);
+                }
+                resolve(false);
+            };
+
+            for (let localIdx = 0; localIdx < batch.length; localIdx++) {
+                const candidate = batch[localIdx];
+                const index = startIndex + localIdx;
+                const hs = buildHandshakeForCandidate(candidate);
+                const { url, handshakeAuth, queryParams } = hs;
+                logWsState(
+                    "connecting",
+                    `batch=${startIndex}-${startIndex + batchSize - 1} candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} ` +
+                        `transport=${candidate.protocol} source=${candidate.source} host=${candidate.host}:${candidate.port} target=${targetHost}:${targetPort}`
+                );
+
+                const probeSocket = io(url, {
+                    auth: handshakeAuth,
+                    query: queryParams,
+                    transports: candidate.useWebSocketOnly
+                        ? ["websocket"]
+                        : candidate.preferPollingFirst
+                          ? ["polling", "websocket"]
+                          : ["websocket", "polling"],
+                    upgrade: !candidate.useWebSocketOnly,
+                    reconnection: false,
+                    timeout: AIRPAD_PROBE_IO_TIMEOUT_MS,
+                    secure: candidate.protocol === "https",
+                    forceNew: true
+                });
+                const engine = (probeSocket as any).io?.engine as EngineLike | undefined;
+                const onEngineClose = (code?: number, reason?: unknown) => {
+                    logWsState(
+                        "engine-close",
+                        `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} ` +
+                            `code=${code ?? "n/a"} reason=${typeof reason === "string" ? reason : safeJson(reason)} transport=${engine?.transport?.name || "unknown"}`
+                    );
+                };
+                const onEngineError = (error: unknown) => {
+                    logWsState(
+                        "engine-error",
+                        `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${describeError(error)}`
+                    );
+                };
+                engine?.on?.("close", onEngineClose);
+                engine?.on?.("error", onEngineError);
+                activeProbeSockets.add(probeSocket);
+
+                const hardTimer = globalThis.setTimeout(() => {
+                    if (won || settled || probeSocket.connected) return;
+                    probeSocket.removeAllListeners();
+                    probeSocket.close();
+                    activeProbeSockets.delete(probeSocket);
+                    engine?.off?.("close", onEngineClose);
+                    engine?.off?.("error", onEngineError);
+                    logWsState("connect-failed", `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=probe-hard-timeout`);
+                    finishAllDead();
+                }, AIRPAD_PROBE_HARD_CAP_MS);
+                (probeSocket as unknown as { __airpadProbeTimer?: ReturnType<typeof globalThis.setTimeout> }).__airpadProbeTimer =
+                    hardTimer;
+
+                probeSocket.on("connect", () => {
+                    globalThis.clearTimeout(hardTimer);
+                    if (attemptId !== connectAttemptId) {
+                        probeSocket.removeAllListeners();
+                        probeSocket.close();
+                        activeProbeSockets.delete(probeSocket);
+                        engine?.off?.("close", onEngineClose);
+                        engine?.off?.("error", onEngineError);
+                        return;
+                    }
+                    if (won || settled) {
+                        probeSocket.removeAllListeners();
+                        probeSocket.close();
+                        activeProbeSockets.delete(probeSocket);
+                        engine?.off?.("close", onEngineClose);
+                        engine?.off?.("error", onEngineError);
+                        return;
+                    }
+                    finishWin(probeSocket, candidate, index, url, hs, engine, onEngineClose, onEngineError);
+                });
+
+                probeSocket.on("connect_error", (error) => {
+                    globalThis.clearTimeout(hardTimer);
+                    activeProbeSockets.delete(probeSocket);
+                    engine?.off?.("close", onEngineClose);
+                    engine?.off?.("error", onEngineError);
+                    if (won || settled) {
+                        probeSocket.removeAllListeners();
+                        probeSocket.close();
+                        return;
+                    }
+                    probeSocket.removeAllListeners();
+                    probeSocket.close();
+                    const details = (error as any)?.description || (error as any)?.context || "";
+                    const errorMessage = String((error as any)?.message || error || "");
+                    const certLikely =
+                        candidate.protocol === "https" &&
+                        isPrivateIp(candidate.host) &&
+                        /xhr poll error|websocket error/i.test(errorMessage);
+                    if (certLikely && !batchTlsCertUrl) {
+                        batchTlsCertUrl = url;
+                    }
+                    const publicIpv4Https =
+                        candidate.protocol === "https" &&
+                        isIpv4Literal(candidate.host) &&
+                        !isPrivateIp(candidate.host) &&
+                        candidate.host !== "127.0.0.1";
+                    const combinedErr = `${errorMessage} ${String(details)}`;
+                    const publicIpTlsLikely =
+                        publicIpv4Https &&
+                        /xhr poll error|websocket error|certificate|CERT|common name|ssl|tls|failed to fetch|name invalid/i.test(combinedErr);
+                    if (publicIpTlsLikely && !batchTlsHostname) {
+                        const suggested =
+                            pageHost && !isIpv4Literal(pageHost) && pageHost !== "localhost" ? pageHost : "";
+                        if (suggested) {
+                            batchTlsHostname = suggested;
+                        }
+                    }
+                    if (
+                        candidate.useWebSocketOnly &&
+                        /xhr poll error|cors|private network|address space|failed fetch/i.test(errorMessage)
+                    ) {
+                        logWsState(
+                            "connect-failed",
+                            `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${errorMessage} hint=private-network-cors`
+                        );
+                    }
+                    logWsState(
+                        "connect-failed",
+                        `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${errorMessage} details=${details ? safeJson(details) : "none"}`
+                    );
+                    finishAllDead();
+                });
+            }
+        });
+
+    void (async () => {
+        for (let round = 0; round < maxRounds; round++) {
+            for (let start = 0; start < uniqueCandidates.length; start += AIRPAD_CANDIDATE_PARALLEL) {
+                if (attemptId !== connectAttemptId) {
+                    return;
+                }
+                const ok = await probeBatch(start, round);
+                if (ok) {
+                    return;
+                }
+            }
+            if (round + 1 < maxRounds) {
+                logWsState("retry", `round=${round + 2}/${maxRounds} next=0`);
+                await new Promise((r) => globalThis.setTimeout(r, retryDelayMs));
+            }
+        }
+        if (attemptId !== connectAttemptId) {
+            return;
+        }
+        logWsState("failed", `round=${maxRounds}/${maxRounds} all-candidates`);
+        isConnecting = false;
+        setWsStatus(false);
+        updateButtonLabel();
+    })();
 }
 
 export function disconnectWS() {
     connectAttemptId += 1;
     manualDisconnectRequested = true;
-    if (activeProbeSocket) {
-        activeProbeSocket.removeAllListeners();
-        activeProbeSocket.close();
-        activeProbeSocket = null;
+    for (const probe of [...activeProbeSockets]) {
+        probe.removeAllListeners();
+        probe.close();
+        activeProbeSockets.delete(probe);
     }
     isConnecting = false;
     if (!socket) {

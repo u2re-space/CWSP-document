@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import { registerRoute, setCatchHandler, setDefaultHandler } from 'workbox-routing'
-import { NetworkFirst, StaleWhileRevalidate, NetworkOnly } from 'workbox-strategies'
+import { CacheFirst, NetworkFirst, StaleWhileRevalidate, NetworkOnly } from 'workbox-strategies'
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
 import { ExpirationPlugin } from 'workbox-expiration'
 import {
@@ -1277,6 +1277,77 @@ registerRoute(
                 maxAgeSeconds: 1800
             })
         ]
+    })
+);
+
+// ============================================================================
+// UI ICONS (Phosphor CDN + same-origin /assets/icons) — complements OPFS in the app
+// ============================================================================
+// fetch() from the page (fest/icon Loader) is intercepted here. CacheFirst on
+// versioned npm URLs yields the fastest repeat loads; same-origin uses SWR so
+// deploys can refresh without a month-long stale window. credentials: omit on
+// CDN matches the Loader and avoids ACAO=* + credentials issues.
+
+const isPhosphorCdnSvgUrl = (url: URL): boolean => {
+    const p = (url.pathname || "").toLowerCase();
+    if (!p.endsWith(".svg")) return false;
+    const h = url.hostname || "";
+    if (h === "cdn.jsdelivr.net" && p.includes("@phosphor-icons")) return true;
+    if (h === "unpkg.com" && p.includes("@phosphor-icons")) return true;
+    return false;
+};
+
+const isSameOriginAppIconSvgUrl = (url: URL): boolean => {
+    try {
+        if (url.origin !== self.location.origin) return false;
+    } catch {
+        return false;
+    }
+    const p = url.pathname || "";
+    if (!/\.svg$/i.test(p)) return false;
+    return /^\/assets\/icons\//i.test(p) || /^\/assets\/phosphor\//i.test(p);
+};
+
+registerRoute(
+    ({ url, request }) => request?.method === "GET" && isPhosphorCdnSvgUrl(url),
+    new CacheFirst({
+        cacheName: "ui-icons-cdn-v1",
+        fetchOptions: {
+            credentials: "omit",
+            mode: "cors",
+            priority: "low",
+            cache: "default",
+        },
+        plugins: [
+            new ExpirationPlugin({
+                maxEntries: 300,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+                purgeOnQuotaError: true,
+            }),
+        ],
+    })
+);
+
+registerRoute(
+    ({ url, request }) =>
+        request?.method === "GET" &&
+        isSameOriginAppIconSvgUrl(url) &&
+        !safeIsUserScopePath(url?.pathname || ""),
+    new StaleWhileRevalidate({
+        cacheName: "ui-icons-origin-v1",
+        fetchOptions: {
+            credentials: "same-origin",
+            mode: "cors",
+            priority: "high",
+            cache: "default",
+        },
+        plugins: [
+            new ExpirationPlugin({
+                maxEntries: 150,
+                maxAgeSeconds: 60 * 60 * 24 * 7,
+                purgeOnQuotaError: true,
+            }),
+        ],
     })
 );
 
