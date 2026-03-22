@@ -39,9 +39,16 @@ export async function opfsModifyJson(options: OpfsModifyOptions) {
     } = options;
     assertOpfs();
 
-    const root = await navigator.storage.getDirectory()?.catch?.(console.warn.bind(console)); // Нормализуем путь один раз
+    const root = await navigator.storage.getDirectory()?.catch?.(() => null);
+    if (!root) {
+        return { processed: 0, changed: 0, errors: 0 };
+    }
     const normDirPath = normalizePath(dirPath);
     const dir = await getDirByPath(root, normDirPath);
+    // First launch or path never created — not an error; migration is a no-op.
+    if (!dir) {
+        return { processed: 0, changed: 0, errors: 0 };
+    }
 
     let processed = 0;
     let changed = 0;
@@ -121,7 +128,13 @@ async function getDirByPath(rootDirHandle, path) {
     const parts = path.split('/').map(s => s.trim()).filter(Boolean);
     let dir = rootDirHandle;
     for (const part of parts) {
-        dir = await dir?.getDirectoryHandle?.(part, { create: false });
+        try {
+            dir = await dir?.getDirectoryHandle?.(part, { create: false });
+        } catch (e: any) {
+            if (e?.name === 'NotFoundError') return null;
+            throw e;
+        }
+        if (!dir) return null;
     }
     return dir;
 }

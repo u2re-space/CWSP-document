@@ -2,7 +2,7 @@
 // Air-кнопка: pointer + жесты + AirMove (Trackball/Touchpad)
 // =========================
 
-import { log, getAirButton, getAirStatusEl } from '../utils/utils';
+import { log, getAirButton, getAirNeighborButton, getAirStatusEl } from '../utils/utils';
 import { connectAirPadSession, sendAirPadIntent } from '../network/session';
 import { checkIsAiModeActive } from '../input/speech';
 import { HOLD_DELAY, TAP_THRESHOLD, MOVE_TAP_THRESHOLD, SWIPE_THRESHOLD } from '../config/config';
@@ -31,8 +31,11 @@ let lastMotionSentAt = 0;
 let lastTapEndTime = 0;           // Когда закончился последний tap
 let lastTapWasClean = false;      // Был ли последний tap "чистым" (короткий, без движения)
 let pendingDragOnHold = false;    // Флаг: если hold — активировать drag
-let isAirButtonInitialized = false;
-let isNeighborButtonInitialized = false;
+const neighborPointerHandlersBound = new WeakSet<Element>();
+const airPointerDownBound = new WeakSet<Element>();
+let airSurfaceDocumentRoutingAttached = false;
+let airSurfacePointerId: number | null = null;
+let airSurfaceCaptureTarget: HTMLElement | null = null;
 
 const DOUBLE_TAP_WINDOW = 300;    // Окно между tap и следующим down для drag
 const DRAG_HOLD_DELAY = 150;      // Задержка hold для drag (короче обычного HOLD_DELAY)
@@ -391,7 +394,7 @@ function enterMiddleScrollMode() {
     log('Neighbor: MIDDLE_SCROLL started (sensors active)');
 
     // Визуальная индикация
-    const neighborButton = document.getElementById('airNeighborButton');
+    const neighborButton = getAirNeighborButton();
     neighborButton?.classList.add('middle-scroll-active', 'active');
 
     //
@@ -410,7 +413,7 @@ function exitMiddleScrollMode() {
     resetAirState();
 
     // Убираем визуальную индикацию
-    const neighborButton = document.getElementById('airNeighborButton');
+    const neighborButton = getAirNeighborButton();
     neighborButton?.classList.remove('middle-scroll-active', 'active');
 }
 
@@ -422,17 +425,17 @@ function resetNeighborState() {
     neighborDownPos = null;
     neighborState = 'IDLE';
 
-    const neighborButton = document.getElementById('airNeighborButton');
+    const neighborButton = getAirNeighborButton();
     neighborButton?.classList.remove('middle-scroll-active', 'active');
 
     resetAirState();
 }
 
 function initNeighborButton() {
-    if (isNeighborButtonInitialized) return;
-
-    const neighborButton = document.getElementById('airNeighborButton');
+    const neighborButton = getAirNeighborButton();
     if (!neighborButton) return;
+    if (neighborPointerHandlersBound.has(neighborButton)) return;
+    neighborPointerHandlersBound.add(neighborButton);
 
     neighborButton.addEventListener('pointerdown', (e) => {
         e.preventDefault();
@@ -534,7 +537,6 @@ function initNeighborButton() {
     });
 
     log('Neighbor button initialized (tap: right-click, hold: middle-scroll via sensors)');
-    isNeighborButtonInitialized = true;
 }
 
 // ========== Экспорт состояния для gyroscope.ts / accelerometer.ts ==========
@@ -546,51 +548,66 @@ export function isMiddleScrollActive(): boolean {
 // ========== Initialization ==========
 
 export function initAirButton() {
-    if (isAirButtonInitialized) return;
-
     const airButton = getAirButton();
     if (!airButton) return;
 
     initNeighborButton();
 
-    let pointerId: number | null = null;
+    if (!airPointerDownBound.has(airButton)) {
+        airPointerDownBound.add(airButton);
+        airButton.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            if (airSurfacePointerId !== null && airSurfacePointerId !== e.pointerId) return;
 
-    airButton.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        if (pointerId !== null && pointerId !== e.pointerId) return;
+            airSurfacePointerId = e.pointerId;
+            airSurfaceCaptureTarget = airButton;
+            airSurfaceCaptureTarget.setPointerCapture(airSurfacePointerId);
+            airOnDown(e);
+        });
+    }
 
-        pointerId = e.pointerId;
-        airButton?.setPointerCapture(pointerId);
-        airOnDown(e);
-    });
+    if (!airSurfaceDocumentRoutingAttached) {
+        airSurfaceDocumentRoutingAttached = true;
 
-    document.addEventListener('pointermove', (e) => {
-        if (e.pointerId !== pointerId) return;
-        e.preventDefault();
+        const routingDoc = airButton.ownerDocument;
+        routingDoc.addEventListener('pointermove', (e) => {
+            if (e.pointerId !== airSurfacePointerId) return;
+            e.preventDefault();
 
-        if (!airDownPos) return;
-        if (checkIsAiModeActive()) return;
+            if (!airDownPos) return;
+            if (checkIsAiModeActive()) return;
 
-        handleAirSurfaceMove(e.clientX, e.clientY);
-    });
+            handleAirSurfaceMove(e.clientX, e.clientY);
+        });
 
-    document.addEventListener('pointerup', (e) => {
-        if (e.pointerId !== pointerId) return;
-        e.preventDefault();
+        routingDoc.addEventListener('pointerup', (e) => {
+            if (e.pointerId !== airSurfacePointerId) return;
+            e.preventDefault();
 
-        if (pointerId !== null) {
-            airButton?.releasePointerCapture(pointerId);
-        }
-        pointerId = null;
-        airOnUp(e);
-    });
-
-    document.addEventListener('pointercancel', (e) => {
-        if (e?.pointerId === pointerId || e?.pointerId == null) {
-            if (pointerId !== null) {
-                airButton?.releasePointerCapture(pointerId);
+            if (airSurfacePointerId !== null && airSurfaceCaptureTarget) {
+                try {
+                    airSurfaceCaptureTarget.releasePointerCapture(airSurfacePointerId);
+                } catch {
+                    /* ignore */
+                }
             }
-            pointerId = null;
+            airSurfacePointerId = null;
+            airSurfaceCaptureTarget = null;
+            airOnUp(e);
+        });
+
+        routingDoc.addEventListener('pointercancel', (e) => {
+            if (e?.pointerId !== airSurfacePointerId && e?.pointerId != null) return;
+
+            if (airSurfacePointerId !== null && airSurfaceCaptureTarget) {
+                try {
+                    airSurfaceCaptureTarget.releasePointerCapture(airSurfacePointerId);
+                } catch {
+                    /* ignore */
+                }
+            }
+            airSurfacePointerId = null;
+            airSurfaceCaptureTarget = null;
 
             if (dragActive) {
                 sendAirPadIntent({ type: 'pointer.up', button: 'left' });
@@ -599,9 +616,8 @@ export function initAirButton() {
             }
 
             resetAirState();
-        }
-    });
+        });
+    }
 
-    isAirButtonInitialized = true;
     log('Air button initialized');
 }

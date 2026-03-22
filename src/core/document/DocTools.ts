@@ -1,8 +1,28 @@
 export const coordinate: [number, number] = [0, 0];
 export const lastElement: [HTMLElement | null] = [null];
-export const saveCoordinate = (e) => {
-    coordinate[0] = e?.clientX ?? coordinate[0];
-    coordinate[1] = e?.clientY ?? coordinate[1];
+
+/** Resolve event target to an HTMLElement (e.g. parent of a Text node). */
+export function eventTargetElement(ev: Event): HTMLElement | null {
+    const t = ev.target;
+    if (t instanceof HTMLElement) return t;
+    if (t instanceof Node && t.nodeType === Node.TEXT_NODE && t.parentElement) return t.parentElement;
+    const path = ev.composedPath?.() ?? [];
+    for (const n of path) {
+        if (n instanceof HTMLElement) return n;
+    }
+    return null;
+}
+
+/** Update last pointer coordinates when the event carries client geometry (Mouse/Pointer). */
+export const saveCoordinate = (e: Event): void => {
+    if (e instanceof PointerEvent || e instanceof MouseEvent) {
+        const x = e.clientX;
+        const y = e.clientY;
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+            coordinate[0] = x;
+            coordinate[1] = y;
+        }
+    }
 };
 
 // @ts-ignore
@@ -104,7 +124,7 @@ if (typeof document !== "undefined") {
         document.addEventListener("click", saveCoordinate, { passive: true });
         document.addEventListener("contextmenu", (e) => {
             saveCoordinate(e);
-            lastElement[0] = (e?.target as HTMLElement || lastElement[0]);
+            lastElement[0] = eventTargetElement(e) ?? lastElement[0];
         }, { passive: true });
     } catch {
         // Ignore - may not be in DOM context

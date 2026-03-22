@@ -114,6 +114,7 @@ export const LAYER_HIERARCHY: LayerDefinition[] = [
     { name: 'layer.view.editor.markdown',     category: 'view', order: 362, description: 'Markdown editor sublayer' },
     { name: 'layer.view.editor.quill',        category: 'view', order: 364, description: 'Quill editor sublayer' },
     { name: 'layer.view.airpad',              category: 'view', order: 370, description: 'Airpad (touch input)' },
+    { name: 'view.airpad',                    category: 'view', order: 371, description: 'Airpad SCSS @layer view.airpad (alias)' },
     { name: 'layer.view.home',                category: 'view', order: 380, description: 'Home/landing view' },
     { name: 'layer.view.print',               category: 'view', order: 390, description: 'Print view' },
     { name: 'view-explorer',                  category: 'view', order: 392, description: 'Explorer legacy layered scope' },

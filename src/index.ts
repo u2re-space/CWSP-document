@@ -304,12 +304,29 @@ export default async function index(mountElement: HTMLElement) {
         initReceivers();
         handleShareTarget();
         // SW is initialized by initPWA(); avoid dual SW managers causing update loops.
-        await withTimeout(setupLaunchQueueConsumer(), "setupLaunchQueueConsumer", 2500, undefined);
-
+        // Keep pre-shell work short so the shell spinner / first paint stays < ~3s on slow devices.
+        const PRE_SHELL_BUDGET_MS = 1200;
         try {
-            await withTimeout(checkPendingShareData(), "checkPendingShareData", 2500, null);
+            await Promise.race([
+                Promise.all([
+                    withTimeout(setupLaunchQueueConsumer(), "setupLaunchQueueConsumer", PRE_SHELL_BUDGET_MS, undefined),
+                    withTimeout(checkPendingShareData(), "checkPendingShareData", PRE_SHELL_BUDGET_MS, null)
+                ]),
+                new Promise<void>((r) => globalThis.setTimeout(r, PRE_SHELL_BUDGET_MS))
+            ]);
         } catch (e) {
-            console.warn('[Index] Pending share data check failed:', e);
+            console.warn("[Index] Pre-boot share/launch queue failed:", e);
+        }
+
+        // Warm viewer markdown engine chunk early when route targets viewer (non-blocking).
+        const prePath = getNormalizedPathname();
+        if (!prePath || prePath === "viewer" || prePath === "share-target" || prePath === "share_target") {
+            void import("./frontend/views/viewer")
+                .then((m: { warmViewerMarkdownEngine?: () => void }) => m.warmViewerMarkdownEngine?.())
+                .catch(() => { /* optional */ });
+        }
+        if (prePath === "airpad") {
+            void import("./frontend/views/airpad/main").catch(() => { /* optional */ });
         }
 
         void withTimeout(pwaPromise, "initPWA", 5000, null, { warnOnTimeout: false })

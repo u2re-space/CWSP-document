@@ -3,6 +3,15 @@
  */
 
 @layer view.airpad {
+    /*
+     * Minimal shell forces `overflow: auto` on `.app-shell__content > *` ([data-view]).
+     * That clips `position: fixed` modals (logs, hints) and traps them under rails.
+     * Scroll only the inner `.container`; keep the view root visible for overlays.
+     */
+    :where(.app-shell__content) > :where([data-view='airpad']) {
+        overflow: visible;
+    }
+
     .view-airpad {
         display: flex;
         flex-direction: column;
@@ -10,17 +19,32 @@
         background-color: var(--view-bg, var(--color-surface, var(--surface, #0a0a0a)));
         color: var(--view-fg, var(--color-on-surface, var(--on-surface, #fff)));
         --action-rail-edge: 0.75rem;
+        overflow: visible;
+        /* Shell / parent layouts may use pointer-events: none; keep the view hit-testable. */
+        pointer-events: auto;
     }
 
     .view-airpad__content {
         flex: 1;
-        overflow: hidden;
+        min-block-size: 0;
+        display: flex;
+        flex-direction: column;
+        /* Do not scroll this wrapper — fixed overlays + rails live here; `.container` scrolls. */
+        overflow: visible;
+        pointer-events: auto;
 
-        // Only the main layout container should fill the view.
-        // Floating controls/overlays are siblings and must keep intrinsic size.
         & > .container {
-            block-size: 100%;
+            flex: 1 1 auto;
+            min-block-size: 0;
+            overflow-inline: hidden;
+            overflow-block: auto;
+            pointer-events: auto;
         }
+    }
+
+    /* Closed modals: never intercept taps (guards against stray display overrides). */
+    .view-airpad .log-overlay:not(.open) {
+        pointer-events: none;
     }
 
     // Shared behavior for the unified bottom action rail.

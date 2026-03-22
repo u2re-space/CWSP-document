@@ -2,7 +2,7 @@
 // Virtual Keyboard Component
 // =========================
 
-import { log, getVkStatusEl } from '../utils/utils';
+import { log, getVkStatusEl, getAirpadDomRoot } from '../utils/utils';
 import { initVirtualKeyboardAPI, hasVirtualKeyboardAPI } from './keyboard/api';
 import {
     setKeyboardElement,
@@ -17,8 +17,6 @@ import {
     setupVirtualKeyboardAPIHandlers,
     setupKeyboardUIHandlers,
 } from './keyboard/handlers';
-
-let virtualKeyboardInitialized = false;
 
 function updateToggleButtonEnabledState(enabled: boolean) {
     const toggleButton = getToggleButton();
@@ -44,9 +42,11 @@ export function setRemoteKeyboardEnabled(enabled: boolean) {
     }
 }
 
-export function initVirtualKeyboard() {
-    if (virtualKeyboardInitialized) return;
-
+/**
+ * @param mountRoot — node under which Airpad markup was mounted (e.g. `[data-airpad-content]`).
+ *   Resolves `.view-airpad` for portal placement; prefers mount root / `getAirpadDomRoot()` over global document queries.
+ */
+export function initVirtualKeyboard(mountRoot?: HTMLElement | null) {
     // Initialize VirtualKeyboard API if available
     initVirtualKeyboardAPI();
     const hasAPI = hasVirtualKeyboardAPI();
@@ -56,7 +56,13 @@ export function initVirtualKeyboard() {
     }
 
     // Mount keyboard inside airpad root so it inherits airpad styles/tokens.
-    const container = document.querySelector('.view-airpad') ?? document.querySelector('#app') ?? document.body;
+    const scoped = getAirpadDomRoot();
+    const container =
+        mountRoot?.closest?.('.view-airpad') ??
+        mountRoot ??
+        scoped?.closest?.('.view-airpad') ??
+        scoped ??
+        document.body;
 
     // Reuse existing instance if already mounted.
     let keyboardElement = container.querySelector('.virtual-keyboard-container') as HTMLElement | null;
@@ -81,8 +87,8 @@ export function initVirtualKeyboard() {
     let toggleButton = toggleContainer.querySelector('.keyboard-toggle') as HTMLElement | null;
     if (!toggleButton) {
         const toggleHTML = hasAPI
-            ? '<button type="button" tabindex="-1" contenteditable="false" virtualkeyboardpolicy="manual" class="keyboard-toggle keyboard-toggle-editable" aria-label="Toggle keyboard">⌨️</button>'
-            : '<button type="button" tabindex="-1" class="keyboard-toggle" aria-label="Toggle keyboard">⌨️</button>';
+            ? '<button type="button" name="airpad-keyboard-toggle" tabindex="-1" contenteditable="false" virtualkeyboardpolicy="manual" class="keyboard-toggle keyboard-toggle-editable" aria-label="Toggle keyboard">⌨️</button>'
+            : '<button type="button" name="airpad-keyboard-toggle" tabindex="-1" class="keyboard-toggle" aria-label="Toggle keyboard">⌨️</button>';
         toggleContainer.insertAdjacentHTML('beforeend', toggleHTML);
         toggleButton = toggleContainer.querySelector('.keyboard-toggle') as HTMLElement | null;
     }
@@ -107,6 +113,5 @@ export function initVirtualKeyboard() {
     setupVirtualKeyboardAPIHandlers();
     setupKeyboardUIHandlers();
 
-    virtualKeyboardInitialized = true;
     log('Virtual keyboard initialized');
 }

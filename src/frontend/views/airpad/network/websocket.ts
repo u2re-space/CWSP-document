@@ -15,6 +15,7 @@ import {
     getAirPadClientId,
     getAirPadPeerInstanceId,
 } from '../config/config';
+import { setAirpadCredentialInvalidator } from '../credential-cache-bridge';
 
 let socket: Socket | null = null;
 let wsConnected = false;
@@ -101,6 +102,11 @@ const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 let aesKeyCache = new Map<string, CryptoKey>();
 let hmacKeyCache = new Map<string, CryptoKey>();
+
+setAirpadCredentialInvalidator(() => {
+    aesKeyCache.clear();
+    hmacKeyCache.clear();
+});
 const coordinatorPending = new Map<string, {
     resolve: (value: any) => void;
     reject: (error: any) => void;

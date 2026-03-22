@@ -14,6 +14,15 @@ import {
 let clipboardToolbarInitialized = false;
 let unsubscribeClipboardUpdate: (() => void) | null = null;
 
+/** Call when Airpad unmounts so a fresh DOM gets listeners on next mount. */
+export function resetClipboardToolbarState(): void {
+    clipboardToolbarInitialized = false;
+    if (unsubscribeClipboardUpdate) {
+        unsubscribeClipboardUpdate();
+        unsubscribeClipboardUpdate = null;
+    }
+}
+
 function setPreview(text: string, meta?: { source?: string }) {
     const clipboardPreviewEl = getClipboardPreviewEl();
     if (!clipboardPreviewEl || typeof clipboardPreviewEl === 'undefined') return;

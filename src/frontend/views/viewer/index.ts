@@ -152,6 +152,11 @@ const getMarkedParser = async (): Promise<(markdown: string) => Promise<string>>
     return markedParserPromise;
 };
 
+/** Warm marked + KaTeX chunk from the app entry; safe no-op if import fails. */
+export function warmViewerMarkdownEngine(): void {
+    void getMarkedParser().catch(() => { /* optional */ });
+}
+
 // ============================================================================
 // VIEWER STATE
 // ============================================================================
@@ -455,7 +460,12 @@ export class ViewerView implements View {
             return false;
         };
 
-        // Update raw view
+        const endBusy = (): void => {
+            renderTarget.removeAttribute("aria-busy");
+            renderTarget.removeAttribute("data-md-state");
+        };
+
+        // Update raw view (sync; cheap path for "see source immediately")
         if (rawTarget) {
             rawTarget.textContent = content || "";
         }
@@ -466,34 +476,50 @@ export class ViewerView implements View {
             container.toggleAttribute("data-raw", true);
             if (rawTarget) rawTarget.hidden = false;
             renderTarget.hidden = true;
+            endBusy();
             return;
         }
 
-        // Render markdown via lazy parser.
-        try {
-            const handleParsed = (html: string) => {
-                const sanitized = DOMPurify?.sanitize?.((html || "")?.trim?.() || "", SANITIZE_OPTIONS) || "";
-                renderTarget.innerHTML = sanitized;
-                this.resolveRelativeResourceUrls(renderTarget);
-                this.applyRenderedLinkBehavior(renderTarget);
-                console.log('[ViewerView] Markdown rendered successfully');
-            };
-
-            const handleError = (error: unknown) => {
-                console.error('[ViewerView] Error rendering markdown:', error);
-                renderTarget.innerHTML = `<div style="color: red; padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 4px;">Error parsing markdown: ${(error as any)?.message}</div>`;
-            };
-
-            const pluginProcessed = this.applyMarkdownPlugins((content || "")?.trim?.() || "");
-            const processedContent = this.applyCustomMarkdownExtensions(pluginProcessed);
-            getMarkedParser()
-                .then((parse) => parse(processedContent))
-                .then(handleParsed)
-                .catch(handleError);
-        } catch (error) {
-            console.error('[ViewerView] Error rendering markdown:', error);
-            renderTarget.innerHTML = `<div style="color: red; padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 4px;">Error parsing markdown: ${(error as any)?.message}</div>`;
+        if (container) {
+            container.removeAttribute("data-raw");
         }
+        renderTarget.hidden = false;
+        if (rawTarget) rawTarget.hidden = true;
+
+        // Paint a placeholder first, then do plugin work + marked off the critical stack.
+        renderTarget.setAttribute("aria-busy", "true");
+        renderTarget.setAttribute("data-md-state", "preparing");
+        renderTarget.innerHTML = `<div class="view-viewer__md-loading" role="status">Rendering preview…</div>`;
+
+        queueMicrotask(() => {
+            try {
+                const handleParsed = (html: string) => {
+                    const sanitized = DOMPurify?.sanitize?.((html || "")?.trim?.() || "", SANITIZE_OPTIONS) || "";
+                    renderTarget.innerHTML = sanitized;
+                    this.resolveRelativeResourceUrls(renderTarget);
+                    this.applyRenderedLinkBehavior(renderTarget);
+                    endBusy();
+                    console.log("[ViewerView] Markdown rendered successfully");
+                };
+
+                const handleError = (error: unknown) => {
+                    console.error("[ViewerView] Error rendering markdown:", error);
+                    renderTarget.innerHTML = `<div style="color: red; padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 4px;">Error parsing markdown: ${(error as any)?.message}</div>`;
+                    endBusy();
+                };
+
+                const pluginProcessed = this.applyMarkdownPlugins((content || "")?.trim?.() || "");
+                const processedContent = this.applyCustomMarkdownExtensions(pluginProcessed);
+                getMarkedParser()
+                    .then((parse) => parse(processedContent))
+                    .then(handleParsed)
+                    .catch(handleError);
+            } catch (error) {
+                console.error("[ViewerView] Error rendering markdown:", error);
+                renderTarget.innerHTML = `<div style="color: red; padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 4px;">Error parsing markdown: ${(error as any)?.message}</div>`;
+                endBusy();
+            }
+        });
     }
 
     private normalizeSourceUrl(source?: string | null): string | null {
@@ -591,6 +617,13 @@ export class ViewerView implements View {
     }
 
     private async openMarkdownSource(source: string, filename?: string): Promise<boolean> {
+        const renderTarget = this.element?.querySelector("[data-render-target]") as HTMLElement | null;
+        if (renderTarget) {
+            renderTarget.setAttribute("aria-busy", "true");
+            renderTarget.setAttribute("data-md-state", "fetching");
+            renderTarget.innerHTML = `<div class="view-viewer__md-loading" role="status">Loading document…</div>`;
+        }
+
         const normalizedSource = this.normalizeSourceUrl(source);
         if (!normalizedSource) return false;
         const markdown = await this.fetchMarkdownFromUrl(normalizedSource);

@@ -52,6 +52,11 @@ export interface BootConfig {
     theme?: ShellTheme;
     /** Service channels to initialize */
     channels?: ServiceChannelId[];
+    /**
+     * Channel to init first (sync). Remaining `channels` init on idle so boot
+     * stays short; they still initialize before first navigation to those views.
+     */
+    channelPriorityId?: ServiceChannelId;
     /** Remember preferences */
     rememberChoice?: boolean;
 }
@@ -207,15 +212,15 @@ export class BootLoader {
             // Establish canonical cascade layer order before any stylesheet loads.
             initializeLayers();
 
-            // Phase 0: Load persisted settings early (theme/font-size/etc.)
-            const persistedSettings = await loadSettings().catch((error) => {
-                console.warn("[BootLoader] Failed to load settings:", error);
-                return null;
-            });
+            // Phase 0–1: Settings + Veela in parallel (both are on the critical path to first paint).
+            const [persistedSettings] = await Promise.all([
+                loadSettings().catch((error) => {
+                    console.warn("[BootLoader] Failed to load settings:", error);
+                    return null;
+                }),
+                this.loadStyles(config.styleSystem)
+            ]);
             const persistedTheme = this.resolveThemeFromSettings(persistedSettings);
-
-            // Phase 1: Load Style System
-            await this.loadStyles(config.styleSystem);
             
             // Phase 2: Initialize Shell
             const shell = await this.loadShell(config.shell, container);
@@ -231,16 +236,15 @@ export class BootLoader {
                 applyAppTheme(persistedSettings);
             }
             
-            // Phase 5: Initialize Channels
+            // Phase 5: Initialize channels (primary sync, rest on idle)
             if (config.channels && config.channels.length > 0) {
-                await this.initChannels(config.channels);
+                await this.initChannels(config.channels, config.channelPriorityId);
             }
             
-            // Phase 6: Navigate to Default View (avoid duplicate first navigation)
-            const currentView = (shell.currentView as any)?.value;
-            if (currentView !== config.defaultView) {
-                await shell.navigate(config.defaultView);
-            }
+            // Phase 6: Always activate the initial view.
+            // ShellBase starts with a placeholder ref; skipping navigate when it accidentally
+            // equals defaultView (e.g. /home with defaultView "home") left the spinner forever.
+            await shell.navigate(config.defaultView);
             
             // Mark as ready
             this.setPhase("ready");
@@ -326,21 +330,56 @@ export class BootLoader {
     }
 
     /**
-     * Initialize service channels
+     * Initialize service channels: one high-priority channel blocks boot, the rest
+     * run when the browser is idle so startup stays within interactive budgets.
      */
-    private async initChannels(channelIds: ServiceChannelId[]): Promise<void> {
+    private async initChannels(
+        channelIds: ServiceChannelId[],
+        priorityId?: ServiceChannelId
+    ): Promise<void> {
         this.setPhase("channels");
-        console.log(`[BootLoader] Initializing channels:`, channelIds);
-        
-        for (const channelId of channelIds) {
-            try {
-                await serviceChannels.initChannel(channelId);
-            } catch (error) {
-                console.warn(`[BootLoader] Failed to init channel ${channelId}:`, error);
-            }
+        const unique = [...new Set(channelIds)];
+        if (unique.length === 0) return;
+
+        const primary =
+            (priorityId && unique.includes(priorityId) ? priorityId : null) ?? unique[0];
+        const rest = unique.filter((id) => id !== primary);
+
+        console.log(
+            `[BootLoader] Initializing primary channel:`,
+            primary,
+            rest.length ? `(+${rest.length} deferred)` : ""
+        );
+
+        try {
+            await serviceChannels.initChannel(primary);
+        } catch (error) {
+            console.warn(`[BootLoader] Failed to init primary channel ${primary}:`, error);
         }
-        
-        console.log(`[BootLoader] Channels initialized`);
+
+        if (rest.length === 0) {
+            console.log("[BootLoader] Channels initialized");
+            return;
+        }
+
+        const runDeferred = (): void => {
+            void (async () => {
+                for (const channelId of rest) {
+                    try {
+                        await serviceChannels.initChannel(channelId);
+                    } catch (error) {
+                        console.warn(`[BootLoader] Failed to init channel ${channelId}:`, error);
+                    }
+                }
+                console.log("[BootLoader] Deferred channels initialized:", rest);
+            })();
+        };
+
+        if (typeof globalThis.requestIdleCallback === "function") {
+            globalThis.requestIdleCallback(runDeferred, { timeout: 5000 });
+        } else {
+            globalThis.setTimeout?.(runDeferred, 0);
+        }
     }
 
     // ========================================================================
@@ -520,12 +559,18 @@ export async function bootMinimal(
     container: HTMLElement,
     view: ViewId = "viewer"
 ): Promise<Shell> {
-    const channels = ["workcenter", "settings", "viewer"].filter((channelId) => isEnabledView(channelId));
+    const channels = ["workcenter", "settings", "viewer"].filter((channelId) =>
+        isEnabledView(channelId)
+    ) as ServiceChannelId[];
+    const defaultView = pickEnabledView(view, "viewer");
+    const channelPriorityId: ServiceChannelId | undefined =
+        (channels.find((c) => c === defaultView) ?? channels[0]) as ServiceChannelId | undefined;
     return bootLoader.boot(container, {
         styleSystem: "vl-basic",
         shell: "minimal",
-        defaultView: pickEnabledView(view, "viewer"),
+        defaultView,
         channels,
+        channelPriorityId,
         rememberChoice: true
     });
 }

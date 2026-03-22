@@ -2,6 +2,8 @@
 // Конфигурация
 // =========================
 
+import { invalidateAirpadTransportCredentials } from "../credential-cache-bridge";
+
 type RemoteProtocol = 'auto' | 'http' | 'https';
 export type AirpadTransportMode = "plaintext" | "secure";
 const STORAGE_KEY = 'airpad.remote.connection.v1';
@@ -128,17 +130,7 @@ const createPeerInstanceId = (): string => {
 // Remote connection settings.
 // remoteHost describes where to establish the Socket.IO transport (Connect URL).
 // remoteRouteTarget is optional and describes which peer/device to route to by default (Remote Host field).
-const stored = loadStoredRemoteConfig();
-export let remoteHost = (stored.host || location.hostname || '').trim();
-export let remoteProtocol: RemoteProtocol =
-    stored.protocol === 'http' || stored.protocol === 'https' || stored.protocol === 'auto'
-        ? stored.protocol
-        : 'auto';
-export let remoteRouteTarget = (
-    stored.routeTarget ||
-    readGlobalAirpadValue(["AIRPAD_ROUTE_TARGET"]) ||
-    ''
-).trim();
+
 const remoteConfig: {
     transportMode: AirpadTransportMode;
     authToken: string;
@@ -147,15 +139,117 @@ const remoteConfig: {
     transportSecret: string;
     signingSecret: string;
 } = {
-    transportMode: stored.transportMode === "secure" ? "secure" : "plaintext",
-    authToken: stored.authToken || "",
-    clientId: stored.clientId || "",
-    peerInstanceId: toTrimmedString((stored as StoredRemoteConfig).peerInstanceId) || createPeerInstanceId(),
-    transportSecret: stored.transportSecret || "",
-    signingSecret: stored.signingSecret || "",
+    transportMode: "plaintext",
+    authToken: "",
+    clientId: "",
+    peerInstanceId: "",
+    transportSecret: "",
+    signingSecret: "",
 };
+
+export let remoteHost = "";
+export let remoteProtocol: RemoteProtocol = "auto";
+export let remoteRouteTarget = "";
+
+/**
+ * Apply settings from a stored blob (localStorage shape). Safe to call on tab focus / storage events.
+ */
+function hydrateFromStored(stored: MigratedRemoteConfig): void {
+    const locHost = typeof location !== "undefined" ? (location.hostname || "") : "";
+    remoteHost = (stored.host || locHost || "").trim();
+    remoteProtocol =
+        stored.protocol === "http" || stored.protocol === "https" || stored.protocol === "auto"
+            ? stored.protocol
+            : "auto";
+    remoteRouteTarget = (
+        stored.routeTarget ||
+        readGlobalAirpadValue(["AIRPAD_ROUTE_TARGET"]) ||
+        ""
+    ).trim();
+    remoteConfig.transportMode = stored.transportMode === "secure" ? "secure" : "plaintext";
+    remoteConfig.authToken = stored.authToken || "";
+    remoteConfig.clientId = stored.clientId || "";
+    const storedPeer = toTrimmedString((stored as StoredRemoteConfig).peerInstanceId);
+    if (storedPeer) {
+        remoteConfig.peerInstanceId = storedPeer;
+    } else if (!remoteConfig.peerInstanceId) {
+        remoteConfig.peerInstanceId = createPeerInstanceId();
+    }
+    remoteConfig.transportSecret = stored.transportSecret || "";
+    remoteConfig.signingSecret = stored.signingSecret || "";
+}
+
+const stored = loadStoredRemoteConfig();
+hydrateFromStored(stored);
+if (!toTrimmedString((stored as StoredRemoteConfig).peerInstanceId)) {
+    remoteConfig.peerInstanceId = remoteConfig.peerInstanceId || createPeerInstanceId();
+}
 if ((stored as MigratedRemoteConfig)._legacyMigrated === true || !(stored as StoredRemoteConfig).peerInstanceId) {
     persistRemoteConfig();
+}
+
+/** Re-read localStorage (e.g. after another tab saved, or before mounting AirPad). */
+export function reloadAirpadRemoteConfigFromStorage(): void {
+    hydrateFromStored(loadStoredRemoteConfig());
+}
+
+/** When another tab updates AirPad settings, refresh in-memory state and crypto caches. */
+export function attachAirpadCrossTabConfigSync(): () => void {
+    const onStorage = (e: StorageEvent): void => {
+        if (e.key !== STORAGE_KEY || e.newValue == null) return;
+        reloadAirpadRemoteConfigFromStorage();
+        invalidateAirpadTransportCredentials();
+    };
+    globalThis.addEventListener?.("storage", onStorage);
+    return () => globalThis.removeEventListener?.("storage", onStorage);
+}
+
+/** Batch apply from the configuration UI (single persist + optional credential invalidation). */
+export type AirpadRemoteConfigInput = {
+    host?: string;
+    protocol?: string;
+    routeTarget?: string;
+    transportMode?: string;
+    authToken?: string;
+    clientId?: string;
+    transportSecret?: string;
+    signingSecret?: string;
+};
+
+export function applyAirpadRemoteConfig(input: AirpadRemoteConfigInput): void {
+    let secretsOrModeChanged = false;
+    if (input.host !== undefined) {
+        remoteHost = (input.host || "").trim();
+    }
+    if (input.protocol !== undefined) {
+        remoteProtocol = input.protocol === "http" || input.protocol === "https" ? input.protocol : "auto";
+    }
+    if (input.routeTarget !== undefined) {
+        remoteRouteTarget = (input.routeTarget || "").trim();
+    }
+    if (input.transportMode !== undefined) {
+        const next = input.transportMode === "secure" ? "secure" : "plaintext";
+        if (next !== remoteConfig.transportMode) secretsOrModeChanged = true;
+        remoteConfig.transportMode = next;
+    }
+    if (input.authToken !== undefined) {
+        remoteConfig.authToken = input.authToken || "";
+    }
+    if (input.clientId !== undefined) {
+        remoteConfig.clientId = input.clientId || "";
+    }
+    if (input.transportSecret !== undefined) {
+        remoteConfig.transportSecret = input.transportSecret || "";
+        secretsOrModeChanged = true;
+    }
+    if (input.signingSecret !== undefined) {
+        remoteConfig.signingSecret = input.signingSecret || "";
+        secretsOrModeChanged = true;
+    }
+    persistRemoteConfig();
+    if (secretsOrModeChanged) {
+        invalidateAirpadTransportCredentials();
+    }
 }
 
 // Configuration getters and setters
@@ -191,7 +285,11 @@ export function getAirPadTransportMode(): AirpadTransportMode {
 }
 
 export function setAirPadTransportMode(mode: string): void {
-    remoteConfig.transportMode = mode === "secure" ? "secure" : "plaintext";
+    const next = mode === "secure" ? "secure" : "plaintext";
+    if (next !== remoteConfig.transportMode) {
+        remoteConfig.transportMode = next;
+        invalidateAirpadTransportCredentials();
+    }
     persistRemoteConfig();
 }
 
@@ -231,6 +329,7 @@ export function getAirPadTransportSecret(): string {
 export function setAirPadTransportSecret(secret: string): void {
     remoteConfig.transportSecret = secret || "";
     persistRemoteConfig();
+    invalidateAirpadTransportCredentials();
 }
 
 export function getAirPadSigningSecret(): string {
@@ -240,6 +339,7 @@ export function getAirPadSigningSecret(): string {
 export function setAirPadSigningSecret(secret: string): void {
     remoteConfig.signingSecret = secret || "";
     persistRemoteConfig();
+    invalidateAirpadTransportCredentials();
 }
 
 // Направление и выбор осей (подбирается под телефон)

@@ -8,7 +8,8 @@
 
 @layer view.airpad {
 
-    .view-airpad :is(*, *::before, *::after) {
+    .view-airpad :is(*, *::before, *::after),
+    .airpad-config-overlay :is(*, *::before, *::after) {
         box-sizing: border-box;
         font-variant-emoji: text;
     }
@@ -18,6 +19,14 @@
         touch-action: manipulation;
         user-select: none;
         -webkit-user-select: none;
+        line-height: 1.5;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    /* Portaled config modal: same base typography; do not force user-select:none (form fields). */
+    .airpad-config-overlay {
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
         line-height: 1.5;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
@@ -34,7 +43,9 @@
    ========================================================================== */
 
 @layer view.airpad {
-    .view-airpad {
+    /* Theme tokens live here; include portaled config overlay (mounted on .app-shell/body). */
+    .view-airpad,
+    .airpad-config-overlay {
         /* Material You color system - Enhanced with BeerCSS influences */
         --primary: #0061a4;
         --primary-container: #d1e4ff;
@@ -172,7 +183,8 @@
 @layer view.airpad {
 
     @media (prefers-color-scheme: light) {
-        .view-airpad {
+        .view-airpad,
+        .airpad-config-overlay {
             /* Surface system - Material Design 3 light */
             --surface: #fafafa;
             --surface-variant: #e7e5e5;
@@ -227,7 +239,8 @@
     }
 
     /* Explicit light theme when shell sets data-theme="light" */
-    .app-shell[data-theme="light"] .view-airpad {
+    .app-shell[data-theme="light"] .view-airpad,
+    .app-shell[data-theme="light"] .airpad-config-overlay {
         --surface: #fafafa;
         --surface-variant: #e7e5e5;
         --surface-container: #f3f1f1;
@@ -530,7 +543,9 @@
     .config-overlay {
         position: fixed;
         inset: 0;
-        background: color-mix(in srgb, var(--shadow), transparent 40%);
+        color: var(--on-surface, #e0e2e8);
+        /* --shadow is not always defined on :root; fallback when overlay is portaled to .app-shell/body */
+        background: color-mix(in srgb, var(--shadow, #000), transparent 40%);
         backdrop-filter: blur(12px);
         display: none;
         align-items: center;
@@ -725,9 +740,10 @@
         display: none;
         align-items: center;
         justify-content: center;
-        background: color-mix(in srgb, var(--shadow), transparent 35%);
+        background: color-mix(in srgb, var(--shadow, #000), transparent 35%);
         backdrop-filter: blur(12px);
-        z-index: 11;
+        /* Above bottom rail (24) / side stack (26) and VK layer (1000); below config (120000). */
+        z-index: 10050;
         padding: var(--space-4);
 
         &.open {
@@ -1265,6 +1281,8 @@
         pointer-events: none;
 
         &.visible {
+            display: flex;
+            pointer-events: auto;
             transform: translateY(0);
         }
     }

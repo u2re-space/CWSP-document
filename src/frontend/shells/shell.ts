@@ -6,6 +6,8 @@ import { showToast } from "@rs-frontend/items/Toast";
 import { withViewTransition, getTransitionDirection } from "../shared/view-transitions";
 import { loadSettings, saveSettings } from "@rs-com/config/Settings";
 import { applyTheme as applyAppTheme } from "@rs-core/utils/Theme";
+import { isEnabledView } from "../config/views";
+import { scheduleViewModulePrefetch } from "../shared/view-prefetch";
 
 //
 import "fest/fl-ui";
@@ -104,7 +106,45 @@ export abstract class ShellBase implements Shell {
         container.replaceChildren(this.rootElement);
         this.mounted = true;
 
+        // Align navigation state with the URL before the first boot navigate(), so the
+        // outgoing "previous" view is not a stale placeholder (e.g. "home" on /viewer).
+        this.syncNavigationFromUrl();
+
         console.log(`[${this.id}] Shell mounted with data-shell="${this.id}"`);
+    }
+
+    /** Match route search params (order-insensitive). */
+    private sameRouteParams(
+        a?: Record<string, string>,
+        b?: Record<string, string>
+    ): boolean {
+        const ea = new URLSearchParams(a || {});
+        const eb = new URLSearchParams(b || {});
+        if (ea.toString() === eb.toString()) return true;
+        const keys = new Set<string>([...ea.keys(), ...eb.keys()]);
+        for (const k of keys) {
+            if (ea.get(k) !== eb.get(k)) return false;
+        }
+        return true;
+    }
+
+    /**
+     * When the shell mounts on a path-backed view, mirror it into navigation state so
+     * boot / first navigate() does not treat a placeholder as the previous view.
+     */
+    protected syncNavigationFromUrl(): void {
+        if (typeof window === "undefined" || typeof window == "undefined") return;
+
+        const fromPath = this.getViewFromPathname();
+        if (!fromPath || !isEnabledView(fromPath)) return;
+
+        this.navigationState.currentView = fromPath;
+        this.navigationState.previousView = undefined;
+        this.navigationState.params = Object.fromEntries(
+            new URLSearchParams(globalThis.location?.search || "")
+        );
+        this.currentView.value = fromPath;
+        this.navigationState.viewHistory = [fromPath];
     }
 
     unmount(): void {
@@ -136,6 +176,21 @@ export abstract class ShellBase implements Shell {
         console.log(`[${this.id}] Navigating to: ${viewId}`, params);
         const navToken = ++this.navigationToken;
 
+        // No-op when already showing this view with the same query (avoids duplicate transitions).
+        if (
+            viewId === this.currentView.value &&
+            this.sameRouteParams(params, this.navigationState.params)
+        ) {
+            const entry = this.loadedViews.get(viewId);
+            if (
+                entry?.element.isConnected &&
+                this.contentContainer?.contains(entry.element) &&
+                !entry.element.hidden
+            ) {
+                return;
+            }
+        }
+
         // Capture previous view BEFORE updating state (needed for direction + onHide)
         const previousView = this.navigationState.currentView;
 
@@ -156,14 +211,30 @@ export abstract class ShellBase implements Shell {
         // Update reactive state
         this.currentView.value = viewId;
 
-        // Update URL pathname (path-based routing, no hash)
+        // Update URL pathname (path-based routing, no hash); include search when comparing.
         if (typeof window !== "undefined" && typeof window != "undefined") {
             const pathname = `/${viewId}`;
-            const search = params ? "?" + new URLSearchParams(params).toString() : "";
-            const newUrl = pathname + search;
-
-            if (globalThis?.location?.pathname !== pathname) {
-                globalThis?.history?.pushState?.({ viewId, params }, "", newUrl);
+            const search = params && Object.keys(params).length > 0
+                ? "?" + new URLSearchParams(params).toString()
+                : "";
+            const newPathAndSearch = pathname + search;
+            try {
+                const next = new URL(newPathAndSearch, globalThis.location.origin);
+                const cur = new URL(globalThis.location.href);
+                if (next.pathname !== cur.pathname || next.search !== cur.search) {
+                    globalThis?.history?.pushState?.(
+                        { viewId, params },
+                        "",
+                        next.pathname + next.search
+                    );
+                }
+            } catch {
+                if (
+                    globalThis?.location?.pathname !== pathname ||
+                    (globalThis?.location?.search || "") !== search
+                ) {
+                    globalThis?.history?.pushState?.({ viewId, params }, "", newPathAndSearch);
+                }
             }
         }
 
@@ -172,6 +243,8 @@ export abstract class ShellBase implements Shell {
             const element = await this.loadView(viewId, params);
             if (navToken !== this.navigationToken) return;
             await this.renderViewWithTransition(element);
+            if (navToken !== this.navigationToken) return;
+            scheduleViewModulePrefetch(viewId);
         } catch (error) {
             console.error(`[${this.id}] Failed to load view ${viewId}:`, error);
             this.showMessage(`Failed to load ${viewId}`);
@@ -190,6 +263,11 @@ export abstract class ShellBase implements Shell {
                     params
                 });
                 this.loadedViews.set(viewId, { view: cached.view, element: refreshed });
+                // First mount ran when the previous root was created; a fresh root still needs
+                // lifecycle init (e.g. Airpad async init replaces the loading placeholder).
+                if (cached.view.lifecycle?.onMount) {
+                    await cached.view.lifecycle.onMount();
+                }
                 return refreshed;
             }
             // Update toolbar if view has one
@@ -544,20 +622,40 @@ export abstract class ShellBase implements Shell {
             // Get view from pathname
             const pathname = globalThis?.location?.pathname?.replace(/^\//, "").toLowerCase();
             const viewId = (event.state?.viewId || pathname || "viewer") as ViewId;
+            const popParams = (event.state?.params ??
+                Object.fromEntries(new URLSearchParams(globalThis.location.search || ""))) as
+                | Record<string, string>
+                | undefined;
 
-            if (viewId !== this.currentView.value) {
+            if (viewId !== this.currentView.value || !this.sameRouteParams(popParams, this.navigationState.params)) {
                 const previousViewId = this.navigationState.currentView;
 
                 // Update state before loading so renderViewWithTransition has
                 // correct previousView and currentView values.
                 this.navigationState.previousView = previousViewId;
                 this.navigationState.currentView = viewId;
+                this.navigationState.params = popParams;
                 this.currentView.value = viewId;
 
-                this.loadView(viewId, event.state?.params).then(element => {
-                    if (navToken !== this.navigationToken) return;
-                    return this.renderViewWithTransition(element);
-                }).catch(console.error);
+                // Keep in-memory history consistent with the browser stack.
+                const hist = this.navigationState.viewHistory;
+                const idx = hist.lastIndexOf(viewId);
+                if (idx >= 0) {
+                    this.navigationState.viewHistory = hist.slice(0, idx + 1);
+                } else {
+                    this.navigationState.viewHistory = [viewId];
+                }
+
+                this.loadView(viewId, popParams)
+                    .then((element) => {
+                        if (navToken !== this.navigationToken) return;
+                        return this.renderViewWithTransition(element);
+                    })
+                    .then(() => {
+                        if (navToken !== this.navigationToken) return;
+                        scheduleViewModulePrefetch(viewId);
+                    })
+                    .catch(console.error);
             }
         });
     }

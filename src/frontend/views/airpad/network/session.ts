@@ -15,6 +15,7 @@ import {
     sendPacketSocketIoIntent
 } from "./rails/packet-socketio";
 import { onVoiceResult } from "./websocket";
+import { invalidateAirpadTransportCredentials } from "../credential-cache-bridge";
 
 export type AirPadSessionRail = "canonical-session";
 export type AirPadVoiceMessage = {
@@ -39,6 +40,23 @@ export const connectAirPadSession = (): void => {
 export const disconnectAirPadSession = (): void => {
     disconnectPacketSocketIoRail();
 };
+
+/**
+ * After changing host/secrets/mode: drop Socket.IO, clear AES/HMAC caches, then connect again.
+ * Mirrors legacy "Save & Reconnect" behavior.
+ */
+export function reconnectAirPadSessionAfterConfigChange(options?: { delayMs?: number }): void {
+    disconnectPacketSocketIoRail();
+    invalidateAirpadTransportCredentials();
+    const delayMs = options?.delayMs ?? 80;
+    globalThis.setTimeout(() => {
+        try {
+            connectPacketSocketIoRail();
+        } catch (e) {
+            console.warn("[AirPad] reconnect after config failed:", e);
+        }
+    }, delayMs);
+}
 
 export const isAirPadSessionConnected = (): boolean => {
     return isPacketSocketIoRailConnected();

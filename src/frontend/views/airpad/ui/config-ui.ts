@@ -4,33 +4,37 @@
 
 import {
     getRemoteHost,
-    setRemoteHost,
     getRemoteProtocol,
-    setRemoteProtocol,
     getRemoteRouteTarget,
-    setRemoteRouteTarget,
     getAirPadTransportMode,
-    setAirPadTransportMode,
     getAirPadAuthToken,
-    setAirPadAuthToken,
     getAirPadClientId,
-    setAirPadClientId,
     getAirPadTransportSecret,
-    setAirPadTransportSecret,
     getAirPadSigningSecret,
-    setAirPadSigningSecret,
+    applyAirpadRemoteConfig,
 } from '../config/config';
-import { connectAirPadSession, disconnectAirPadSession, isAirPadSessionConnected } from '../network/session';
+import { reconnectAirPadSessionAfterConfigChange } from '../network/session';
 import { hideKeyboard } from '../input/keyboard/handlers';
 
-function getAirpadHostElement(): Element {
-    return document.querySelector('.view-airpad') ?? document.querySelector('#app') ?? document.body;
+/** Marker for teardown; do not reuse generic `.config-overlay` alone (other features could add one). */
+const AIRPAD_CONFIG_MARKER = 'airpad-config-overlay';
+
+/**
+ * Mount outside `.view-airpad`: ancestors use `contain: strict` (minimal shell), which clips
+ * `position: fixed` overlays and makes the dialog invisible.
+ */
+function getConfigOverlayMountParent(): HTMLElement {
+    const shell = document.querySelector('.app-shell');
+    if (shell instanceof HTMLElement) {
+        return shell;
+    }
+    return document.body;
 }
 
 // Create configuration overlay
 export function createConfigUI(): HTMLElement {
     const overlay = document.createElement('div');
-    overlay.className = 'config-overlay';
+    overlay.className = `config-overlay ${AIRPAD_CONFIG_MARKER}`;
     overlay.innerHTML = `
         <div class="config-panel">
             <h3>Airpad Configuration</h3>
@@ -86,8 +90,8 @@ export function createConfigUI(): HTMLElement {
             </div>
 
             <div class="config-actions">
-                <button id="saveConfig" type="button">Save & Reconnect</button>
-                <button id="cancelConfig" type="button">Cancel</button>
+                <button id="saveConfig" type="button" name="airpad-config-save">Save & Reconnect</button>
+                <button id="cancelConfig" type="button" name="airpad-config-cancel">Cancel</button>
             </div>
         </div>
     `;
@@ -113,32 +117,30 @@ export function createConfigUI(): HTMLElement {
     signingSecretInput.value = getAirPadSigningSecret();
 
     saveButton.addEventListener('click', () => {
-        setRemoteHost(hostInput.value);
-        setRemoteRouteTarget(routeTargetInput.value);
-        setRemoteProtocol(protocolInput.value);
-        setAirPadTransportMode(transportModeInput.value);
-        setAirPadAuthToken(authTokenInput.value);
-        setAirPadClientId(clientIdInput.value);
-        setAirPadTransportSecret(transportSecretInput.value);
-        setAirPadSigningSecret(signingSecretInput.value);
-
-        // Disconnect and reconnect with new settings
-        if (isAirPadSessionConnected()) {
-            disconnectAirPadSession();
-        }
-        setTimeout(() => connectAirPadSession(), 100);
-
-        // Hide overlay
+        applyAirpadRemoteConfig({
+            host: hostInput.value,
+            routeTarget: routeTargetInput.value,
+            protocol: protocolInput.value,
+            transportMode: transportModeInput.value,
+            authToken: authTokenInput.value,
+            clientId: clientIdInput.value,
+            transportSecret: transportSecretInput.value,
+            signingSecret: signingSecretInput.value,
+        });
+        reconnectAirPadSessionAfterConfigChange({ delayMs: 100 });
+        overlay.classList.remove('flex');
         overlay.style.display = 'none';
     });
 
     cancelButton.addEventListener('click', () => {
+        overlay.classList.remove('flex');
         overlay.style.display = 'none';
     });
 
     // Click outside to close
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
+            overlay.classList.remove('flex');
             overlay.style.display = 'none';
         }
     });
@@ -149,10 +151,14 @@ export function createConfigUI(): HTMLElement {
 // Show configuration overlay
 export function showConfigUI(): void {
     // Hide virtual keyboard when opening config dialog
-    hideKeyboard();
+    try {
+        hideKeyboard();
+    } catch {
+        /* non-fatal */
+    }
 
-    const host = getAirpadHostElement();
-    let overlay = document.querySelector('.config-overlay') as HTMLElement | null;
+    const host = getConfigOverlayMountParent();
+    let overlay = document.querySelector(`.${AIRPAD_CONFIG_MARKER}`) as HTMLElement | null;
     if (overlay && overlay.parentElement !== host) {
         overlay.remove();
         overlay = null;
@@ -178,5 +184,12 @@ export function showConfigUI(): void {
         if (transportSecretInput) transportSecretInput.value = getAirPadTransportSecret();
         if (signingSecretInput) signingSecretInput.value = getAirPadSigningSecret();
     }
+    overlay.classList.add('flex');
     overlay.style.display = 'flex';
+    overlay.style.zIndex = '120000';
+}
+
+/** Remove portaled overlay when Airpad unmounts (avoids stale node on body/shell). */
+export function teardownAirpadConfigOverlay(): void {
+    document.querySelectorAll(`.${AIRPAD_CONFIG_MARKER}`).forEach((el) => el.remove());
 }

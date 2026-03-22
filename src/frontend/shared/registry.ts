@@ -201,9 +201,10 @@ class ViewRegistryClass {
      * Load and instantiate a view
      */
     async load(id: ViewId, options?: Parameters<ViewFactory>[0]): Promise<View> {
-        // Return cached instance if available and no new options
+        // One live instance per view id. Shell also caches DOM roots; recreating here
+        // duplicated receive-channel bindings and dropped in-flight state.
         const cached = this.loadedViews.get(id);
-        if (cached && !options) {
+        if (cached) {
             return cached;
         }
 
@@ -263,6 +264,18 @@ class ViewRegistryClass {
      */
     getLoaded(id: ViewId): View | undefined {
         return this.loadedViews.get(id);
+    }
+
+    /**
+     * Warm the dynamic import for a view module (no instance, no receive-channel bind).
+     * Safe to call from idle prefetch; failures are ignored.
+     */
+    prefetchModule(id: ViewId): void {
+        const registration = this.views.get(id);
+        if (!registration) return;
+        void registration.loader().catch(() => {
+            /* ignore prefetch errors */
+        });
     }
 }
 

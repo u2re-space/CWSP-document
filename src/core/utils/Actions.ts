@@ -255,24 +255,13 @@ export const recordSpeechRecognition = async (userInputHoldUntilStop: boolean = 
     }
 
     //
-    document.addEventListener("pointerup", (ev) => {
-        if (userInputHoldUntilStop) {
-            ev?.stopPropagation?.();
-            ev?.stopImmediatePropagation?.();
-            ev?.preventDefault?.();
-            recognition.stop()?.catch?.(console.warn.bind(console));
-        }
-    }, { once: true, capture: true });
-
-    //
-    document.addEventListener("pointercancel", (ev) => {
-        if (userInputHoldUntilStop) {
-            ev?.stopPropagation?.();
-            ev?.stopImmediatePropagation?.();
-            ev?.preventDefault?.();
-            recognition.stop()?.catch?.(console.warn.bind(console));
-        }
-    }, { once: true, capture: true });
+    // Bubble phase: stop recognition without killing other listeners (no stop* / preventDefault).
+    const endOnPointerEnd = () => {
+        if (!userInputHoldUntilStop) return;
+        recognition.stop()?.catch?.(console.warn.bind(console));
+    };
+    document.addEventListener("pointerup", endOnPointerEnd, { once: true, capture: false });
+    document.addEventListener("pointercancel", endOnPointerEnd, { once: true, capture: false });
 
     //
     recognition.start()?.catch?.(console.warn.bind(console));

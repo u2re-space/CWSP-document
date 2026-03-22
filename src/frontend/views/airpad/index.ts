@@ -12,9 +12,12 @@ import type { BaseViewOptions } from "../types";
 import { disconnectAirPadSession } from "./network/session";
 import { setRemoteKeyboardEnabled } from "./input/virtual-keyboard";
 import { unmountAirpadRuntime } from "./main";
+import { waitForDomPaint } from "@rs-frontend/shared/event-handling-policy";
 
 // @ts-ignore
 import style from "./airpad.scss?inline";
+
+export type AirpadViewOptions = BaseViewOptions;
 
 // ============================================================================
 // AIRPAD VIEW
@@ -40,6 +43,10 @@ export class AirpadView implements View {
         onShow: () => {
             this._sheet = loadAsAdopted(style) as CSSStyleSheet;
             void this.lockOrientationForAirpad();
+            // If the shell re-rendered a detached root without re-running onMount, finish init here.
+            if (!this.initialized) {
+                void this.initAirpad();
+            }
         },
         onHide: () => {
             setRemoteKeyboardEnabled(false);
@@ -78,8 +85,8 @@ export class AirpadView implements View {
             </div>
         ` as HTMLElement;
 
-        // Initialize airpad asynchronously
-        this.initAirpad();
+        // Init runs from lifecycle.onMount (after shell wires the view) to avoid double-start
+        // and to match other views; keeps a single code path.
 
         return this.element;
     }
@@ -104,10 +111,10 @@ export class AirpadView implements View {
                 // Dynamic import of airpad main
                 const { default: mountAirpad } = await import("./main");
 
-                // Clear loading state
+                // Clear loading state, then wait a frame so removal/layout settle before mounting UI + listeners.
                 content.innerHTML = "";
+                await waitForDomPaint();
 
-                // Mount airpad
                 await mountAirpad(content as HTMLElement);
                 await this.lockOrientationForAirpad()?.catch?.((error) => { console.error("[Airpad] Failed to lock orientation:", error); });
 
@@ -121,9 +128,15 @@ export class AirpadView implements View {
                     <button type="button" data-action="retry">Try Again</button>
                 </div>
             `;
-                content.querySelector("[data-action=retry]")?.addEventListener("click", () => {
+                content.querySelector("[data-action=\"retry\"]")?.addEventListener("click", () => {
                     this.initialized = false;
-                    this.initAirpad();
+                    this.initPromise = null;
+                    content.innerHTML = `
+                        <div class="view-airpad__loading">
+                            <div class="view-airpad__spinner"></div>
+                            <span>Loading Airpad...</span>
+                        </div>`;
+                    void this.initAirpad();
                 });
             } finally {
                 this.initPromise = null;
@@ -136,7 +149,7 @@ export class AirpadView implements View {
     private cleanup(): void {
         unmountAirpadRuntime();
         setRemoteKeyboardEnabled(false);
-            disconnectAirPadSession();
+        disconnectAirPadSession();
         this.unlockOrientationForAirpad();
         this.initialized = false;
         this.initPromise = null;

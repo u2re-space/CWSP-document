@@ -2,7 +2,9 @@
 // Keyboard Event Handlers
 // =========================
 
-import { log, getVkStatusEl } from '../../utils/utils';
+import { stopBubbling } from '@rs-frontend/shared/event-handling-policy';
+import { eventTargetElement } from '@rs-core/document/DocTools';
+import { getAirpadOwnerDocument, log, getVkStatusEl } from '../../utils/utils';
 import { sendKeyboardChar } from './message';
 import { getVirtualKeyboardAPI } from './api';
 import {
@@ -15,12 +17,29 @@ import {
 import { renderKeyboard, renderEmoji, restoreButtonIcon } from './ui';
 
 const DEBUG_KEYBOARD_INPUT = false;
-let toggleButtonHandlerInitialized = false;
-let virtualKeyboardApiHandlersInitialized = false;
-let keyboardUIHandlersInitialized = false;
+/** Avoid duplicate document-level listeners across Airpad remounts. */
+let keyboardDocumentDismissListenersAttached = false;
+const keyboardToggleClickBound = new WeakSet<Element>();
+const keyboardToggleApiBound = new WeakSet<Element>();
+const keyboardContainerUiBound = new WeakSet<Element>();
+
+/** Outside taps must not close the keyboard when interacting with these regions. */
+const KEYBOARD_STAYS_OPEN_MATCHES = 'input,textarea,select,[contenteditable="true"]';
+const KEYBOARD_STAYS_OPEN_CLOSEST =
+    '.config-overlay, .virtual-keyboard-container, .keyboard-toggle, .view-airpad, .view-airpad button, .view-airpad .big-button, .view-airpad .neighbor-button, .log-overlay.open, .log-panel, .airpad-config-overlay';
+
+function isKeyboardStayOpenTarget(el: HTMLElement | null | undefined): boolean {
+    if (!el) return false;
+    return Boolean(
+        el.matches?.(KEYBOARD_STAYS_OPEN_MATCHES) || el.closest?.(KEYBOARD_STAYS_OPEN_CLOSEST),
+    );
+}
 
 function isConfigOverlayVisible(): boolean {
-    const overlay = document.querySelector('.config-overlay') as HTMLElement | null;
+    const doc = getAirpadOwnerDocument();
+    const overlay =
+        (doc?.querySelector('.airpad-config-overlay') as HTMLElement | null) ??
+        (doc?.querySelector('.config-overlay') as HTMLElement | null);
     if (!overlay) return false;
     return overlay.style.display === 'flex' || overlay.classList.contains('flex');
 }
@@ -110,16 +129,15 @@ export function toggleKeyboard() {
 
 // Setup toggle button click handler
 export function setupToggleButtonHandler() {
-    if (toggleButtonHandlerInitialized) return;
-
     const toggleButton = getToggleButton();
 
     if (!toggleButton) return;
+    if (keyboardToggleClickBound.has(toggleButton)) return;
+    keyboardToggleClickBound.add(toggleButton);
 
     toggleButton.addEventListener('click', (e) => {
-        // Never allow click-through to underlying UI (details/summary, etc.).
-        e.preventDefault();
-        e.stopPropagation();
+        // Block bubble to underlying UI (e.g. details/summary); do not use stopImmediatePropagation.
+        stopBubbling(e);
 
         if (!isRemoteKeyboardEnabled()) {
             log('Keyboard is available after WS connection');
@@ -133,18 +151,16 @@ export function setupToggleButtonHandler() {
 
         toggleKeyboard();
     });
-
-    toggleButtonHandlerInitialized = true;
 }
 
 // Setup VirtualKeyboard API input handlers
 export function setupVirtualKeyboardAPIHandlers() {
-    if (virtualKeyboardApiHandlersInitialized) return;
-
     const virtualKeyboardAPI = getVirtualKeyboardAPI();
     const toggleButton = getToggleButton();
 
     if (!virtualKeyboardAPI || !toggleButton) return;
+    if (keyboardToggleApiBound.has(toggleButton)) return;
+    keyboardToggleApiBound.add(toggleButton);
 
     const ICON = '⌨️';
     let pendingRestore: number | null = null;
@@ -278,7 +294,6 @@ export function setupVirtualKeyboardAPIHandlers() {
         // Backspace / Delete
         if (e.key === 'Backspace' || e.key === 'Delete') {
             e.preventDefault();
-            e.stopPropagation();
             waitingForInput = false;
             if (!shouldSkipDuplicate('backspace')) {
                 sendAndRestore('\b');
@@ -289,7 +304,6 @@ export function setupVirtualKeyboardAPIHandlers() {
         // Enter
         if (e.key === 'Enter') {
             e.preventDefault();
-            e.stopPropagation();
             waitingForInput = false;
             resetCompositionState(true);
             if (!shouldSkipDuplicate('enter')) {
@@ -301,7 +315,6 @@ export function setupVirtualKeyboardAPIHandlers() {
         // Tab
         if (e.key === 'Tab') {
             e.preventDefault();
-            e.stopPropagation();
             waitingForInput = false;
             if (!shouldSkipDuplicate('tab')) {
                 sendAndRestore('\t');
@@ -590,7 +603,6 @@ export function setupVirtualKeyboardAPIHandlers() {
         if (!isRemoteKeyboardEnabled()) return;
 
         e.preventDefault();
-        e.stopPropagation();
         waitingForInput = false;
         resetCompositionState(true);
 
@@ -610,7 +622,6 @@ export function setupVirtualKeyboardAPIHandlers() {
         if (!isRemoteKeyboardEnabled()) return;
 
         e.preventDefault();
-        e.stopPropagation();
         waitingForInput = false;
         resetCompositionState(true);
 
@@ -659,105 +670,101 @@ export function setupVirtualKeyboardAPIHandlers() {
         restoreButtonIcon();
     });
 
-    virtualKeyboardApiHandlersInitialized = true;
 }
 
 // Setup keyboard UI event handlers
 export function setupKeyboardUIHandlers() {
-    if (keyboardUIHandlersInitialized) return;
-
     const keyboardElement = getKeyboardElement();
     if (!keyboardElement) return;
 
-    const closeBtn = keyboardElement.querySelector('.keyboard-close');
-    closeBtn?.addEventListener('click', hideKeyboard);
+    const bindElementUi = !keyboardContainerUiBound.has(keyboardElement);
+    if (bindElementUi) {
+        keyboardContainerUiBound.add(keyboardElement);
 
-    const tabs = keyboardElement.querySelectorAll('.keyboard-tab');
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const targetTab = tab.getAttribute('data-tab');
-            tabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
+        const closeBtn = keyboardElement.querySelector('.keyboard-close');
+        closeBtn?.addEventListener('click', hideKeyboard);
 
-            const panels = keyboardElement?.querySelectorAll('.keyboard-panel');
-            panels?.forEach(panel => {
-                panel.classList.remove('active');
-                if (panel.getAttribute('data-panel') === targetTab) {
-                    panel.classList.add('active');
-                }
+        const tabs = keyboardElement.querySelectorAll('.keyboard-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.getAttribute('data-tab');
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                const panels = keyboardElement?.querySelectorAll('.keyboard-panel');
+                panels?.forEach(panel => {
+                    panel.classList.remove('active');
+                    if (panel.getAttribute('data-panel') === targetTab) {
+                        panel.classList.add('active');
+                    }
+                });
             });
         });
-    });
 
-    const shiftBtn = keyboardElement.querySelector('.keyboard-shift');
-    let isUpper = false;
-    shiftBtn?.addEventListener('click', () => {
-        isUpper = !isUpper;
-        renderKeyboard(isUpper);
-        shiftBtn.classList.toggle('active', isUpper);
-    });
+        const shiftBtn = keyboardElement.querySelector('.keyboard-shift');
+        let isUpper = false;
+        shiftBtn?.addEventListener('click', () => {
+            isUpper = !isUpper;
+            renderKeyboard(isUpper);
+            shiftBtn.classList.toggle('active', isUpper);
+        });
 
-    const categoryBtns = keyboardElement.querySelectorAll('.emoji-category-btn');
-    if (categoryBtns.length > 0) {
-        const firstBtn = categoryBtns[0] as HTMLElement;
-        firstBtn.classList.add('active');
-        const firstCategory = firstBtn.getAttribute('data-category');
-        if (firstCategory) {
-            renderEmoji(firstCategory);
+        const categoryBtns = keyboardElement.querySelectorAll('.emoji-category-btn');
+        if (categoryBtns.length > 0) {
+            const firstBtn = categoryBtns[0] as HTMLElement;
+            firstBtn.classList.add('active');
+            const firstCategory = firstBtn.getAttribute('data-category');
+            if (firstCategory) {
+                renderEmoji(firstCategory);
+            }
+
+            categoryBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const category = btn.getAttribute('data-category');
+                    if (category) {
+                        categoryBtns.forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        renderEmoji(category);
+                    }
+                });
+            });
         }
 
-        categoryBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const category = btn.getAttribute('data-category');
-                if (category) {
-                    categoryBtns.forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    renderEmoji(category);
-                }
-            });
+        keyboardElement.addEventListener('click', (e) => {
+            if (e.target === keyboardElement) {
+                hideKeyboard();
+            }
         });
     }
 
-    keyboardElement.addEventListener('click', (e) => {
-        if (e.target === keyboardElement) {
-            hideKeyboard();
-        }
-    });
+    if (!keyboardDocumentDismissListenersAttached) {
+        keyboardDocumentDismissListenersAttached = true;
 
-    document.addEventListener('focusout', (e) => {
-        if (!isRemoteKeyboardEnabled()) return;
+        document.addEventListener('focusout', (e) => {
+            if (!isRemoteKeyboardEnabled()) return;
 
-        const target = e?.target as HTMLElement;
-        const relatedTarget = e?.relatedTarget as HTMLElement;
+            const fromEl = eventTargetElement(e);
+            const rel = (e as FocusEvent).relatedTarget;
+            const toEl = rel instanceof HTMLElement ? rel : null;
 
-        const staysInInteractiveZone = Boolean(
-            target?.closest?.('.config-overlay, .virtual-keyboard-container, .keyboard-toggle') ||
-            relatedTarget?.closest?.('.config-overlay, .virtual-keyboard-container, .keyboard-toggle') ||
-            relatedTarget?.matches?.("input,textarea,select,[contenteditable=\"true\"]")
+            const staysInInteractiveZone =
+                isKeyboardStayOpenTarget(fromEl) || isKeyboardStayOpenTarget(toEl);
+
+            if (!staysInInteractiveZone) hideKeyboard();
+        });
+
+        // Single pointer path avoids double hideKeyboard (pointerdown + click) and races with DocTools.saveCoordinate.
+        document.addEventListener(
+            'pointerdown',
+            (e) => {
+                if (!isRemoteKeyboardEnabled()) return;
+
+                const el = eventTargetElement(e);
+                if (!isKeyboardStayOpenTarget(el)) {
+                    hideKeyboard();
+                }
+            },
+            { capture: false, passive: true },
         );
-
-        if (!staysInInteractiveZone) hideKeyboard();
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!isRemoteKeyboardEnabled()) return;
-
-        const target = e?.target as HTMLElement;
-        if (!(target?.matches?.("input,textarea,select,[contenteditable=\"true\"]") ||
-              target?.closest?.('.config-overlay, .virtual-keyboard-container, .keyboard-toggle'))) {
-            hideKeyboard();
-        }
-    });
-
-    document.addEventListener('pointerdown', (e) => {
-        if (!isRemoteKeyboardEnabled()) return;
-
-        const target = e?.target as HTMLElement;
-        if (!(target?.matches?.("input,textarea,select,[contenteditable=\"true\"]") ||
-              target?.closest?.('.config-overlay, .virtual-keyboard-container, .keyboard-toggle'))) {
-            hideKeyboard();
-        }
-    });
-
-    keyboardUIHandlersInitialized = true;
+    }
 }

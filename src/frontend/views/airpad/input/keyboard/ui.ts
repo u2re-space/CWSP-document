@@ -4,23 +4,23 @@
 
 import { EMOJI_CATEGORIES, KEYBOARD_LAYOUT, KEYBOARD_LAYOUT_UPPER } from './constants';
 import { sendKeyboardChar } from './message';
-import { getToggleButton } from './state';
+import { getKeyboardElement, getToggleButton } from './state';
 
 // Create keyboard HTML structure - hidden by default
 export function createKeyboardHTML(): string {
     return `
-        <div class="virtual-keyboard-container" data-hidden="true" aria-hidden="true" style="display: none;">
+        <div class="virtual-keyboard-container" data-hidden="true" aria-hidden="true">
             <div class="keyboard-header">
-                <button class="keyboard-close" aria-label="Close keyboard">✕</button>
+                <button type="button" name="airpad-keyboard-close" class="keyboard-close" aria-label="Close keyboard">✕</button>
                 <div class="keyboard-tabs">
-                    <button class="keyboard-tab active" data-tab="letters">ABC</button>
-                    <button class="keyboard-tab" data-tab="emoji">😀</button>
+                    <button type="button" name="airpad-keyboard-tab-letters" class="keyboard-tab active" data-tab="letters">ABC</button>
+                    <button type="button" name="airpad-keyboard-tab-emoji" class="keyboard-tab" data-tab="emoji">😀</button>
                 </div>
             </div>
             <div class="keyboard-content">
                 <div class="keyboard-panel active" data-panel="letters">
                     <div class="keyboard-shift-container">
-                        <button class="keyboard-shift" data-shift="lower">⇧</button>
+                        <button type="button" name="airpad-keyboard-shift" class="keyboard-shift" data-shift="lower">⇧</button>
                     </div>
                     <div class="keyboard-rows" id="keyboardRows"></div>
                     <div class="keyboard-special">
@@ -44,7 +44,7 @@ export function createKeyboardHTML(): string {
 
 // Render keyboard layout
 export function renderKeyboard(isUpper: boolean = false) {
-    const rowsEl = document.getElementById('keyboardRows');
+    const rowsEl = getKeyboardElement()?.querySelector('#keyboardRows');
     if (!rowsEl) return;
 
     rowsEl.innerHTML = '';
@@ -67,7 +67,7 @@ export function renderKeyboard(isUpper: boolean = false) {
 
 // Render emoji grid
 export function renderEmoji(category: string) {
-    const gridEl = document.getElementById('emojiGrid');
+    const gridEl = getKeyboardElement()?.querySelector('#emojiGrid');
     if (!gridEl) return;
 
     const emojis = EMOJI_CATEGORIES[category as keyof typeof EMOJI_CATEGORIES] || [];
