@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import { crx } from "@crxjs/vite-plugin";
 import { loadEnv } from "vite";
 
+import { assetFileNames as distAssetFileNames, chunkFileNames as distChunkFileNames, manualChunks as distManualChunks } from "./shared/vite-chunk-placement.mjs";
+
 //
 const importConfig = (url, ...args)=>{ return import(url)?.then?.((m)=>m?.default?.(...args)); }
 const objectAssign = (target, ...sources) => {
@@ -144,8 +146,8 @@ const createCrxConfig = (mode) => {
     const crxOutput = objectAssign({}, baseOutput, {
         dir: resolve(__dirname, "./dist-crx"),
         entryFileNames: "app/[name].js",
-        chunkFileNames: "modules/[name].js",
-        assetFileNames: "assets/[name][extname]",
+        chunkFileNames: distChunkFileNames,
+        assetFileNames: distAssetFileNames(NAME),
         inlineDynamicImports: false,
     });
 
@@ -181,9 +183,7 @@ const createCrxConfig = (mode) => {
                 input: crxInputs,
                 output: {
                     ...crxOutput,
-                    // Don't use manualChunks from base config - let CRX plugin handle chunking
-                    manualChunks: undefined,
-                    // Keep readable names
+                    manualChunks: distManualChunks,
                     compact: false,
                     minifyInternalExports: false,
                 }
@@ -230,16 +230,7 @@ export default async ({ mode } = {}) => {
                 input: {
                     index: resolve(__dirname, './src/index.ts')
                 },
-                output: {
-                    ...baseConfig.build?.rollupOptions?.output,
-                    entryFileNames: 'index.js',
-                    chunkFileNames: "modules/[name].js",
-                    assetFileNames: (assetInfo) => {
-                        const ext = assetInfo.name?.split('.').pop() || '';
-                        if (ext === 'css') return `assets/[name][extname]`;
-                        return "assets/[name][extname]";
-                    },
-                }
+                output: baseConfig.build?.rollupOptions?.output,
             }
         }
     };

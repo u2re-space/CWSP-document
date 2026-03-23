@@ -7,8 +7,8 @@
     },
     "scripts": {
         "build": "npm run build:pwa",
-        "build:pwa": "vite build",
-        "build:crx": "vite build --config vite.config.js --mode crx",
+        "build:pwa": "rm -rf ./dist && vite build && node ./scripts/normalize-worker-names.mjs",
+        "build:crx": "rm -rf ./dist-crx && vite build --config vite.config.js --mode crx && node ./scripts/normalize-worker-names.mjs",
         "build:crx:lite": "VITE_ENABLED_VIEWS=viewer,editor,settings,history,home,print vite build --config vite.config.js --mode crx",
         "build:all": "node ./scripts/build.mjs pwa crx",
         "build:modules": "node ./scripts/build.mjs modules",

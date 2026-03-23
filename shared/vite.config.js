@@ -1,5 +1,12 @@
 import { resolve } from "node:path";
 
+import {
+    assetFileNames as distAssetFileNames,
+    chunkFileNames as distChunkFileNames,
+    manualChunks as distManualChunks,
+    relocateWorkerBundleAssetsPlugin,
+} from "./vite-chunk-placement.mjs";
+
 //
 import https from "../private/https/certificate.mjs";
 import postcssConfig from "../postcss.config.js";
@@ -195,17 +202,6 @@ const importFromTSConfig = (tsconfig, __dirname) => {
 //
 export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve("./", import.meta.dirname))=>{
     const $resolve = { alias: importFromTSConfig(tsconfig, __dirname) }
-    const projectMap = new Map([
-        ["fest/core", "core.ts"],
-        ["fest/icon", "icon.ts"],
-        ["fest/fl-ui", "fl.ui"],
-        ["fest/object", "object.ts"],
-        ["fest/uniform", "uniform.ts"],
-        ["fest/dom", "dom.ts"],
-        ["fest/veela", "veela.css"],
-        ["fest/veela-runtime", "veela.css"],
-        ["fest/lure", "lur.e"],
-    ]);
 
     const terserOptions = {
         ecma: 2025,
@@ -227,6 +223,7 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
     const plugins = [
         // SPA fallback for PWA routes (share-target, etc.)
         spaFallbackPlugin(),
+        relocateWorkerBundleAssetsPlugin(),
         /*jspmPlugin({
             downloadDeps: true,
             inputMap: true
@@ -276,24 +273,6 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
         })
     ];
 
-    // Packages that are often tree-shaken or only used in workers; keep default chunking to avoid empty chunks
-    const VENDOR_SKIP_NAMES = new Set(['png', 'jpeg', 'cbor-x', 'docx', 'ico']);
-    const manualChunks = function(id) {
-        if (id.includes('node_modules')) {
-            const modules = id.split('node_modules/');
-            const pkg = modules[modules.length - 1].split('/');
-            const name = pkg[0].startsWith('@') ? pkg[1] : pkg[0];
-            if (VENDOR_SKIP_NAMES.has(name)) return undefined;
-            return `vendor/${name}`;
-        }
-        if (id.includes('/modules/projects/')) {
-            const match = id.match(/\/modules\/projects\/([^/]+)/);
-            if (match && id?.endsWith?.("src/index.ts")) {
-                return `${[...projectMap?.entries?.()]?.find?.(([k,v])=>match?.[0]?.includes?.("/" + v))?.[0]/*?.replace?.("fest/", "")*/ || "unk"}`;
-            }
-        }
-    }
-
     //
     const rollupOptions = {
         shimMissingExports: true,
@@ -313,25 +292,16 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             dir: resolve(__dirname, './dist'),
             exports: "auto",
             minifyInternalExports: true,
-            // Use library name for main entry, [name] for dynamic imports
+            // Main PWA bundle: dist/index.js (source src/index.ts)
             entryFileNames: (chunkInfo) => {
-                // Main entry uses library name
-                if (chunkInfo.isEntry && chunkInfo.name === 'index') {
-                    return `${NAME}.js`;
+                if (chunkInfo.isEntry && chunkInfo.name === "index") {
+                    return "index.js";
                 }
                 return "[name].js";
             },
-            chunkFileNames: "modules/[name].js",
-            // Use library name for main CSS, original name for other assets
-            assetFileNames: (assetInfo) => {
-                const ext = assetInfo.name?.split('.').pop() || '';
-                // Main CSS bundle should use library name
-                if (ext === 'css') {
-                    return `assets/${NAME}[extname]`;
-                }
-                return "assets/[name][extname]";
-            },
-            manualChunks,
+            chunkFileNames: distChunkFileNames,
+            assetFileNames: distAssetFileNames(NAME),
+            manualChunks: distManualChunks,
         }
     };
 
@@ -464,7 +434,8 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
 
     //
     const build = {
-        emptyOutDir: false,
+        // Prevent stale chunks from being precached by injectManifest.
+        emptyOutDir: true,
         target: 'esnext',
         outDir: resolve(__dirname, './dist'),
         cssCodeSplit: false,
