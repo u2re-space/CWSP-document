@@ -9,7 +9,7 @@
     <title>CrossWord</title>
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiBmaWxsPSIjMDA3YWNjIj4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjY0IiBmaWxsPSIjMDA3YWNjIi8+CiAgPHRleHQgeD0iMjU2IiB5PSIyODAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMDAiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Q1c8L3RleHQ+Cjwvc3ZnPg==" />
-    <link rel="manifest" href="./pwa/manifest.json" />
+    <link rel="manifest" href="/src/pwa/manifest.json" />
     <meta name="theme-color" content="#007acc" data-theme-color />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -357,9 +357,9 @@
                     font-size: 16px !important;
                 }
 
-                :where(body, html, :root)>*:not([hidden], [aria-hidden="true"], [data-hidden]):not(markdown-viewer, #markdown-body, .view-markdown),
+                :where(body, html, :root)>*:not([hidden], [aria-hidden="true"], [data-hidden]):not(markdown-viewer, #markdown-body, .view-markdown, #app, .app-shell, .app-shell__content, .view-viewer, .view-viewer__content, [data-viewer-content], [data-render-target], .markdown-body, .markdown-viewer-content, .result-content),
                 :where(body, html, :root) :where(#app, #raw-md),
-                :where(body, html, :root) :where(div, span, button, input, header, main, footer):not([hidden], [aria-hidden="true"], [data-hidden]):not(markdown-viewer, #markdown-body, .view-markdown) {
+                :where(body, html, :root) :where(div, span, button, input, header, main, footer):not([hidden], [aria-hidden="true"], [data-hidden]):not(markdown-viewer, #markdown-body, .view-markdown, #app, .app-shell, .app-shell__content, .view-viewer, .view-viewer__content, [data-viewer-content], [data-render-target], .markdown-body, .markdown-viewer-content, .result-content) {
                     page-break-after: avoid !important;
                     page-break-before: avoid !important;
                     break-after: avoid !important;
@@ -500,7 +500,7 @@
             }
         }
     </style>
-    <link rel="modulepreload" href="./src/index.ts" fetchpriority="high" />
+    <link rel="modulepreload" href="/src/index.ts" fetchpriority="high" />
 </head>
 
 <body>
@@ -509,7 +509,7 @@
         <div class="loading-message">Initializing application...</div>
     </div>
     <script type="module">
-        const app = import("./src/index.ts");
+        const app = import("/src/index.ts");
         app?.then?.((app) => {
             app?.default?.(document.getElementById("app"));
         })?.catch?.((error) => {

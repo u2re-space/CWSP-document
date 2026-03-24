@@ -34,6 +34,7 @@ import {
     type UnifiedMessage
 } from "@rs-com/core/UnifiedMessaging";
 import { bindViewReceiveChannel } from "./channel-mixin";
+import { createWebComponentViewAdapter } from "../views/base/UIElement";
 import {
     VIEW_ENABLED_VIEWER,
     VIEW_ENABLED_WORKCENTER,
@@ -220,7 +221,8 @@ class ViewRegistryClass {
             throw new Error(`Invalid view module: ${id}`);
         }
 
-        const view = await factory(options);
+        const viewInstance = await factory(options);
+        const view = createWebComponentViewAdapter(viewInstance);
 
         const previousCleanup = this.viewReceiveCleanup.get(id);
         if (previousCleanup) {

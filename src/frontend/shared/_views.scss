@@ -2120,3 +2120,50 @@
         }
     }
 }
+
+@layer print {
+    @media print {
+        /* Keep markdown web-component content printable across all shells. */
+        [data-cw-view-host="true"][data-view-id="viewer"],
+        .view-viewer,
+        .view-viewer__content,
+        [data-viewer-content],
+        [data-render-target],
+        md-view,
+        markdown-viewer,
+        .markdown-body,
+        .markdown-viewer-content,
+        .result-content {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            overflow: visible !important;
+            position: static !important;
+            inset: auto !important;
+            inline-size: 100% !important;
+            block-size: auto !important;
+            max-inline-size: none !important;
+            max-block-size: none !important;
+            contain: none !important;
+            container-type: normal !important;
+            content-visibility: visible !important;
+            break-before: auto !important;
+            break-after: auto !important;
+        }
+
+        .view-viewer__toolbar,
+        [data-viewer-toolbar] {
+            display: none !important;
+        }
+
+        /* Avoid file-manager frame clipping markdown previews/reads in print mode. */
+        ui-file-manager,
+        .view-explorer,
+        .view-explorer__content {
+            overflow: visible !important;
+            contain: none !important;
+            block-size: auto !important;
+            max-block-size: none !important;
+        }
+    }
+}

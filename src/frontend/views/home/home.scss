@@ -104,15 +104,14 @@
         }
     }
 
-    @media (max-width: 768px) {
-        :root:has([data-view="home"]),
-        html:has([data-view="home"]) {
+    @container (max-width: 768px) {
+        .view-home {
             --view-hero-padding: var(--space-8);
             --view-card-gap: var(--space-4);
         }
     }
 
-    @media (max-width: 480px) {
+    @container (max-width: 480px) {
         .view-home__actions {
             grid-template-columns: 1fr;
         }

@@ -237,6 +237,20 @@
                 min-block-size: 0 !important;
             }
         }
+
+        [data-cw-view-host="true"],
+        [data-cw-view-host="true"] > .cw-view-element__mount,
+        md-view,
+        markdown-viewer,
+        .markdown-body,
+        .markdown-viewer-content,
+        .result-content {
+            overflow: visible !important;
+            contain: none !important;
+            container-type: normal !important;
+            block-size: auto !important;
+            max-block-size: none !important;
+        }
     }
 
     :is(html, body):has([data-shell="base"]) {

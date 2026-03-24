@@ -351,6 +351,20 @@
             }
         }
 
+        [data-cw-view-host="true"],
+        [data-cw-view-host="true"] > .cw-view-element__mount,
+        md-view,
+        markdown-viewer,
+        .markdown-body,
+        .markdown-viewer-content,
+        .result-content {
+            overflow: visible !important;
+            contain: none !important;
+            container-type: normal !important;
+            block-size: auto !important;
+            max-block-size: none !important;
+        }
+
         .app-shell__nav,
         .app-shell__status {
             display: none !important;
