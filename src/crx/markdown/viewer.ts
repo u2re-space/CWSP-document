@@ -19,18 +19,31 @@ const loadFromSessionKey = async (key: string): Promise<string | null> => {
 
 const fetchViaServiceWorker = (src: string): Promise<{ ok: boolean; key?: string; src?: string; error?: string }> => {
     return new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: "md:load", src }, (response) => {
-            if (chrome.runtime.lastError) {
-                console.warn("[Viewer] SW fetch failed:", chrome.runtime.lastError);
-                resolve({ ok: false });
+        try {
+            if (!chrome?.runtime?.id) {
+                resolve({ ok: false, error: "runtime-unavailable" });
                 return;
             }
-            resolve(response || { ok: false });
-        });
+            chrome.runtime.sendMessage({ type: "md:load", src }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.warn("[Viewer] SW fetch failed:", chrome.runtime.lastError);
+                    resolve({ ok: false, error: chrome.runtime.lastError.message || "runtime-error" });
+                    return;
+                }
+                resolve(response || { ok: false });
+            });
+        } catch (error) {
+            console.warn("[Viewer] sendMessage failed:", error);
+            resolve({ ok: false, error: "runtime-invalidated" });
+        }
     });
 };
 
 const fetchDirect = async (src: string): Promise<string | null> => {
+    if (/^file:/i.test(src)) {
+        // file:// pages are unique origins in Chromium; direct fetch is often blocked.
+        return null;
+    }
     try {
         const res = await fetch(src, { credentials: "include", cache: "no-store" });
         if (!res.ok) return null;
@@ -103,6 +116,12 @@ const resolveSource = async (params: URLSearchParams): Promise<string | null> =>
     const explicitSource = params.get("src");
     if (explicitSource && !isVirtualViewValue(explicitSource)) {
         return explicitSource;
+    }
+
+    // For file:// opens, service worker preloads markdown into session storage.
+    // Avoid probing open tabs, which can re-introduce file:// fetch attempts.
+    if (params.get("mdk")) {
+        return null;
     }
 
     const sourceFromView = params.get("view-src") || params.get("view");

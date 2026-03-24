@@ -10,6 +10,7 @@ import { GeoState, isNearby } from "@rs-com/service/misc/GeoService";
 import { TimeState, isNow, registerEventForNotification } from "@rs-com/service/misc/TimeService";
 import { findEntities } from "@rs-com/service/misc/EntityRegistry";
 import { writeText } from "@rs-core/modules/Clipboard";
+import { scheduleFrame } from "@rs-core/utils/Runtime";
 
 //
 import { marked } from "marked";
@@ -787,7 +788,7 @@ const hydrateLazyCard = (placeholder: HydratedCardElement) => {
     placeholder.parentNode?.replaceChild(realCard, placeholder);
 
     // Trigger enter animation
-    requestAnimationFrame(() => {
+    scheduleFrame(() => {
         realCard.classList.remove('card-hydrating');
         realCard.classList.add('card-hydrated');
     });

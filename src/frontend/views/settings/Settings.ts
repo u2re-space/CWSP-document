@@ -81,6 +81,13 @@ const parseFloatInRange = (value: string | undefined, fallback: number, min: num
 
 export const createSettingsView = (opts: SettingsViewOptions) => {
     loadAsAdopted(style)
+    let note: HTMLElement | null = null;
+    const setNote = (text: string) => {
+        if (!note) return;
+        note.textContent = text;
+        if (text) setTimeout(() => (note && (note.textContent = "")), 1500);
+    };
+
     const root = H`<div class="view-settings">
 
     <section class="actions">
@@ -379,7 +386,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
   </div>` as HTMLElement;
 
     const field = (sel: string) => root.querySelector(sel) as HTMLInputElement | HTMLSelectElement | null;
-    const note = root.querySelector("[data-note]") as HTMLElement | null;
+    note = root.querySelector("[data-note]") as HTMLElement | null;
 
     const apiUrl = field('[data-field="ai.baseUrl"]') as HTMLInputElement | null;
     const apiKey = field('[data-field="ai.apiKey"]') as HTMLInputElement | null;
@@ -520,12 +527,6 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         if (normalized === "style" || normalized === "styles" || normalized === "styling") return "markdown";
         const availableTabs = new Set(["appearance", "markdown", "ai", "mcp", "instructions", "extension"]);
         return availableTabs.has(normalized) ? normalized : "ai";
-    };
-
-    const setNote = (t: string) => {
-        if (!note) return;
-        note.textContent = t;
-        if (t) setTimeout(() => (note.textContent = ""), 1500);
     };
 
     const openExplorerPath = (path: string) => {

@@ -25,8 +25,8 @@ export interface ClipboardResult {
 // BroadcastChannel for cross-context clipboard operations
 const CLIPBOARD_CHANNEL = "rs-clipboard";
 const scheduleClipboardFrame = (cb: FrameRequestCallback | (() => void)): void => {
-    if (typeof requestAnimationFrame === "function") {
-        requestAnimationFrame(cb as FrameRequestCallback);
+    if (typeof globalThis.requestAnimationFrame === "function") {
+        globalThis.requestAnimationFrame(cb as FrameRequestCallback);
         return;
     }
     if (typeof MessageChannel !== "undefined") {

@@ -5,8 +5,8 @@ import type { AIConfig, RecognitionResult } from "@rs-com/service/shared/types";
 
 const waitForClipboardFrame = (): Promise<void> =>
 	new Promise((resolve) => {
-		if (typeof requestAnimationFrame === "function") {
-			requestAnimationFrame(() => resolve());
+		if (typeof globalThis.requestAnimationFrame === "function") {
+			globalThis.requestAnimationFrame(() => resolve());
 			return;
 		}
 		if (typeof MessageChannel !== "undefined") {

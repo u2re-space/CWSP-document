@@ -3,6 +3,7 @@ import { implementDropEvent, implementPasteEvent } from "@rs-core/modules/HookEv
 import { observe, ref } from "fest/object";
 import type { ChapterDescriptor, EntityDescriptor } from "@rs-core/utils/Types";
 import type { EntityInterface } from "@rs-com/template/EntityInterface";
+import { scheduleFrame } from "@rs-core/utils/Runtime";
 import { renderTabName } from "@rs-core/utils/Utils";
 import { sendToEntityPipeline } from "@rs-core/storage/FileSystem";
 import { CollectItemsForTabPage, MakeItemBy } from "@rs-frontend/items/Items";
@@ -132,7 +133,7 @@ export const ViewPage = <
     };
 
     // Initial visibility check
-    requestAnimationFrame(() => {
+    scheduleFrame(() => {
         if (section?.checkVisibility?.()) {
             viewPage.$refresh();
         }

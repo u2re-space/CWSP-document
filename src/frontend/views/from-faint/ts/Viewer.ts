@@ -4,6 +4,7 @@ import { observe} from "fest/object";
 import type { ChapterDescriptor, EntityDescriptor } from "@rs-core/utils/Types";
 import type { EntityInterface } from "@rs-com/template/EntityInterface";
 import { renderTabName } from "../../../core/utils/Utils";
+import { scheduleFrame } from "@rs-core/utils/Runtime";
 import { sendToEntityPipeline } from "@rs-core/storage/FileSystem";
 import { CollectItemsForTabPage, MakeItemBy } from "../../items/Items";
 import { orientRef } from "fest/lure";
@@ -80,7 +81,7 @@ export const ViewPage = <
     document.addEventListener("rs-fs-changed", () => { viewPage.$refresh?.(); });
 
     // after append and appear in pages, try to first signal
-    requestAnimationFrame(() => {
+    scheduleFrame(() => {
         if (section?.checkVisibility?.()) {
             viewPage.$refresh?.();
         }

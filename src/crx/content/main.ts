@@ -42,6 +42,13 @@ const coordinate: [number, number] = [0, 0];
 let lastElement: HTMLElement | null = null;
 let selectionNotifyTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSelectionKey = "0";
+const runOnNextFrame = (callback: () => void) => {
+    if (typeof globalThis.requestAnimationFrame === "function") {
+        globalThis.requestAnimationFrame(callback);
+        return;
+    }
+    globalThis.setTimeout(callback, 0);
+};
 
 const notifySelectionState = () => {
     const selectedText = (typeof window != "undefined" ? window : globalThis)?.getSelection?.()?.toString?.() || "";
@@ -52,7 +59,13 @@ const notifySelectionState = () => {
     if (nextKey === lastSelectionKey) return;
     lastSelectionKey = nextKey;
     try {
-        chrome.runtime.sendMessage({ type: "crx-selection-change", hasSelection, length });
+        if (!chrome?.runtime?.id) return;
+        chrome.runtime.sendMessage({ type: "crx-selection-change", hasSelection, length }, () => {
+            if (chrome.runtime.lastError) {
+                // Ignore when content script belongs to a stale extension context.
+                return;
+            }
+        });
     } catch {
         // ignore
     }
@@ -253,7 +266,7 @@ const showPageNotification = (message: string, type: "success" | "error" | "info
         el.addEventListener("click", () => { el.style.opacity = "0"; el.style.transform = "translateY(-20px) scale(0.95)"; setTimeout(() => el.remove(), 400); });
 
         (document.body || document.documentElement).appendChild(el);
-        requestAnimationFrame(() => { el.style.opacity = "1"; el.style.transform = "translateY(0) scale(1)"; });
+        runOnNextFrame(() => { el.style.opacity = "1"; el.style.transform = "translateY(0) scale(1)"; });
         setTimeout(() => { el.style.opacity = "0"; el.style.transform = "translateY(-20px) scale(0.95)"; setTimeout(() => el.remove(), 400); }, 5000);
     } catch {
         if ("Notification" in (typeof window != "undefined" ? window : globalThis) && Notification.permission === "granted") {

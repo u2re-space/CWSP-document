@@ -475,6 +475,45 @@ const isMarkdownUrl = (candidate?: string | null): candidate is string => {
     } catch { return false; }
 };
 
+const markdownRedirectCooldown = new Map<number, number>();
+const MARKDOWN_REDIRECT_COOLDOWN_MS = 2500;
+
+const shouldThrottleMarkdownRedirect = (tabId: number) => {
+    const now = Date.now();
+    const last = markdownRedirectCooldown.get(tabId) || 0;
+    if (now - last < MARKDOWN_REDIRECT_COOLDOWN_MS) return true;
+    markdownRedirectCooldown.set(tabId, now);
+    return false;
+};
+
+const parseMarkdownHeaders = (details: chrome.webRequest.WebResponseHeadersDetails) => {
+    const headers = details.responseHeaders || [];
+    let contentType = "";
+    let contentDisposition = "";
+    for (const header of headers) {
+        const name = String(header?.name || "").toLowerCase();
+        const value = String(header?.value || "");
+        if (!name) continue;
+        if (name === "content-type") contentType = value.toLowerCase();
+        if (name === "content-disposition") contentDisposition = value.toLowerCase();
+    }
+
+    const typeLooksMarkdown =
+        contentType.includes("text/markdown")
+        || contentType.includes("text/x-markdown")
+        || contentType.includes("application/markdown")
+        || contentType.includes("application/x-markdown");
+
+    const dispositionHasMarkdownName = /filename\*?=.*\.(md|markdown|mdown|mkd|mkdn|mdtxt|mdtext)/i.test(contentDisposition);
+    const plainTextWithMarkdownHint = contentType.includes("text/plain") && dispositionHasMarkdownName;
+
+    return {
+        typeLooksMarkdown,
+        dispositionHasMarkdownName,
+        plainTextWithMarkdownHint
+    };
+};
+
 const isMarkdownContent = (text: string): boolean => {
     if (!text) return false;
     const trimmed = text.trim();
@@ -513,8 +552,13 @@ const isDefinitelyMarkdownResponse = (sourceUrl: string, text: string, contentTy
 const toViewerUrl = (source?: string | null, markdownKey?: string | null) => {
     if (!source) return VIEWER_URL;
     const p = new URLSearchParams();
-    p.set("src", source);
+    const isFileUrl = source.startsWith("file:");
+    // Never pass file:// as src to viewer to avoid unique-origin fetch attempts.
+    if (!isFileUrl) {
+        p.set("src", source);
+    }
     if (markdownKey) p.set("mdk", markdownKey);
+    if (isFileUrl) p.set("origin", "file");
     return `${VIEWER_URL}?${p}`;
 };
 
@@ -544,7 +588,13 @@ const fetchMarkdownText = async (candidate: string) => {
 };
 
 const openMarkdownInViewer = async (originalUrl: string, tabId: number) => {
-    if (originalUrl.startsWith("file:")) { openViewer(originalUrl, tabId, null); return true; }
+    if (tabId > 0 && shouldThrottleMarkdownRedirect(tabId)) return true;
+    if (originalUrl.startsWith("file:")) {
+        const text = tabId > 0 ? await tryReadMarkdownFromTab(tabId, originalUrl) : "";
+        const key = text ? await putMarkdownToSession(text) : null;
+        openViewer(originalUrl, tabId, key);
+        return true;
+    }
     const fetched = await fetchMarkdownText(originalUrl).catch(() => null);
     if (!fetched || !fetched.ok || !fetched.text) return false;
     if (!isDefinitelyMarkdownResponse(fetched.src, fetched.text, fetched.contentType)) return false;
@@ -958,6 +1008,13 @@ chrome.webNavigation?.onCommitted?.addListener?.((details) => {
     void openMarkdownInViewer(url, tabId);
 });
 
+chrome.webNavigation?.onHistoryStateUpdated?.addListener?.((details) => {
+    if (details.frameId !== 0) return;
+    const { tabId, url } = details;
+    if (!isMarkdownUrl(url) || url.startsWith(VIEWER_ORIGIN)) return;
+    void openMarkdownInViewer(url, tabId);
+});
+
 chrome.webNavigation?.onCompleted?.addListener?.((details) => {
     (async () => {
         if (details.frameId !== 0) return;
@@ -968,6 +1025,20 @@ chrome.webNavigation?.onCompleted?.addListener?.((details) => {
         openViewer(url, tabId, key);
     })().catch(console.warn);
 });
+
+chrome.webRequest?.onHeadersReceived?.addListener?.((details) => {
+    if (details.tabId < 0) return;
+    if (!details.url || details.url.startsWith(VIEWER_ORIGIN)) return;
+    if (details.type !== "main_frame") return;
+
+    const markdownHint = parseMarkdownHeaders(details);
+    if (!markdownHint.typeLooksMarkdown && !markdownHint.plainTextWithMarkdownHint) return;
+
+    void openMarkdownInViewer(details.url, details.tabId);
+}, {
+    urls: ["<all_urls>"],
+    types: ["main_frame"]
+}, ["responseHeaders", "extraHeaders"]);
 
 // ============================================================================
 // CRX-Snip and pipeline message handlers

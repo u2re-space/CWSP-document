@@ -2,6 +2,7 @@ import { makeObjectAssignable, observe, stringRef, safe } from "fest/object";
 import { makeUIState } from "fest/lure/extension/core/UIState";
 import { JSOX } from "jsox";
 import { readText } from "@rs-core/modules/Clipboard";
+import { scheduleFrame } from "@rs-core/utils/Runtime";
 
 export type GridCell = [number, number];
 
@@ -496,6 +497,11 @@ export const applyGridSettings = (settings?: { grid?: GridLayoutSettings }) => {
         persistGridLayout();
     }
 
+    // Non-DOM runtimes (e.g. extension service worker) still persist state, but skip DOM writes.
+    if (typeof document === "undefined") {
+        return;
+    }
+
     // Apply to all speed-dial grids via data attributes (for CSS to consume)
     document.querySelectorAll('.speed-dial-grid').forEach(grid => {
         const el = grid as HTMLElement;
@@ -511,8 +517,8 @@ export const applyGridSettings = (settings?: { grid?: GridLayoutSettings }) => {
 };
 
 // Apply grid settings on load
-if (typeof globalThis !== "undefined") {
-    requestAnimationFrame(() => applyGridSettings());
+if (typeof globalThis !== "undefined" && typeof document !== "undefined") {
+    scheduleFrame(() => applyGridSettings());
 }
 
 //

@@ -1,6 +1,7 @@
 import { H, M, navigate } from "fest/lure";
 import { NAVIGATION_SHORTCUTS } from "../../../../core/storage/StateStorage";
 import { isPrimitive } from "fest/core";
+import { scheduleFrame } from "@rs-core/utils/Runtime";
 
 //
 export const Sidebar: any = (currentView: { value: string }, entityViews, existsViews, _makeView: (key: string) => any) => {
@@ -25,7 +26,7 @@ ${M(entityViews, (frag, name) => H`<li><a target="_self" href="#${name}" data-na
         const name = (a?.getAttribute?.('data-name')?.replace?.(/^#/, "") || "home")?.replace?.(/^#/, "");
 
         // reactive INP side effect avoid
-        requestAnimationFrame(() => {
+        scheduleFrame(() => {
             const $currentView = isPrimitive(currentView) ? currentView : ((currentView as { value: string }) as any);
             const curView = ($currentView?.replace?.(/^#/, "") ?? ($currentView as { value: string })?.value)?.replace?.(/^#/, "");
             if (name && name != curView) {

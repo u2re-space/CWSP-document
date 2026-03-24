@@ -4,6 +4,7 @@ import { computeTimelineOrderInGeneral, computeTimelineOrderInsideOfDay, createD
 import { MakeCardElement, MakeLazyCardElement, type LazyCardOptions } from "./Cards";
 import type { ChapterDescriptor, EntityDescriptor } from "@rs-core/utils/Types";
 import type { EntityInterface } from "@rs-com/template/EntityInterface";
+import { scheduleFrame } from "@rs-core/utils/Runtime";
 import { cleanToDay, GET_OR_CACHE_BY_NAME, mergeByExists, PUSH_ONCE, REMOVE_IF_HAS } from "@rs-core/utils/Utils";
 import { bindDropToDir } from "@rs-core/storage/FileOps";
 import { registerEntity, unregisterEntity } from "@rs-com/service/misc/EntityRegistry";
@@ -428,7 +429,7 @@ export const CollectItemsForTabPage = <
     root.addEventListener('focusin', () => { firstTimeLoadWithState?.(); });
 
     // after append and appear in pages, try to first signal
-    requestAnimationFrame(() => {
+    scheduleFrame(() => {
         if (root?.checkVisibility?.()) {
             firstTimeLoadWithState?.();
         }

@@ -1,5 +1,6 @@
 import type { EntityInterface, TimeType } from "@rs-com/template/EntityInterface";
 import type { EntityDescriptor } from "@rs-core/utils/Types";
+import { scheduleFrame } from "@rs-core/utils/Runtime";
 import { removeFile, writeFile } from "fest/lure";
 import { H, Q, M } from "fest/lure";
 import { observe, stringRef, propRef } from "fest/object";
@@ -383,7 +384,13 @@ export const makeEvents = (
     return {
         doDelete: async (ev: Event) => {
             ev?.stopPropagation?.();
-            requestIdleCallback(async () => {
+            const scheduleIdle = (cb: IdleRequestCallback) => {
+                if (typeof globalThis.requestIdleCallback === "function") {
+                    return globalThis.requestIdleCallback(cb);
+                }
+                return setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 0 } as IdleDeadline), 0);
+            };
+            scheduleIdle(async () => {
                 const path = makePath(entityItem, entityDesc);
                 try { await removeFile(null, path); } catch (e) { console.warn(e); }
                 const card = (ev?.target as HTMLElement)?.closest?.(`.card[data-id="${entityItem?.id || entityItem?.name}"]`);
@@ -392,7 +399,7 @@ export const makeEvents = (
         },
         doEdit: async (ev: Event) => {
             ev?.stopPropagation?.();
-            requestAnimationFrame(async () => {
+            scheduleFrame(async () => {
                 // Open entity editor modal
                 try {
                     const updatedEntity = await makeEntityEdit(entityItem, entityDesc, {

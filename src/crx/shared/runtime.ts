@@ -37,11 +37,17 @@ export const createChromeExtensionRuntimeChannel = (channelName: string): Worker
             // Send via chrome runtime messaging with callback handling
             return new Promise((resolve, reject) => {
                 try {
+                    if (!chrome?.runtime?.id) {
+                        resolve({ ok: false, error: "runtime-unavailable" });
+                        return;
+                    }
                     console.log('[Runtime Channel] Sending message:', message);
                     chrome.runtime.sendMessage(message, (response) => {
                         if (chrome.runtime.lastError) {
-                            console.error('[Runtime Channel] Chrome runtime error:', chrome.runtime.lastError);
-                            reject(new Error(chrome.runtime.lastError.message));
+                            const runtimeErrorMessage = chrome.runtime.lastError.message || "runtime-error";
+                            console.warn('[Runtime Channel] Chrome runtime error:', runtimeErrorMessage);
+                            // Keep consumers alive after extension reload/invalidation.
+                            resolve({ ok: false, error: runtimeErrorMessage });
                             return;
                         }
 

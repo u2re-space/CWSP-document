@@ -8,6 +8,7 @@ import { loadSettings, saveSettings } from "@rs-com/config/Settings";
 import { applyTheme as applyAppTheme } from "@rs-core/utils/Theme";
 import { isEnabledView } from "../config/views";
 import { scheduleViewModulePrefetch } from "../shared/view-prefetch";
+import { ensureShellElementDefined, type ShellElement } from "./UIElement";
 
 //
 import "fest/fl-ui";
@@ -86,17 +87,22 @@ export abstract class ShellBase implements Shell {
             }
         }
 
-        // Create layout
-        this.rootElement = this.createLayout();
+        // Create slotted shell host and mount shell layout into it.
+        const shellTagName = ensureShellElementDefined(this.id);
+        const shellHost = document.createElement(shellTagName) as ShellElement;
+        const shellLayout = this.createLayout();
+        shellHost.mountShellLayout(shellLayout);
+        this.rootElement = shellHost;
 
         // CRITICAL: Set data-shell attribute for context-based CSS selectors
         // This enables :has([data-shell="...""]) selectors to cascade automatically
         this.rootElement.setAttribute('data-shell', this.id);
+        this.rootElement.setAttribute('data-shell-system', 'task-tab');
 
         // Find containers
-        this.contentContainer = this.rootElement.querySelector("[data-shell-content]") || this.rootElement;
-        this.toolbarContainer = this.rootElement.querySelector("[data-shell-toolbar]");
-        this.statusContainer = this.rootElement.querySelector("[data-shell-status]");
+        this.contentContainer = shellLayout.querySelector("[data-shell-content]") || shellLayout;
+        this.toolbarContainer = shellLayout.querySelector("[data-shell-toolbar]");
+        this.statusContainer = shellLayout.querySelector("[data-shell-status]");
         this.ensureToolbarChrome();
 
         // Apply initial theme

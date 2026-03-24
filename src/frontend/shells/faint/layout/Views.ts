@@ -303,7 +303,14 @@ export async function frontend(mountElement) {
                 if (!actions) toolbarPromise.resolve(actions = document.createElement('div'));
             }, 10000); // 10 second timeout
 
-            requestIdleCallback(async () => {
+            const scheduleIdle = (cb: IdleRequestCallback) => {
+                if (typeof globalThis.requestIdleCallback === "function") {
+                    return globalThis.requestIdleCallback(cb, { timeout: 1000 });
+                }
+                return setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 0 } as IdleDeadline), 0);
+            };
+
+            scheduleIdle(async () => {
                 try {
                     clearTimeout(timeoutId);
                     promised.resolve(element = await makeEntityView(registryKey, entityView));

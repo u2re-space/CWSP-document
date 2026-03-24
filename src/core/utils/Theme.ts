@@ -22,6 +22,11 @@ const resolveFontSize = (size?: AppSettings["appearance"] extends { fontSize?: i
 
 //
 export const applyTheme = (settings: AppSettings) => {
+    if (typeof document === "undefined") {
+        // Service worker/offscreen-like runtimes have no DOM. Keep this a no-op.
+        return;
+    }
+
     const root = document.documentElement;
     const theme = settings.appearance?.theme || "auto";
     const resolvedScheme = resolveColorScheme(theme);

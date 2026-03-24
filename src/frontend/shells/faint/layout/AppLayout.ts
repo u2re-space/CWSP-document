@@ -2,6 +2,7 @@ import { observe, propRef, affected } from "fest/object";
 import { H, C } from "fest/lure";
 import { navigate, historyState } from "fest/lure";
 import { isPrimitive } from "fest/core";
+import { scheduleFrame } from "@rs-core/utils/Runtime";
 import { makeWallpaper, SpeedDial } from "../../../views/from-faint/SpeedDial";
 
 //
@@ -107,14 +108,14 @@ export const AppLayout = (currentView: any, existsViews: Map<string, any>, makeV
 
     //
     // Initialize current view
-    requestAnimationFrame(() => {
+    scheduleFrame(() => {
         if (currentView && !currentView?.value?.replace?.(/^#/, "")) {
             (currentView as { value: string }).value = $defaultView;
         }
 
         //
         setView(currentView?.value?.replace?.(/^#/, "") || "home", true);
-        requestAnimationFrame(() => affected([currentView, "value"], (value: any) => {
+        scheduleFrame(() => affected([currentView, "value"], (value: any) => {
             setView(value?.replace?.(/^#/, "") || "home", false);
         }));
     });
@@ -124,13 +125,13 @@ export const AppLayout = (currentView: any, existsViews: Map<string, any>, makeV
         const $homeView = "home";//(location.hash?.replace?.(/^#/, "") || "home");
         const newTab = (ev?.newTab?.replace?.(/^#/, "") || $homeView)?.replace?.(/^#/, "");
         if (ev?.target == $layout) {
-            requestAnimationFrame(() => {
+            scheduleFrame(() => {
                 skipCreateNewView = true;
                 navigate(`#${newTab || "home"}`, existsViews.has(newTab || "home"));
             });
         };
     }} on:tab-close=${(ev: any) => {
-        requestAnimationFrame(() => {
+        scheduleFrame(() => {
             skipCreateNewView = true;
             onClose(ev?.tabName, currentView, existsViews);
         });

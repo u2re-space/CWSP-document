@@ -435,9 +435,23 @@ const initMarkdownViewer = () => {
     const input = document.getElementById("md-url") as HTMLInputElement;
     const btn = document.getElementById("md-open") as HTMLButtonElement;
 
+    const normalizeMarkdownCandidate = (value: string): string => {
+        const raw = (value || "").trim();
+        if (!raw) return "";
+        if (/^(https?:|file:|ftp:)/i.test(raw)) return raw;
+        if (raw.startsWith("//")) return `https:${raw}`;
+        return `https://${raw}`;
+    };
+
     const openUrl = () => {
-        const url = input?.value?.trim();
+        const url = normalizeMarkdownCandidate(input?.value || "");
         if (!url) return;
+        if (/^file:/i.test(url)) {
+            // Let webNavigation flow capture file:// text and redirect with session key.
+            chrome.tabs.create({ url });
+            globalThis?.close?.();
+            return;
+        }
         const viewerUrl = chrome.runtime.getURL("markdown/viewer.html");
         chrome.tabs.create({ url: `${viewerUrl}?src=${encodeURIComponent(url)}` });
         globalThis?.close?.();
