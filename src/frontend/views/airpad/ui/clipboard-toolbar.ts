@@ -11,12 +11,13 @@ import {
     requestAirPadClipboardRead,
 } from '../network/session';
 
-let clipboardToolbarInitialized = false;
 let unsubscribeClipboardUpdate: (() => void) | null = null;
+const boundCopyButtons = new WeakSet<HTMLElement>();
+const boundCutButtons = new WeakSet<HTMLElement>();
+const boundPasteButtons = new WeakSet<HTMLElement>();
 
 /** Call when Airpad unmounts so a fresh DOM gets listeners on next mount. */
 export function resetClipboardToolbarState(): void {
-    clipboardToolbarInitialized = false;
     if (unsubscribeClipboardUpdate) {
         unsubscribeClipboardUpdate();
         unsubscribeClipboardUpdate = null;
@@ -69,8 +70,6 @@ async function tryWritePhoneClipboardText(text: string): Promise<boolean> {
 }
 
 export function initClipboardToolbar() {
-    if (clipboardToolbarInitialized) return;
-
     const btnCut = getBtnCut();
     const btnCopy = getBtnCopy();
     const btnPaste = getBtnPaste();
@@ -86,57 +85,64 @@ export function initClipboardToolbar() {
         if (res?.ok && typeof res.text === 'string') setPreview(res.text, { source: 'pc' });
     });
 
-    btnCopy?.addEventListener('click', async () => {
-        const res = await requestAirPadClipboardCopy();
-        if (!res?.ok) {
-            log('Copy failed: ' + (res?.error || 'unknown'));
-            return;
-        }
+    if (btnCopy && !boundCopyButtons.has(btnCopy)) {
+        boundCopyButtons.add(btnCopy);
+        btnCopy.addEventListener('click', async () => {
+            const res = await requestAirPadClipboardCopy();
+            if (!res?.ok) {
+                log('Copy failed: ' + (res?.error || 'unknown'));
+                return;
+            }
 
-        const text = String(res.text || '');
-        setPreview(text, { source: 'pc' });
+            const text = String(res.text || '');
+            setPreview(text, { source: 'pc' });
 
-        // Best-effort: try to write to phone clipboard (may be blocked by browser policies).
-        const ok = await tryWritePhoneClipboardText(text);
-        if (!ok) {
-            log('PC clipboard received. If phone clipboard write is blocked, copy from the preview line.');
-        }
-    });
+            // Best-effort: try to write to phone clipboard (may be blocked by browser policies).
+            const ok = await tryWritePhoneClipboardText(text);
+            if (!ok) {
+                log('PC clipboard received. If phone clipboard write is blocked, copy from the preview line.');
+            }
+        });
+    }
 
-    btnCut?.addEventListener('click', async () => {
-        const res = await requestAirPadClipboardCut();
-        if (!res?.ok) {
-            log('Cut failed: ' + (res?.error || 'unknown'));
-            return;
-        }
+    if (btnCut && !boundCutButtons.has(btnCut)) {
+        boundCutButtons.add(btnCut);
+        btnCut.addEventListener('click', async () => {
+            const res = await requestAirPadClipboardCut();
+            if (!res?.ok) {
+                log('Cut failed: ' + (res?.error || 'unknown'));
+                return;
+            }
 
-        const text = String(res.text || '');
-        setPreview(text, { source: 'pc' });
+            const text = String(res.text || '');
+            setPreview(text, { source: 'pc' });
 
-        const ok = await tryWritePhoneClipboardText(text);
-        if (!ok) {
-            log('PC clipboard received (after cut). If phone clipboard write is blocked, copy from the preview line.');
-        }
-    });
+            const ok = await tryWritePhoneClipboardText(text);
+            if (!ok) {
+                log('PC clipboard received (after cut). If phone clipboard write is blocked, copy from the preview line.');
+            }
+        });
+    }
 
-    btnPaste?.addEventListener('click', async () => {
-        const text = await readPhoneClipboardText();
-        if (!text) {
-            log('Paste: phone clipboard is empty (or permission denied).');
-            return;
-        }
+    if (btnPaste && !boundPasteButtons.has(btnPaste)) {
+        boundPasteButtons.add(btnPaste);
+        btnPaste.addEventListener('click', async () => {
+            const text = await readPhoneClipboardText();
+            if (!text) {
+                log('Paste: phone clipboard is empty (or permission denied).');
+                return;
+            }
 
-        const res = await requestAirPadClipboardPaste(text);
-        if (!res?.ok) {
-            log('Paste failed: ' + (res?.error || 'unknown'));
-            return;
-        }
+            const res = await requestAirPadClipboardPaste(text);
+            if (!res?.ok) {
+                log('Paste failed: ' + (res?.error || 'unknown'));
+                return;
+            }
 
-        // Show what we just pasted (useful confirmation)
-        setPreview(text, { source: 'phone' });
-    });
-
-    clipboardToolbarInitialized = true;
+            // Show what we just pasted (useful confirmation)
+            setPreview(text, { source: 'phone' });
+        });
+    }
 }
 
 

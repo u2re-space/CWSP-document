@@ -242,7 +242,8 @@
     :root[data-theme="light"] .view-airpad,
     :root[data-theme="light"] .airpad-config-overlay,
     [data-shell][data-theme="light"] .view-airpad,
-    [data-shell][data-theme="light"] .airpad-config-overlay {
+    [data-shell][data-theme="light"] .airpad-config-overlay,
+    .airpad-config-overlay[data-theme="light"] {
         --surface: #fafafa;
         --surface-variant: #e7e5e5;
         --surface-container: #f3f1f1;

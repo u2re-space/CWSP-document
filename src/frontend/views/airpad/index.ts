@@ -9,10 +9,8 @@ import { H } from "fest/lure";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
 import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shells/types";
 import type { BaseViewOptions } from "../types";
-import { disconnectAirPadSession } from "./network/session";
 import { setRemoteKeyboardEnabled } from "./input/virtual-keyboard";
-import { unmountAirpadRuntime } from "./main";
-import { waitForDomPaint } from "@rs-frontend/shared/event-handling-policy";
+import { ensureCwAirpadAppDefined, type CwAirpadApp } from "./component/CwAirpadApp";
 
 // @ts-ignore
 import style from "./airpad.scss?inline";
@@ -31,6 +29,7 @@ export class AirpadView implements View {
     private options: BaseViewOptions;
     private shellContext?: ShellContext;
     private element: HTMLElement | null = null;
+    private appElement: CwAirpadApp | null = null;
     private initialized = false;
     private initPromise: Promise<void> | null = null;
     
@@ -73,17 +72,12 @@ export class AirpadView implements View {
         }
 
         this._sheet = loadAsAdopted(style) as CSSStyleSheet;
+        ensureCwAirpadAppDefined();
 
         this.element = H`
-            <div class="view-airpad">
-                <div class="view-airpad__content" data-airpad-content>
-                    <div class="view-airpad__loading">
-                        <div class="view-airpad__spinner"></div>
-                        <span>Loading Airpad...</span>
-                    </div>
-                </div>
-            </div>
+            <cw-airpad-app data-airpad-app></cw-airpad-app>
         ` as HTMLElement;
+        this.appElement = this.element as unknown as CwAirpadApp;
 
         // Init runs from lifecycle.onMount (after shell wires the view) to avoid double-start
         // and to match other views; keeps a single code path.
@@ -104,40 +98,16 @@ export class AirpadView implements View {
         if (this.initPromise) return this.initPromise;
 
         this.initPromise = (async () => {
-            const content = this.element?.querySelector("[data-airpad-content]");
-            if (!content) return;
+            const app = this.appElement ?? (this.element as unknown as CwAirpadApp | null);
+            if (!app) return;
 
             try {
-                // Dynamic import of airpad main
-                const { default: mountAirpad } = await import("./main");
-
-                // Clear loading state, then wait a frame so removal/layout settle before mounting UI + listeners.
-                content.innerHTML = "";
-                await waitForDomPaint();
-
-                await mountAirpad(content as HTMLElement);
+                await app.start?.();
                 await this.lockOrientationForAirpad()?.catch?.((error) => { console.error("[Airpad] Failed to lock orientation:", error); });
-
                 this.initialized = true;
             } catch (error) {
                 console.error("[Airpad] Failed to initialize:", error);
-                content.innerHTML = `
-                <div class="view-airpad__error">
-                    <p>Failed to load Airpad</p>
-                    <p class="view-airpad__error-detail">${String(error)}</p>
-                    <button type="button" data-action="retry">Try Again</button>
-                </div>
-            `;
-                content.querySelector("[data-action=\"retry\"]")?.addEventListener("click", () => {
-                    this.initialized = false;
-                    this.initPromise = null;
-                    content.innerHTML = `
-                        <div class="view-airpad__loading">
-                            <div class="view-airpad__spinner"></div>
-                            <span>Loading Airpad...</span>
-                        </div>`;
-                    void this.initAirpad();
-                });
+                this.appElement?.retry?.();
             } finally {
                 this.initPromise = null;
             }
@@ -147,12 +117,11 @@ export class AirpadView implements View {
     }
 
     private cleanup(): void {
-        unmountAirpadRuntime();
-        setRemoteKeyboardEnabled(false);
-        disconnectAirPadSession();
+        this.appElement?.dispose?.();
         this.unlockOrientationForAirpad();
         this.initialized = false;
         this.initPromise = null;
+        this.appElement = null;
     }
 
     private async lockOrientationForAirpad(): Promise<void> {

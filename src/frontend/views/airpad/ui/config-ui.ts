@@ -15,25 +15,39 @@ import {
 } from '../config/config';
 import { reconnectAirPadSessionAfterConfigChange } from '../network/session';
 import { hideKeyboard } from '../input/keyboard/handlers';
+import { getAirpadOwnerDocument } from '../utils/utils';
 
 /** Marker for teardown; do not reuse generic `.config-overlay` alone (other features could add one). */
 const AIRPAD_CONFIG_MARKER = 'airpad-config-overlay';
 
 /**
- * Mount outside `.view-airpad`: ancestors use `contain: strict` (minimal shell), which clips
- * `position: fixed` overlays and makes the dialog invisible.
+ * Mount on the owner `document.body` (not `cw-shell-minimal` / task-tab host).
+ * Minimal shell uses `contain: strict` + `overflow: hidden`; children with `position: fixed`
+ * are still clipped to that host, so the dialog stays in the DOM but is not visible.
  */
 function getConfigOverlayMountParent(): HTMLElement {
-    const host = document.querySelector("[data-shell-system=\"task-tab\"]") as HTMLElement | null;
-    if (host) return host;
-    const legacy = document.querySelector(".app-shell") as HTMLElement | null;
-    if (legacy) return legacy;
-    return document.body;
+    const doc = getAirpadOwnerDocument() ?? document;
+    return (doc.body ?? doc.documentElement ?? document.body) as HTMLElement;
+}
+
+/** Body-portaled overlay is not under `[data-shell][data-theme]`, so copy theme for SCSS tokens. */
+function syncAirpadConfigOverlayShellTheme(overlay: HTMLElement, doc: Document): void {
+    const shell =
+        (doc.querySelector("cw-shell-minimal[data-theme]") as HTMLElement | null) ??
+        (doc.querySelector("[data-shell-system=\"task-tab\"][data-theme]") as HTMLElement | null) ??
+        (doc.querySelector("[data-shell][data-theme]") as HTMLElement | null);
+    const theme = shell?.getAttribute("data-theme");
+    if (theme === "light" || theme === "dark") {
+        overlay.setAttribute("data-theme", theme);
+    } else {
+        overlay.removeAttribute("data-theme");
+    }
 }
 
 // Create configuration overlay
 export function createConfigUI(): HTMLElement {
-    const overlay = document.createElement('div');
+    const doc = getAirpadOwnerDocument() ?? document;
+    const overlay = doc.createElement('div');
     overlay.className = `config-overlay ${AIRPAD_CONFIG_MARKER}`;
     overlay.innerHTML = `
         <div class="config-panel">
@@ -116,6 +130,12 @@ export function createConfigUI(): HTMLElement {
     transportSecretInput.value = getAirPadTransportSecret();
     signingSecretInput.value = getAirPadSigningSecret();
 
+    const closeOverlay = () => {
+        overlay.classList.remove('flex');
+        overlay.style.display = 'none';
+        overlay.setAttribute('aria-hidden', 'true');
+    };
+
     saveButton.addEventListener('click', () => {
         applyAirpadRemoteConfig({
             host: hostInput.value,
@@ -128,20 +148,15 @@ export function createConfigUI(): HTMLElement {
             signingSecret: signingSecretInput.value,
         });
         reconnectAirPadSessionAfterConfigChange({ delayMs: 100 });
-        overlay.classList.remove('flex');
-        overlay.style.display = 'none';
+        closeOverlay();
     });
 
-    cancelButton.addEventListener('click', () => {
-        overlay.classList.remove('flex');
-        overlay.style.display = 'none';
-    });
+    cancelButton.addEventListener('click', closeOverlay);
 
     // Click outside to close
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
-            overlay.classList.remove('flex');
-            overlay.style.display = 'none';
+            closeOverlay();
         }
     });
 
@@ -157,8 +172,9 @@ export function showConfigUI(): void {
         /* non-fatal */
     }
 
+    const doc = getAirpadOwnerDocument() ?? document;
     const host = getConfigOverlayMountParent();
-    let overlay = document.querySelector(`.${AIRPAD_CONFIG_MARKER}`) as HTMLElement | null;
+    let overlay = doc.querySelector(`.${AIRPAD_CONFIG_MARKER}`) as HTMLElement | null;
     if (overlay && overlay.parentElement !== host) {
         overlay.remove();
         overlay = null;
@@ -184,12 +200,15 @@ export function showConfigUI(): void {
         if (transportSecretInput) transportSecretInput.value = getAirPadTransportSecret();
         if (signingSecretInput) signingSecretInput.value = getAirPadSigningSecret();
     }
+    syncAirpadConfigOverlayShellTheme(overlay, doc);
     overlay.classList.add('flex');
     overlay.style.display = 'flex';
     overlay.style.zIndex = '120000';
+    overlay.setAttribute('aria-hidden', 'false');
 }
 
 /** Remove portaled overlay when Airpad unmounts (avoids stale node on body/shell). */
 export function teardownAirpadConfigOverlay(): void {
-    document.querySelectorAll(`.${AIRPAD_CONFIG_MARKER}`).forEach((el) => el.remove());
+    const doc = getAirpadOwnerDocument() ?? document;
+    doc.querySelectorAll(`.${AIRPAD_CONFIG_MARKER}`).forEach((el) => el.remove());
 }

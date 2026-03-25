@@ -1,20 +1,5 @@
 import type { AirPadClipboardResult, AirPadIntent } from "./intents";
-import {
-    connectPacketSocketIoRail,
-    createPacketSocketIoKeyboardMessage,
-    disconnectPacketSocketIoRail,
-    initPacketSocketIoRail,
-    isPacketSocketIoRailConnected,
-    onPacketSocketIoClipboardUpdate,
-    onPacketSocketIoRailConnectionChange,
-    requestPacketSocketIoClipboardCopy,
-    requestPacketSocketIoClipboardCut,
-    requestPacketSocketIoClipboardPaste,
-    requestPacketSocketIoClipboardRead,
-    sendPacketSocketIoBinary,
-    sendPacketSocketIoIntent
-} from "./rails/packet-socketio";
-import { onVoiceResult } from "./websocket";
+import { airpadTransport } from "./transport";
 import { invalidateAirpadTransportCredentials } from "../credential-cache-bridge";
 
 export type AirPadSessionRail = "canonical-session";
@@ -30,15 +15,15 @@ const ACTIVE_RAIL: AirPadSessionRail = "canonical-session";
 export const getAirPadSessionRail = (): AirPadSessionRail => ACTIVE_RAIL;
 
 export const initAirPadSessionTransport = (button: HTMLElement | null): void => {
-    initPacketSocketIoRail(button);
+    airpadTransport.init(button);
 };
 
 export const connectAirPadSession = (): void => {
-    connectPacketSocketIoRail();
+    airpadTransport.connect();
 };
 
 export const disconnectAirPadSession = (): void => {
-    disconnectPacketSocketIoRail();
+    airpadTransport.disconnect();
 };
 
 /**
@@ -46,12 +31,12 @@ export const disconnectAirPadSession = (): void => {
  * Mirrors legacy "Save & Reconnect" behavior.
  */
 export function reconnectAirPadSessionAfterConfigChange(options?: { delayMs?: number }): void {
-    disconnectPacketSocketIoRail();
+    airpadTransport.disconnect();
     invalidateAirpadTransportCredentials();
     const delayMs = options?.delayMs ?? 80;
     globalThis.setTimeout(() => {
         try {
-            connectPacketSocketIoRail();
+            airpadTransport.connect();
         } catch (e) {
             console.warn("[AirPad] reconnect after config failed:", e);
         }
@@ -59,23 +44,22 @@ export function reconnectAirPadSessionAfterConfigChange(options?: { delayMs?: nu
 }
 
 export const isAirPadSessionConnected = (): boolean => {
-    return isPacketSocketIoRailConnected();
+    return airpadTransport.isConnected();
 };
-
 export const onAirPadSessionConnectionChange = (handler: (connected: boolean) => void): (() => void) => {
-    return onPacketSocketIoRailConnectionChange(handler);
+    return airpadTransport.onConnectionChange(handler);
 };
 
 export const onAirPadRemoteClipboardUpdate = (handler: (text: string, meta?: { source?: string }) => void): (() => void) => {
-    return onPacketSocketIoClipboardUpdate(handler);
+    return airpadTransport.onClipboardUpdate(handler);
 };
 
 export const onAirPadVoiceMessage = (handler: (message: AirPadVoiceMessage) => void): (() => void) => {
-    return onVoiceResult(handler);
+    return airpadTransport.onVoiceResult(handler);
 };
 
 export const sendAirPadIntent = (intent: AirPadIntent): void => {
-    sendPacketSocketIoIntent(intent);
+    airpadTransport.sendIntent(intent);
 };
 
 export const sendAirPadKeyboardChar = (char: string): void => {
@@ -83,25 +67,25 @@ export const sendAirPadKeyboardChar = (char: string): void => {
 };
 
 export const createAirPadKeyboardMessage = (codePoint: number, flags = 0): ArrayBuffer => {
-    return createPacketSocketIoKeyboardMessage(codePoint, flags);
+    return airpadTransport.createKeyboardMessage(codePoint, flags);
 };
 
 export const sendAirPadBinaryMessage = (buffer: ArrayBuffer | Uint8Array): void => {
-    sendPacketSocketIoBinary(buffer);
+    airpadTransport.sendBinary(buffer);
 };
 
 export const requestAirPadClipboardRead = async (): Promise<AirPadClipboardResult> => {
-    return requestPacketSocketIoClipboardRead();
+    return airpadTransport.requestClipboardRead();
 };
 
 export const requestAirPadClipboardCopy = async (): Promise<AirPadClipboardResult> => {
-    return requestPacketSocketIoClipboardCopy();
+    return airpadTransport.requestClipboardCopy();
 };
 
 export const requestAirPadClipboardCut = async (): Promise<AirPadClipboardResult> => {
-    return requestPacketSocketIoClipboardCut();
+    return airpadTransport.requestClipboardCut();
 };
 
 export const requestAirPadClipboardPaste = async (text: string): Promise<AirPadClipboardResult> => {
-    return requestPacketSocketIoClipboardPaste(text);
+    return airpadTransport.requestClipboardPaste(text);
 };

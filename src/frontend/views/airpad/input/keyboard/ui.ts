@@ -100,20 +100,28 @@ function handleKeyPress(key: string) {
 export function restoreButtonIcon() {
     const toggleButton = getToggleButton();
     if (!toggleButton) return;
-    // Clear any text content and restore icon immediately (no delay)
+
+    // Keep this path exception-safe: hideKeyboard() calls this frequently and
+    // detached/focused state races can throw addRange errors in Chromium.
     toggleButton.textContent = '⌨️';
-    // Move cursor to end to prevent visible selection
-    const range = document.createRange();
+
+    if (!toggleButton.isConnected) return;
+    const ownerDoc = toggleButton.ownerDocument;
+    if (!ownerDoc) return;
+    if (ownerDoc.activeElement !== toggleButton) return;
+
+    const textNode = toggleButton.firstChild;
     const sel = globalThis?.getSelection?.();
-    if (sel && toggleButton.firstChild) {
-        try {
-            range.setStart(toggleButton.firstChild, Math.min(1, toggleButton.textContent.length));
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-        } catch (e) {
-            // Ignore selection errors
-        }
+    if (!(textNode instanceof Text) || !sel) return;
+
+    try {
+        const range = ownerDoc.createRange();
+        range.setStart(textNode, Math.min(1, toggleButton.textContent?.length ?? 0));
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    } catch {
+        // ignore detached/selection races
     }
 }
 

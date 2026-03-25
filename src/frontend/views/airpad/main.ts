@@ -25,6 +25,9 @@ import { resetMotionAccum } from "./config/motion-state";
 import { resetMotionBaseline } from "./ui/air-button";
 import { resetRelativeOrientationRuntimeState } from "./input/sensor/relative-orientation";
 import { reloadAirpadRemoteConfigFromStorage, attachAirpadCrossTabConfigSync } from "./config/config";
+import { AirpadEventBus, type AirpadEventMap } from "./component/AirpadEventBus";
+import { ensureCwAirpadActionRailDefined, CwAirpadActionRailElement } from "./component/CwAirpadActionRail";
+import { ensureCwAirpadSidePanelsDefined, CwAirpadSidePanelsElement } from "./component/CwAirpadSidePanels";
 
 let unsubscribeWsKeyboardSync: (() => void) | null = null;
 let airpadInitToken = 0;
@@ -62,6 +65,8 @@ export default async function mountAirpad(mountElement: HTMLElement): Promise<vo
     const currentInitToken = airpadInitToken;
 
     loadAsAdopted(stylesheet);
+    ensureCwAirpadActionRailDefined();
+    ensureCwAirpadSidePanelsDefined();
 
     // Find or create #app container
     let appContainer = mountElement ?? document.body.querySelector("#app") ?? (document.body as HTMLElement);
@@ -118,81 +123,8 @@ export default async function mountAirpad(mountElement: HTMLElement): Promise<vo
             <div id="voiceText" class="voice-line"></div>
         </div>
 
-        <div class="side-actions-row" role="group" aria-label="Panels">
-            <button type="button" id="hintToggle" name="airpad-hints-toggle" class="side-log-toggle side-hint-toggle"
-                aria-controls="hintOverlay" aria-expanded="false">
-                Hints
-            </button>
-            <button type="button" id="logToggle" name="airpad-log-toggle" class="side-log-toggle"
-                aria-controls="logOverlay" aria-expanded="false">
-                Логи
-            </button>
-            <button type="button" id="btnMotionReset" name="airpad-motion-reset" class="side-log-toggle side-fix-toggle"
-                aria-label="Reset motion calibration">
-                Fix
-            </button>
-            <button type="button" id="btnReload" name="airpad-reload" class="side-log-toggle side-reload-toggle"
-                aria-label="Reload">
-                Reload
-            </button>
-        </div>
-
-        <div id="logOverlay" class="log-overlay" aria-hidden="true">
-            <div class="log-panel">
-                <div class="log-overlay-header">
-                    <span>Журнал соединения</span>
-                    <button type="button" id="logClose" name="airpad-log-close" class="ghost-btn" aria-label="Закрыть логи">Закрыть</button>
-                </div>
-                <div id="logContainer" class="log-container"></div>
-            </div>
-        </div>
-
-        <div id="hintOverlay" class="log-overlay hint-overlay" aria-hidden="true">
-            <div class="log-panel hint-panel">
-                <div class="log-overlay-header">
-                    <span>Подсказки AirPad</span>
-                    <button type="button" id="hintClose" name="airpad-hint-close" class="ghost-btn" aria-label="Закрыть подсказки">Закрыть</button>
-                </div>
-                <section class="hint hint-modal-content" id="hintPanel" aria-label="Airpad quick help">
-                    <details class="hint-group" data-hint-group>
-                        <summary>Жесты Air-кнопки</summary>
-                        <ul>
-                            <li>Короткий тап — клик.</li>
-                            <li>Удержание &gt; 100ms — режим air-мыши.</li>
-                            <li>Свайп вверх/вниз по кнопке — скролл.</li>
-                            <li>Свайп влево/вправо — жест.</li>
-                        </ul>
-                    </details>
-
-                    <details class="hint-group" data-hint-group>
-                        <summary>AI-кнопка</summary>
-                        <ul>
-                            <li>Нажми и держи — идёт распознавание речи.</li>
-                            <li>Отпусти — команда уйдёт в endpoint voice pipeline.</li>
-                        </ul>
-                    </details>
-
-                    <details class="hint-group" data-hint-group>
-                        <summary>Виртуальная клавиатура</summary>
-                        <ul>
-                            <li>Открой кнопкой ⌨️ на нижней панели.</li>
-                            <li>Поддерживает текст, эмодзи и спецсимволы.</li>
-                            <li>Передаёт ввод в бинарном формате.</li>
-                        </ul>
-                    </details>
-                </section>
-            </div>
-        </div>
-
-        <!-- Bottom clipboard toolbar (phone <-> PC) -->
-        <div class="bottom-toolbar" id="clipboardToolbar" aria-label="Clipboard actions">
-            <button type="button" id="btnCut" name="airpad-clipboard-cut" class="toolbar-btn" aria-label="Cut (Ctrl+X)">✂️</button>
-            <button type="button" id="btnCopy" name="airpad-clipboard-copy" class="toolbar-btn" aria-label="Copy (Ctrl+C)">📋</button>
-            <button type="button" id="btnPaste" name="airpad-clipboard-paste" class="toolbar-btn" aria-label="Paste (Ctrl+V)">📥</button>
-            <button type="button" id="btnConnect" name="airpad-ws-connect" class="toolbar-btn connect-fab connect-fab--ws">WS ↔</button>
-            <button type="button" id="btnConfig" name="airpad-config" class="toolbar-btn" aria-label="Configuration" title="Configuration">⚙️</button>
-        </div>
-        <div id="clipboardPreview" class="clipboard-preview" aria-live="polite"></div>
+        <cw-airpad-side-panels></cw-airpad-side-panels>
+        <cw-airpad-action-rail></cw-airpad-action-rail>
     `);
 
     setAirpadDomRoot(appContainer);
@@ -221,6 +153,23 @@ async function initAirpadApp(initToken: number | undefined, signal: AbortSignal,
     }
 
     const byId = (id: string) => queryAirpad(`#${CSS.escape(id)}`);
+    const bus = new AirpadEventBus();
+    const sidePanels = root.querySelector("cw-airpad-side-panels") as CwAirpadSidePanelsElement | null;
+    const actionRail = root.querySelector("cw-airpad-action-rail") as CwAirpadActionRailElement | null;
+    sidePanels?.connect(bus);
+    actionRail?.connect(bus);
+    signal.addEventListener("abort", () => {
+        sidePanels?.disconnect();
+        actionRail?.disconnect();
+        bus.clear();
+    }, { once: true });
+    const bindBus = <K extends keyof AirpadEventMap>(
+        event: K,
+        handler: (payload: AirpadEventMap[K]) => void
+    ): void => {
+        const off = bus.on(event, handler);
+        signal.addEventListener("abort", off, { once: true });
+    };
 
     function resetMotionRuntime() {
         resetMotionAccum();
@@ -229,20 +178,25 @@ async function initAirpadApp(initToken: number | undefined, signal: AbortSignal,
         log("Motion runtime state reset (recalibrated).");
     }
 
-    function initConfigButton() {
-        const configButton = byId("btnConfig");
-        if (!configButton) {
-            return;
-        }
-        configButton.addEventListener("click", () => showConfigUI(), { signal });
-    }
-
-    function initMotionResetButton() {
-        const resetButton = byId("btnMotionReset") as HTMLButtonElement | null;
-        if (!resetButton) return;
-        resetButton.title = "Reset motion calibration";
-        resetButton.addEventListener("click", () => resetMotionRuntime(), { signal });
-    }
+    bindBus("ui.config.open", () => showConfigUI());
+    bindBus("ui.motion.reset", () => resetMotionRuntime());
+    bindBus("ui.reload.request", () => {
+        try {
+            globalThis?.location?.reload?.();
+        } catch (e) {
+            console.error(e);
+        } //@ts-ignore
+        try {
+            globalThis?.navigation?.navigate?.("airpad");
+        } catch (e) {
+            console.error(e);
+        } //@ts-ignore
+        try {
+            globalThis?.navigation?.reload?.();
+        } catch (e) {
+            console.error(e);
+        } //@ts-ignore
+    });
 
     function initAdaptiveHintPanel() {
         const hintRoot = byId("hintPanel");
@@ -265,10 +219,6 @@ async function initAirpadApp(initToken: number | undefined, signal: AbortSignal,
         compactMedia.addEventListener?.("change", applyHintDensity, { signal });
     }
 
-    const initReloadButton = () => {
-        // Reload wiring lives in initLogOverlay (btnReload).
-    };
-
     const safeToString = (value: unknown): string => {
         if (value instanceof Error) return `${value.name}: ${value.message}`;
         if (typeof value === "string") return value;
@@ -286,123 +236,11 @@ async function initAirpadApp(initToken: number | undefined, signal: AbortSignal,
 
     if (aborted()) return;
 
-    const initLogOverlay = () => {
-        const overlay = byId("logOverlay");
-        const toggle = byId("logToggle");
-        const close = byId("logClose");
-
-        if (!overlay || !toggle) {
-            return;
-        }
-
-        const reload = byId("btnReload");
-        reload?.addEventListener(
-            "click",
-            () => {
-                try {
-                    globalThis?.location?.reload?.();
-                } catch (e) {
-                    console.error(e);
-                } //@ts-ignore
-                try {
-                    globalThis?.navigation?.navigate?.("airpad");
-                } catch (e) {
-                    console.error(e);
-                } //@ts-ignore
-                try {
-                    globalThis?.navigation?.reload?.();
-                } catch (e) {
-                    console.error(e);
-                } //@ts-ignore
-            },
-            { signal }
-        );
-
-        const openOverlay = () => {
-            overlay.classList.add("open");
-            overlay.setAttribute("aria-hidden", "false");
-            toggle.setAttribute("aria-expanded", "true");
-        };
-
-        const closeOverlay = () => {
-            overlay.classList.remove("open");
-            overlay.setAttribute("aria-hidden", "true");
-            toggle.setAttribute("aria-expanded", "false");
-        };
-
-        toggle.addEventListener("click", openOverlay, { signal });
-        close?.addEventListener("click", closeOverlay, { signal });
-        overlay.addEventListener(
-            "click",
-            (e) => {
-                if (e.target === overlay) {
-                    closeOverlay();
-                }
-            },
-            { signal }
-        );
-        root.addEventListener(
-            "keydown",
-            (e) => {
-                if (e.key === "Escape" && overlay.classList.contains("open")) {
-                    closeOverlay();
-                }
-            },
-            { capture: true, signal }
-        );
-    };
-
-    const initHintOverlay = () => {
-        const overlay = byId("hintOverlay");
-        const toggle = byId("hintToggle");
-        const close = byId("hintClose");
-
-        if (!overlay || !toggle) {
-            return;
-        }
-
-        const openOverlay = () => {
-            overlay.classList.add("open");
-            overlay.setAttribute("aria-hidden", "false");
-            toggle.setAttribute("aria-expanded", "true");
-        };
-
-        const closeOverlay = () => {
-            overlay.classList.remove("open");
-            overlay.setAttribute("aria-hidden", "true");
-            toggle.setAttribute("aria-expanded", "false");
-        };
-
-        toggle.addEventListener("click", openOverlay, { signal });
-        close?.addEventListener("click", closeOverlay, { signal });
-        overlay.addEventListener(
-            "click",
-            (e) => {
-                if (e.target === overlay) {
-                    closeOverlay();
-                }
-            },
-            { signal }
-        );
-        root.addEventListener(
-            "keydown",
-            (e) => {
-                if (e.key === "Escape" && overlay.classList.contains("open")) {
-                    closeOverlay();
-                }
-            },
-            { capture: true, signal }
-        );
-    };
-
     // Fresh read from localStorage + sync when another tab changes settings (storage event).
     reloadAirpadRemoteConfigFromStorage();
     airpadCrossTabUnsub ??= attachAirpadCrossTabConfigSync();
 
     // Phase 1 — sync: DOM is in place; wire controls immediately (no idle wait).
-    runInitializer("log overlay", () => initLogOverlay());
-    runInitializer("hint overlay", () => initHintOverlay());
-    runInitializer("reload button", () => initReloadButton());
     runInitializer("websocket button", () => initAirPadSessionTransport(getBtnConnect()));
     runInitializer("speech", () => initSpeechRecognition());
     runInitializer("AI button", () => initAiButton());
@@ -413,9 +251,7 @@ async function initAirpadApp(initToken: number | undefined, signal: AbortSignal,
         setRemoteKeyboardEnabled(connected);
     });
     runInitializer("clipboard toolbar", () => initClipboardToolbar());
-    runInitializer("config button", () => initConfigButton());
     runInitializer("adaptive hint", () => initAdaptiveHintPanel());
-    runInitializer("motion reset", () => initMotionResetButton());
 
     log('Готово. Нажми "WS Connect", затем используй Air/AI кнопки.');
     log("Движение мыши основано только на Gyroscope API (повороты телефона).");
