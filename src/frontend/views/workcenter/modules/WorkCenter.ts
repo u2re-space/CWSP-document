@@ -53,8 +53,7 @@ marked?.use?.(markedKatex({
 
             const { masked, restore } = maskCodeSegments(markdown);
             const katexNode = document.createElement("div");
-            // Code fragments are masked above, so HTML here is only from non-code markdown.
-            katexNode.innerHTML = masked;
+            katexNode.textContent = masked;
             renderMathInElement(katexNode, {
                 throwOnError: false,
                 nonStandard: true,
@@ -68,10 +67,7 @@ marked?.use?.(markedKatex({
                 ]
             });
 
-            return restore(katexNode.innerHTML)
-                .replace(/&gt;/g, ">")
-                .replace(/&lt;/g, "<")
-                .replace(/&amp;/g, "&");
+            return restore(katexNode.innerHTML);
         },
     },
 });

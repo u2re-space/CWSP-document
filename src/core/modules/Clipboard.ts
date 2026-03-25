@@ -114,19 +114,7 @@ export const writeText = async (text: string): Promise<ClipboardResult> => {
                     console.warn("[Clipboard] Direct write failed:", err);
                 }
 
-                try {
-                    if (typeof navigator !== "undefined" && navigator.permissions) {
-                        const result = await navigator.permissions.query({ name: "clipboard-write" } as unknown as PermissionDescriptor);
-                        if (result.state === "granted" || result.state === "prompt") {
-                            if (await tryWriteText()) {
-                                resolve({ ok: true, data: trimmed, method: "clipboard-api" });
-                                return;
-                            }
-                        }
-                    }
-                } catch (err) {
-                    console.warn("[Clipboard] Permission check failed:", err);
-                }
+                // Avoid navigator.permissions.query — it can hang indefinitely in embedded / non‑HTTPS contexts.
 
                 // Fallback: legacy execCommand — never use for huge strings (freezes UI)
                 if (trimmed.length > CLIPBOARD_LEGACY_MAX_CHARS) {

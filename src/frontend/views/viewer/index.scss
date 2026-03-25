@@ -133,6 +133,15 @@
         }
     }
 
+    /* Shell / critical CSS may set user-select:none on broad ancestors — keep prose selectable and context menus usable. */
+    .view-viewer__content [data-render-target],
+    .view-viewer__content [data-render-target] * {
+        pointer-events: auto;
+        user-select: text;
+        -webkit-user-select: text;
+        -webkit-touch-callout: default;
+    }
+
 }
 
 @layer viewer.utilities {

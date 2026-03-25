@@ -8,7 +8,8 @@ import { loadSettings, saveSettings } from "@rs-com/config/Settings";
 import { applyTheme as applyAppTheme } from "@rs-core/utils/Theme";
 import { isEnabledView } from "../config/views";
 import { scheduleViewModulePrefetch } from "../shared/view-prefetch";
-import { ensureShellElementDefined, type ShellElement, type MinimalShellHostElement } from "./UIElement";
+import { ensureStyleSheet } from "fest/icon";
+import { ensureShellElementDefined, type ShellElement, MinimalShellHostElement } from "./UIElement";
 
 //
 import "fest/fl-ui";
@@ -98,6 +99,21 @@ export abstract class ShellBase implements Shell {
         const shellCss = this.getStylesheet();
         if (shellCss && shellHost.shadowRoot) {
             loadInlineStyle(shellCss, shellHost.shadowRoot);
+        }
+
+        // Phosphor rules live on document.adoptedStyleSheets; they do not pierce this shadow tree.
+        if (shellHost instanceof MinimalShellHostElement && shellHost.shadowRoot) {
+            const iconSheet = ensureStyleSheet();
+            if (iconSheet) {
+                try {
+                    const cur = [...shellHost.shadowRoot.adoptedStyleSheets];
+                    if (!cur.includes(iconSheet)) {
+                        shellHost.shadowRoot.adoptedStyleSheets = [...cur, iconSheet];
+                    }
+                } catch (e) {
+                    console.warn("[Shell] Could not adopt icon registry stylesheet into minimal shell shadow:", e);
+                }
+            }
         }
 
         // CRITICAL: Set data-shell attribute for context-based CSS selectors

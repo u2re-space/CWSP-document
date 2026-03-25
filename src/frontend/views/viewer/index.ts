@@ -30,7 +30,7 @@ let markedParserPromise: Promise<(markdown: string) => Promise<string>> | null =
 
 const MATH_DELIMITER_PATTERN = /\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|(?<!\$)\$[^$\n]+\$|\\\([\s\S]*?\\\)/;
 
-/** KaTeX preprocess uses innerHTML + renderMathInElement — deadly on large docs (and `$` in currency). */
+/** KaTeX preprocess: keep markdown as text (not innerHTML) before auto-render — HTML parsing breaks `{`, `\\`, `<` in math. */
 const VIEWER_MAX_KATEX_PREPROCESS_CHARS = 350_000;
 /** Assigning multi‑MB strings to a <pre> synchronously freezes the tab; defer past this threshold. */
 const VIEWER_RAW_TEXTCONTENT_DEFER_CHARS = 96_000;
@@ -45,6 +45,8 @@ const VIEWER_MAX_RENDERED_COPY_CHARS = 600_000;
 const FENCED_CODE_PATTERN = /(^|\n)(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n\2(?=\n|$)/g;
 const INLINE_CODE_PATTERN = /`[^`\n]+`/g;
 const SANITIZE_OPTIONS = {
+    /** KaTeX `output: "mathml"` emits `<math>` + SVG; default DOMPurify HTML-only config strips them → raw LaTeX in the UI. */
+    USE_PROFILES: { html: true, mathMl: true, svg: true },
     FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "applet", "link", "meta", "base", "form", "noscript", "template"],
     FORBID_CONTENTS: ["script", "style", "iframe", "object", "embed", "applet", "noscript", "template"]
 };
@@ -139,8 +141,8 @@ const getMarkedParser = async (): Promise<(markdown: string) => Promise<string>>
 
                     const { masked, restore } = maskCodeSegments(markdown);
                     const katexNode = document.createElement("div");
-                    // Code fragments are masked above, so HTML here is only from non-code markdown.
-                    katexNode.innerHTML = masked;
+                    // Text node only: innerHTML would parse `<`, `{`, `\\rightarrow`, etc. and corrupt LaTeX.
+                    katexNode.textContent = masked;
                     renderMathInElement(katexNode, {
                         throwOnError: false,
                         nonStandard: true,
@@ -154,10 +156,7 @@ const getMarkedParser = async (): Promise<(markdown: string) => Promise<string>>
                         ]
                     });
 
-                    return restore(katexNode.innerHTML)
-                        .replace(/&gt;/g, ">")
-                        .replace(/&lt;/g, "<")
-                        .replace(/&amp;/g, "&");
+                    return restore(katexNode.innerHTML);
                 },
             },
         });
@@ -814,6 +813,10 @@ export class ViewerView implements View {
     }
 
     private async handleCopyRendered(renderTarget: HTMLElement): Promise<void> {
+        await new Promise<void>((r) => {
+            if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => r());
+            else globalThis.setTimeout(() => r(), 0);
+        });
         const text = (renderTarget?.innerText || "").trim();
         if (!text) {
             this.showMessage("No content to copy");

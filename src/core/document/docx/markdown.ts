@@ -107,8 +107,7 @@ function ensureMarkedConfigured(): void {
                     const { masked, restore } = maskCodeSegments(markdown);
                     const katexNode = document.createElement("div");
                     const repairedMathMarkdown = repairLatexInMathDelimiters(masked);
-                    // Code fragments are masked above, so HTML here is only from non-code markdown.
-                    katexNode.innerHTML = normalizeKatexToPureMathMlHtml(repairedMathMarkdown) || "";
+                    katexNode.textContent = repairedMathMarkdown;
                     renderMathInElement(katexNode, {
                         throwOnError: false,
                         nonStandard: true,
@@ -122,10 +121,8 @@ function ensureMarkedConfigured(): void {
                         ],
                     });
 
-                    return restore(katexNode.innerHTML)
-                        .replace(/&gt;/g, ">")
-                        .replace(/&lt;/g, "<")
-                        .replace(/&amp;/g, "&");
+                    const normalized = normalizeKatexToPureMathMlHtml(katexNode.innerHTML);
+                    return restore(normalized);
                 },
             },
         }
