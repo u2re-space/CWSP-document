@@ -71,6 +71,10 @@
         &[data-theme="dark"] {
             color-scheme: dark;
         }
+
+        @media print {
+            display: contents !important;
+        }
     }
 }
 
@@ -83,6 +87,10 @@
             border-top-color: var(--shell-btn-active-fg);
             border-radius: 50%;
             animation: app-shell-spin 0.8s linear infinite;
+        }
+
+        slot {
+            display: contents !important;
         }
     }
 
@@ -217,11 +225,19 @@
             color: black;
             overflow: visible;
             contain: none;
+
+            @media print {
+                display: contents !important;
+            }
         }
 
         .app-shell__content {
             overflow: visible;
             contain: none;
+
+            @media print {
+                display: contents !important;
+            }
 
             &::-webkit-scrollbar {
                 display: none;

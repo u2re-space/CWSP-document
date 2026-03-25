@@ -20,6 +20,7 @@ import style from "./minimal.scss?inline";
 import "fest/icon";
 import { ShellBase } from "../shell";
 import { isEnabledView } from "../../config/views";
+import type { ShellTheme } from "../types";
 
 // ============================================================================
 // NAVIGATION ITEMS
@@ -147,6 +148,50 @@ export class MinimalShell extends ShellBase {
 
     protected getStylesheet(): string | null {
         return style;
+    }
+
+    /**
+     * View hosts (`cw-view-*`) stay in the shell host's light DOM with `slot="view"` so they project
+     * into shadow `<main>` (see `MinimalShellHostElement`).
+     */
+    protected renderView(element: HTMLElement): void {
+        if (!this.contentContainer || !this.rootElement) {
+            console.warn(`[${this.id}] No content container available`);
+            return;
+        }
+
+        this.contentContainer.setAttribute("data-current-view", this.currentView.value);
+
+        const previousId = this.navigationState.previousView;
+        if (previousId && previousId !== this.currentView.value && this.loadedViews.has(previousId)) {
+            const prev = this.loadedViews.get(previousId)!;
+            prev.element.removeAttribute("data-view");
+            prev.element.hidden = true;
+            if (this.rootElement.contains(prev.element)) {
+                prev.element.remove();
+            }
+        }
+
+        element.setAttribute("data-view", this.currentView.value);
+        element.hidden = false;
+        element.slot = "view";
+
+        if (!this.rootElement.contains(element)) {
+            this.rootElement.appendChild(element);
+        }
+
+        const loading = this.contentContainer.querySelector(".app-shell__loading") as HTMLElement | null;
+        if (loading) loading.hidden = true;
+
+        this.currentViewElement = element;
+    }
+
+    protected applyTheme(theme: ShellTheme): void {
+        super.applyTheme(theme);
+        const inner = this.rootElement?.shadowRoot?.querySelector(".app-shell") as HTMLElement | null;
+        if (inner && this.rootElement?.dataset.theme) {
+            inner.dataset.theme = this.rootElement.dataset.theme;
+        }
     }
 
     async mount(container: HTMLElement): Promise<void> {

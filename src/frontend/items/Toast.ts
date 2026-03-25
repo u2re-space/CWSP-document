@@ -35,6 +35,28 @@ const DEFAULT_CONFIG: Required<ToastLayerConfig> = {
 
 const DEFAULT_DURATION = 3000;
 const TRANSITION_DURATION = 200;
+/** Suppress the same toast repeating within this window (main thread + broadcast). */
+const DEDUPE_WINDOW_MS = 400;
+
+let lastToastFingerprint = "";
+let lastToastFingerprintAt = 0;
+
+const toastFingerprint = (opts: ToastOptions): string =>
+    `${opts.kind || "info"}\0${opts.position || DEFAULT_CONFIG.position}\0${opts.message}`;
+
+const hasVisibleDuplicate = (layer: HTMLElement, message: string, kind: ToastKind): boolean => {
+    for (const el of layer.children) {
+        if (
+            el instanceof HTMLElement &&
+            el.classList.contains("rs-toast") &&
+            el.getAttribute("data-kind") === kind &&
+            el.textContent === message
+        ) {
+            return true;
+        }
+    }
+    return false;
+};
 
 // Toast CSS styles (inlined for isolation)
 const TOAST_STYLES = `
@@ -264,8 +286,16 @@ export const showToast = (options: ToastOptions | string): HTMLElement | null =>
     // Validate message
     if (!message) return null;
 
+    const fp = toastFingerprint(opts);
+    const now = Date.now();
+    if (fp === lastToastFingerprint && now - lastToastFingerprintAt < DEDUPE_WINDOW_MS) {
+        return null;
+    }
+
     // Check for document availability (service worker context)
     if (typeof document === "undefined") {
+        lastToastFingerprint = fp;
+        lastToastFingerprintAt = now;
         broadcastToast(opts);
         return null;
     }
@@ -276,6 +306,15 @@ export const showToast = (options: ToastOptions | string): HTMLElement | null =>
     };
 
     const layer = getToastLayer(config);
+
+    if (hasVisibleDuplicate(layer, message, kind)) {
+        lastToastFingerprint = fp;
+        lastToastFingerprintAt = now;
+        return null;
+    }
+
+    lastToastFingerprint = fp;
+    lastToastFingerprintAt = now;
 
     // Limit number of toasts
     while (layer.children.length >= config.maxToasts) {

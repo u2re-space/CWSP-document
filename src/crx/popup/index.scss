@@ -35,13 +35,15 @@
         overflow: auto !important;
         overflow-inline: hidden !important;
         overflow-block: auto !important;
-        scrollbar-width: thin !important;
         scrollbar-color: light-dark(#10101044, #f0f0f044) transparent !important;
         scrollbar-gutter: stable !important;
         justify-items: safe center !important;
         align-items: safe center !important;
         justify-content: start !important;
         align-content: safe center !important;
+        scrollbar-width: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
 
     body[data-crx-page="popup"] {
@@ -524,14 +526,14 @@
 
         // App container
         #app {
-            padding: 14px;
+            padding: 0px;
             display: flex;
             flex-direction: column;
             gap: 14px;
             text-align: start;
             background: rgb(0 0 0 / 35%);
-            border-radius: 12px;
-            border: 1px solid rgb(255 255 255 / 14%);
+            border-radius: 0px;
+            border: 0px solid rgb(255 255 255 / 14%);
             backdrop-filter: blur(8px);
             inline-size: 100%;
             block-size: fit-content;

@@ -11,6 +11,7 @@ import {
     storeShareTargetPayloadToCache as storeShareTargetPayloadToCacheGateway,
     type CachedShareTargetPayload
 } from "@rs-com/core/ShareTargetGateway";
+import { waitForIngressPipelineSlot } from "../shared/ingress-pipeline-guard";
 
 // ============================================================================
 // CSS INJECTION
@@ -320,6 +321,8 @@ const routeToTransferView = async (
     hint?: ViewTransferHint,
     pending = false
 ): Promise<boolean> => {
+    await waitForIngressPipelineSlot();
+
     const preparedData = await hydrateTextPayloadFromFiles(shareData);
 
     const files = Array.isArray(preparedData.files)
@@ -380,7 +383,15 @@ const routeToTransferView = async (
     });
 
     const currentPath = (globalThis?.location?.pathname || "").replace(/\/+$/, "") || "/";
-    if (currentPath !== resolved.routePath) {
+    let silentRoute = false;
+    try {
+        const sp = new URLSearchParams(globalThis?.location?.search || "");
+        silentRoute = sp.get("silent") === "1" || sp.get("silent") === "true";
+    } catch {
+        silentRoute = false;
+    }
+
+    if (!silentRoute && currentPath !== resolved.routePath) {
         const nextUrl = new URL(globalThis?.location?.href);
         nextUrl.pathname = resolved.routePath;
         nextUrl.search = "";
@@ -392,7 +403,11 @@ const routeToTransferView = async (
         console.log("[ViewTransfer] Navigating to resolved route:", nextUrl.toString());
         globalThis.location.href = nextUrl.toString();
     } else {
-        console.log("[ViewTransfer] Already on resolved route:", resolved.routePath);
+        if (silentRoute && currentPath !== resolved.routePath) {
+            console.log("[ViewTransfer] Silent mode: skipping navigation; delivery via channels only:", resolved.routePath);
+        } else {
+            console.log("[ViewTransfer] Already on resolved route:", resolved.routePath);
+        }
     }
 
     return delivered;

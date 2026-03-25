@@ -8,7 +8,7 @@ import { loadSettings, saveSettings } from "@rs-com/config/Settings";
 import { applyTheme as applyAppTheme } from "@rs-core/utils/Theme";
 import { isEnabledView } from "../config/views";
 import { scheduleViewModulePrefetch } from "../shared/view-prefetch";
-import { ensureShellElementDefined, type ShellElement } from "./UIElement";
+import { ensureShellElementDefined, type ShellElement, type MinimalShellHostElement } from "./UIElement";
 
 //
 import "fest/fl-ui";
@@ -89,10 +89,16 @@ export abstract class ShellBase implements Shell {
 
         // Create slotted shell host and mount shell layout into it.
         const shellTagName = ensureShellElementDefined(this.id);
-        const shellHost = document.createElement(shellTagName) as ShellElement;
+        const shellHost = document.createElement(shellTagName) as ShellElement | MinimalShellHostElement;
         const shellLayout = this.createLayout();
         shellHost.mountShellLayout(shellLayout);
         this.rootElement = shellHost;
+
+        // Minimal shell chrome is inside shadow — duplicate shell CSS there (document-level rules do not pierce shadow).
+        const shellCss = this.getStylesheet();
+        if (shellCss && shellHost.shadowRoot) {
+            loadInlineStyle(shellCss, shellHost.shadowRoot);
+        }
 
         // CRITICAL: Set data-shell attribute for context-based CSS selectors
         // This enables :has([data-shell="...""]) selectors to cascade automatically

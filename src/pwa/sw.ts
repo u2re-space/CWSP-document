@@ -16,7 +16,15 @@ import {
     SHARE_FILES_MANIFEST_KEY,
     type ShareData
 } from './lib/ShareTargetUtils';
-import { BROADCAST_CHANNELS, MESSAGE_TYPES, STORAGE_KEYS, ROUTE_HASHES, COMPONENTS } from '@rs-com/config/Names';
+import {
+    BROADCAST_CHANNELS,
+    MESSAGE_TYPES,
+    STORAGE_KEYS,
+    ROUTE_HASHES,
+    COMPONENTS,
+    isViewPostApiPath,
+    viewBroadcastChannelName
+} from '@rs-com/config/Names';
 import { summarizeForLog } from '@rs-com/core/LogSanitizer';
 import * as FestCore from "fest/core";
 
@@ -1049,6 +1057,46 @@ const processShareWithAI = async (
  */
 const isShareTargetUrl = (pathname: string): boolean =>
     pathname === '/share-target' || pathname === '/share_target';
+
+/**
+ * POST /{view} — in-app API: body is broadcast on `rs-view-{view}` for the target web component / shell.
+ * GET /{view} remains the SPA shell document route (handled by precache / network).
+ */
+registerRoute(
+    ({ url, request }) => request?.method === 'POST' && !!isViewPostApiPath(url?.pathname || ''),
+    async (workboxEvent: any) => {
+        const request: Request = workboxEvent?.request ?? workboxEvent;
+        const pathname = new URL(request.url).pathname;
+        const viewId = isViewPostApiPath(pathname);
+        if (!viewId) {
+            return fetch(request);
+        }
+        try {
+            const bodyText = await request.text();
+            const contentType = request.headers.get('content-type') || '';
+            const payload = {
+                type: 'view-post',
+                viewId,
+                bodyText,
+                contentType
+            };
+            broadcast(viewBroadcastChannelName(viewId), payload);
+            return new Response(JSON.stringify({ ok: true, viewId }), {
+                status: 200,
+                headers: {
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Cache-Control': 'no-store'
+                }
+            });
+        } catch (err: any) {
+            return new Response(JSON.stringify({ ok: false, error: String(err?.message || err) }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json; charset=utf-8' }
+            });
+        }
+    },
+    'POST'
+);
 
 /**
  * Share target handler with optional AI processing

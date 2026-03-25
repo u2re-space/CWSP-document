@@ -24,6 +24,13 @@ export interface ClipboardResult {
 
 // BroadcastChannel for cross-context clipboard operations
 const CLIPBOARD_CHANNEL = "rs-clipboard";
+
+/** Beyond this, legacy execCommand + textarea.select() can freeze the tab for seconds. */
+const CLIPBOARD_LEGACY_MAX_CHARS = 256_000;
+/** Hard cap — clipboard APIs and string work degrade badly above this. */
+const CLIPBOARD_TEXT_MAX_CHARS = 2_000_000;
+/** Failsafe if the browser never settles clipboard read/write. */
+const CLIPBOARD_OPERATION_TIMEOUT_MS = 12_000;
 const scheduleClipboardFrame = (cb: FrameRequestCallback | (() => void)): void => {
     if (typeof globalThis.requestAnimationFrame === "function") {
         globalThis.requestAnimationFrame(cb as FrameRequestCallback);
@@ -60,12 +67,27 @@ export const toText = (data: unknown): string => {
     }
 };
 
+const raceClipboardWrite = (write: Promise<void>, ms: number): Promise<"ok" | "timeout" | "error"> =>
+    Promise.race([
+        write
+            .then(() => "ok" as const)
+            .catch(() => "error" as const),
+        new Promise<"timeout">((res) => {
+            globalThis.setTimeout(() => res("timeout"), ms);
+        })
+    ]);
+
 /**
  * Write text to clipboard using modern API
  */
 export const writeText = async (text: string): Promise<ClipboardResult> => {
-    const trimmed = toText(text).trim();
-    if (!trimmed) return { ok: false, error: "Empty content" };
+    const raw = toText(text);
+    if (!raw.trim()) return { ok: false, error: "Empty content" };
+    if (raw.length > CLIPBOARD_TEXT_MAX_CHARS) {
+        return { ok: false, error: "Content too large to copy safely" };
+    }
+
+    const trimmed = raw.trim();
 
     return new Promise<ClipboardResult>((resolve) => {
         scheduleClipboardFrame(() => {
@@ -74,31 +96,44 @@ export const writeText = async (text: string): Promise<ClipboardResult> => {
                 globalThis?.focus?.();
             }
 
-            // Try direct clipboard API first
             const tryClipboardAPI = async () => {
+                const tryWriteText = async (): Promise<boolean> => {
+                    if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) return false;
+                    const outcome = await raceClipboardWrite(navigator.clipboard.writeText(trimmed), CLIPBOARD_OPERATION_TIMEOUT_MS);
+                    if (outcome === "ok") return true;
+                    if (outcome === "timeout") console.warn("[Clipboard] writeText timed out");
+                    return false;
+                };
+
                 try {
-                    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-                        await navigator.clipboard.writeText(trimmed);
-                        return resolve({ ok: true, data: trimmed, method: "clipboard-api" });
+                    if (await tryWriteText()) {
+                        resolve({ ok: true, data: trimmed, method: "clipboard-api" });
+                        return;
                     }
                 } catch (err) {
                     console.warn("[Clipboard] Direct write failed:", err);
                 }
 
-                // Try with permissions query
                 try {
                     if (typeof navigator !== "undefined" && navigator.permissions) {
                         const result = await navigator.permissions.query({ name: "clipboard-write" } as unknown as PermissionDescriptor);
                         if (result.state === "granted" || result.state === "prompt") {
-                            await navigator.clipboard.writeText(trimmed);
-                            return resolve({ ok: true, data: trimmed, method: "clipboard-api" });
+                            if (await tryWriteText()) {
+                                resolve({ ok: true, data: trimmed, method: "clipboard-api" });
+                                return;
+                            }
                         }
                     }
                 } catch (err) {
                     console.warn("[Clipboard] Permission check failed:", err);
                 }
 
-                // Fallback: legacy execCommand (deprecated but works in some contexts)
+                // Fallback: legacy execCommand — never use for huge strings (freezes UI)
+                if (trimmed.length > CLIPBOARD_LEGACY_MAX_CHARS) {
+                    resolve({ ok: false, error: "Content too large for fallback copy" });
+                    return;
+                }
+
                 try {
                     if (typeof document !== "undefined") {
                         const textarea = document.createElement("textarea");
@@ -109,7 +144,8 @@ export const writeText = async (text: string): Promise<ClipboardResult> => {
                         const success = document.execCommand("copy");
                         textarea.remove();
                         if (success) {
-                            return resolve({ ok: true, data: trimmed, method: "legacy" });
+                            resolve({ ok: true, data: trimmed, method: "legacy" });
+                            return;
                         }
                     }
                 } catch (err) {
@@ -119,7 +155,7 @@ export const writeText = async (text: string): Promise<ClipboardResult> => {
                 resolve({ ok: false, error: "All clipboard methods failed" });
             };
 
-            tryClipboardAPI();
+            void tryClipboardAPI();
         });
     });
 };

@@ -3,6 +3,100 @@ import type { ShellId } from "./types";
 const SHELL_ELEMENT_TAG_PREFIX = "cw-shell";
 const shellElementCtorByTag = new Map<string, CustomElementConstructor>();
 
+const MINIMAL_SHELL_HOST_STYLES = `
+:host {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    container-type: size;
+    contain: strict;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+.app-shell__content > slot[name="view"]::slotted([data-view]) {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    scrollbar-width: thin;
+    inline-size: stretch;
+    block-size: stretch;
+    min-inline-size: 0;
+    min-block-size: 0;
+    display: block;
+    container-type: size;
+}
+
+::slotted([data-cw-view-host="true"]) {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    min-block-size: 0;
+    min-inline-size: 0;
+    container-type: size;
+}
+
+@media print {
+    :host {
+        overflow: visible !important;
+        contain: none !important;
+        container-type: normal !important;
+        block-size: auto !important;
+        max-block-size: none !important;
+    }
+
+    ::slotted(*) {
+        overflow: visible !important;
+        contain: none !important;
+        container-type: normal !important;
+        block-size: auto !important;
+        max-block-size: none !important;
+    }
+}
+`;
+
+/**
+ * Minimal shell: full `app-shell` chrome lives in shadow DOM; active view (`cw-view-*`) is a
+ * light-DOM child with `slot="view"` projected into `<main>`.
+ */
+export class MinimalShellHostElement extends HTMLElement {
+    private chromeMounted = false;
+
+    mountShellLayout(layout: HTMLElement): void {
+        if (this.chromeMounted) return;
+
+        const shadow = this.shadowRoot ?? this.attachShadow({ mode: "open" });
+
+        const hostStyle = document.createElement("style");
+        hostStyle.textContent = MINIMAL_SHELL_HOST_STYLES;
+        shadow.appendChild(hostStyle);
+
+        const main = layout.querySelector("[data-shell-content]");
+        if (main) {
+            const loading = main.querySelector(":scope > .app-shell__loading");
+            const frag = document.createDocumentFragment();
+            if (loading) {
+                frag.appendChild(loading);
+            }
+            const viewSlot = document.createElement("slot");
+            viewSlot.name = "view";
+            frag.appendChild(viewSlot);
+            main.replaceChildren(frag);
+        }
+
+        const statusEl = layout.querySelector("[data-shell-status]");
+        if (statusEl) {
+            statusEl.replaceChildren();
+            const stSlot = document.createElement("slot");
+            stSlot.name = "shell-status";
+            statusEl.appendChild(stSlot);
+        }
+
+        shadow.appendChild(layout);
+        this.chromeMounted = true;
+    }
+}
+
 export class ShellElement extends HTMLElement {
     private initialized = false;
 
@@ -111,7 +205,11 @@ export const ensureShellElementDefined = (shellId: ShellId | string): string => 
     if (!customElements.get(tagName)) {
         let ctor = shellElementCtorByTag.get(tagName);
         if (!ctor) {
-            ctor = class extends ShellElement { };
+            const sid = String(shellId || "").toLowerCase();
+            ctor =
+                sid === "minimal"
+                    ? MinimalShellHostElement
+                    : class extends ShellElement { };
             shellElementCtorByTag.set(tagName, ctor);
         }
         customElements.define(tagName, ctor);

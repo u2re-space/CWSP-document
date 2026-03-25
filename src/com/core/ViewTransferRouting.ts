@@ -1,5 +1,6 @@
 import { sendMessage, enqueuePendingMessage, type UnifiedMessage } from "@rs-com/core/UnifiedMessaging";
 import { summarizeForLog } from "@rs-com/core/LogSanitizer";
+import { viewBroadcastChannelName } from "@rs-com/config/Names";
 
 export type ViewTransferSource = "share-target" | "launch-queue" | "pending" | "clipboard";
 
@@ -136,6 +137,17 @@ export const resolveViewTransfer = (payload: ViewTransferPayload): ViewTransferR
     return resolved;
 };
 
+const mirrorTransferToViewChannel = (resolved: ViewTransferResolved, message: UnifiedMessage): void => {
+    if (typeof BroadcastChannel === "undefined") return;
+    try {
+        const ch = new BroadcastChannel(viewBroadcastChannelName(resolved.destination));
+        ch.postMessage({ type: "view-transfer", message });
+        ch.close();
+    } catch (e) {
+        console.warn("[ViewTransfer] View-channel mirror failed:", e);
+    }
+};
+
 export const dispatchViewTransfer = async (
     payload: ViewTransferPayload
 ): Promise<{ delivered: boolean; resolved: ViewTransferResolved }> => {
@@ -158,6 +170,8 @@ export const dispatchViewTransfer = async (
         contentType: message.contentType,
         metadata: message.metadata
     }));
+
+    mirrorTransferToViewChannel(resolved, message);
 
     let queuedAsPending = false;
     if (payload.pending && !hasBinaryPayload) {

@@ -21,6 +21,11 @@ import { ViteMcp } from 'vite-plugin-mcp';
  * Plugin to handle SPA fallback routes (share-target, etc.)
  * Rewrites specific routes to index.html so service worker can intercept
  */
+/** Matches `VIEW_POST_API_SEGMENTS` in `src/com/config/Names.ts` (dev POST API relay). */
+const VIEW_POST_API_SEGMENTS = new Set([
+    'viewer', 'workcenter', 'settings', 'explorer', 'history', 'editor', 'airpad', 'print', 'home',
+]);
+
 const spaFallbackPlugin = () => ({
     name: 'spa-fallback-routes',
     configureServer(server) {
@@ -28,6 +33,38 @@ const spaFallbackPlugin = () => ({
         server.middlewares.use((req, res, next) => {
             const url = req.url || '';
             const pathname = url.split('?')[0];
+
+            // POST /{view} — same contract as PWA SW: JSON ack + devRelay body for local BroadcastChannel.
+            if (req.method === 'POST') {
+                const seg = pathname.replace(/^\/+|\/+$/g, '').split('/')[0]?.toLowerCase();
+                if (seg && VIEW_POST_API_SEGMENTS.has(seg)) {
+                    const chunks = [];
+                    req.on('data', (c) => chunks.push(c));
+                    req.on('end', () => {
+                        try {
+                            const bodyText = Buffer.concat(chunks).toString('utf8');
+                            res.statusCode = 200;
+                            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                            res.setHeader('Cache-Control', 'no-store');
+                            res.end(JSON.stringify({
+                                ok: true,
+                                viewId: seg,
+                                devRelay: true,
+                                bodyText,
+                                contentType: String(req.headers['content-type'] || ''),
+                            }));
+                        } catch (e) {
+                            res.statusCode = 500;
+                            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                            res.end(JSON.stringify({
+                                ok: false,
+                                error: String((e && e.message) || e),
+                            }));
+                        }
+                    });
+                    return;
+                }
+            }
 
             // Never treat /user/* as SPA shell routes.
             // If SW did not intercept on first navigation, return SW handoff page for documents

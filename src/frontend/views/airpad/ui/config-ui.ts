@@ -24,10 +24,10 @@ const AIRPAD_CONFIG_MARKER = 'airpad-config-overlay';
  * `position: fixed` overlays and makes the dialog invisible.
  */
 function getConfigOverlayMountParent(): HTMLElement {
-    const shell = document.querySelector('.app-shell');
-    if (shell instanceof HTMLElement) {
-        return shell;
-    }
+    const host = document.querySelector("[data-shell-system=\"task-tab\"]") as HTMLElement | null;
+    if (host) return host;
+    const legacy = document.querySelector(".app-shell") as HTMLElement | null;
+    if (legacy) return legacy;
     return document.body;
 }
 

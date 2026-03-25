@@ -49,6 +49,38 @@ export const BROADCAST_CHANNELS = {
     SERVICE_HOME: 'rs-service-home'
 } as const;
 
+/** Same-origin view POST API + per-view BroadcastChannel (`rs-view-<id>`). */
+export const VIEW_POST_API_SEGMENTS = [
+    'viewer',
+    'workcenter',
+    'settings',
+    'explorer',
+    'history',
+    'editor',
+    'airpad',
+    'print',
+    'home'
+] as const;
+
+export type ViewPostApiSegment = (typeof VIEW_POST_API_SEGMENTS)[number];
+
+export const isViewPostApiPath = (pathname: string): ViewPostApiSegment | null => {
+    const seg = String(pathname || '')
+        .split('?')[0]!
+        .replace(/^\/+|\/+$/g, '')
+        .split('/')[0]!
+        .toLowerCase();
+    return (VIEW_POST_API_SEGMENTS as readonly string[]).includes(seg) ? (seg as ViewPostApiSegment) : null;
+};
+
+export const viewBroadcastChannelName = (viewId: string): string => {
+    const id = String(viewId || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/^-+|-+$/g, '');
+    return `rs-view-${id || 'app'}`;
+};
+
 // ============================================================================
 // COMPONENT/MODULE NAMES
 // ============================================================================

@@ -29,6 +29,19 @@ let markedParserPromise: Promise<(markdown: string) => Promise<string>> | null =
 
 
 const MATH_DELIMITER_PATTERN = /\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|(?<!\$)\$[^$\n]+\$|\\\([\s\S]*?\\\)/;
+
+/** KaTeX preprocess uses innerHTML + renderMathInElement — deadly on large docs (and `$` in currency). */
+const VIEWER_MAX_KATEX_PREPROCESS_CHARS = 350_000;
+/** Assigning multi‑MB strings to a <pre> synchronously freezes the tab; defer past this threshold. */
+const VIEWER_RAW_TEXTCONTENT_DEFER_CHARS = 96_000;
+/** Raw panel cap (content still fully in memory via ref; only DOM text is truncated). */
+const VIEWER_RAW_DISPLAY_MAX_CHARS = 1_200_000;
+/** Clipboard read / paste file construction — avoid reading multi‑MB blobs on the main thread. */
+const VIEWER_CLIPBOARD_READ_TEXT_MAX_BYTES = 2 * 1024 * 1024;
+/** `isBase64Like` / `parseDataUrl` on megabyte strings can stall; plain paste above this skips probe. */
+const VIEWER_INGEST_BASE64_PROBE_MAX = 480_000;
+/** `innerText` on a huge rendered DOM is extremely expensive. */
+const VIEWER_MAX_RENDERED_COPY_CHARS = 600_000;
 const FENCED_CODE_PATTERN = /(^|\n)(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n\2(?=\n|$)/g;
 const INLINE_CODE_PATTERN = /`[^`\n]+`/g;
 const SANITIZE_OPTIONS = {
@@ -117,6 +130,9 @@ const getMarkedParser = async (): Promise<(markdown: string) => Promise<string>>
         {
             hooks: {
                 preprocess: (markdown: string): string => {
+                    if (markdown.length > VIEWER_MAX_KATEX_PREPROCESS_CHARS) {
+                        return markdown;
+                    }
                     if (!MATH_DELIMITER_PATTERN.test(markdown)) {
                         return markdown;
                     }
@@ -344,7 +360,10 @@ export class ViewerView implements View {
             <div class="view-viewer">
                 <div class="view-viewer__toolbar" data-viewer-toolbar>
                     <div class="view-viewer__toolbar-left">
-                        
+                        <button class="view-viewer__btn" data-action="paste" type="button" title="Paste from clipboard (mobile-friendly)" aria-label="Paste from clipboard">
+                            <ui-icon icon="clipboard-text" icon-style="duotone"></ui-icon>
+                            <span>Paste</span>
+                        </button>
                         <button class="view-viewer__btn" data-action="toggle-raw" type="button" title="Toggle raw/rendered view">
                             <ui-icon icon="code" icon-style="duotone"></ui-icon>
                             <span>Raw</span>
@@ -465,9 +484,22 @@ export class ViewerView implements View {
             renderTarget.removeAttribute("data-md-state");
         };
 
-        // Update raw view (sync; cheap path for "see source immediately")
+        // Raw source: huge strings synchronously block layout; defer and cap DOM text.
         if (rawTarget) {
-            rawTarget.textContent = content || "";
+            const c = content || "";
+            const assignRaw = (): void => {
+                if (c.length > VIEWER_RAW_DISPLAY_MAX_CHARS) {
+                    rawTarget.textContent =
+                        `${c.slice(0, VIEWER_RAW_DISPLAY_MAX_CHARS)}\n\n… [truncated — open in editor for full source]`;
+                } else {
+                    rawTarget.textContent = c;
+                }
+            };
+            if (c.length > VIEWER_RAW_TEXTCONTENT_DEFER_CHARS) {
+                globalThis.setTimeout(assignRaw, 0);
+            } else {
+                assignRaw();
+            }
         }
 
         // Auto-switch to raw if it looks like HTML
@@ -652,6 +684,9 @@ export class ViewerView implements View {
                 case "open":
                     this.handleOpen();
                     break;
+                case "paste":
+                    void this.handlePasteFromToolbar();
+                    break;
                 case "copy":
                     this.handleCopy();
                     break;
@@ -784,6 +819,10 @@ export class ViewerView implements View {
             this.showMessage("No content to copy");
             return;
         }
+        if (text.length > VIEWER_MAX_RENDERED_COPY_CHARS) {
+            this.showMessage("Rendered page is too large to copy as text — use Copy (raw) instead");
+            return;
+        }
         try {
             const result = await writeClipboardText(text);
             if (!result.ok) throw new Error(result.error || "Clipboard write failed");
@@ -894,10 +933,163 @@ export class ViewerView implements View {
             .filter((file): file is File => !!file);
         const files = itemFiles.length > 0 ? itemFiles : Array.from(e.clipboardData.files || []);
 
+        const text = e.clipboardData.getData("text/plain");
+        if (files.length === 0 && (!text || !text.trim())) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        await this.ingestPastedPayload(files, text);
+    }
+
+    /**
+     * Mobile / no-keyboard: read clipboard via Async Clipboard API (user gesture from toolbar tap).
+     */
+    private async handlePasteFromToolbar(): Promise<void> {
+        if (!this.element || !this.isViewVisible) {
+            this.showMessage("Open the Viewer tab to paste");
+            return;
+        }
+        if (document.visibilityState !== "visible") return;
+        if (
+            this.shellContext?.navigationState?.currentView &&
+            this.shellContext.navigationState.currentView !== this.id
+        ) {
+            this.showMessage("Open the Viewer tab to paste");
+            return;
+        }
+
+        try {
+            const { files, text } = await this.readSystemClipboard();
+            if (files.length === 0 && (!text || !text.trim())) {
+                this.showMessage("Clipboard is empty or access denied");
+                return;
+            }
+            await this.ingestPastedPayload(files, text);
+        } catch (error) {
+            console.error("[ViewerView] Paste from toolbar failed:", error);
+            this.showMessage("Could not read clipboard — check permissions");
+        }
+    }
+
+    private async readSystemClipboard(): Promise<{ files: File[]; text?: string }> {
+        const files: File[] = [];
+        let text: string | undefined;
+
+        if (typeof navigator === "undefined" || !navigator.clipboard) {
+            return { files, text };
+        }
+
+        try {
+            if (typeof navigator.clipboard.read === "function") {
+                const items = await navigator.clipboard.read();
+                let mdNameIndex = 0;
+
+                for (const item of items) {
+                    for (const type of item.types) {
+                        const lower = type.toLowerCase();
+                        if (lower === "text/html") continue;
+
+                        let blob: Blob;
+                        try {
+                            blob = await item.getType(type);
+                        } catch {
+                            continue;
+                        }
+                        if (!blob || blob.size === 0) continue;
+
+                        if (lower === "text/plain") {
+                            if (blob.size > VIEWER_CLIPBOARD_READ_TEXT_MAX_BYTES) continue;
+                            const t = await blob.text();
+                            if (t) text = text ?? t;
+                            continue;
+                        }
+
+                        if (lower.startsWith("image/")) {
+                            const ext = lower.split("/")[1] || "img";
+                            files.push(new File([blob], `paste.${ext}`, { type }));
+                            continue;
+                        }
+
+                        // Markdown / text documents as file (OS often exposes copied .md this way)
+                        if (
+                            lower === "text/markdown" ||
+                            lower === "text/x-markdown" ||
+                            lower === "text/md" ||
+                            lower.includes("markdown")
+                        ) {
+                            if (blob.size > VIEWER_CLIPBOARD_READ_TEXT_MAX_BYTES) continue;
+                            files.push(
+                                new File([blob], `pasted-${mdNameIndex++}.md`, {
+                                    type: "text/markdown"
+                                })
+                            );
+                            continue;
+                        }
+
+                        if (lower.startsWith("text/")) {
+                            if (blob.size > VIEWER_CLIPBOARD_READ_TEXT_MAX_BYTES) continue;
+                            files.push(
+                                new File([blob], `pasted-${mdNameIndex++}.md`, {
+                                    type
+                                })
+                            );
+                            continue;
+                        }
+
+                        // Opaque MIME (e.g. copied file) — if it looks like UTF-8 text, treat as .md
+                        const sniffed = await this.sniffBlobAsUtf8MarkdownFile(blob, mdNameIndex);
+                        if (sniffed) {
+                            files.push(sniffed);
+                            mdNameIndex++;
+                        }
+                    }
+                }
+
+                if (files.length > 0 || (text && text.trim())) {
+                    return { files, text };
+                }
+            }
+        } catch {
+            // Fall through to readText()
+        }
+
+        try {
+            const t = await navigator.clipboard.readText();
+            if (t) text = text ?? t;
+        } catch {
+            /* ignore */
+        }
+
+        return { files, text };
+    }
+
+    /**
+     * Clipboard sometimes exposes a copied file as application/octet-stream; if bytes look like UTF-8 text, open as .md.
+     */
+    private async sniffBlobAsUtf8MarkdownFile(blob: Blob, nameIndex: number): Promise<File | null> {
+        const maxBytes = 4 * 1024 * 1024;
+        if (blob.size > maxBytes) return null;
+
+        const sampleSize = Math.min(blob.size, 24576);
+        const sample = blob.slice(0, sampleSize);
+        const buf = new Uint8Array(await sample.arrayBuffer());
+        if (buf.length === 0) return null;
+        if (buf.includes(0)) return null;
+
+        let printable = 0;
+        for (let i = 0; i < buf.length; i++) {
+            const c = buf[i]!;
+            if (c === 9 || c === 10 || c === 13 || (c >= 32 && c < 127) || c >= 160) printable++;
+        }
+        if (printable / buf.length < 0.9) return null;
+
+        return new File([blob], `pasted-${nameIndex}.md`, { type: "text/markdown" });
+    }
+
+    private async ingestPastedPayload(files: File[], textPlain: string | undefined): Promise<void> {
         if (files.length > 0) {
             const textFile = files.find((file) => this.isTextLikeFile(file)) || files[0];
-            e.preventDefault();
-            e.stopPropagation();
             try {
                 if (!this.isTextLikeFile(textFile)) {
                     this.showMessage(`Unsupported file type for viewer: ${textFile.name || textFile.type || "binary file"}`);
@@ -914,15 +1106,17 @@ export class ViewerView implements View {
             }
         }
 
-        const text = e.clipboardData.getData("text/plain");
-        if (!text || !text.trim()) return;
-
-        e.preventDefault();
-        e.stopPropagation();
+        const text = textPlain;
+        if (!text || !text.trim()) {
+            return;
+        }
 
         try {
             const raw = text.trim();
-            if (parseDataUrl(raw) || isBase64Like(raw)) {
+            if (
+                raw.length <= VIEWER_INGEST_BASE64_PROBE_MAX &&
+                (parseDataUrl(raw) || isBase64Like(raw))
+            ) {
                 const asset = await normalizeDataAsset(raw, {
                     namePrefix: "pasted-doc",
                     uriComponent: true

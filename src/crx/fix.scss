@@ -157,6 +157,7 @@
         }
 
         :where(body > #app) {
+            scrollbar-width: none;
             display: grid;
             grid-template-columns: minmax(0px, 1fr);
             grid-template-rows: minmax(0px, 1fr);
@@ -296,6 +297,7 @@
                 user-select: auto !important;
                 touch-action: auto !important;
                 cursor: auto !important;
+                scrollbar-width: none !important;
             }
         }
     }

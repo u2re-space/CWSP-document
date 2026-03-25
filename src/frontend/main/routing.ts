@@ -4,6 +4,9 @@
  * Path-based routing for views (no hash navigation).
  * 
  * Routes:
+ * - `GET /{view}` → SPA shell loads the matching view in the shell content slot (see `index.ts`).
+ * - `POST /{view}` → In-app API (PWA: service worker; dev: Vite middleware): request body is relayed
+ *   on BroadcastChannel `rs-view-{view}`; use `postViewApi()` from `@rs-frontend/shared/view-api`.
  * - `/` → Boot menu or default view (shell selection)
  * - `/viewer` → Viewer
  * - `/workcenter` → Work Center
