@@ -268,6 +268,9 @@
         @media print {
             #app,
             .app-shell,
+            .cw-view-viewer-shell,
+            .cw-view-viewer__prose,
+            [data-cw-viewer-prose],
             .view-viewer,
             .view-viewer__content,
             .app-shell__content,
@@ -388,6 +391,9 @@
                 break-before: avoid !important;
             }
 
+            .cw-view-viewer-shell,
+            .cw-view-viewer__prose,
+            [data-cw-viewer-prose],
             .view-viewer,
             .view-viewer__content,
             [data-viewer-content] {
@@ -413,21 +419,21 @@
             .app-shell__status,
             #raw-md,
             .markdown-viewer-raw,
-            .loading-spinner *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            .loading-message *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            [data-hidden] *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            [hidden] *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            [aria-hidden="true"] *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            .view-viewer__toolbar *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            [data-viewer-toolbar] *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            button *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            nav *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            .app-shell__loading *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            head *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            .app-loading *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            .app-shell__status *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            #raw-md *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
-            .markdown-viewer-raw *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content) {
+            .loading-spinner *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            .loading-message *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            [data-hidden] *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            [hidden] *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            [aria-hidden="true"] *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            .view-viewer__toolbar *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            [data-viewer-toolbar] *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            button *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            nav *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            .app-shell__loading *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            head *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            .app-loading *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            .app-shell__status *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            #raw-md *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content),
+            .markdown-viewer-raw *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content) {
                 display: none !important;
                 position: absolute !important;
                 inset: 0 !important;

@@ -5,6 +5,48 @@ const viewElementCtorByTag = new Map<string, CustomElementConstructor>();
 
 type ViewElementLifecycleEvent = "before-mount" | "after-mount" | "before-update" | "after-update";
 
+const dispatchCwViewLifecycle = (
+    host: HTMLElement,
+    type: ViewElementLifecycleEvent,
+    viewId: string | undefined
+): void => {
+    host.dispatchEvent(
+        new CustomEvent("cw-view-lifecycle", {
+            bubbles: true,
+            composed: true,
+            detail: { type, viewId }
+        })
+    );
+};
+
+/**
+ * Markdown viewer host: open shadow with mount → shell → view-viewer (toolbar + empty __content) → slots.
+ * Raw `<pre slot="raw">` and default-slot prose live in light DOM (assigned nodes).
+ */
+export class CwViewViewerHostElement extends HTMLElement {
+    private initialized = false;
+
+    mountView(view: View, options?: ViewOptions): void {
+        const isFirstMount = !this.initialized;
+        this.dataset.viewId = String(view.id || "");
+        this.dataset.cwViewHost = "true";
+
+        dispatchCwViewLifecycle(this, isFirstMount ? "before-mount" : "before-update", view.id);
+
+        const anyView = view as unknown as {
+            renderIntoWebComponentHost?: (host: CwViewViewerHostElement, options?: ViewOptions) => void;
+        };
+        if (typeof anyView.renderIntoWebComponentHost === "function") {
+            anyView.renderIntoWebComponentHost(this, options);
+        } else {
+            console.warn("[cw-view-viewer] View has no renderIntoWebComponentHost; skipping mount.");
+        }
+
+        this.initialized = true;
+        dispatchCwViewLifecycle(this, isFirstMount ? "after-mount" : "after-update", view.id);
+    }
+}
+
 export class ViewElement extends HTMLElement {
     private innerView: View | null = null;
     private mountRoot: HTMLElement | null = null;
@@ -83,6 +125,13 @@ const ensureViewElementStyle = (): void => {
             inline-size: 100%;
             container-type: size;
         }
+
+        cw-view-viewer[data-cw-view-host="true"] {
+            box-sizing: border-box;
+            min-block-size: 0;
+            min-inline-size: 0;
+            overflow: hidden;
+        }
     `;
     document.head.append(style);
 };
@@ -93,10 +142,14 @@ export const getViewElementTagName = (viewId: string): string =>
 export const ensureViewElementDefined = (viewId: string): string => {
     const tagName = getViewElementTagName(viewId);
     if (!customElements.get(tagName)) {
-        let ctor = viewElementCtorByTag.get(tagName);
-        if (!ctor) {
-            ctor = class extends ViewElement { };
-            viewElementCtorByTag.set(tagName, ctor);
+        let ctor: CustomElementConstructor;
+        if (viewId === "viewer") {
+            ctor = CwViewViewerHostElement;
+        } else {
+            ctor = viewElementCtorByTag.get(tagName) ?? class extends ViewElement { };
+            if (!viewElementCtorByTag.has(tagName)) {
+                viewElementCtorByTag.set(tagName, ctor);
+            }
         }
         customElements.define(tagName, ctor);
     }
@@ -109,12 +162,14 @@ export interface ViewWebComponentFactory {
 }
 
 export const createViewWebComponentFactory = (view: View): ViewWebComponentFactory => {
-    let element: ViewElement | null = null;
+    let element: (HTMLElement & { mountView(v: View, o?: ViewOptions): void }) | null = null;
     return {
         create(options?: ViewOptions): HTMLElement {
             const tagName = ensureViewElementDefined(String(view.id || "unknown"));
             if (!element) {
-                element = document.createElement(tagName) as ViewElement;
+                element = document.createElement(tagName) as HTMLElement & {
+                    mountView(v: View, o?: ViewOptions): void;
+                };
             }
             element.mountView(view, options);
             return element;

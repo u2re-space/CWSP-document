@@ -2,8 +2,9 @@
  * Markdown Viewer View
  *
  * Shell-agnostic markdown viewer component.
- * Can be used in any shell to display markdown content.
- * Uses the <md-view> web component for encapsulated rendering.
+ * **Standalone** `render()`: shell in light DOM (legacy editor preview).
+ * **`cw-view-viewer` host** (`renderIntoWebComponentHost`): shadow = mount → shell → view-viewer (toolbar +
+ *   `__content` wrapping `<slot name="raw">` + default `<slot>`); light DOM = `<pre slot="raw">` + prose `[data-render-target]`.
  */
 
 import { H, normalizeDataAsset, parseDataUrl, isBase64Like, openDirectory, provide } from "fest/lure";
@@ -12,13 +13,15 @@ import { loadAsAdopted, removeAdopted } from "fest/dom";
 import DOMPurify from 'dompurify';
 import renderMathInElement from "katex/dist/contrib/auto-render.mjs";
 import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shells/types";
+import type { CwViewViewerHostElement } from "../base/UIElement";
 import type { BaseViewOptions } from "../types";
 import { createViewState } from "../types";
 import { writeText as writeClipboardText } from "@rs-core/modules/Clipboard";
+import { API_ENDPOINTS } from "@rs-com/config/Names";
 import { loadSettings } from "@rs-com/config/Settings";
 import type { MarkdownExtensionRule } from "@rs-com/config/SettingsTypes";
 
-// Import the md-view web component from fl.ui
+// Import fest/fl-ui (e.g. shared markdown utilities elsewhere)
 import "fest/fl-ui";
 
 // @ts-ignore - SCSS import
@@ -59,6 +62,18 @@ const VIEWER_CSS_LAYER_ORDER = [
     "rs-md-print",
     "rs-md-user-print"
 ] as const;
+
+/** Toolbar: same-origin Phosphor SVG URL (Vite/SW proxy); used as CSS mask for theme-colored fills. */
+const VIEWER_TOOLBAR_PHOSPHOR_STYLE = "duotone" as const;
+function viewerToolbarPhosphorSrc(iconKebab: string): string {
+    return `${API_ENDPOINTS.PHOSPHOR_ICONS}/${VIEWER_TOOLBAR_PHOSPHOR_STYLE}/${iconKebab}.svg`;
+}
+
+/** Inline style: `--view-picon-mask` for `.view-viewer__picon` (mask + `background-color` from toolbar tokens). */
+function viewerToolbarPiconStyle(iconKebab: string): string {
+    const u = viewerToolbarPhosphorSrc(iconKebab);
+    return `--view-picon-mask:url("${u}")`;
+}
 
 type ViewerMarkdownSettings = {
     preset: "default" | "classic" | "compact" | "paper";
@@ -285,6 +300,8 @@ export class ViewerView implements View {
     private options: ViewerOptions;
     private shellContext?: ShellContext;
     private element: HTMLElement | null = null;
+    /** When mounted under `cw-view-viewer`, slotted raw/prose are light children of this host. */
+    private slotProjectingHost: HTMLElement | null = null;
     private contentRef = ref("");
     private renderSeq = 0;
     private stateManager = createViewState<ViewerState>(STORAGE_KEY);
@@ -346,6 +363,8 @@ export class ViewerView implements View {
     }
 
     render(options?: ViewOptions): HTMLElement {
+        this.slotProjectingHost = null;
+
         // Merge options
         if (options) {
             this.options = { ...this.options, ...options };
@@ -355,60 +374,65 @@ export class ViewerView implements View {
         // Load styles (idempotent — returns cached sheet)
         this._sheet = loadAsAdopted(style) as CSSStyleSheet;
 
-        // Create main element with md-view web component
         this.element = H`
-            <div class="view-viewer">
-                <div class="view-viewer__toolbar" data-viewer-toolbar>
-                    <div class="view-viewer__toolbar-left">
-                        <button class="view-viewer__btn" data-action="open" type="button" title="Open file">
-                            <ui-icon icon="folder-open" icon-style="duotone"></ui-icon>
-                            <span>Open</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="toggle-raw" type="button" title="Toggle raw/rendered view">
-                            <ui-icon icon="code" icon-style="duotone"></ui-icon>
-                            <span>Raw</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="copy" type="button" title="Copy raw content">
-                            <ui-icon icon="copy" icon-style="duotone"></ui-icon>
-                            <span>Copy</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="paste" type="button" title="Paste from clipboard (mobile-friendly)" aria-label="Paste from clipboard">
-                            <ui-icon icon="clipboard-text" icon-style="duotone"></ui-icon>
-                            <span>Paste</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="download" type="button" title="Download as markdown">
-                            <ui-icon icon="download" icon-style="duotone"></ui-icon>
-                            <span>Download</span>
-                        </button>
+            <div class="cw-view-viewer-shell">
+                <div class="view-viewer">
+                    <div class="view-viewer__toolbar" data-viewer-toolbar>
+                        <div class="view-viewer__toolbar-left">
+                            <button class="view-viewer__btn" data-action="open" type="button" title="Open file">
+                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("folder-open")} aria-hidden="true"></span>
+                                <span>Open</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="toggle-raw" type="button" title="Toggle raw/rendered view">
+                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("code")} aria-hidden="true"></span>
+                                <span>Raw</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="copy" type="button" title="Copy raw content">
+                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("copy")} aria-hidden="true"></span>
+                                <span>Copy</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="paste" type="button" title="Paste from clipboard (mobile-friendly)" aria-label="Paste from clipboard">
+                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("clipboard-text")} aria-hidden="true"></span>
+                                <span>Paste</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="download" type="button" title="Download as markdown">
+                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("download")} aria-hidden="true"></span>
+                                <span>Download</span>
+                            </button>
+                        </div>
+                        <div class="view-viewer__toolbar-right">
+                            
+                            <button class="view-viewer__btn" data-action="attach" type="button" title="Attach to Work Center">
+                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("lightning")} aria-hidden="true"></span>
+                                <span>Attach</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="open-style-settings" type="button" title="Markdown styling, modules, plugins">
+                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("paint-roller")} aria-hidden="true"></span>
+                                <span>Style</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="copy-rendered" type="button" title="Copy rendered text">
+                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("text-t")} aria-hidden="true"></span>
+                                <span>Copy text</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="export-docx" type="button" title="Export as DOCX">
+                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("file-doc")} aria-hidden="true"></span>
+                                <span>DOCX</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="print" type="button" title="Print content">
+                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("printer")} aria-hidden="true"></span>
+                                <span>Print</span>
+                            </button>
+                        </div>
                     </div>
-                    <div class="view-viewer__toolbar-right">
-                        
-                        <button class="view-viewer__btn" data-action="attach" type="button" title="Attach to Work Center">
-                            <ui-icon icon="lightning" icon-style="duotone"></ui-icon>
-                            <span>Attach</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="open-style-settings" type="button" title="Markdown styling, modules, plugins">
-                            <ui-icon icon="paint-roller" icon-style="duotone"></ui-icon>
-                            <span>Style</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="copy-rendered" type="button" title="Copy rendered text">
-                            <ui-icon icon="text-t" icon-style="duotone"></ui-icon>
-                            <span>Copy text</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="export-docx" type="button" title="Export as DOCX">
-                            <ui-icon icon="file-doc" icon-style="duotone"></ui-icon>
-                            <span>DOCX</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="print" type="button" title="Print content">
-                            <ui-icon icon="printer" icon-style="duotone"></ui-icon>
-                            <span>Print</span>
-                        </button>
+                    <div class="view-viewer__content" data-viewer-content>
+                        <pre class="markdown-viewer-raw" data-raw-target aria-label="Raw content" hidden></pre>
                     </div>
                 </div>
-                <div class="view-viewer__content" data-viewer-content>
-                    <div class="markdown-body markdown-viewer-content result-content" data-render-target></div>
-                    <pre class="markdown-viewer-raw" data-raw-target aria-label="Raw content" hidden></pre>
-                </div>
+                <div
+                    class="cw-view-viewer__prose markdown-body markdown-viewer-content result-content"
+                    data-render-target
+                    data-cw-viewer-prose
+                ></div>
             </div>
         ` as HTMLElement;
 
@@ -433,6 +457,84 @@ export class ViewerView implements View {
         });
 
         return this.element;
+    }
+
+    /**
+     * Mount under `<cw-view-viewer>`: chrome in shadow, raw + rendered bodies in light DOM (slotted).
+     */
+    renderIntoWebComponentHost(host: CwViewViewerHostElement, options?: ViewOptions): void {
+        if (options) {
+            this.options = { ...this.options, ...options };
+            this.shellContext = options.shellContext || this.shellContext;
+        }
+
+        this.slotProjectingHost = host;
+        this._sheet ??= loadAsAdopted(style) as CSSStyleSheet;
+
+        let shadow = host.shadowRoot;
+        if (!shadow) {
+            shadow = host.attachShadow({ mode: "open" });
+            const hostCss = document.createElement("style");
+            hostCss.textContent = `
+                :host {
+                    display: block;
+                    box-sizing: border-box;
+                    block-size: 100%;
+                    inline-size: 100%;
+                    min-block-size: 0;
+                    min-inline-size: 0;
+                }
+            `;
+            shadow.appendChild(hostCss);
+
+            const mount = document.createElement("div");
+            mount.className = "cw-view-element__mount";
+            const shell = document.createElement("div");
+            shell.className = "cw-view-viewer-shell";
+            const viewViewer = this.buildViewViewerChromeForShadow();
+            shell.append(viewViewer);
+            mount.appendChild(shell);
+            shadow.appendChild(mount);
+            this.adoptViewerStylesIntoShadowRoot(shadow);
+        }
+
+        this.element = shadow!.querySelector(".cw-view-viewer-shell") as HTMLElement;
+
+        let pre = host.querySelector(":scope > pre[data-raw-target]") as HTMLPreElement | null;
+        let prose = host.querySelector(":scope > [data-render-target]") as HTMLElement | null;
+        if (!pre) {
+            pre = document.createElement("pre");
+            pre.className = "markdown-viewer-raw";
+            pre.setAttribute("data-raw-target", "");
+            pre.setAttribute("aria-label", "Raw content");
+            pre.slot = "raw";
+        } else if (!pre.slot) {
+            pre.slot = "raw";
+        }
+        if (!prose) {
+            prose = document.createElement("div");
+            prose.className = "cw-view-viewer__prose markdown-body markdown-viewer-content result-content";
+            prose.toggleAttribute("data-render-target", true);
+            prose.toggleAttribute("data-cw-viewer-prose", true);
+        }
+        host.replaceChildren(pre, prose);
+
+        this.syncAdoptedSheetsToShadow();
+
+        const renderTarget = prose;
+        const rawTarget = pre;
+        this.setupEventHandlers(rawTarget);
+
+        if (renderTarget && rawTarget) {
+            this.renderMarkdown(this.contentRef.value, renderTarget, rawTarget);
+        }
+
+        affected(this.contentRef, () => {
+            if (renderTarget && rawTarget) {
+                this.renderMarkdown(this.contentRef.value, renderTarget, rawTarget);
+            }
+            this.saveState();
+        });
     }
 
     getToolbar(): HTMLElement | null {
@@ -465,6 +567,121 @@ export class ViewerView implements View {
     // ========================================================================
     // PRIVATE METHODS
     // ========================================================================
+
+    private buildViewViewerChromeForShadow(): HTMLElement {
+        return H`
+            <div class="view-viewer">
+                <div class="view-viewer__toolbar" data-viewer-toolbar>
+                    <div class="view-viewer__toolbar-left">
+                        <button class="view-viewer__btn" data-action="open" type="button" title="Open file">
+                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("folder-open")} aria-hidden="true"></span>
+                            <span>Open</span>
+                        </button>
+                        <button class="view-viewer__btn" data-action="toggle-raw" type="button" title="Toggle raw/rendered view">
+                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("code")} aria-hidden="true"></span>
+                            <span>Raw</span>
+                        </button>
+                        <button class="view-viewer__btn" data-action="copy" type="button" title="Copy raw content">
+                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("copy")} aria-hidden="true"></span>
+                            <span>Copy</span>
+                        </button>
+                        <button class="view-viewer__btn" data-action="paste" type="button" title="Paste from clipboard (mobile-friendly)" aria-label="Paste from clipboard">
+                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("clipboard-text")} aria-hidden="true"></span>
+                            <span>Paste</span>
+                        </button>
+                        <button class="view-viewer__btn" data-action="download" type="button" title="Download as markdown">
+                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("download")} aria-hidden="true"></span>
+                            <span>Download</span>
+                        </button>
+                    </div>
+                    <div class="view-viewer__toolbar-right">
+                        <button class="view-viewer__btn" data-action="attach" type="button" title="Attach to Work Center">
+                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("lightning")} aria-hidden="true"></span>
+                            <span>Attach</span>
+                        </button>
+                        <button class="view-viewer__btn" data-action="open-style-settings" type="button" title="Markdown styling, modules, plugins">
+                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("paint-roller")} aria-hidden="true"></span>
+                            <span>Style</span>
+                        </button>
+                        <button class="view-viewer__btn" data-action="copy-rendered" type="button" title="Copy rendered text">
+                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("text-t")} aria-hidden="true"></span>
+                            <span>Copy text</span>
+                        </button>
+                        <button class="view-viewer__btn" data-action="export-docx" type="button" title="Export as DOCX">
+                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("file-doc")} aria-hidden="true"></span>
+                            <span>DOCX</span>
+                        </button>
+                        <button class="view-viewer__btn" data-action="print" type="button" title="Print content">
+                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("printer")} aria-hidden="true"></span>
+                            <span>Print</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="view-viewer__content" data-viewer-content>
+                    <div class="cw-view-viewer__slot-raw">
+                        <slot name="raw"></slot>
+                    </div>
+                    <div class="cw-view-viewer__slot-default">
+                        <slot></slot>
+                    </div>
+                </div>
+            </div>
+        ` as HTMLElement;
+    }
+
+    private adoptViewerStylesIntoShadowRoot(shadow: ShadowRoot): void {
+        const sheet = this._sheet as CSSStyleSheet | null;
+        if (!sheet || typeof shadow.adoptedStyleSheets === "undefined") return;
+        if (!shadow.adoptedStyleSheets.includes(sheet)) {
+            shadow.adoptedStyleSheets = [...shadow.adoptedStyleSheets, sheet];
+        }
+    }
+
+    private syncAdoptedSheetsToShadow(): void {
+        const shadow = this.slotProjectingHost?.shadowRoot;
+        if (!shadow || typeof shadow.adoptedStyleSheets === "undefined") return;
+        const push = (s: CSSStyleSheet | null | undefined) => {
+            if (!s) return;
+            if (!shadow!.adoptedStyleSheets.includes(s)) {
+                shadow!.adoptedStyleSheets = [...shadow!.adoptedStyleSheets, s];
+            }
+        };
+        push(this._sheet as CSSStyleSheet | null);
+        push(this.customSheet ?? null);
+    }
+
+    private queryViewerSlotted(sel: string): HTMLElement | null {
+        const fromHost = this.slotProjectingHost?.querySelector(sel);
+        if (fromHost) return fromHost as HTMLElement;
+        return (this.element?.querySelector(sel) ?? null) as HTMLElement | null;
+    }
+
+    private viewBranchesContain(node: Node | null): boolean {
+        if (!node) return false;
+        if (this.slotProjectingHost?.contains(node)) return true;
+        return Boolean(this.element?.contains(node));
+    }
+
+    private viewBranchesHover(): boolean {
+        return (
+            Boolean(this.slotProjectingHost?.matches(":hover")) ||
+            Boolean(this.element?.matches(":hover"))
+        );
+    }
+
+    /** Syncs raw/rendered layout: shell + content `data-raw` drives CSS (toolbar + raw vs slotted markdown). */
+    private syncViewerRawMode(raw: boolean): void {
+        const shell = this.element;
+        if (!shell?.classList.contains("cw-view-viewer-shell")) return;
+        shell.toggleAttribute("data-raw", raw);
+        this.slotProjectingHost?.toggleAttribute("data-raw", raw);
+        const content = shell.querySelector("[data-viewer-content]");
+        if (raw) {
+            content?.setAttribute("data-raw", "");
+        } else {
+            content?.removeAttribute("data-raw");
+        }
+    }
 
     private renderMarkdown(content: string, renderTarget: HTMLElement, rawTarget: HTMLPreElement): void {
         if (!renderTarget) return;
@@ -509,8 +726,7 @@ export class ViewerView implements View {
         const normalized = String(content ?? "");
         if (!normalized.trim()) {
             if (seq !== this.renderSeq) return;
-            const container = this.element?.querySelector(".view-viewer__content");
-            if (container) container.removeAttribute("data-raw");
+            this.syncViewerRawMode(false);
             renderTarget.hidden = false;
             if (rawTarget) rawTarget.hidden = true;
             renderTarget.removeAttribute("aria-busy");
@@ -523,16 +739,14 @@ export class ViewerView implements View {
         // Auto-switch to raw if it looks like HTML
         const container = this.element?.querySelector(".view-viewer__content");
         if (container && looksLikeHtmlDocument(content || "")) {
-            container.toggleAttribute("data-raw", true);
+            this.syncViewerRawMode(true);
             if (rawTarget) rawTarget.hidden = false;
             renderTarget.hidden = true;
             endBusy();
             return;
         }
 
-        if (container) {
-            container.removeAttribute("data-raw");
-        }
+        this.syncViewerRawMode(false);
         renderTarget.hidden = false;
         if (rawTarget) rawTarget.hidden = true;
 
@@ -670,7 +884,7 @@ export class ViewerView implements View {
     }
 
     private async openMarkdownSource(source: string, filename?: string): Promise<boolean> {
-        const renderTarget = this.element?.querySelector("[data-render-target]") as HTMLElement | null;
+        const renderTarget = this.queryViewerSlotted("[data-render-target]");
         if (renderTarget) {
             renderTarget.setAttribute("aria-busy", "true");
             renderTarget.setAttribute("data-md-state", "fetching");
@@ -691,7 +905,9 @@ export class ViewerView implements View {
 
         const toolbar = this.element.querySelector("[data-viewer-toolbar]");
         const content = this.element.querySelector("[data-viewer-content]");
-        const renderTarget = this.element.querySelector("[data-render-target]") as HTMLElement | null;
+        const shell =
+            this.element.classList.contains("cw-view-viewer-shell") ? this.element : null;
+        const renderTarget = this.queryViewerSlotted("[data-render-target]");
 
         let showRaw = false;
 
@@ -715,7 +931,7 @@ export class ViewerView implements View {
                     showRaw = !showRaw;
                     if (renderTarget) renderTarget.hidden = showRaw;
                     if (rawElement) rawElement.hidden = !showRaw;
-                    content?.toggleAttribute("data-raw", showRaw);
+                    this.syncViewerRawMode(showRaw);
                     break;
                 case "copy-rendered":
                     if (renderTarget) {
@@ -742,28 +958,32 @@ export class ViewerView implements View {
             }
         });
 
-        // Setup drag and drop
-        if (content) {
-            content.addEventListener("mouseenter", () => {
+        // Setup drag and drop (shell includes toolbar + raw + slotted markdown)
+        const dropZone = shell || content;
+        if (dropZone) {
+            dropZone.addEventListener("mouseenter", () => {
                 this.isPointerInView = true;
             });
 
-            content.addEventListener("mouseleave", () => {
+            dropZone.addEventListener("mouseleave", () => {
                 this.isPointerInView = false;
             });
 
-            content.addEventListener("dragover", (e) => {
+            dropZone.addEventListener("dragover", (e) => {
                 e.preventDefault();
-                (e.currentTarget as HTMLElement).classList.add("dragover");
+                const mark = shell ?? content;
+                mark?.classList.add("dragover");
             });
 
-            content.addEventListener("dragleave", () => {
-                (content as HTMLElement).classList.remove("dragover");
+            dropZone.addEventListener("dragleave", () => {
+                const mark = shell ?? content;
+                mark?.classList.remove("dragover");
             });
 
-            content.addEventListener("drop", (e) => {
+            dropZone.addEventListener("drop", (e) => {
                 e.preventDefault();
-                (content as HTMLElement).classList.remove("dragover");
+                const mark = shell ?? content;
+                mark?.classList.remove("dragover");
                 this.handleFileDrop(e as DragEvent);
             });
         }
@@ -912,7 +1132,7 @@ export class ViewerView implements View {
 
     private handlePrint(renderTarget: HTMLElement): void {
         try {
-            const rawTarget = this.element?.querySelector("[data-raw-target]") as HTMLPreElement | null;
+            const rawTarget = this.queryViewerSlotted("[data-raw-target]") as HTMLPreElement | null;
             const isRawVisible = Boolean(rawTarget && !rawTarget.hidden);
             const printTarget = isRawVisible ? rawTarget : renderTarget;
 
@@ -1253,9 +1473,9 @@ export class ViewerView implements View {
             return false;
         }
 
-        const hasFocusWithinView = this.element.contains(document.activeElement);
-        const targetInView = this.element.contains(target);
-        const hoverWithinView = this.isPointerInView || this.element.matches(":hover");
+        const hasFocusWithinView = this.viewBranchesContain(document.activeElement);
+        const targetInView = this.viewBranchesContain(target);
+        const hoverWithinView = this.isPointerInView || this.viewBranchesHover();
 
         return targetInView || hasFocusWithinView || hoverWithinView;
     }
@@ -1421,7 +1641,7 @@ export class ViewerView implements View {
             : 860;
 
         const systemCss = `
-            .view-viewer .markdown-viewer-content {
+            .cw-view-viewer-shell .markdown-viewer-content {
                 font-family: ${this.getFontFamilyFromPreset()};
                 font-size: ${fontSizePx}px;
                 line-height: ${lineHeight};
@@ -1431,49 +1651,49 @@ export class ViewerView implements View {
                 padding: 1rem 1.1rem 3rem;
             }
 
-            .view-viewer .markdown-viewer-content h1 { font-size: var(--md-h1-size, 1.95em); }
-            .view-viewer .markdown-viewer-content h2 { font-size: var(--md-h2-size, 1.55em); }
-            .view-viewer .markdown-viewer-content p,
-            .view-viewer .markdown-viewer-content li {
+            .cw-view-viewer-shell .markdown-viewer-content h1 { font-size: var(--md-h1-size, 1.95em); }
+            .cw-view-viewer-shell .markdown-viewer-content h2 { font-size: var(--md-h2-size, 1.55em); }
+            .cw-view-viewer-shell .markdown-viewer-content p,
+            .cw-view-viewer-shell .markdown-viewer-content li {
                 margin-block: var(--md-p-margin, 0.9em);
             }
 
-            .view-viewer .markdown-viewer-content {
+            .cw-view-viewer-shell .markdown-viewer-content {
                 ${this.getPresetVariablesCss()}
             }
         `;
 
         const modulesCss = `
             ${this.markdownSettings.modules.typography ? "" : `
-            .view-viewer .markdown-viewer-content p,
-            .view-viewer .markdown-viewer-content li {
+            .cw-view-viewer-shell .markdown-viewer-content p,
+            .cw-view-viewer-shell .markdown-viewer-content li {
                 margin-block: 0.35em;
             }
-            .view-viewer .markdown-viewer-content h1,
-            .view-viewer .markdown-viewer-content h2,
-            .view-viewer .markdown-viewer-content h3 {
+            .cw-view-viewer-shell .markdown-viewer-content h1,
+            .cw-view-viewer-shell .markdown-viewer-content h2,
+            .cw-view-viewer-shell .markdown-viewer-content h3 {
                 margin-block: 0.45em;
             }`}
 
             ${this.markdownSettings.modules.codeBlocks ? `
-            .view-viewer .markdown-viewer-content pre {
+            .cw-view-viewer-shell .markdown-viewer-content pre {
                 border-radius: 10px;
                 padding: 0.8rem 1rem;
                 overflow-x: auto;
             }
-            .view-viewer .markdown-viewer-content code {
+            .cw-view-viewer-shell .markdown-viewer-content code {
                 font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
                 font-size: 0.92em;
             }` : ""}
 
             ${this.markdownSettings.modules.tables ? `
-            .view-viewer .markdown-viewer-content table {
+            .cw-view-viewer-shell .markdown-viewer-content table {
                 inline-size: 100%;
                 border-collapse: collapse;
                 margin: 1rem 0;
             }
-            .view-viewer .markdown-viewer-content th,
-            .view-viewer .markdown-viewer-content td {
+            .cw-view-viewer-shell .markdown-viewer-content th,
+            .cw-view-viewer-shell .markdown-viewer-content td {
                 border: 1px solid color-mix(in oklab, currentColor 18%, transparent);
                 padding: 0.45rem 0.6rem;
                 text-align: left;
@@ -1481,15 +1701,15 @@ export class ViewerView implements View {
             }` : ""}
 
             ${this.markdownSettings.modules.blockquotes ? `
-            .view-viewer .markdown-viewer-content blockquote {
+            .cw-view-viewer-shell .markdown-viewer-content blockquote {
                 border-inline-start: 4px solid color-mix(in oklab, currentColor 30%, transparent);
                 padding-inline: 1rem;
                 margin-inline: 0;
             }` : ""}
 
             ${this.markdownSettings.modules.media ? `
-            .view-viewer .markdown-viewer-content img,
-            .view-viewer .markdown-viewer-content video {
+            .cw-view-viewer-shell .markdown-viewer-content img,
+            .cw-view-viewer-shell .markdown-viewer-content video {
                 max-inline-size: 100%;
                 border-radius: 8px;
                 display: block;
@@ -1499,19 +1719,19 @@ export class ViewerView implements View {
 
         const builtInPrintCss = `
             @media print {
-                .view-viewer .markdown-viewer-content {
+                .cw-view-viewer-shell .markdown-viewer-content {
                     zoom: ${printScale};
                 }
                 ${this.markdownSettings.modules.printBreaks ? `
-                .view-viewer .markdown-viewer-content h1,
-                .view-viewer .markdown-viewer-content h2,
-                .view-viewer .markdown-viewer-content h3 {
+                .cw-view-viewer-shell .markdown-viewer-content h1,
+                .cw-view-viewer-shell .markdown-viewer-content h2,
+                .cw-view-viewer-shell .markdown-viewer-content h3 {
                     break-after: avoid-page;
                     break-inside: avoid;
                 }
-                .view-viewer .markdown-viewer-content pre,
-                .view-viewer .markdown-viewer-content table,
-                .view-viewer .markdown-viewer-content blockquote {
+                .cw-view-viewer-shell .markdown-viewer-content pre,
+                .cw-view-viewer-shell .markdown-viewer-content table,
+                .cw-view-viewer-shell .markdown-viewer-content blockquote {
                     break-inside: avoid;
                 }` : ""}
             }
@@ -1591,6 +1811,7 @@ export class ViewerView implements View {
             console.warn("[Viewer] Failed to load custom markdown styles:", error);
             this.customSheet = null;
         }
+        this.syncAdoptedSheetsToShadow();
     }
 
     private async loadMarkdownSettings(): Promise<void> {
@@ -1661,6 +1882,7 @@ export class ViewerView implements View {
         }
         removeAdopted(this._sheet!);
         this.element = null;
+        this.slotProjectingHost = null;
     }
 
     private onShow(): void {
@@ -1680,8 +1902,8 @@ export class ViewerView implements View {
     }
 
     private onRefresh(): void {
-        const renderTarget = this.element?.querySelector("[data-render-target]") as HTMLElement | null;
-        const rawTarget = this.element?.querySelector("[data-raw-target]") as HTMLPreElement | null;
+        const renderTarget = this.queryViewerSlotted("[data-render-target]");
+        const rawTarget = this.queryViewerSlotted("[data-raw-target]") as HTMLPreElement | null;
         if (renderTarget && rawTarget) {
             this.renderMarkdown(this.contentRef.value, renderTarget, rawTarget);
         }

@@ -37,63 +37,316 @@
 }
 
 @layer viewer.base {
+    /*
+     * Shell = column flex. Two shapes:
+     * - Standalone preview: prose is a direct child of .cw-view-viewer-shell.
+     * - cw-view-viewer host: slots live inside .view-viewer__content; prose/pre are light-DOM (assigned to slots).
+     */
+    .cw-view-viewer-shell {
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        block-size: 100%;
+        inline-size: 100%;
+        min-block-size: 0;
+        min-inline-size: 0;
+        container-type: size;
+        isolation: isolate;
+    }
+
     .view-viewer {
         display: flex;
         flex-direction: column;
-        block-size: 100%;
+        box-sizing: border-box;
         background-color: var(--view-bg);
         color: var(--view-fg);
+    }
+
+    .cw-view-viewer-shell:not([data-raw]) .view-viewer {
+        flex: 0 0 auto;
+    }
+
+    /* Standalone: raw lives in .view-viewer__content; grow view-viewer when showing raw */
+    .cw-view-viewer-shell[data-raw]:not(:has(.cw-view-viewer__slot-default)) .view-viewer {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+    }
+
+    /* Web component: shell’s only block child is .view-viewer; it fills height */
+    .cw-view-viewer-shell:has(.cw-view-viewer__slot-default) .view-viewer {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+    }
+
+    /* Slot wrappers stack inside __content; __content is the flex grow + clip region */
+    .cw-view-viewer-shell:has(.cw-view-viewer__slot-default) .view-viewer__content {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .cw-view-viewer-shell:has(.cw-view-viewer__slot-default):not([data-raw]) .cw-view-viewer__slot-raw {
+        display: none !important;
+    }
+
+    .cw-view-viewer-shell:has(.cw-view-viewer__slot-default)[data-raw] .cw-view-viewer__slot-default {
+        display: none !important;
+    }
+
+    .cw-view-viewer-shell:has(.cw-view-viewer__slot-default):not([data-raw]) .cw-view-viewer__slot-default {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    .cw-view-viewer-shell:has(.cw-view-viewer__slot-default)[data-raw] .cw-view-viewer__slot-raw {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+        box-sizing: border-box;
+        overflow-block: auto;
+        overflow-inline: hidden;
+        overscroll-behavior: contain;
+    }
+
+    /* Standalone: hide prose in raw mode; hide __content when rendered */
+    .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default))[data-raw] .cw-view-viewer__prose {
+        display: none !important;
+    }
+
+    .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default)):not([data-raw]) .view-viewer__content {
+        display: none;
+    }
+
+    .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default)):not([data-raw]) .cw-view-viewer__prose {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+        box-sizing: border-box;
+        overflow-block: auto;
+        overflow-inline: hidden;
+        overscroll-behavior: contain;
+    }
+
+    .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default))[data-raw] .view-viewer__content {
+        flex: 1 1 auto;
+        min-block-size: 0;
     }
 }
 
 @layer viewer.components {
+    /* Compact toolbar: tight rhythm, icon-led controls (theme tokens when present). */
     .view-viewer__toolbar {
+        /*
+         * Toolbar icons: Phosphor SVG as CSS mask + themed fill (same-origin proxy).
+         * Override on `.view-viewer`, shell, or host:
+         *   --view-picon-fill, --view-picon-fill-hover, --view-picon-fill-active, --view-picon-fill-disabled
+         */
+        --view-toolbar-icon-size: 1.25rem;
+        --view-toolbar-ph-icon-size: var(--view-toolbar-icon-size);
+        --view-picon-fill: var(--color-on-surface, var(--view-fg));
+        --view-picon-fill-hover: var(--color-primary, var(--color-on-surface, var(--view-fg)));
+        --view-picon-fill-active: color-mix(
+            in oklab,
+            var(--color-on-surface, var(--view-fg)) 82%,
+            var(--color-primary, #007acc) 18%
+        );
+        --view-picon-fill-disabled: color-mix(in oklab, var(--color-on-surface, var(--view-fg)) 40%, transparent);
+        --view-toolbar-row-pad-block: 0.2rem;
+        --view-toolbar-row-pad-inline: 0.2rem;
+        --view-toolbar-gap: 0.125rem;
+
+        position: relative;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 0.125rem;
-        padding: 0.25rem 0.25rem;
-        background-color: var(--view-toolbar-bg);
+        gap: var(--view-toolbar-gap);
+        flex-wrap: nowrap;
+        min-block-size: 2.25rem;
+        padding: var(--view-toolbar-row-pad-block) var(--view-toolbar-row-pad-inline);
+        background: var(--color-surface-container-high, var(--view-toolbar-bg));
         border-block-end: 1px solid var(--view-border);
+        box-shadow: var(--elev-1, 0 1px 2px light-dark(rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.25)));
         flex-shrink: 0;
+        overflow-inline: auto;
+        overflow-block: hidden;
+        scrollbar-width: none;
+        scrollbar-color: transparent transparent;
+        -webkit-overflow-scrolling: touch;
+
+        button.view-viewer__btn > .view-viewer__picon {
+            flex-shrink: 0 !important;
+            order: -1;
+            display: inline-block !important;
+            box-sizing: border-box !important;
+            inline-size: var(--view-toolbar-ph-icon-size, 1.25rem) !important;
+            block-size: var(--view-toolbar-ph-icon-size, 1.25rem) !important;
+            min-inline-size: 0 !important;
+            min-block-size: 0 !important;
+            max-inline-size: none !important;
+            max-block-size: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: none !important;
+            vertical-align: middle !important;
+            flex: 0 0 auto !important;
+            background-image: none !important;
+            background-color: var(--view-picon-fill) !important;
+            box-shadow: none !important;
+            filter: none !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            mix-blend-mode: normal !important;
+            pointer-events: none !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            mask-image: var(--view-picon-mask) !important;
+            mask-size: contain !important;
+            mask-repeat: no-repeat !important;
+            mask-position: center !important;
+            -webkit-mask-image: var(--view-picon-mask) !important;
+            -webkit-mask-size: contain !important;
+            -webkit-mask-repeat: no-repeat !important;
+            -webkit-mask-position: center !important;
+            transition: background-color var(--motion-fast, 0.12s ease) !important;
+        }
+
+        &::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                90deg,
+                color-mix(in oklab, var(--color-primary, #007acc) 2%, transparent) 0%,
+                transparent 50%,
+                color-mix(in oklab, var(--color-primary, #007acc) 2%, transparent) 100%
+            );
+            pointer-events: none;
+        }
+
+        & > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+
+        @container (max-inline-size: 1024px) {
+            min-block-size: 2.125rem;
+            padding: 0.15rem 0.15rem;
+        }
+
+        @container (max-inline-size: 768px) {
+            min-block-size: 2rem;
+            padding: 0.1rem 0.1rem;
+        }
     }
 
     .view-viewer__toolbar-left,
     .view-viewer__toolbar-right {
         display: flex;
         align-items: center;
+        flex-shrink: 0;
         gap: 0.125rem;
+
+        @container (max-inline-size: 480px) {
+            gap: 1px;
+        }
     }
 
     .view-viewer__btn {
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        gap: 0.25rem;
-        padding: 0.25rem 0.25rem;
+        justify-content: center;
+        gap: 0.28rem;
+        min-block-size: 1.85rem;
+        padding: 0.15rem 0.15rem;
         border: none;
-        border-radius: 6px;
-        background: transparent;
-        color: var(--view-fg);
-        font-size: 0.8125rem;
-        font-weight: 500;
+        border-radius: var(--radius-sm, 4px);
+        background: var(--color-surface, transparent);
+        color: var(--color-on-surface, var(--view-fg));
+        font-family: inherit;
+        font-size: var(--text-xs, 0.75rem);
+        font-weight: var(--font-weight-medium, 500);
+        line-height: 1.2;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
         cursor: pointer;
-        transition: background-color 0.15s ease;
+        appearance: none;
+        -webkit-tap-highlight-color: transparent;
+        box-sizing: border-box;
+        flex-shrink: 0;
+        transition:
+            background-color var(--motion-fast, 0.12s ease),
+            color var(--motion-fast, 0.12s ease),
+            box-shadow var(--motion-fast, 0.12s ease);
+        overflow: visible;
 
-        ui-icon {
-            font-size: 1rem;
-            opacity: 0.7;
+        /* Labels secondary to icons (typo fix: priority = icons > text). */
+        span {
+            max-inline-size: 6.5rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.625rem;
+            font-weight: 400;
+            line-height: 1.15;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            opacity: 0.72;
+            display: none;
         }
 
         &:hover {
-            background-color: var(--view-btn-hover-bg);
+            background: var(--color-surface-container-high, var(--view-btn-hover-bg));
+
+            span {
+                opacity: 0.9;
+            }
+
+            > .view-viewer__picon {
+                background-color: var(--view-picon-fill-hover) !important;
+            }
+        }
+
+        &:active {
+            background: color-mix(in oklab, var(--color-surface-container-high, var(--view-btn-hover-bg)) 92%, var(--color-on-surface, currentColor) 8%);
+
+            > .view-viewer__picon {
+                background-color: var(--view-picon-fill-active) !important;
+            }
+        }
+
+        &:disabled > .view-viewer__picon {
+            background-color: var(--view-picon-fill-disabled) !important;
+            opacity: 0.55 !important;
         }
 
         &:focus-visible {
-            outline: 2px solid var(--color-primary, #007acc);
-            outline-offset: 2px;
+            outline: none;
+            box-shadow: var(--focus-ring, 0 0 0 2px var(--color-primary, #007acc));
         }
 
-        @container (max-width: 640px) {
+        @container (max-inline-size: 1024px) {
+            gap: 0.15rem;
+            padding: 0.12rem 0.3rem;
+            min-block-size: 1.625rem;
+        }
+
+        @container (max-inline-size: 768px) {
+            gap: 0;
+            min-block-size: 1.75rem;
+            min-inline-size: 1.75rem;
+            padding: 0.15rem;
+
             span {
                 display: none;
             }
@@ -122,8 +375,9 @@
     }
 
     .view-viewer__content {
-        flex: 1;
-        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
         padding: 0px;
 
         &.dragover {
@@ -133,9 +387,31 @@
         }
     }
 
+    /* Standalone / non–slot-mode: __content is the scrollport */
+    .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default)) .view-viewer__content {
+        overflow-block: auto;
+        overflow-inline: hidden;
+        overscroll-behavior: contain;
+    }
+
+    .cw-view-viewer-shell.dragover {
+        background-color: rgba(0, 122, 204, 0.05);
+        outline: 2px dashed rgba(0, 122, 204, 0.3);
+        outline-offset: -8px;
+    }
+
     /* Shell / critical CSS may set user-select:none on broad ancestors — keep prose selectable and context menus usable. */
-    .view-viewer__content [data-render-target],
-    .view-viewer__content [data-render-target] * {
+    .cw-view-viewer-shell [data-render-target],
+    .cw-view-viewer-shell [data-render-target] * {
+        pointer-events: auto;
+        user-select: text;
+        -webkit-user-select: text;
+        -webkit-touch-callout: default;
+    }
+
+    /* Slotted prose lives in cw-view-viewer light DOM (not under .cw-view-viewer-shell in the tree). */
+    cw-view-viewer [data-render-target],
+    cw-view-viewer [data-render-target] * {
         pointer-events: auto;
         user-select: text;
         -webkit-user-select: text;
@@ -152,6 +428,13 @@
     }
 
     @media print {
+        .cw-view-viewer-shell {
+            display: block !important;
+            block-size: auto !important;
+            inline-size: 100% !important;
+            overflow: visible !important;
+        }
+
         .view-viewer {
             display: block !important;
             block-size: auto !important;
@@ -171,6 +454,22 @@
             overflow: visible !important;
             block-size: auto !important;
             inline-size: 100% !important;
+        }
+
+        .cw-view-viewer__prose {
+            display: block !important;
+            block-size: auto !important;
+            inline-size: 100% !important;
+            overflow: visible !important;
+            contain: none !important;
+        }
+
+        .cw-view-viewer__slot-raw,
+        .cw-view-viewer__slot-default {
+            display: block !important;
+            block-size: auto !important;
+            inline-size: 100% !important;
+            overflow: visible !important;
         }
 
         [data-render-target],

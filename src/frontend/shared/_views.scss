@@ -2130,6 +2130,9 @@
     @media print {
         /* Keep markdown web-component content printable across all shells. */
         [data-cw-view-host="true"][data-view-id="viewer"],
+        .cw-view-viewer-shell,
+        .cw-view-viewer__prose,
+        [data-cw-viewer-prose],
         .view-viewer,
         .view-viewer__content,
         [data-viewer-content],

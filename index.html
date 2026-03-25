@@ -358,15 +358,18 @@
                     font-size: 16px !important;
                 }
 
-                :where(body, html, :root)>*:not([hidden], [aria-hidden="true"], [data-hidden]):not(markdown-viewer, #markdown-body, .view-markdown, #app, .app-shell, .app-shell__content, .view-viewer, .view-viewer__content, [data-viewer-content], [data-render-target], .markdown-body, .markdown-viewer-content, .result-content),
+                :where(body, html, :root)>*:not([hidden], [aria-hidden="true"], [data-hidden]):not(markdown-viewer, #markdown-body, .view-markdown, #app, .app-shell, .app-shell__content, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, [data-viewer-content], [data-render-target], .markdown-body, .markdown-viewer-content, .result-content),
                 :where(body, html, :root) :where(#app, #raw-md),
-                :where(body, html, :root) :where(div, span, button, input, header, main, footer):not([hidden], [aria-hidden="true"], [data-hidden]):not(markdown-viewer, #markdown-body, .view-markdown, #app, .app-shell, .app-shell__content, .view-viewer, .view-viewer__content, [data-viewer-content], [data-render-target], .markdown-body, .markdown-viewer-content, .result-content) {
+                :where(body, html, :root) :where(div, span, button, input, header, main, footer):not([hidden], [aria-hidden="true"], [data-hidden]):not(markdown-viewer, #markdown-body, .view-markdown, #app, .app-shell, .app-shell__content, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, [data-viewer-content], [data-render-target], .markdown-body, .markdown-viewer-content, .result-content) {
                     page-break-after: avoid !important;
                     page-break-before: avoid !important;
                     break-after: avoid !important;
                     break-before: avoid !important;
                 }
 
+                .cw-view-viewer-shell,
+                .cw-view-viewer__prose,
+                [data-cw-viewer-prose],
                 .view-viewer,
                 .view-viewer__content,
                 [data-viewer-content] {
@@ -417,7 +420,7 @@
                 .markdown-viewer-raw {
 
                     &,
-                    & *:not(#app, .app-shell, .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content) {
+                    & *:not(#app, .app-shell, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, .app-shell__content, .markdown-body, .markdown-viewer-content, .result-content) {
                         display: none !important;
                         position: absolute !important;
                         inset: 0 !important;
@@ -466,6 +469,9 @@
 
                 #app,
                 .app-shell,
+                .cw-view-viewer-shell,
+                .cw-view-viewer__prose,
+                [data-cw-viewer-prose],
                 .view-viewer,
                 .view-viewer__content,
                 .app-shell__content,

@@ -447,6 +447,9 @@
 
         [data-cw-view-host="true"],
         [data-cw-view-host="true"] > .cw-view-element__mount,
+        .cw-view-viewer-shell,
+        .cw-view-viewer__prose,
+        [data-cw-viewer-prose],
         md-view,
         markdown-viewer,
         .markdown-body,
