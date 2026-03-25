@@ -155,6 +155,11 @@
         --view-transition: var(--transition-normal) var(--ease-in-out);
     }
 
+    /* PWA / notch: overscroll and status-bar letterboxing pick up the same surface as the app */
+    html {
+        background-color: var(--color-background, Canvas);
+    }
+
     :is(html, body):has([data-shell="minimal"] [data-view="workcenter"]) {
         --view-sidebar-position: "right";
         --view-toolbar-alignment: "end";
@@ -216,7 +221,7 @@
         }
 
         :is(:root, html):has([data-shell="minimal"]) {
-            --view-nav-height: 44px;
+            --view-nav-height: 52px;
         }
 
         body:has([data-shell="faint"]) {

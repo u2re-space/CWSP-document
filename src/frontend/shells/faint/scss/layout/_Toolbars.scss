@@ -99,11 +99,11 @@
 
                 //
                 & {
-                    min-inline-size: 0px;
-                    min-block-size: 0px;
+                    min-inline-size: 2.5rem;
+                    min-block-size: 2.75rem;
                     inline-size: max-content;
                     block-size: stretch;
-                    touch-action: none;
+                    touch-action: manipulation;
                     flex-direction: row;
                     flex-wrap: nowrap;
                     max-inline-size: stretch;
@@ -111,14 +111,19 @@
                     padding-block: 0px;
                     padding-inline: 0.5rem;
                     max-block-size: stretch;
+                    flex-shrink: 0;
                 }
 
                 //
                 ui-icon {
                     padding: 0rem;
-                    block-size: stretch;
-                    inline-size: fit-content;
-                    max-block-size: 1.25rem;
+                    --icon-size: clamp(1.25rem, 5.5vmin, 1.75rem);
+                    font-size: var(--icon-size);
+                    block-size: auto;
+                    inline-size: auto;
+                    min-inline-size: 1.25rem;
+                    min-block-size: 1.25rem;
+                    max-block-size: none;
                 }
 
                 //

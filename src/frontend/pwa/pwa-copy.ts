@@ -232,14 +232,11 @@ export const initPWAClipboard = (): (() => void) => {
         const clipboardChannel = new BroadcastChannel("rs-clipboard");
 
         const clipboardHandler = async (event: MessageEvent) => {
-            const { type, data, options, operations } = event.data || {};
+            const { type, data, operations } = event.data || {};
             console.log('[PWA-Copy] Clipboard channel message:', type, summarizeForLog(data));
 
-            // Handle direct clipboard copy requests
-            if (type === "copy" && data !== undefined) {
-                const { copy } = await import("../../core/modules/Clipboard");
-                await copy(data, { showFeedback: true, ...options });
-            }
+            // type === "copy" is handled only by initClipboardReceiver() (singleton in Clipboard.ts).
+            // A second handler here duplicated copy() and could freeze the UI.
 
             // Handle pending operations sent directly from service worker
             if (type === "pending-operations" && operations && Array.isArray(operations)) {

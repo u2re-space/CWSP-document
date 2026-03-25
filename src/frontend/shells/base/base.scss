@@ -63,6 +63,7 @@
         contain: strict;
         -webkit-tap-highlight-color: transparent;
         transition: background-color 0.2s ease, color 0.2s ease;
+        border-radius: 0px;
 
         &[data-theme="light"] {
             color-scheme: light;
@@ -110,6 +111,7 @@
         scrollbar-width: thin;
         scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
         container-type: size;
+        border-radius: 0px;
 
         & > * {
             flex: 1;

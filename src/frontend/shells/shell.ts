@@ -5,10 +5,12 @@ import { ViewRegistry } from "../shared/registry";
 import { showToast } from "@rs-frontend/items/Toast";
 import { withViewTransition, getTransitionDirection } from "../shared/view-transitions";
 import { loadSettings, saveSettings } from "@rs-com/config/Settings";
-import { applyTheme as applyAppTheme } from "@rs-core/utils/Theme";
+import { applyTheme as applyAppTheme, syncBrowserChromeTheme } from "@rs-core/utils/Theme";
 import { isEnabledView } from "../config/views";
 import { scheduleViewModulePrefetch } from "../shared/view-prefetch";
 import { ensureStyleSheet } from "fest/icon";
+import "fest/icon";
+import { dynamicTheme } from "fest/lure";
 import { ensureShellElementDefined, type ShellElement, MinimalShellHostElement } from "./UIElement";
 
 //
@@ -51,7 +53,9 @@ export abstract class ShellBase implements Shell {
 
     // Mounted state
     protected mounted = false;
-    protected themeSelectElement: HTMLSelectElement | null = null;
+    protected themeCycleButton: HTMLButtonElement | null = null;
+    protected themeCycleIcon: HTMLElement | null = null;
+    protected themeAttrObserver: MutationObserver | null = null;
 
     // ========================================================================
     // ABSTRACT METHODS (to be implemented by concrete shells)
@@ -129,6 +133,7 @@ export abstract class ShellBase implements Shell {
 
         // Apply initial theme
         this.applyTheme(this.getThemeRefValue());
+        this.bindThemeAttrObserver();
 
         // Mount to container
         container.replaceChildren(this.rootElement);
@@ -137,6 +142,14 @@ export abstract class ShellBase implements Shell {
         // Align navigation state with the URL before the first boot navigate(), so the
         // outgoing "previous" view is not a stale placeholder (e.g. "home" on /viewer).
         this.syncNavigationFromUrl();
+
+        // LUR.E dynamic theme owns meta[name="theme-color"] for frame/WCO tinting.
+        try {
+            (globalThis as any).__LURE_DYNAMIC_THEME_PRIORITY__ = true;
+            dynamicTheme(document.documentElement);
+        } catch (e) {
+            console.warn(`[${this.id}] dynamicTheme init failed:`, e);
+        }
 
         console.log(`[${this.id}] Shell mounted with data-shell="${this.id}"`);
     }
@@ -196,6 +209,8 @@ export abstract class ShellBase implements Shell {
         this.statusContainer = null;
         this.container = null;
         this.mounted = false;
+        this.themeAttrObserver?.disconnect();
+        this.themeAttrObserver = null;
 
         console.log(`[${this.id}] Shell unmounted`);
     }
@@ -450,20 +465,29 @@ export abstract class ShellBase implements Shell {
         this.invokeCurrentViewOnShow();
     }
 
+    protected resolveShellColorScheme(theme: ShellTheme): "light" | "dark" {
+        const prefersDark = globalThis?.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
+        return theme.colorScheme === "dark"
+            ? "dark"
+            : theme.colorScheme === "light"
+              ? "light"
+              : prefersDark
+                ? "dark"
+                : "light";
+    }
+
     /**
      * Apply theme to the shell
      */
     protected applyTheme(theme: ShellTheme): void {
         if (!this.rootElement) return;
 
-        // Set color scheme
-        const prefersDark = globalThis?.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
-        const resolved = theme.colorScheme === "dark" ? "dark"
-            : theme.colorScheme === "light" ? "light"
-            : prefersDark ? "dark" : "light";
+        const resolved = this.resolveShellColorScheme(theme);
 
         this.rootElement.dataset.theme = resolved;
         this.rootElement.style.colorScheme = resolved;
+
+        syncBrowserChromeTheme(resolved, theme.colorScheme);
 
         // Apply CSS variables if provided
         if (theme.cssVariables) {
@@ -543,34 +567,28 @@ export abstract class ShellBase implements Shell {
         themeSlot.style.alignItems = "center";
         themeSlot.style.gap = "0.35rem";
 
-        const label = document.createElement("span");
-        label.textContent = "Theme";
-        label.style.fontSize = "0.8rem";
-        label.style.opacity = "0.8";
+        const cycleBtn = document.createElement("button");
+        cycleBtn.type = "button";
+        cycleBtn.className = "app-shell__nav-btn shell-theme-cycle-btn";
+        cycleBtn.setAttribute("aria-label", "Theme: follow system");
+        cycleBtn.title = "Theme: follow system — click to pin dark or light, then click again to return to auto";
 
-        const select = document.createElement("select");
-        select.setAttribute("aria-label", "Theme mode");
-        select.innerHTML = `
-            <option value="auto">Auto</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-        `;
-        select.addEventListener("change", () => {
-            void this.applyThemeMode(select.value as "auto" | "light" | "dark");
+        const icon = document.createElement("ui-icon");
+        icon.setAttribute("icon", "lamp");
+        icon.setAttribute("icon-style", "duotone");
+        cycleBtn.appendChild(icon);
+
+        cycleBtn.addEventListener("click", () => {
+            const mode = this.getThemeModeFromShellTheme();
+            if (mode === "auto") {
+                const eff = this.resolveEffectiveSystemScheme();
+                void this.applyThemeMode(eff === "light" ? "dark" : "light");
+            } else {
+                void this.applyThemeMode("auto");
+            }
         });
 
-        const toggle = document.createElement("button");
-        toggle.type = "button";
-        toggle.textContent = "Toggle";
-        toggle.title = "Quick toggle light/dark";
-        toggle.setAttribute("aria-label", "Toggle light or dark mode");
-        toggle.addEventListener("click", () => {
-            const current = this.getThemeModeFromShellTheme();
-            const next = current === "dark" ? "light" : "dark";
-            void this.applyThemeMode(next);
-        });
-
-        themeSlot.append(/*label,*/ select/*, toggle*/);
+        themeSlot.append(cycleBtn);
 
         const viewSlot = document.createElement("div");
         viewSlot.className = "shell-view-toolbar-slot";
@@ -584,7 +602,8 @@ export abstract class ShellBase implements Shell {
         this.toolbarContainer.append(themeSlot, viewSlot);
         this.toolbarThemeSlot = themeSlot;
         this.toolbarViewSlot = viewSlot;
-        this.themeSelectElement = select;
+        this.themeCycleButton = cycleBtn;
+        this.themeCycleIcon = icon;
         this.syncThemeToolbarControls();
     }
 
@@ -596,6 +615,10 @@ export abstract class ShellBase implements Shell {
         return "auto";
     }
 
+    private resolveEffectiveSystemScheme(): "light" | "dark" {
+        return globalThis?.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light";
+    }
+
     private createShellTheme(mode: "auto" | "light" | "dark"): ShellTheme {
         if (mode === "dark") return { id: "dark", name: "Dark", colorScheme: "dark" };
         if (mode === "light") return { id: "light", name: "Light", colorScheme: "light" };
@@ -604,7 +627,26 @@ export abstract class ShellBase implements Shell {
 
     private syncThemeToolbarControls(): void {
         const mode = this.getThemeModeFromShellTheme();
-        if (this.themeSelectElement) this.themeSelectElement.value = mode;
+        const effectiveMode = mode === "auto" ? this.getExternalThemeModeHint() : mode;
+        const iconEl = this.themeCycleIcon;
+        const btn = this.themeCycleButton;
+        if (!iconEl || !btn) return;
+
+        const iconName =
+            effectiveMode === "light" ? "sun-dim" : effectiveMode === "dark" ? "moon-stars" : "lamp";
+        iconEl.setAttribute("icon", iconName);
+
+        if (mode === "auto") {
+            btn.title =
+                "Theme: follow system — click to pin the opposite of the current appearance, then click again for auto";
+            btn.setAttribute("aria-label", "Theme follows system. Activate to pin light or dark.");
+        } else if (mode === "light") {
+            btn.title = "Theme: light — click to follow system again";
+            btn.setAttribute("aria-label", "Light theme is on. Activate to follow system appearance.");
+        } else {
+            btn.title = "Theme: dark — click to follow system again";
+            btn.setAttribute("aria-label", "Dark theme is on. Activate to follow system appearance.");
+        }
     }
 
     private async applyThemeMode(mode: "auto" | "light" | "dark"): Promise<void> {
@@ -619,11 +661,29 @@ export abstract class ShellBase implements Shell {
                 }
             });
             applyAppTheme(saved);
-            this.showMessage(`Theme: ${mode}`);
         } catch (error) {
             console.warn(`[${this.id}] Failed to save theme mode:`, error);
-            this.showMessage("Theme updated for current session");
         }
+    }
+
+    private getExternalThemeModeHint(): "auto" | "light" | "dark" {
+        const scheme = (document?.documentElement?.getAttribute?.("data-scheme") || "").toLowerCase();
+        if (scheme === "light" || scheme === "dark") return scheme as "light" | "dark";
+        return "auto";
+    }
+
+    private bindThemeAttrObserver(): void {
+        this.themeAttrObserver?.disconnect();
+        if (typeof document === "undefined") return;
+
+        const root = document.documentElement;
+        this.themeAttrObserver = new MutationObserver(() => {
+            this.syncThemeToolbarControls();
+        });
+        this.themeAttrObserver.observe(root, {
+            attributes: true,
+            attributeFilter: ["data-scheme", "data-theme"]
+        });
     }
 
     // ========================================================================

@@ -183,8 +183,8 @@
 @layer view.airpad {
 
     @media (prefers-color-scheme: light) {
-        .view-airpad,
-        .airpad-config-overlay {
+        :root:not([data-theme="dark"]) .view-airpad,
+        :root:not([data-theme="dark"]) .airpad-config-overlay {
             /* Surface system - Material Design 3 light */
             --surface: #fafafa;
             --surface-variant: #e7e5e5;
@@ -238,9 +238,11 @@
         }
     }
 
-    /* Explicit light theme when shell sets data-theme="light" */
-    .app-shell[data-theme="light"] .view-airpad,
-    .app-shell[data-theme="light"] .airpad-config-overlay {
+    /* Explicit light theme from shell/root (works for shadow-host shells too). */
+    :root[data-theme="light"] .view-airpad,
+    :root[data-theme="light"] .airpad-config-overlay,
+    [data-shell][data-theme="light"] .view-airpad,
+    [data-shell][data-theme="light"] .airpad-config-overlay {
         --surface: #fafafa;
         --surface-variant: #e7e5e5;
         --surface-container: #f3f1f1;

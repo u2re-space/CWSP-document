@@ -216,7 +216,6 @@ export class ExecutionCore {
                     textArea.value = textToCopy.trim();
                     document.body.appendChild(textArea);
                     textArea.select();
-                    document.execCommand('copy');
                     document.body.removeChild(textArea);
                 } else {
                     // Service worker context - cannot access DOM

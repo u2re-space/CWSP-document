@@ -225,16 +225,16 @@ export class BootLoader {
             // Phase 2: Initialize Shell
             const shell = await this.loadShell(config.shell, container);
             
-            // Phase 3: Apply Theme
+            // Phase 3: Shell theme ref (DOM apply runs on mount when rootElement exists)
             shell.setTheme(config.theme || persistedTheme);
-            
-            // Phase 4: Mount Shell
-            await shell.mount(container);
 
-            // Phase 4.5: Apply document-level theme/settings
+            // Phase 3.5: Document / Veela tokens before first shell paint (PWA cutout + scheme)
             if (persistedSettings) {
                 applyAppTheme(persistedSettings);
             }
+
+            // Phase 4: Mount Shell
+            await shell.mount(container);
             
             // Phase 5: Initialize channels (primary sync, rest on idle)
             if (config.channels && config.channels.length > 0) {

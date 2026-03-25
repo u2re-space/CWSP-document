@@ -286,6 +286,7 @@ export class ViewerView implements View {
     private shellContext?: ShellContext;
     private element: HTMLElement | null = null;
     private contentRef = ref("");
+    private renderSeq = 0;
     private stateManager = createViewState<ViewerState>(STORAGE_KEY);
     private _sheet: CSSStyleSheet | null = null;
     private pasteController: AbortController | null = null;
@@ -359,9 +360,9 @@ export class ViewerView implements View {
             <div class="view-viewer">
                 <div class="view-viewer__toolbar" data-viewer-toolbar>
                     <div class="view-viewer__toolbar-left">
-                        <button class="view-viewer__btn" data-action="paste" type="button" title="Paste from clipboard (mobile-friendly)" aria-label="Paste from clipboard">
-                            <ui-icon icon="clipboard-text" icon-style="duotone"></ui-icon>
-                            <span>Paste</span>
+                        <button class="view-viewer__btn" data-action="open" type="button" title="Open file">
+                            <ui-icon icon="folder-open" icon-style="duotone"></ui-icon>
+                            <span>Open</span>
                         </button>
                         <button class="view-viewer__btn" data-action="toggle-raw" type="button" title="Toggle raw/rendered view">
                             <ui-icon icon="code" icon-style="duotone"></ui-icon>
@@ -370,6 +371,10 @@ export class ViewerView implements View {
                         <button class="view-viewer__btn" data-action="copy" type="button" title="Copy raw content">
                             <ui-icon icon="copy" icon-style="duotone"></ui-icon>
                             <span>Copy</span>
+                        </button>
+                        <button class="view-viewer__btn" data-action="paste" type="button" title="Paste from clipboard (mobile-friendly)" aria-label="Paste from clipboard">
+                            <ui-icon icon="clipboard-text" icon-style="duotone"></ui-icon>
+                            <span>Paste</span>
                         </button>
                         <button class="view-viewer__btn" data-action="download" type="button" title="Download as markdown">
                             <ui-icon icon="download" icon-style="duotone"></ui-icon>
@@ -385,10 +390,6 @@ export class ViewerView implements View {
                         <button class="view-viewer__btn" data-action="open-style-settings" type="button" title="Markdown styling, modules, plugins">
                             <ui-icon icon="paint-roller" icon-style="duotone"></ui-icon>
                             <span>Style</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="open" type="button" title="Open file">
-                            <ui-icon icon="folder-open" icon-style="duotone"></ui-icon>
-                            <span>Open</span>
                         </button>
                         <button class="view-viewer__btn" data-action="copy-rendered" type="button" title="Copy rendered text">
                             <ui-icon icon="text-t" icon-style="duotone"></ui-icon>
@@ -467,6 +468,7 @@ export class ViewerView implements View {
 
     private renderMarkdown(content: string, renderTarget: HTMLElement, rawTarget: HTMLPreElement): void {
         if (!renderTarget) return;
+        const seq = ++this.renderSeq;
 
         const looksLikeHtmlDocument = (text: string): boolean => {
             const t = (text || "").trimStart().toLowerCase();
@@ -479,6 +481,7 @@ export class ViewerView implements View {
         };
 
         const endBusy = (): void => {
+            if (seq !== this.renderSeq) return;
             renderTarget.removeAttribute("aria-busy");
             renderTarget.removeAttribute("data-md-state");
         };
@@ -487,6 +490,7 @@ export class ViewerView implements View {
         if (rawTarget) {
             const c = content || "";
             const assignRaw = (): void => {
+                if (seq !== this.renderSeq) return;
                 if (c.length > VIEWER_RAW_DISPLAY_MAX_CHARS) {
                     rawTarget.textContent =
                         `${c.slice(0, VIEWER_RAW_DISPLAY_MAX_CHARS)}\n\n… [truncated — open in editor for full source]`;
@@ -499,6 +503,21 @@ export class ViewerView implements View {
             } else {
                 assignRaw();
             }
+        }
+
+        // Fast path: empty/whitespace content should never run marked/DOMPurify (avoids hangs + flicker).
+        const normalized = String(content ?? "");
+        if (!normalized.trim()) {
+            if (seq !== this.renderSeq) return;
+            const container = this.element?.querySelector(".view-viewer__content");
+            if (container) container.removeAttribute("data-raw");
+            renderTarget.hidden = false;
+            if (rawTarget) rawTarget.hidden = true;
+            renderTarget.removeAttribute("aria-busy");
+            renderTarget.setAttribute("data-md-state", "empty");
+            renderTarget.innerHTML =
+                `<div class="view-viewer__md-empty" role="status">Empty document</div>`;
+            return;
         }
 
         // Auto-switch to raw if it looks like HTML
@@ -523,8 +542,10 @@ export class ViewerView implements View {
         renderTarget.innerHTML = `<div class="view-viewer__md-loading" role="status">Rendering preview…</div>`;
 
         queueMicrotask(() => {
+            if (seq !== this.renderSeq) return;
             try {
                 const handleParsed = (html: string) => {
+                    if (seq !== this.renderSeq) return;
                     const sanitized = DOMPurify?.sanitize?.((html || "")?.trim?.() || "", SANITIZE_OPTIONS) || "";
                     renderTarget.innerHTML = sanitized;
                     this.resolveRelativeResourceUrls(renderTarget);
@@ -534,6 +555,7 @@ export class ViewerView implements View {
                 };
 
                 const handleError = (error: unknown) => {
+                    if (seq !== this.renderSeq) return;
                     console.error("[ViewerView] Error rendering markdown:", error);
                     renderTarget.innerHTML = `<div style="color: red; padding: 1rem; background: #fee; border: 1px solid #fcc; border-radius: 4px;">Error parsing markdown: ${(error as any)?.message}</div>`;
                     endBusy();
@@ -715,7 +737,7 @@ export class ViewerView implements View {
                     this.handleOpenStyleSettings();
                     break;
                 case "attach":
-                    this.handleAttachToWorkCenter();
+                    void this.handleAttachToWorkCenter();
                     break;
             }
         });
@@ -801,11 +823,21 @@ export class ViewerView implements View {
     }
 
     private async handleCopy(): Promise<void> {
+        const raw = this.contentRef.value || "";
+        if (!raw.trim()) {
+            this.showMessage("No content to copy");
+            return;
+        }
         try {
-            const result = await writeClipboardText(this.contentRef.value);
+            const result = await Promise.race([
+                writeClipboardText(raw),
+                new Promise<{ ok: false; error: string }>((resolve) =>
+                    globalThis.setTimeout(() => resolve({ ok: false, error: "Clipboard timeout" }), 3500)
+                )
+            ]);
             if (!result.ok) throw new Error(result.error || "Clipboard write failed");
             this.showMessage("Copied raw content to clipboard");
-            this.options.onCopy?.(this.contentRef.value);
+            this.options.onCopy?.(raw);
         } catch (error) {
             console.error("[ViewerView] Failed to copy:", error);
             this.showMessage("Failed to copy to clipboard");
@@ -817,7 +849,8 @@ export class ViewerView implements View {
             if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => r());
             else globalThis.setTimeout(() => r(), 0);
         });
-        const text = (renderTarget?.innerText || "").trim();
+        // textContent avoids full layout flush that innerText can trigger on large docs.
+        const text = (renderTarget?.textContent || "").trim();
         if (!text) {
             this.showMessage("No content to copy");
             return;
@@ -827,7 +860,12 @@ export class ViewerView implements View {
             return;
         }
         try {
-            const result = await writeClipboardText(text);
+            const result = await Promise.race([
+                writeClipboardText(text),
+                new Promise<{ ok: false; error: string }>((resolve) =>
+                    globalThis.setTimeout(() => resolve({ ok: false, error: "Clipboard timeout" }), 3500)
+                )
+            ]);
             if (!result.ok) throw new Error(result.error || "Clipboard write failed");
             this.showMessage("Copied rendered text to clipboard");
         } catch {
@@ -896,10 +934,42 @@ export class ViewerView implements View {
         }
     }
 
-    private handleAttachToWorkCenter(): void {
-        this.options.onAttachToWorkCenter?.(this.contentRef.value);
-        this.shellContext?.navigate("workcenter");
-        this.showMessage("Content attached to Work Center");
+    private async handleAttachToWorkCenter(): Promise<void> {
+        const content = this.contentRef.value || "";
+        if (!content.trim()) {
+            this.showMessage("No content to attach");
+            return;
+        }
+
+        await Promise.resolve(this.shellContext?.navigate("workcenter"));
+
+        const filename = this.options.filename || `viewer-${Date.now()}.md`;
+        const payload = {
+            text: content,
+            content,
+            filename,
+            source: "viewer-attach"
+        };
+
+        try {
+            const { ViewRegistry } = await import("../../shared/registry");
+            const workcenter =
+                ViewRegistry.getLoaded("workcenter") ||
+                await ViewRegistry.load("workcenter", { shellContext: this.shellContext });
+            if (workcenter?.handleMessage) {
+                await workcenter.handleMessage({
+                    type: "content-share",
+                    contentType: "markdown",
+                    data: payload
+                });
+                this.showMessage("Content attached to Work Center");
+                return;
+            }
+        } catch (error) {
+            console.warn("[Viewer] direct workcenter attach failed:", error);
+        }
+
+        this.showMessage("Attach failed — open Work Center and try again");
     }
 
     private handleOpenStyleSettings(): void {
@@ -985,7 +1055,12 @@ export class ViewerView implements View {
 
         try {
             if (typeof navigator.clipboard.read === "function") {
-                const items = await navigator.clipboard.read();
+                const items = await Promise.race([
+                    navigator.clipboard.read(),
+                    new Promise<ClipboardItem[]>((resolve) =>
+                        globalThis.setTimeout(() => resolve([]), 3500)
+                    )
+                ]);
                 let mdNameIndex = 0;
 
                 for (const item of items) {

@@ -603,7 +603,6 @@ const initSettingsUI = () => {
                 textarea.style.pointerEvents = "none";
                 document.body.appendChild(textarea);
                 textarea.select();
-                document.execCommand("copy");
                 textarea.remove();
             } catch {
                 alert(`Export JSON:\n\n${payload}`);

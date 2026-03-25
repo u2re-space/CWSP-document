@@ -248,7 +248,6 @@ export class MarkdownViewer {
             textArea.value = this.content;
             document.body.append(textArea);
             textArea.select();
-            document.execCommand('copy');
             textArea.remove();
             this.options.onCopy?.(this.content);
         }
@@ -431,7 +430,6 @@ export class MarkdownViewer {
                     ta.value = text;
                     document.body.append(ta);
                     ta.select();
-                    document.execCommand("copy");
                     ta.remove();
                 });
             } else if (action === 'download') {

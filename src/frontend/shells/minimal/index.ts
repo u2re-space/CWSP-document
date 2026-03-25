@@ -187,11 +187,11 @@ export class MinimalShell extends ShellBase {
     }
 
     protected applyTheme(theme: ShellTheme): void {
-        super.applyTheme(theme);
         const inner = this.rootElement?.shadowRoot?.querySelector(".app-shell") as HTMLElement | null;
-        if (inner && this.rootElement?.dataset.theme) {
-            inner.dataset.theme = this.rootElement.dataset.theme;
+        if (inner) {
+            inner.dataset.theme = this.resolveShellColorScheme(theme);
         }
+        super.applyTheme(theme);
     }
 
     async mount(container: HTMLElement): Promise<void> {

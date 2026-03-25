@@ -36,6 +36,7 @@ export class WorkCenterView implements View {
     private resultObserver: MutationObserver | null = null;
     private _sheet: CSSStyleSheet | null = null;
     private readonly autoFileFingerprints = new Set<string>();
+    private pendingMessages: unknown[] = [];
 
     lifecycle: ViewLifecycle = {
         onMount: () => this.onMount(),
@@ -77,6 +78,7 @@ export class WorkCenterView implements View {
         this.syncPromptInputFromState();
         this.setupProcessResultObserver();
         this.emitFilesChanged();
+        void this.flushPendingMessages();
         return this.element;
     }
 
@@ -123,6 +125,19 @@ export class WorkCenterView implements View {
             data?: { file?: File; files?: File[]; text?: string; content?: string; url?: string };
         };
 
+        if (!this.manager) {
+            if (this.pendingMessages.length >= 64) this.pendingMessages.shift();
+            this.pendingMessages.push(message);
+            return;
+        }
+        await this.handleMessageWithManager(msg);
+    }
+
+    private async handleMessageWithManager(msg: {
+        type?: string;
+        contentType?: string;
+        data?: { file?: File; files?: File[]; text?: string; content?: string; url?: string };
+    }): Promise<void> {
         if (!this.manager) return;
 
         if (msg.type === "share-target-input" || msg.type === "share-target-result" || msg.type === "ai-result" || msg.type === "content-share") {
@@ -146,6 +161,19 @@ export class WorkCenterView implements View {
         if (msg.type === "content-process") {
             const executeBtn = this.element?.querySelector('[data-action="execute"]') as HTMLButtonElement | null;
             executeBtn?.click();
+        }
+    }
+
+    private async flushPendingMessages(): Promise<void> {
+        if (!this.manager || this.pendingMessages.length === 0) return;
+        const queue = this.pendingMessages.splice(0, this.pendingMessages.length);
+        for (const message of queue) {
+            const msg = message as {
+                type?: string;
+                contentType?: string;
+                data?: { file?: File; files?: File[]; text?: string; content?: string; url?: string };
+            };
+            await this.handleMessageWithManager(msg);
         }
     }
 
@@ -257,11 +285,13 @@ export class WorkCenterView implements View {
             this.pendingRenderAfterMount = false;
             this.requestRender();
         }
+        void this.flushPendingMessages();
     }
 
     private onHide(): void {
         // Keep DOM and manager state alive while hidden.
     }
+
 }
 
 export function createView(options?: WorkCenterOptions): WorkCenterView {

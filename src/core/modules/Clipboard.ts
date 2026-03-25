@@ -129,12 +129,11 @@ export const writeText = async (text: string): Promise<ClipboardResult> => {
                         textarea.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none;";
                         document.body.appendChild(textarea);
                         textarea.select();
-                        const success = document.execCommand("copy");
                         textarea.remove();
-                        if (success) {
+                        /*if (success) {
                             resolve({ ok: true, data: trimmed, method: "legacy" });
                             return;
-                        }
+                        }*/
                     }
                 } catch (err) {
                     console.warn("[Clipboard] Legacy execCommand failed:", err);
@@ -387,27 +386,55 @@ export const requestCopy = (data: unknown, options?: ClipboardWriteOptions): voi
     }
 };
 
+/** One logical listener for rs-clipboard — multiple initClipboardReceiver calls must not stack handlers (duplicate copy() freezes UI). */
+let _clipboardBroadcastChannel: BroadcastChannel | null = null;
+let _clipboardBroadcastRefCount = 0;
+let _clipboardBroadcastHandler: ((event: MessageEvent) => void) | null = null;
+/** Serialize SW/client broadcast copies so overlapping clipboard API work does not wedge the main thread. */
+let _clipboardBroadcastQueue: Promise<void> = Promise.resolve();
+
 /**
  * Listen for clipboard operation requests
  */
 export const listenForClipboardRequests = (): (() => void) => {
     if (typeof BroadcastChannel === "undefined") return () => {};
 
-    const channel = new BroadcastChannel(CLIPBOARD_CHANNEL);
-    const handler = async (event: MessageEvent) => {
-        if (event.data?.type === "copy") {
+    if (_clipboardBroadcastRefCount === 0) {
+        const channel = new BroadcastChannel(CLIPBOARD_CHANNEL);
+        const handler = (event: MessageEvent) => {
+            if (event.data?.type !== "copy") return;
             const opts = event.data.options || {};
-            await copy(event.data.data, {
-                ...opts,
-                showFeedback: opts.showFeedback !== false,
-                silentOnError: opts.silentOnError === true
+            const data = event.data.data;
+            _clipboardBroadcastQueue = _clipboardBroadcastQueue.then(async () => {
+                try {
+                    await copy(data, {
+                        ...opts,
+                        showFeedback: opts.showFeedback !== false,
+                        silentOnError: opts.silentOnError === true
+                    });
+                } catch (err) {
+                    console.warn("[Clipboard] Broadcast copy failed:", err);
+                }
             });
-        }
-    };
-    channel.addEventListener("message", handler);
+        };
+        channel.addEventListener("message", handler);
+        _clipboardBroadcastChannel = channel;
+        _clipboardBroadcastHandler = handler;
+    }
+    _clipboardBroadcastRefCount++;
     return () => {
-        channel.removeEventListener("message", handler);
-        channel.close();
+        _clipboardBroadcastRefCount--;
+        if (_clipboardBroadcastRefCount <= 0) {
+            const ch = _clipboardBroadcastChannel;
+            const h = _clipboardBroadcastHandler;
+            if (ch && h) {
+                ch.removeEventListener("message", h);
+                ch.close();
+            }
+            _clipboardBroadcastChannel = null;
+            _clipboardBroadcastHandler = null;
+            _clipboardBroadcastRefCount = 0;
+        }
     };
 };
 

@@ -194,7 +194,6 @@ const copyMarkdown = async () => {
         ta.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0;";
         document.body.appendChild(ta);
         ta.select();
-        document.execCommand("copy");
         ta.remove();
     }
 };

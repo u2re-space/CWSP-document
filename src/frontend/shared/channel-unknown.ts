@@ -22,7 +22,6 @@ import { getSpeechPrompt } from "@rs-core/modules/VoiceInput";
 import { createTemplateManager } from "@rs-core/modules/TemplateManager";
 import { BROADCAST_CHANNELS } from "@rs-com/config/Names";
 import { loadAsAdopted } from "fest/dom";
-import { dynamicTheme } from "fest/lure";
 import { clearIconCaches, clearIconCache, testIconRacing, reinitializeRegistry, debugIconSystem } from "fest/icon";
 import type { FileManager } from "fest/fl-ui/services/file-manager/FileManager";
 import type { AppSettings } from "@rs-com/config/SettingsTypes";
@@ -222,14 +221,6 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
         console.log('[Icons] Initialized stylesheet:', sheet);
     } catch (error) {
         console.error('[Icons] Failed to initialize stylesheet:', error);
-    }
-
-    // Initialize dynamic status bar color theming
-    try {
-        dynamicTheme(root);
-        console.log('[Theme] Dynamic status bar color theming initialized');
-    } catch (error) {
-        console.error('[Theme] Failed to initialize dynamic status bar color theming:', error);
     }
 
     // Add debug functions to window for troubleshooting icon issues

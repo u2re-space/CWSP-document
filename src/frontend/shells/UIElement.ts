@@ -12,6 +12,8 @@ const MINIMAL_SHELL_HOST_STYLES = `
     contain: strict;
     isolation: isolate;
     overflow: hidden;
+    /* Minimal shell: align with .app-shell__nav via --shell-nav-bg (set in minimal.scss) */
+    background-color: var(--shell-nav-bg, var(--color-surface-container-high, var(--color-background, Canvas)));
 }
 
 .app-shell__content > slot[name="view"]::slotted([data-view]) {

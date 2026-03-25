@@ -172,13 +172,11 @@ const writeTextWithRAF = async (text: string, maxRetries = 3): Promise<{ ok: boo
 
                                 // Focus the textarea for better compatibility
                                 textarea.focus();
-
-                                const success = document.execCommand("copy");
                                 textarea.remove();
 
-                                if (success) {
+                                /*if (success) {
                                     return resolve({ ok: true, method: "legacy-execCommand" });
-                                }
+                                }*/
                             }
                         } catch (err) {
                             console.warn(`[Clipboard] Legacy execCommand failed (attempt ${attempt + 1}):`, err);
