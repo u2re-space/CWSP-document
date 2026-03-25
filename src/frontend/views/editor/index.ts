@@ -169,16 +169,6 @@ export class EditorView implements View {
                     break;
             }
         });
-
-        // Keyboard shortcuts
-        this.textarea?.addEventListener("keydown", (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                if (e.key === "s") {
-                    e.preventDefault();
-                    this.handleSave();
-                }
-            }
-        });
     }
 
     private handleOpen(): void {

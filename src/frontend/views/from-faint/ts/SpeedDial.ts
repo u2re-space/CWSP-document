@@ -279,19 +279,23 @@ const handleWallpaperDropOrPaste = (event: DragEvent | ClipboardEvent) => {
         const dataTransfer = isPaste ? (event as ClipboardEvent).clipboardData : (event as DragEvent).dataTransfer;
 
         if (isPaste) {
-            handleSpeedDialPaste(event as ClipboardEvent)
+            void handleSpeedDialPaste(event as ClipboardEvent);
         }
 
         event.preventDefault();
         event.stopPropagation();
 
-        handleIncomingEntries(dataTransfer || ((event as any).clipboardData || (event as any).dataTransfer), "/images/wallpaper/", null, (file, path) => {
-            console.log(file, path);
-            if (file.type.startsWith("image/")) {
-                wallpaperState.src = path;
-                persistWallpaper();
-                showSuccess("Wallpaper updated");
-            }
+        const dt = dataTransfer || ((event as any).clipboardData || (event as any).dataTransfer);
+        // Defer heavy file/clipboard scanning so the UI thread can process preventDefault first.
+        queueMicrotask(() => {
+            handleIncomingEntries(dt, "/images/wallpaper/", null, (file, path) => {
+                console.log(file, path);
+                if (file.type.startsWith("image/")) {
+                    wallpaperState.src = path;
+                    persistWallpaper();
+                    showSuccess("Wallpaper updated");
+                }
+            });
         });
     }
 };
@@ -332,9 +336,6 @@ export function SpeedDial(makeView: any) {
             ${M(items, renderIconItem)}
         </div>
     </div>`;
-
-    //
-    box.onPaste = async (ev: ClipboardEvent) => await handleWallpaperDropOrPaste(ev);
 
     //
     return box;

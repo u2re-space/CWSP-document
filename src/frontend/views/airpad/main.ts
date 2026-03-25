@@ -14,6 +14,7 @@ import { initAirButton } from "./ui/air-button";
 import { initRelativeOrientation } from "./input/sensor/relative-orientation";
 import { stopRelativeOrientation } from "./input/sensor/relative-orientation";
 import { initVirtualKeyboard, setRemoteKeyboardEnabled } from "./input/virtual-keyboard";
+import { teardownKeyboardDismissListeners } from "./input/keyboard/handlers";
 import { initClipboardToolbar } from "./ui/clipboard-toolbar";
 import { showConfigUI, teardownAirpadConfigOverlay } from "./ui/config-ui";
 import { resetClipboardToolbarState } from "./ui/clipboard-toolbar";
@@ -31,6 +32,7 @@ let airpadInitAbort: AbortController | null = null;
 let airpadCrossTabUnsub: (() => void) | null = null;
 
 export function unmountAirpadRuntime(): void {
+    teardownKeyboardDismissListeners();
     airpadInitToken += 1;
     airpadInitAbort?.abort();
     airpadInitAbort = null;

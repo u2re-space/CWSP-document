@@ -17,6 +17,9 @@ export class MarkdownEditor {
     private editor: HTMLTextAreaElement | null = null;
     private preview: any | null = null;
     private autoSaveTimeout: number | null = null;
+    /** Coalesce live preview + stats so large docs do not parse/markdown on every keystroke. */
+    private previewStatsDebounce: ReturnType<typeof setTimeout> | null = null;
+    private static readonly PREVIEW_STATS_DEBOUNCE_MS = 160;
 
     constructor(options: MarkdownEditorOptions = {}) {
         this.options = {
@@ -186,6 +189,10 @@ export class MarkdownEditor {
     setContent(content: string): void {
         if (this.editor) {
             this.editor.value = content;
+            if (this.previewStatsDebounce !== null) {
+                globalThis.clearTimeout(this.previewStatsDebounce);
+                this.previewStatsDebounce = null;
+            }
             this.updatePreview();
             this.updateStats();
         }
@@ -246,11 +253,6 @@ export class MarkdownEditor {
             this.handleContentChange();
         });
 
-        // Keyboard shortcuts
-        this.editor.addEventListener('keydown', (e) => {
-            this.handleKeyboardShortcuts(e);
-        });
-
         // Toolbar actions
         container.addEventListener('click', (e) => {
             const target = e.target as HTMLElement;
@@ -276,44 +278,25 @@ export class MarkdownEditor {
 
     private handleContentChange(): void {
         const content = this.getContent();
-        this.updatePreview();
-        this.updateStats();
         this.options.onContentChange?.(content);
 
         // Auto-save
         if (this.options.autoSave) {
             this.scheduleAutoSave();
         }
+
+        this.schedulePreviewAndStatsUpdate();
     }
 
-    private handleKeyboardShortcuts(e: KeyboardEvent): void {
-        // Ctrl+S for save
-        if (e.ctrlKey && e.key === 's') {
-            e.preventDefault();
-            this.save();
-            return;
+    private schedulePreviewAndStatsUpdate(): void {
+        if (this.previewStatsDebounce !== null) {
+            globalThis.clearTimeout(this.previewStatsDebounce);
         }
-
-        // Tab for indentation
-        if (e.key === 'Tab') {
-            e.preventDefault();
-            this.insertText('\t');
-            return;
-        }
-
-        // Ctrl+B for bold
-        if (e.ctrlKey && e.key === 'b') {
-            e.preventDefault();
-            this.handleToolbarAction('bold');
-            return;
-        }
-
-        // Ctrl+I for italic
-        if (e.ctrlKey && e.key === 'i') {
-            e.preventDefault();
-            this.handleToolbarAction('italic');
-            return;
-        }
+        this.previewStatsDebounce = globalThis.setTimeout(() => {
+            this.previewStatsDebounce = null;
+            this.updatePreview();
+            this.updateStats();
+        }, MarkdownEditor.PREVIEW_STATS_DEBOUNCE_MS) as unknown as number;
     }
 
     private handleToolbarAction(action: string): void {

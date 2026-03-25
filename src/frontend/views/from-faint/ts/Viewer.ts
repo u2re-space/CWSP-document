@@ -52,7 +52,15 @@ export const ViewPage = <
     }
 
     //
-    viewPage.$refresh = () => { reloadTabs?.(); };
+    let refreshCoalesced = false;
+    viewPage.$refresh = () => {
+        if (refreshCoalesced) return;
+        refreshCoalesced = true;
+        scheduleFrame(() => {
+            refreshCoalesced = false;
+            reloadTabs?.();
+        });
+    };
     viewPage.$refresh?.();
 
     //
@@ -78,7 +86,6 @@ export const ViewPage = <
     section.addEventListener('contentvisibilityautostatechange', (e: any) => { viewPage.$refresh?.(); });
     section.addEventListener('visibilitychange', (e: any) => { viewPage.$refresh?.(); });
     section.addEventListener('focusin', (e: any) => { viewPage.$refresh?.(); });
-    document.addEventListener("rs-fs-changed", () => { viewPage.$refresh?.(); });
 
     // after append and appear in pages, try to first signal
     scheduleFrame(() => {

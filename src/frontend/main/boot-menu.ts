@@ -214,7 +214,7 @@ const setupEventHandlers = (opts: ChoiceScreenOptions, elements: ReturnType<type
 
     // Keyboard navigation
     const container = bigMinimalButton.closest('.choice.container') as HTMLElement;
-    container.addEventListener("keydown", (e) => {
+    const brokenKey = (e) => {
         // Any key press cancels countdown
         stopCountdown();
 
@@ -231,9 +231,11 @@ const setupEventHandlers = (opts: ChoiceScreenOptions, elements: ReturnType<type
         if (e.key === "Enter") {
             const el = document.activeElement as HTMLElement | null;
             const btn = el?.closest?.("button") as HTMLButtonElement | null;
-            btn?.click?.();
+            btn?.click?.(); container?.removeEventListener("keydown", brokenKey);
         }
-    });
+    };
+
+    container.addEventListener("keydown", brokenKey);
 
     // Mouse activity also cancels countdown
     container.addEventListener("mousedown", () => stopCountdown(), { once: true });

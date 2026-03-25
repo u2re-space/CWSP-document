@@ -17,8 +17,19 @@ import {
 import { renderKeyboard, renderEmoji, restoreButtonIcon } from './ui';
 
 const DEBUG_KEYBOARD_INPUT = false;
-/** Avoid duplicate document-level listeners across Airpad remounts. */
-let keyboardDocumentDismissListenersAttached = false;
+/** AbortController for document-level dismiss listeners (scoped to airpad owner document). */
+let keyboardDismissAbort: AbortController | null = null;
+
+/** Remove focus/pointer dismiss listeners (call on Airpad unmount). */
+export function teardownKeyboardDismissListeners(): void {
+    try {
+        keyboardDismissAbort?.abort();
+    } catch {
+        /* ignore */
+    }
+    keyboardDismissAbort = null;
+}
+
 const keyboardToggleClickBound = new WeakSet<Element>();
 const keyboardToggleApiBound = new WeakSet<Element>();
 const keyboardContainerUiBound = new WeakSet<Element>();
@@ -242,6 +253,125 @@ export function setupVirtualKeyboardAPIHandlers() {
         scheduleRestore();
     };
 
+    const TEXT_STREAM_CHUNK_SIZE = 256;
+    const TEXT_STREAM_SOFT_LIMIT = 12000;
+    const TEXT_STREAM_HARD_LIMIT = 120000;
+    let streamToken = 0;
+    const sendTextChunked = (text: string, dedupeKey?: string) => {
+        const raw = String(text || "");
+        if (!raw) {
+            scheduleRestore();
+            return;
+        }
+        if (dedupeKey && shouldSkipDuplicate(dedupeKey)) {
+            scheduleRestore();
+            return;
+        }
+
+        let safe = raw;
+        if (safe.length > TEXT_STREAM_HARD_LIMIT) {
+            safe = safe.slice(0, TEXT_STREAM_HARD_LIMIT);
+            log(`[AirPad] Input truncated to ${TEXT_STREAM_HARD_LIMIT} chars to avoid UI freeze.`);
+        } else if (safe.length > TEXT_STREAM_SOFT_LIMIT) {
+            log(`[AirPad] Streaming large input (${safe.length} chars) in chunks.`);
+        }
+
+        const token = ++streamToken;
+        let index = 0;
+        const pump = () => {
+            if (token !== streamToken) return;
+            if (!isRemoteKeyboardEnabled()) return;
+            const end = Math.min(index + TEXT_STREAM_CHUNK_SIZE, safe.length);
+            for (let i = index; i < end; i++) {
+                sendKeyboardChar(safe[i]!);
+            }
+            index = end;
+            if (index < safe.length) {
+                globalThis.setTimeout(pump, 0);
+                return;
+            }
+            scheduleRestore();
+        };
+        pump();
+    };
+
+    /** IME/composition: cancel in-flight chunked sends when a new update arrives (latest wins). */
+    let compositionPumpGen = 0;
+
+    const sendCompositionTextChunked = (text: string, onDone?: () => void) => {
+        const raw = String(text || "");
+        if (!raw) {
+            onDone?.();
+            return;
+        }
+        let safe = raw;
+        if (safe.length > TEXT_STREAM_HARD_LIMIT) {
+            safe = safe.slice(0, TEXT_STREAM_HARD_LIMIT);
+            log(`[AirPad] Composition text truncated to ${TEXT_STREAM_HARD_LIMIT} chars to avoid UI freeze.`);
+        } else if (safe.length > TEXT_STREAM_SOFT_LIMIT) {
+            log(`[AirPad] Streaming large composition input (${safe.length} chars) in chunks.`);
+        }
+        const gen = compositionPumpGen;
+        let index = 0;
+        const pump = () => {
+            if (gen !== compositionPumpGen) return;
+            if (!isRemoteKeyboardEnabled()) return;
+            const end = Math.min(index + TEXT_STREAM_CHUNK_SIZE, safe.length);
+            for (let i = index; i < end; i++) {
+                sendKeyboardChar(safe[i]!);
+            }
+            index = end;
+            if (index < safe.length) {
+                globalThis.setTimeout(pump, 0);
+                return;
+            }
+            onDone?.();
+        };
+        pump();
+    };
+
+    const sendCompositionBackspacesChunked = (count: number, onDone?: () => void) => {
+        if (count <= 0) {
+            onDone?.();
+            return;
+        }
+        const gen = compositionPumpGen;
+        let remaining = count;
+        const pump = () => {
+            if (gen !== compositionPumpGen) return;
+            if (!isRemoteKeyboardEnabled()) return;
+            const n = Math.min(remaining, TEXT_STREAM_CHUNK_SIZE);
+            for (let i = 0; i < n; i++) {
+                sendKeyboardChar('\b');
+            }
+            remaining -= n;
+            if (remaining > 0) {
+                globalThis.setTimeout(pump, 0);
+                return;
+            }
+            onDone?.();
+        };
+        pump();
+    };
+
+    const sendCompositionReplaceChunked = (backspaceCount: number, newText: string, onDone: () => void) => {
+        let t = String(newText || "");
+        if (t.length > TEXT_STREAM_HARD_LIMIT) {
+            t = t.slice(0, TEXT_STREAM_HARD_LIMIT);
+            log(`[AirPad] Composition replacement truncated to ${TEXT_STREAM_HARD_LIMIT} chars.`);
+        }
+        sendCompositionBackspacesChunked(backspaceCount, () => {
+            if (!t) {
+                onDone();
+                return;
+            }
+            sendCompositionTextChunked(t, onDone);
+        });
+    };
+
+    /** Small IME deltas stay synchronous to preserve ordering with lastCompositionText. */
+    const COMPOSITION_INLINE_MAX = 256;
+
     // Helper to extract clean text (without icon)
     const getCleanText = (text: string): string => {
         return text
@@ -375,13 +505,7 @@ export function setupVirtualKeyboardAPIHandlers() {
         if (waitingForInput && inputEvent.inputType === 'insertText' && inputEvent.data) {
             e.preventDefault();
             waitingForInput = false;
-
-            if (!shouldSkipDuplicate(`text:${inputEvent.data}`)) {
-                for (const char of inputEvent.data) {
-                    sendKeyboardChar(char);
-                }
-                scheduleRestore();
-            }
+            sendTextChunked(inputEvent.data, `text:${inputEvent.data}`);
             return;
         }
 
@@ -389,12 +513,7 @@ export function setupVirtualKeyboardAPIHandlers() {
         if (inputEvent.inputType === 'insertText') {
             e.preventDefault();
             const data = inputEvent.data;
-            if (data && !shouldSkipDuplicate(`text:${data}`)) {
-                for (const char of data) {
-                    sendKeyboardChar(char);
-                }
-                scheduleRestore();
-            }
+            if (data) sendTextChunked(data, `text:${data}`);
             return;
         }
 
@@ -403,12 +522,7 @@ export function setupVirtualKeyboardAPIHandlers() {
             e.preventDefault();
             resetCompositionState(true);
             const data = inputEvent.data || (inputEvent as any).dataTransfer?.getData('text');
-            if (data && !shouldSkipDuplicate(`replace:${data}`)) {
-                for (const char of data) {
-                    sendKeyboardChar(char);
-                }
-                scheduleRestore();
-            }
+            if (data) sendTextChunked(data, `replace:${data}`);
             return;
         }
 
@@ -436,12 +550,7 @@ export function setupVirtualKeyboardAPIHandlers() {
             e.preventDefault();
             resetCompositionState(true);
             const data = inputEvent.data || (inputEvent as any).dataTransfer?.getData('text/plain');
-            if (data) {
-                for (const char of data) {
-                    sendKeyboardChar(char);
-                }
-                scheduleRestore();
-            }
+            if (data) sendTextChunked(data);
             return;
         }
     });
@@ -459,6 +568,7 @@ export function setupVirtualKeyboardAPIHandlers() {
         isComposing = true;
         lastCompositionText = '';
         waitingForInput = false;
+        compositionPumpGen++;
         if (DEBUG_KEYBOARD_INPUT) console.log('[Composition] start');
     });
 
@@ -470,8 +580,14 @@ export function setupVirtualKeyboardAPIHandlers() {
             compositionTimeout = null;
         }
 
+        compositionPumpGen++;
         const currentText = e.data || '';
         if (DEBUG_KEYBOARD_INPUT) console.log('[Composition] update:', currentText, 'last:', lastCompositionText);
+
+        const finishUpdate = () => {
+            lastCompositionText = currentText;
+            scheduleRestore();
+        };
 
         // Find what's new since last update
         if (currentText.startsWith(lastCompositionText)) {
@@ -479,32 +595,45 @@ export function setupVirtualKeyboardAPIHandlers() {
             const newChars = currentText.slice(lastCompositionText.length);
             if (newChars.length > 0) {
                 if (DEBUG_KEYBOARD_INPUT) console.log('[Composition] sending new chars:', newChars);
-                for (const char of newChars) {
-                    sendKeyboardChar(char);
+                if (newChars.length <= COMPOSITION_INLINE_MAX) {
+                    for (const char of newChars) {
+                        sendKeyboardChar(char);
+                    }
+                    finishUpdate();
+                } else {
+                    sendCompositionTextChunked(newChars, finishUpdate);
                 }
+            } else {
+                finishUpdate();
             }
         } else if (lastCompositionText.startsWith(currentText)) {
             // Characters were deleted (backspace during composition)
             const deletedCount = lastCompositionText.length - currentText.length;
             if (DEBUG_KEYBOARD_INPUT) console.log('[Composition] deleted chars:', deletedCount);
-            for (let i = 0; i < deletedCount; i++) {
-                sendKeyboardChar('\b');
+            if (deletedCount <= COMPOSITION_INLINE_MAX) {
+                for (let i = 0; i < deletedCount; i++) {
+                    sendKeyboardChar('\b');
+                }
+                finishUpdate();
+            } else {
+                sendCompositionBackspacesChunked(deletedCount, finishUpdate);
             }
         } else {
             // Complete replacement (autocorrect, word selection)
-            // Delete old text and send new
             if (DEBUG_KEYBOARD_INPUT) console.log('[Composition] replacement detected');
-            for (let i = 0; i < lastCompositionText.length; i++) {
-                sendKeyboardChar('\b');
-            }
-            for (const char of currentText) {
-                sendKeyboardChar(char);
+            const bs = lastCompositionText.length;
+            if (bs <= COMPOSITION_INLINE_MAX && currentText.length <= COMPOSITION_INLINE_MAX) {
+                for (let i = 0; i < bs; i++) {
+                    sendKeyboardChar('\b');
+                }
+                for (const char of currentText) {
+                    sendKeyboardChar(char);
+                }
+                finishUpdate();
+            } else {
+                sendCompositionReplaceChunked(bs, currentText, finishUpdate);
             }
         }
-
-        // Update tracking
-        lastCompositionText = currentText;
-        scheduleRestore();
     });
 
     toggleButton.addEventListener('compositionend', (e) => {
@@ -517,25 +646,33 @@ export function setupVirtualKeyboardAPIHandlers() {
             compositionTimeout = null;
         }
 
+        compositionPumpGen++;
         const finalText = e.data || '';
 
         // Check if compositionend brings new data not sent via update
         // This happens when user selects from autocomplete suggestions
-        if (finalText !== lastCompositionText) {
-            // Delete what we sent during composition
-            for (let i = 0; i < lastCompositionText.length; i++) {
-                sendKeyboardChar('\b');
-            }
-            // Send the final text
-            for (const char of finalText) {
-                sendKeyboardChar(char);
-            }
-        }
+        const finishEnd = () => {
+            isComposing = false;
+            lastCompositionText = '';
+            scheduleRestore();
+        };
 
-        // Reset composition state
-        isComposing = false;
-        lastCompositionText = '';
-        scheduleRestore();
+        if (finalText !== lastCompositionText) {
+            const bs = lastCompositionText.length;
+            if (bs <= COMPOSITION_INLINE_MAX && finalText.length <= COMPOSITION_INLINE_MAX) {
+                for (let i = 0; i < bs; i++) {
+                    sendKeyboardChar('\b');
+                }
+                for (const char of finalText) {
+                    sendKeyboardChar(char);
+                }
+                finishEnd();
+            } else {
+                sendCompositionReplaceChunked(bs, finalText, finishEnd);
+            }
+        } else {
+            finishEnd();
+        }
     });
 
     // ==================
@@ -568,9 +705,7 @@ export function setupVirtualKeyboardAPIHandlers() {
             if (DEBUG_KEYBOARD_INPUT) console.log('[Input] Unidentified key chars:', newChars);
 
             if (newChars.length > 0 && !shouldSkipDuplicate(`unidentified:${newChars}`)) {
-                for (const char of newChars) {
-                    sendKeyboardChar(char);
-                }
+                sendTextChunked(newChars);
             }
 
             scheduleRestore();
@@ -582,9 +717,7 @@ export function setupVirtualKeyboardAPIHandlers() {
             const newChars = findNewCharacters(currentText, lastKnownContent);
 
             if (newChars.length > 0 && !shouldSkipDuplicate(`input:${newChars}`)) {
-                for (const char of newChars) {
-                    sendKeyboardChar(char);
-                }
+                sendTextChunked(newChars);
             }
 
             scheduleRestore();
@@ -608,10 +741,7 @@ export function setupVirtualKeyboardAPIHandlers() {
 
         const pastedText = e.clipboardData?.getData('text') || '';
         if (pastedText) {
-            for (const char of pastedText) {
-                sendKeyboardChar(char);
-            }
-            scheduleRestore();
+            sendTextChunked(pastedText);
         }
     });
 
@@ -627,9 +757,8 @@ export function setupVirtualKeyboardAPIHandlers() {
 
         const droppedText = e.dataTransfer?.getData('text') || '';
         if (droppedText) {
-            for (const char of droppedText) {
-                sendKeyboardChar(char);
-            }
+            sendTextChunked(droppedText);
+            return;
         }
         scheduleRestore();
     });
@@ -737,11 +866,18 @@ export function setupKeyboardUIHandlers() {
         });
     }
 
-    if (!keyboardDocumentDismissListenersAttached) {
-        keyboardDocumentDismissListenersAttached = true;
+    const doc = getAirpadOwnerDocument();
+    if (!doc) return;
 
-        document.addEventListener('focusout', (e) => {
+    teardownKeyboardDismissListeners();
+    keyboardDismissAbort = new AbortController();
+    const { signal } = keyboardDismissAbort;
+
+    doc.addEventListener(
+        'focusout',
+        (e) => {
             if (!isRemoteKeyboardEnabled()) return;
+            if (!isKeyboardVisible()) return;
 
             const fromEl = eventTargetElement(e);
             const rel = (e as FocusEvent).relatedTarget;
@@ -751,20 +887,22 @@ export function setupKeyboardUIHandlers() {
                 isKeyboardStayOpenTarget(fromEl) || isKeyboardStayOpenTarget(toEl);
 
             if (!staysInInteractiveZone) hideKeyboard();
-        });
+        },
+        { signal },
+    );
 
-        // Single pointer path avoids double hideKeyboard (pointerdown + click) and races with DocTools.saveCoordinate.
-        document.addEventListener(
-            'pointerdown',
-            (e) => {
-                if (!isRemoteKeyboardEnabled()) return;
+    // Single pointer path avoids double hideKeyboard (pointerdown + click) and races with DocTools.saveCoordinate.
+    doc.addEventListener(
+        'pointerdown',
+        (e) => {
+            if (!isRemoteKeyboardEnabled()) return;
+            if (!isKeyboardVisible()) return;
 
-                const el = eventTargetElement(e);
-                if (!isKeyboardStayOpenTarget(el)) {
-                    hideKeyboard();
-                }
-            },
-            { capture: false, passive: true },
-        );
-    }
+            const el = eventTargetElement(e);
+            if (!isKeyboardStayOpenTarget(el)) {
+                hideKeyboard();
+            }
+        },
+        { capture: false, passive: true, signal },
+    );
 }

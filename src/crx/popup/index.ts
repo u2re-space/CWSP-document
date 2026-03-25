@@ -458,7 +458,7 @@ const initMarkdownViewer = () => {
     };
 
     btn?.addEventListener("click", openUrl);
-    input?.addEventListener("keydown", (e) => { if (e.key === "Enter") openUrl(); });
+    //input?.addEventListener("keydown", (e) => { if (e.key === "Enter") openUrl(); });
 };
 
 // ---------------------------------------------------------------------------
