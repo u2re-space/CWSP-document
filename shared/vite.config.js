@@ -238,7 +238,14 @@ const importFromTSConfig = (tsconfig, __dirname) => {
 
 //
 export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve("./", import.meta.dirname))=>{
-    const $resolve = { alias: importFromTSConfig(tsconfig, __dirname) }
+    const workspaceRoot = searchForWorkspaceRoot(__dirname);
+    const phosphorCoreRoot = resolve(workspaceRoot, "node_modules", "@phosphor-icons", "core");
+    const $resolve = {
+        alias: [
+            { find: "@phosphor-icons/core", replacement: phosphorCoreRoot },
+            ...importFromTSConfig(tsconfig, __dirname),
+        ],
+    };
 
     const terserOptions = {
         ecma: 2025,

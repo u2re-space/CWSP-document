@@ -17,7 +17,6 @@ import type { CwViewViewerHostElement } from "../base/UIElement";
 import type { BaseViewOptions } from "../types";
 import { createViewState } from "../types";
 import { writeText as writeClipboardText } from "@rs-core/modules/Clipboard";
-import { API_ENDPOINTS } from "@rs-com/config/Names";
 import { loadSettings } from "@rs-com/config/Settings";
 import type { MarkdownExtensionRule } from "@rs-com/config/SettingsTypes";
 
@@ -26,6 +25,7 @@ import "fest/fl-ui";
 
 // @ts-ignore - SCSS import
 import style from "./index.scss?inline";
+import { viewerToolbarPiconStyle } from "./viewer-toolbar-phosphor-inline";
 import type { MarkedExtension } from "marked";
 
 let markedParserPromise: Promise<(markdown: string) => Promise<string>> | null = null;
@@ -62,18 +62,6 @@ const VIEWER_CSS_LAYER_ORDER = [
     "rs-md-print",
     "rs-md-user-print"
 ] as const;
-
-/** Toolbar: same-origin Phosphor SVG URL (Vite/SW proxy); used as CSS mask for theme-colored fills. */
-const VIEWER_TOOLBAR_PHOSPHOR_STYLE = "duotone" as const;
-function viewerToolbarPhosphorSrc(iconKebab: string): string {
-    return `${API_ENDPOINTS.PHOSPHOR_ICONS}/${VIEWER_TOOLBAR_PHOSPHOR_STYLE}/${iconKebab}.svg`;
-}
-
-/** Inline style: `--view-picon-mask` for `.view-viewer__picon` (mask + `background-color` from toolbar tokens). */
-function viewerToolbarPiconStyle(iconKebab: string): string {
-    const u = viewerToolbarPhosphorSrc(iconKebab);
-    return `--view-picon-mask:url("${u}")`;
-}
 
 type ViewerMarkdownSettings = {
     preset: "default" | "classic" | "compact" | "paper";

@@ -182,31 +182,32 @@
         -webkit-overflow-scrolling: touch;
 
         button.view-viewer__btn > .view-viewer__picon {
-            flex-shrink: 0 !important;
+            flex-shrink: 0;
             order: -1;
-            display: inline-block !important;
-            box-sizing: border-box !important;
-            inline-size: var(--view-toolbar-ph-icon-size, 1.25rem) !important;
-            block-size: var(--view-toolbar-ph-icon-size, 1.25rem) !important;
-            min-inline-size: 0 !important;
-            min-block-size: 0 !important;
-            max-inline-size: none !important;
-            max-block-size: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            border: none !important;
-            vertical-align: middle !important;
-            flex: 0 0 auto !important;
-            background-image: none !important;
-            background-color: var(--view-picon-fill) !important;
-            box-shadow: none !important;
-            filter: none !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-            mix-blend-mode: normal !important;
-            pointer-events: none !important;
-            user-select: none !important;
-            -webkit-user-select: none !important;
+            display: inline-block;
+            box-sizing: border-box;
+            inline-size: var(--view-toolbar-ph-icon-size, 1.25rem);
+            block-size: var(--view-toolbar-ph-icon-size, 1.25rem);
+            min-inline-size: 0;
+            min-block-size: 0;
+            max-inline-size: none;
+            max-block-size: none;
+            padding: 0;
+            margin: 0;
+            border: none;
+            vertical-align: middle;
+            flex: 0 0 auto;
+            background-image: none;
+            background-color: var(--view-picon-fill);
+            box-shadow: none;
+            filter: none;
+            opacity: 1;
+            visibility: visible;
+            mix-blend-mode: normal;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
+            /* Inline data-URL mask: keep !important so global resets do not strip the glyph */
             mask-image: var(--view-picon-mask) !important;
             mask-size: contain !important;
             mask-repeat: no-repeat !important;
@@ -215,7 +216,7 @@
             -webkit-mask-size: contain !important;
             -webkit-mask-repeat: no-repeat !important;
             -webkit-mask-position: center !important;
-            transition: background-color var(--motion-fast, 0.12s ease) !important;
+            transition: background-color var(--motion-fast, 0.12s ease);
         }
 
         &::before {
@@ -313,7 +314,7 @@
             }
 
             > .view-viewer__picon {
-                background-color: var(--view-picon-fill-hover) !important;
+                background-color: var(--view-picon-fill-hover);
             }
         }
 
@@ -321,13 +322,13 @@
             background: color-mix(in oklab, var(--color-surface-container-high, var(--view-btn-hover-bg)) 92%, var(--color-on-surface, currentColor) 8%);
 
             > .view-viewer__picon {
-                background-color: var(--view-picon-fill-active) !important;
+                background-color: var(--view-picon-fill-active);
             }
         }
 
         &:disabled > .view-viewer__picon {
-            background-color: var(--view-picon-fill-disabled) !important;
-            opacity: 0.55 !important;
+            background-color: var(--view-picon-fill-disabled);
+            opacity: 0.55;
         }
 
         &:focus-visible {
