@@ -421,6 +421,17 @@ export function setupVirtualKeyboardAPIHandlers() {
 
         beforeInputFired = false;
 
+        // Avoid browser-native copy/cut on the contenteditable keyboard toggle (can freeze on some engines).
+        if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+            const lowerKey = String(e.key || '').toLowerCase();
+            if (lowerKey === 'c' || lowerKey === 'x') {
+                e.preventDefault();
+                waitingForInput = false;
+                resetCompositionState(true);
+                return;
+            }
+        }
+
         // Backspace / Delete
         if (e.key === 'Backspace' || e.key === 'Delete') {
             e.preventDefault();
