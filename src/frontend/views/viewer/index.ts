@@ -22,10 +22,10 @@ import type { MarkdownExtensionRule } from "@rs-com/config/SettingsTypes";
 
 // Import fest/fl-ui (e.g. shared markdown utilities elsewhere)
 import "fest/fl-ui";
+import "fest/icon";
 
 // @ts-ignore - SCSS import
 import style from "./index.scss?inline";
-import { viewerToolbarPiconStyle } from "./viewer-toolbar-phosphor-inline";
 import type { MarkedExtension } from "marked";
 
 let markedParserPromise: Promise<(markdown: string) => Promise<string>> | null = null;
@@ -368,46 +368,46 @@ export class ViewerView implements View {
                     <div class="view-viewer__toolbar" data-viewer-toolbar>
                         <div class="view-viewer__toolbar-left">
                             <button class="view-viewer__btn" data-action="open" type="button" title="Open file">
-                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("folder-open")} aria-hidden="true"></span>
+                                <ui-icon class="view-viewer__toolbar-icon" icon="folder-open" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                                 <span>Open</span>
                             </button>
                             <button class="view-viewer__btn" data-action="toggle-raw" type="button" title="Toggle raw/rendered view">
-                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("code")} aria-hidden="true"></span>
+                                <ui-icon class="view-viewer__toolbar-icon" icon="code" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                                 <span>Raw</span>
                             </button>
                             <button class="view-viewer__btn" data-action="copy" type="button" title="Copy raw content">
-                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("copy")} aria-hidden="true"></span>
+                                <ui-icon class="view-viewer__toolbar-icon" icon="copy" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                                 <span>Copy</span>
                             </button>
                             <button class="view-viewer__btn" data-action="paste" type="button" title="Paste from clipboard (mobile-friendly)" aria-label="Paste from clipboard">
-                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("clipboard-text")} aria-hidden="true"></span>
+                                <ui-icon class="view-viewer__toolbar-icon" icon="clipboard-text" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                                 <span>Paste</span>
                             </button>
                             <button class="view-viewer__btn" data-action="download" type="button" title="Download as markdown">
-                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("download")} aria-hidden="true"></span>
+                                <ui-icon class="view-viewer__toolbar-icon" icon="download" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                                 <span>Download</span>
                             </button>
                         </div>
                         <div class="view-viewer__toolbar-right">
                             
                             <button class="view-viewer__btn" data-action="attach" type="button" title="Attach to Work Center">
-                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("lightning")} aria-hidden="true"></span>
+                                <ui-icon class="view-viewer__toolbar-icon" icon="lightning" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                                 <span>Attach</span>
                             </button>
                             <button class="view-viewer__btn" data-action="open-style-settings" type="button" title="Markdown styling, modules, plugins">
-                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("paint-roller")} aria-hidden="true"></span>
+                                <ui-icon class="view-viewer__toolbar-icon" icon="paint-roller" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                                 <span>Style</span>
                             </button>
                             <button class="view-viewer__btn" data-action="copy-rendered" type="button" title="Copy rendered text">
-                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("text-t")} aria-hidden="true"></span>
+                                <ui-icon class="view-viewer__toolbar-icon" icon="text-t" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                                 <span>Copy text</span>
                             </button>
                             <button class="view-viewer__btn" data-action="export-docx" type="button" title="Export as DOCX">
-                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("file-doc")} aria-hidden="true"></span>
+                                <ui-icon class="view-viewer__toolbar-icon" icon="file-doc" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                                 <span>DOCX</span>
                             </button>
                             <button class="view-viewer__btn" data-action="print" type="button" title="Print content">
-                                <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("printer")} aria-hidden="true"></span>
+                                <ui-icon class="view-viewer__toolbar-icon" icon="printer" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                                 <span>Print</span>
                             </button>
                         </div>
@@ -562,45 +562,45 @@ export class ViewerView implements View {
                 <div class="view-viewer__toolbar" data-viewer-toolbar>
                     <div class="view-viewer__toolbar-left">
                         <button class="view-viewer__btn" data-action="open" type="button" title="Open file">
-                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("folder-open")} aria-hidden="true"></span>
+                            <ui-icon class="view-viewer__toolbar-icon" icon="folder-open" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                             <span>Open</span>
                         </button>
                         <button class="view-viewer__btn" data-action="toggle-raw" type="button" title="Toggle raw/rendered view">
-                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("code")} aria-hidden="true"></span>
+                            <ui-icon class="view-viewer__toolbar-icon" icon="code" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                             <span>Raw</span>
                         </button>
                         <button class="view-viewer__btn" data-action="copy" type="button" title="Copy raw content">
-                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("copy")} aria-hidden="true"></span>
+                            <ui-icon class="view-viewer__toolbar-icon" icon="copy" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                             <span>Copy</span>
                         </button>
                         <button class="view-viewer__btn" data-action="paste" type="button" title="Paste from clipboard (mobile-friendly)" aria-label="Paste from clipboard">
-                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("clipboard-text")} aria-hidden="true"></span>
+                            <ui-icon class="view-viewer__toolbar-icon" icon="clipboard-text" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                             <span>Paste</span>
                         </button>
                         <button class="view-viewer__btn" data-action="download" type="button" title="Download as markdown">
-                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("download")} aria-hidden="true"></span>
+                            <ui-icon class="view-viewer__toolbar-icon" icon="download" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                             <span>Download</span>
                         </button>
                     </div>
                     <div class="view-viewer__toolbar-right">
                         <button class="view-viewer__btn" data-action="attach" type="button" title="Attach to Work Center">
-                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("lightning")} aria-hidden="true"></span>
+                            <ui-icon class="view-viewer__toolbar-icon" icon="lightning" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                             <span>Attach</span>
                         </button>
                         <button class="view-viewer__btn" data-action="open-style-settings" type="button" title="Markdown styling, modules, plugins">
-                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("paint-roller")} aria-hidden="true"></span>
+                            <ui-icon class="view-viewer__toolbar-icon" icon="paint-roller" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                             <span>Style</span>
                         </button>
                         <button class="view-viewer__btn" data-action="copy-rendered" type="button" title="Copy rendered text">
-                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("text-t")} aria-hidden="true"></span>
+                            <ui-icon class="view-viewer__toolbar-icon" icon="text-t" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                             <span>Copy text</span>
                         </button>
                         <button class="view-viewer__btn" data-action="export-docx" type="button" title="Export as DOCX">
-                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("file-doc")} aria-hidden="true"></span>
+                            <ui-icon class="view-viewer__toolbar-icon" icon="file-doc" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                             <span>DOCX</span>
                         </button>
                         <button class="view-viewer__btn" data-action="print" type="button" title="Print content">
-                            <span class="view-viewer__picon" style=${viewerToolbarPiconStyle("printer")} aria-hidden="true"></span>
+                            <ui-icon class="view-viewer__toolbar-icon" icon="printer" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
                             <span>Print</span>
                         </button>
                     </div>

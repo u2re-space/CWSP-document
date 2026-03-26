@@ -145,7 +145,7 @@
     /* Compact toolbar: tight rhythm, icon-led controls (theme tokens when present). */
     .view-viewer__toolbar {
         /*
-         * Toolbar icons: Phosphor SVG as CSS mask + themed fill (same-origin proxy).
+         * Toolbar icons: ui-icon (fest/icon) static duotone map and --icon-color.
          * Override on `.view-viewer`, shell, or host:
          *   --view-picon-fill, --view-picon-fill-hover, --view-picon-fill-active, --view-picon-fill-disabled
          */
@@ -181,42 +181,17 @@
         scrollbar-color: transparent transparent;
         -webkit-overflow-scrolling: touch;
 
-        button.view-viewer__btn > .view-viewer__picon {
+        button.view-viewer__btn > ui-icon.view-viewer__toolbar-icon {
             flex-shrink: 0;
             order: -1;
-            display: inline-block;
             box-sizing: border-box;
-            inline-size: var(--view-toolbar-ph-icon-size, 1.25rem);
-            block-size: var(--view-toolbar-ph-icon-size, 1.25rem);
-            min-inline-size: 0;
-            min-block-size: 0;
-            max-inline-size: none;
-            max-block-size: none;
-            padding: 0;
-            margin: 0;
-            border: none;
-            vertical-align: middle;
             flex: 0 0 auto;
-            background-image: none;
-            background-color: var(--view-picon-fill);
-            box-shadow: none;
-            filter: none;
-            opacity: 1;
-            visibility: visible;
-            mix-blend-mode: normal;
+            vertical-align: middle;
+            --icon-size: var(--view-toolbar-ph-icon-size, 1.25rem);
+            --icon-padding: 0;
+            --icon-color: var(--view-picon-fill);
             pointer-events: none;
-            user-select: none;
-            -webkit-user-select: none;
-            /* Inline data-URL mask: keep !important so global resets do not strip the glyph */
-            mask-image: var(--view-picon-mask) !important;
-            mask-size: contain !important;
-            mask-repeat: no-repeat !important;
-            mask-position: center !important;
-            -webkit-mask-image: var(--view-picon-mask) !important;
-            -webkit-mask-size: contain !important;
-            -webkit-mask-repeat: no-repeat !important;
-            -webkit-mask-position: center !important;
-            transition: background-color var(--motion-fast, 0.12s ease);
+            transition: color var(--motion-fast, 0.12s ease);
         }
 
         &::before {
@@ -270,7 +245,7 @@
         justify-content: center;
         gap: 0.28rem;
         min-block-size: 1.85rem;
-        padding: 0.15rem 0.15rem;
+        padding: 0rem 0rem;
         border: none;
         border-radius: var(--radius-sm, 4px);
         background: var(--color-surface, transparent);
@@ -291,6 +266,8 @@
             color var(--motion-fast, 0.12s ease),
             box-shadow var(--motion-fast, 0.12s ease);
         overflow: visible;
+        aspect-ratio: 1 / 1;
+        inline-size: fit-content;
 
         /* Labels secondary to icons (typo fix: priority = icons > text). */
         span {
@@ -313,21 +290,21 @@
                 opacity: 0.9;
             }
 
-            > .view-viewer__picon {
-                background-color: var(--view-picon-fill-hover);
+            > ui-icon.view-viewer__toolbar-icon {
+                --icon-color: var(--view-picon-fill-hover);
             }
         }
 
         &:active {
             background: color-mix(in oklab, var(--color-surface-container-high, var(--view-btn-hover-bg)) 92%, var(--color-on-surface, currentColor) 8%);
 
-            > .view-viewer__picon {
-                background-color: var(--view-picon-fill-active);
+            > ui-icon.view-viewer__toolbar-icon {
+                --icon-color: var(--view-picon-fill-active);
             }
         }
 
-        &:disabled > .view-viewer__picon {
-            background-color: var(--view-picon-fill-disabled);
+        &:disabled > ui-icon.view-viewer__toolbar-icon {
+            --icon-color: var(--view-picon-fill-disabled);
             opacity: 0.55;
         }
 
