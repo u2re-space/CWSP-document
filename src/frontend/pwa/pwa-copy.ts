@@ -5,7 +5,8 @@
  */
 
 import { initClipboardReceiver, listenForClipboardRequests, requestCopy } from "../../core";
-import { initToastReceiver } from "../items/Toast";
+import { copy } from "../../core/modules/Clipboard";
+import { initToastReceiver, showToast } from "../items/Toast";
 import { unifiedMessaging } from "@rs-com/core/UnifiedMessaging";
 import { summarizeForLog } from "@rs-com/core/LogSanitizer";
 
@@ -175,7 +176,6 @@ const checkPendingClipboardOperations = async (): Promise<void> => {
                 if (operation.type === 'ai-result' && operation.data) {
                     console.log('[PWA-Copy] Processing pending AI result:', operation.id);
                     const text = extractRecognizedContent(operation.data);
-                    const { copy } = await import("../../core/modules/Clipboard");
                     await copy(text, { showFeedback: true });
 
                     await sendShareTargetResultToWorkcenter({
@@ -245,7 +245,6 @@ export const initPWAClipboard = (): (() => void) => {
                     if (operation.type === 'ai-result' && operation.data) {
                         console.log('[PWA-Copy] Processing broadcasted AI result:', operation.id);
                         const text = typeof operation.data === 'string' ? operation.data : JSON.stringify(operation.data);
-                        const { copy } = await import("../../core/modules/Clipboard");
                         await copy(text, { showFeedback: true });
 
                         await sendShareTargetResultToWorkcenter({
@@ -287,7 +286,6 @@ export const initPWAClipboard = (): (() => void) => {
 
             // Handle share-target copy request
             if (type === "copy-shared" && data) {
-                const { copy } = await import("../../core/modules/Clipboard");
                 await copy(data, { showFeedback: true });
             }
 
@@ -301,7 +299,6 @@ export const initPWAClipboard = (): (() => void) => {
                 console.log('[PWA-Copy] AI result from SW:', summarizeForLog(data));
                 if (data.success && data.data) {
                     const text = extractRecognizedContent(data.data);
-                    const { copy } = await import("../../core/modules/Clipboard");
                     await copy(text, { showFeedback: true });
 
                     // Also broadcast to work center for visibility
@@ -322,7 +319,6 @@ export const initPWAClipboard = (): (() => void) => {
                         metadata: { priority: 'high' }
                     });
                 } else {
-                    const { showToast } = await import("../items/Toast");
                     showToast({ message: data.error || "Processing failed", kind: "error" });
                 }
             }
@@ -366,7 +362,6 @@ export const initPWAClipboard = (): (() => void) => {
                         console.log('[PWA-Copy] Copying result data:', summarizeForLog(result.data));
                         // Use the extractRecognizedContent function to get the right data
                         const extractedContent = extractRecognizedContent(result.data);
-                        const { copy } = await import("../../core/modules/Clipboard");
                         await copy(extractedContent, { showFeedback: true });
 
                         // Also broadcast to work center for visibility

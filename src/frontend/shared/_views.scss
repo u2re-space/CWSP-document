@@ -875,7 +875,7 @@
                 .toolbar-btn {
                     min-block-size: 32px;
                     min-inline-size: calc-size(fit-content, max(size, 32px) + 0.5rem + var(--icon-size, 1rem));
-                    padding: var(--space-xs) var(--space-sm);
+                    padding: 0px 0px;
                     font-size: var(--text-xs);
                 }
             }
@@ -1534,11 +1534,9 @@
 
     button:not(.toolbar-btn),
     .btn {
+        position: relative;
         display: inline-flex;
-        align-items: center;
-        justify-content: center;
         gap: var(--space-xs);
-        padding: var(--space-sm) var(--space-lg);
         border: 1px solid transparent;
         border-radius: var(--radius-lg);
         background: var(--color-surface-container-high);
@@ -1550,6 +1548,17 @@
         cursor: pointer;
         transition: all var(--motion-fast);
         box-shadow: var(--elev-0);
+        inline-size: max-content;
+        flex-basis: max-content;
+        min-inline-size: max-content;
+        flex-grow: 1;
+        flex-shrink: 0;
+        max-inline-size: none;
+
+        align-items: safe center;
+        align-content: safe center;
+        justify-content: safe center;
+        justify-items: safe center;
 
         &:hover {
             background: var(--color-surface-container-highest);

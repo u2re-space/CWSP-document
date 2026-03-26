@@ -388,6 +388,7 @@ export class ViewerView implements View {
                                 <span>Download</span>
                             </button>
                         </div>
+                        <div class="view-viewer__toolbar-center"></div>
                         <div class="view-viewer__toolbar-right">
                             
                             <button class="view-viewer__btn" data-action="attach" type="button" title="Attach to Work Center">
@@ -466,6 +467,26 @@ export class ViewerView implements View {
             hostCss.textContent = `
                 :host {
                     display: block;
+                    box-sizing: border-box;
+                    block-size: 100%;
+                    inline-size: 100%;
+                    min-block-size: 0;
+                    min-inline-size: 0;
+                    overflow: hidden;
+                }
+
+                .cw-view-element__mount {
+                    display: block;
+                    box-sizing: border-box;
+                    block-size: 100%;
+                    inline-size: 100%;
+                    min-block-size: 0;
+                    min-inline-size: 0;
+                    overflow: hidden;
+                }
+
+                .cw-view-viewer-shell,
+                .view-viewer {
                     box-sizing: border-box;
                     block-size: 100%;
                     inline-size: 100%;
@@ -582,6 +603,7 @@ export class ViewerView implements View {
                             <span>Download</span>
                         </button>
                     </div>
+                    <div class="view-viewer__toolbar-center"></div>
                     <div class="view-viewer__toolbar-right">
                         <button class="view-viewer__btn" data-action="attach" type="button" title="Attach to Work Center">
                             <ui-icon class="view-viewer__toolbar-icon" icon="lightning" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>

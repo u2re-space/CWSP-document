@@ -128,8 +128,13 @@ const ensureViewElementStyle = (): void => {
 
         cw-view-viewer[data-cw-view-host="true"] {
             box-sizing: border-box;
+            display: block;
+            block-size: 100%;
+            inline-size: 100%;
             min-block-size: 0;
             min-inline-size: 0;
+            container-type: inline-size;
+            contain: layout style paint;
             overflow: hidden;
         }
     `;

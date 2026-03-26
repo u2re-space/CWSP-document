@@ -1,9 +1,10 @@
 import type { ClipboardResult, ImageProcessingOptions, PlatformAdapter } from "../shared/types";
+import { readText, requestCopyViaCRX, writeText } from "@rs-core/modules/Clipboard";
+import { showToast } from "@rs-frontend/items/Toast";
 
 const createPwaAdapter = (): PlatformAdapter => ({
 	async copyToClipboard(data: string): Promise<ClipboardResult> {
 		try {
-			const { writeText } = await import("@rs-core/modules/Clipboard");
 			return (await writeText(data)) as ClipboardResult;
 		} catch (e) {
 			return { ok: false, error: String(e) };
@@ -12,7 +13,6 @@ const createPwaAdapter = (): PlatformAdapter => ({
 
 	async readFromClipboard(): Promise<ClipboardResult> {
 		try {
-			const { readText } = await import("@rs-core/modules/Clipboard");
 			return (await readText()) as ClipboardResult;
 		} catch (e) {
 			return { ok: false, error: String(e) };
@@ -28,12 +28,10 @@ const createPwaAdapter = (): PlatformAdapter => ({
 		options?: { type?: "info" | "success" | "warning" | "error"; duration?: number },
 	): void {
 		try {
-			import("@rs-frontend/items/Toast").then(({ showToast }) => {
-				showToast({
-					message,
-					kind: options?.type || "info",
-					duration: options?.duration || 3000,
-				});
+			showToast({
+				message,
+				kind: options?.type || "info",
+				duration: options?.duration || 3000,
 			});
 		} catch {
 			console.log(message);
@@ -44,7 +42,6 @@ const createPwaAdapter = (): PlatformAdapter => ({
 const createCrxAdapter = (): PlatformAdapter => ({
 	async copyToClipboard(data: string): Promise<ClipboardResult> {
 		try {
-			const { requestCopyViaCRX } = await import("@rs-core/modules/Clipboard");
 			const result = await requestCopyViaCRX(data);
 			return { ok: result.ok, data: result.data as string | undefined };
 		} catch (e) {
@@ -54,7 +51,6 @@ const createCrxAdapter = (): PlatformAdapter => ({
 
 	async readFromClipboard(): Promise<ClipboardResult> {
 		try {
-			const { readText } = await import("@rs-core/modules/Clipboard");
 			return (await readText()) as ClipboardResult;
 		} catch (e) {
 			return { ok: false, error: String(e) };
@@ -138,7 +134,6 @@ const createCrxAdapter = (): PlatformAdapter => ({
 const createCoreAdapter = (): PlatformAdapter => ({
 	async copyToClipboard(data: string): Promise<ClipboardResult> {
 		try {
-			const { writeText } = await import("@rs-core/modules/Clipboard");
 			return (await writeText(data)) as ClipboardResult;
 		} catch (e) {
 			return { ok: false, error: String(e) };
@@ -147,7 +142,6 @@ const createCoreAdapter = (): PlatformAdapter => ({
 
 	async readFromClipboard(): Promise<ClipboardResult> {
 		try {
-			const { readText } = await import("@rs-core/modules/Clipboard");
 			return (await readText()) as ClipboardResult;
 		} catch (e) {
 			return { ok: false, error: String(e) };
