@@ -22,12 +22,12 @@
         @layer ui-system {
 
             /* Hide undefined custom elements and problematic elements during load */
-            :where(*):not(:defined) {
+            /*:where(*):not(:defined) {
                 opacity: 0 !important;
                 visibility: collapse !important;
                 pointer-events: none !important;
                 display: none !important;
-            }
+            }*/
 
             /* Hide script, link, style elements to prevent visual glitches */
             :where(link, script, style) {
@@ -158,14 +158,14 @@
             }
 
             @media screen {
-                :where(*):not(:defined) {
+                /*:where(*):not(:defined) {
                     opacity: 0;
                     visibility: collapse;
                     pointer-events: none;
                     display: none;
                     background-color: transparent;
                     color: transparent;
-                }
+                }*/
 
                 /* */
                 :where(*) {

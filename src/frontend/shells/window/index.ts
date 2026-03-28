@@ -502,6 +502,9 @@ export class WindowShell extends ShellBase {
     private bindOverlayChrome(): void {
         const overlayLayer = document.querySelector('[data-app-layer="overlay"]') as HTMLElement | null;
         if (!overlayLayer) return;
+        overlayLayer.style.position = overlayLayer.style.position || "absolute";
+        overlayLayer.style.inset = overlayLayer.style.inset || "0";
+        overlayLayer.style.pointerEvents = overlayLayer.style.pointerEvents || "none";
 
         if (!this.dockElement) {
             let dock = overlayLayer.querySelector("cw-app-dock[data-window-dock]") as HTMLElement | null;
@@ -513,6 +516,19 @@ export class WindowShell extends ShellBase {
                 dock.style.pointerEvents = "auto";
                 overlayLayer.appendChild(dock);
             }
+            dock.style.display = "flex";
+            dock.style.position = "absolute";
+            dock.style.insetInline = "0";
+            dock.style.insetBlockEnd = "0";
+            dock.style.zIndex = "1200";
+            dock.style.minBlockSize = "48px";
+            dock.style.padding = "0.45rem 0.55rem";
+            dock.style.alignItems = "center";
+            dock.style.gap = "0.45rem";
+            dock.style.flexWrap = "wrap";
+            dock.style.background = "var(--window-dock-bg, rgba(9,12,20,0.78))";
+            dock.style.borderBlockStart = "1px solid var(--window-dock-border, rgba(130,160,235,0.32))";
+            dock.style.backdropFilter = "blur(8px)";
             this.dockElement = dock;
         }
 
@@ -526,6 +542,19 @@ export class WindowShell extends ShellBase {
                 status.style.pointerEvents = "auto";
                 overlayLayer.appendChild(status);
             }
+            status.style.display = "flex";
+            status.style.position = "absolute";
+            status.style.insetInline = "0";
+            status.style.insetBlockStart = "0";
+            status.style.zIndex = "1300";
+            status.style.minBlockSize = "30px";
+            status.style.padding = "0.25rem 0.65rem";
+            status.style.alignItems = "center";
+            status.style.gap = "0.55rem";
+            status.style.fontSize = "0.75rem";
+            status.style.color = "var(--window-shell-fg, #e8eefc)";
+            status.style.background = "color-mix(in oklab, #03060c 82%, #1f2a44 18%)";
+            status.style.borderBlockStart = "1px solid rgba(130, 160, 235, 0.24)";
             this.statusContainer = status;
         }
     }
