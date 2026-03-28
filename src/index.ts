@@ -13,8 +13,7 @@ import { initializeLayers } from "./frontend/shared/layer-manager";
 import type { ViewId } from "./frontend/shells/types";
 import { pickEnabledView } from "./frontend/config/views";
 import { initializeAppCanvasLayer } from "./frontend/items/Canvas";
-
-import { loadAsAdopted } from "fest/dom";
+import { fixOrientToScreen, loadAsAdopted } from "fest/dom";
 import viewStyles from "@rs-frontend/views/scss/_views.scss?inline";
 
 
@@ -126,17 +125,19 @@ const getSavedShell = (): ShellPreference | null => {
 
 type AppLayers = {
     canvasLayer: HTMLElement;
+    orientLayer: HTMLElement;
     shellLayer: HTMLElement;
     overlayLayer: HTMLElement;
 };
 
 const ensureAppLayers = (mountElement: HTMLElement): AppLayers => {
     const existingCanvas = mountElement.querySelector<HTMLElement>('[data-app-layer="canvas"]');
+    const existingOrient = mountElement.querySelector<HTMLElement>('[data-app-layer="orient"]');
     const existingShell = mountElement.querySelector<HTMLElement>('[data-app-layer="shell"]');
     const existingOverlay = mountElement.querySelector<HTMLElement>('[data-app-layer="overlay"]');
 
-    if (existingCanvas && existingShell && existingOverlay) {
-        return { canvasLayer: existingCanvas, shellLayer: existingShell, overlayLayer: existingOverlay };
+    if (existingCanvas && existingOrient && existingShell && existingOverlay) {
+        return { canvasLayer: existingCanvas, orientLayer: existingOrient, shellLayer: existingShell, overlayLayer: existingOverlay };
     }
 
     mountElement.replaceChildren();
@@ -151,6 +152,25 @@ const ensureAppLayers = (mountElement: HTMLElement): AppLayers => {
     canvasLayer.style.inset = "0";
     canvasLayer.style.zIndex = "0";
     canvasLayer.style.pointerEvents = "none";
+
+    const orientLayer = document.createElement("div");
+    orientLayer.dataset.appLayer = "orient";
+    orientLayer.className = "app-layer app-layer--orient";
+    orientLayer.style.position = "absolute";
+    orientLayer.style.inset = "0";
+    orientLayer.style.zIndex = "5";
+    orientLayer.style.pointerEvents = "none";
+    orientLayer.style.background = "transparent";
+
+    const orientBox = document.createElement("cw-oriented-box");
+    orientBox.className = "ui-orientbox app-oriented-box";
+    orientBox.setAttribute("data-mixin", "ui-orientbox");
+    (orientBox as HTMLElement).style.position = "absolute";
+    (orientBox as HTMLElement).style.inset = "0";
+    (orientBox as HTMLElement).style.pointerEvents = "none";
+    (orientBox as HTMLElement).style.background = "transparent";
+    orientLayer.appendChild(orientBox);
+    fixOrientToScreen(orientBox as any);
 
     const shellLayer = document.createElement("div");
     shellLayer.dataset.appLayer = "shell";
@@ -173,9 +193,9 @@ const ensureAppLayers = (mountElement: HTMLElement): AppLayers => {
     overlayLayer.style.background = "transparent";
     overlayLayer.style.backgroundColor = "transparent";
 
-    mountElement.append(canvasLayer, shellLayer, overlayLayer);
+    mountElement.append(canvasLayer, orientLayer, shellLayer, overlayLayer);
     initializeAppCanvasLayer(canvasLayer);
-    return { canvasLayer, shellLayer, overlayLayer };
+    return { canvasLayer, orientLayer, shellLayer, overlayLayer };
 };
 
 // ============================================================================

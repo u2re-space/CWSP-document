@@ -63,8 +63,6 @@ export class WindowShell extends ShellBase {
         return H`
             <div class="app-window-shell" data-shell="window">
                 <main class="app-window-shell__stage" data-shell-content role="main"></main>
-                <div class="app-window-shell__dock-host" data-window-dock-slot></div>
-                <div class="app-window-shell__status" data-shell-status hidden aria-live="polite"></div>
             </div>
         ` as HTMLElement;
     }
@@ -77,15 +75,7 @@ export class WindowShell extends ShellBase {
         await super.mount(container);
         this.stageElement = this.rootElement?.shadowRoot?.querySelector("[data-shell-content]") as HTMLElement | null;
         this.homeFrameElement = this.rootElement?.querySelector("[data-window-home-frame]") as HTMLElement | null;
-        this.dockElement = this.rootElement?.querySelector("[data-window-dock]") as HTMLElement | null;
-        if (!this.dockElement && this.rootElement) {
-            const dock = H`
-                <cw-shell-dock class="app-window-shell__dock" data-window-dock aria-label="Window dock"></cw-shell-dock>
-            ` as HTMLElement;
-            dock.slot = "dock";
-            this.rootElement.appendChild(dock);
-            this.dockElement = dock;
-        }
+        this.bindOverlayChrome();
 
         this.initStatusBar();
         this.bindBrowserNavigation();
@@ -477,6 +467,9 @@ export class WindowShell extends ShellBase {
     }
 
     private initStatusBar(): void {
+        if (!this.statusContainer) {
+            this.bindOverlayChrome();
+        }
         if (!this.statusContainer) return;
         this.statusContainer.hidden = false;
         this.statusContainer.setAttribute("role", "status");
@@ -504,6 +497,37 @@ export class WindowShell extends ShellBase {
             <span class="app-window-shell__status-spacer"></span>
             <span class="app-window-shell__status-item">${time}</span>
         `;
+    }
+
+    private bindOverlayChrome(): void {
+        const overlayLayer = document.querySelector('[data-app-layer="overlay"]') as HTMLElement | null;
+        if (!overlayLayer) return;
+
+        if (!this.dockElement) {
+            let dock = overlayLayer.querySelector("cw-app-dock[data-window-dock]") as HTMLElement | null;
+            if (!dock) {
+                dock = document.createElement("cw-app-dock");
+                dock.setAttribute("data-window-dock", "true");
+                dock.className = "app-window-shell__dock";
+                dock.setAttribute("aria-label", "Window dock");
+                dock.style.pointerEvents = "auto";
+                overlayLayer.appendChild(dock);
+            }
+            this.dockElement = dock;
+        }
+
+        if (!this.statusContainer) {
+            let status = overlayLayer.querySelector("cw-status-bar[data-window-status]") as HTMLElement | null;
+            if (!status) {
+                status = document.createElement("cw-status-bar");
+                status.setAttribute("data-window-status", "true");
+                status.className = "app-window-shell__status";
+                status.setAttribute("aria-live", "polite");
+                status.style.pointerEvents = "auto";
+                overlayLayer.appendChild(status);
+            }
+            this.statusContainer = status;
+        }
     }
 }
 
