@@ -1,6 +1,7 @@
 /* ai-refactor: optimized/refactored at 2026-02-13T00:26:37Z */
 @use "sass:list";
 @use "veela-lib" as *;
+@use "../../../../../modules/projects/veela.css/src/scss/lib/advanced/design/colorize" as colorize;
 @use "../../library/mixins" as ui;
 @use "../../library/tokens" as t;
 
@@ -471,7 +472,7 @@ $card-variants: (
         );
         @include card-sync-vars;
         @include card-shadows(2, 0.08, 0.08, $card-ambient-default);
-        @include solid-colorize("&", ("shade": var(--card-surface-tone, 0), "scope": "selector"));
+        @include colorize.solid-colorize("&", ("shade": var(--card-surface-tone, 0), "scope": "selector"));
 
         display: grid;
         grid-template-columns: 1fr;

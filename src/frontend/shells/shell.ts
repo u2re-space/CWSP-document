@@ -11,7 +11,19 @@ import { scheduleViewModulePrefetch } from "../shared/view-prefetch";
 import { ensureStyleSheet } from "fest/icon";
 import "fest/icon";
 import { dynamicTheme } from "fest/lure";
-import { ensureShellElementDefined, type ShellElement, MinimalShellHostElement } from "./UIElement";
+import { ensureShellElementDefined, type ShellElement, WebtopEnvironmentHostElement } from "./UIElement";
+import { ensureAppLayerRoots } from "../main/wallpaper-host";
+import {
+    createTaskId,
+    findTaskByView,
+    getTask,
+    getTaskHashMeta,
+    getTaskFromHash,
+    initTaskSyncChannel,
+    publishTaskSync,
+    setTaskHash,
+    upsertTask
+} from "../shared/task-focus";
 
 //
 import "fest/fl-ui";
@@ -50,6 +62,8 @@ export abstract class ShellBase implements Shell {
     protected loadedViews = new Map<ViewId, { view: View; element: HTMLElement }>();
     protected currentViewElement: HTMLElement | null = null;
     protected navigationToken = 0;
+    protected taskIdsByView = new Map<ViewId, string>();
+    protected activeTaskId: string | null = null;
 
     // Mounted state
     protected mounted = false;
@@ -94,19 +108,21 @@ export abstract class ShellBase implements Shell {
 
         // Create slotted shell host and mount shell layout into it.
         const shellTagName = ensureShellElementDefined(this.id);
-        const shellHost = document.createElement(shellTagName) as ShellElement | MinimalShellHostElement;
+        const shellHost = document.createElement(shellTagName) as ShellElement | WebtopEnvironmentHostElement;
         const shellLayout = this.createLayout();
         shellHost.mountShellLayout(shellLayout);
         this.rootElement = shellHost;
 
-        // Minimal shell chrome is inside shadow — duplicate shell CSS there (document-level rules do not pierce shadow).
+        // Shadow-based shells only: duplicate shell CSS into shadow (document rules do not pierce shadow).
         const shellCss = this.getStylesheet();
         if (shellCss && shellHost.shadowRoot) {
             loadInlineStyle(shellCss, shellHost.shadowRoot);
         }
 
-        // Phosphor rules live on document.adoptedStyleSheets; they do not pierce this shadow tree.
-        if (shellHost instanceof MinimalShellHostElement && shellHost.shadowRoot) {
+        // Phosphor: only needed inside shadow; light-DOM webtop host uses document icon sheets.
+        if (shellHost instanceof WebtopEnvironmentHostElement) {
+            // no-op
+        } else if (shellHost.shadowRoot) {
             const iconSheet = ensureStyleSheet();
             if (iconSheet) {
                 try {
@@ -115,7 +131,7 @@ export abstract class ShellBase implements Shell {
                         shellHost.shadowRoot.adoptedStyleSheets = [...cur, iconSheet];
                     }
                 } catch (e) {
-                    console.warn("[Shell] Could not adopt icon registry stylesheet into minimal shell shadow:", e);
+                    console.warn("[Shell] Could not adopt icon registry stylesheet into shell shadow:", e);
                 }
             }
         }
@@ -123,7 +139,18 @@ export abstract class ShellBase implements Shell {
         // CRITICAL: Set data-shell attribute for context-based CSS selectors
         // This enables :has([data-shell="...""]) selectors to cascade automatically
         this.rootElement.setAttribute('data-shell', this.id);
-        this.rootElement.setAttribute('data-shell-system', 'task-tab');
+        this.rootElement.setAttribute(
+            'data-shell-system',
+            this.id === "environment"
+                ? "environment"
+                : shellHost instanceof WebtopEnvironmentHostElement
+                  ? "webtop"
+                  : "task-tab"
+        );
+        initTaskSyncChannel((task) => {
+            if (!task?.id) return;
+            this.taskIdsByView.set(task.viewId, task.id);
+        });
 
         // Find containers
         this.contentContainer = shellLayout.querySelector("[data-shell-content]") || shellLayout;
@@ -135,8 +162,9 @@ export abstract class ShellBase implements Shell {
         this.applyTheme(this.getThemeRefValue());
         this.bindThemeAttrObserver();
 
-        // Mount to container
-        container.replaceChildren(this.rootElement);
+        // Mount into explicit app layers to keep stacking deterministic.
+        const layers = ensureAppLayerRoots(container);
+        layers.shell.replaceChildren(this.rootElement);
         this.mounted = true;
 
         // Align navigation state with the URL before the first boot navigate(), so the
@@ -186,6 +214,25 @@ export abstract class ShellBase implements Shell {
         );
         this.currentView.value = fromPath;
         this.navigationState.viewHistory = [fromPath];
+        const existing = findTaskByView(fromPath);
+        const taskId = existing?.id || createTaskId(fromPath);
+        this.taskIdsByView.set(fromPath, taskId);
+        this.activeTaskId = taskId;
+        this.navigationState.currentTaskId = taskId;
+        const synced = upsertTask({
+            id: taskId,
+            viewId: fromPath,
+            state: "active",
+            params: this.navigationState.params
+        });
+        publishTaskSync(synced);
+        setTaskHash(taskId, true, {
+            viewId: fromPath,
+            state: "active",
+            target: "shell",
+            action: "focus",
+            params: this.navigationState.params
+        });
     }
 
     unmount(): void {
@@ -241,6 +288,11 @@ export abstract class ShellBase implements Shell {
         this.navigationState.previousView = previousView;
         this.navigationState.currentView = viewId;
         this.navigationState.params = params;
+        const existingTaskId = this.taskIdsByView.get(viewId) || findTaskByView(viewId)?.id;
+        const taskId = existingTaskId || createTaskId(viewId);
+        this.taskIdsByView.set(viewId, taskId);
+        this.activeTaskId = taskId;
+        this.navigationState.currentTaskId = taskId;
 
         // Add to history (avoid duplicates)
         if (this.navigationState.viewHistory[this.navigationState.viewHistory.length - 1] !== viewId) {
@@ -254,9 +306,10 @@ export abstract class ShellBase implements Shell {
         // Update reactive state
         this.currentView.value = viewId;
 
-        // Update URL pathname (path-based routing, no hash); include search when comparing.
+        // Canonical URL uses `/` and stores focused task in hash metadata.
+        // View identity is kept in history.state.viewId (process/task model).
         if (typeof window !== "undefined" && typeof window != "undefined") {
-            const pathname = `/${viewId}`;
+            const pathname = "/";
             const search = params && Object.keys(params).length > 0
                 ? "?" + new URLSearchParams(params).toString()
                 : "";
@@ -266,7 +319,7 @@ export abstract class ShellBase implements Shell {
                 const cur = new URL(globalThis.location.href);
                 if (next.pathname !== cur.pathname || next.search !== cur.search) {
                     globalThis?.history?.pushState?.(
-                        { viewId, params },
+                        { viewId, params, taskId },
                         "",
                         next.pathname + next.search
                     );
@@ -276,9 +329,32 @@ export abstract class ShellBase implements Shell {
                     globalThis?.location?.pathname !== pathname ||
                     (globalThis?.location?.search || "") !== search
                 ) {
-                    globalThis?.history?.pushState?.({ viewId, params }, "", newPathAndSearch);
+                    globalThis?.history?.pushState?.({ viewId, params, taskId }, "", newPathAndSearch);
                 }
             }
+            setTaskHash(taskId, true, {
+                viewId,
+                state: "active",
+                target: "shell",
+                action: "focus",
+                params
+            });
+            const synced = upsertTask({
+                id: taskId,
+                viewId,
+                state: "active",
+                params
+            });
+            publishTaskSync(synced);
+            globalThis.dispatchEvent?.(new CustomEvent("cw:view-task-sync", {
+                detail: {
+                    taskId,
+                    viewId,
+                    params: params || {},
+                    state: "active",
+                    silent: true
+                }
+            }));
         }
 
         // Load and render view (load happens outside the transition to avoid blocking it)
@@ -517,6 +593,26 @@ export abstract class ShellBase implements Shell {
         }
     }
 
+    protected setActiveTaskState(state: "active" | "background" | "minimized"): void {
+        const taskId = this.activeTaskId || this.navigationState.currentTaskId;
+        const viewId = this.navigationState.currentView;
+        if (!taskId || !viewId) return;
+        const synced = upsertTask({
+            id: taskId,
+            viewId,
+            state,
+            params: this.navigationState.params
+        });
+        setTaskHash(taskId, true, {
+            viewId,
+            state,
+            target: "shell",
+            action: "focus",
+            params: this.navigationState.params
+        });
+        publishTaskSync(synced);
+    }
+
     /**
      * Show a status message
      */
@@ -708,8 +804,7 @@ export abstract class ShellBase implements Shell {
         globalThis?.addEventListener?.("popstate", (event) => {
             const navToken = ++this.navigationToken;
             // Get view from pathname
-            const pathname = globalThis?.location?.pathname?.replace(/^\//, "").toLowerCase();
-            const viewId = (event.state?.viewId || pathname || "viewer") as ViewId;
+            const viewId = (event.state?.viewId || this.navigationState.currentView || "home") as ViewId;
             const popParams = (event.state?.params ??
                 Object.fromEntries(new URLSearchParams(globalThis.location.search || ""))) as
                 | Record<string, string>
@@ -723,7 +818,37 @@ export abstract class ShellBase implements Shell {
                 this.navigationState.previousView = previousViewId;
                 this.navigationState.currentView = viewId;
                 this.navigationState.params = popParams;
+                const taskId =
+                    (event.state?.taskId as string | undefined) ||
+                    this.taskIdsByView.get(viewId) ||
+                    findTaskByView(viewId)?.id ||
+                    createTaskId(viewId);
+                this.taskIdsByView.set(viewId, taskId);
+                this.activeTaskId = taskId;
+                this.navigationState.currentTaskId = taskId;
                 this.currentView.value = viewId;
+                setTaskHash(taskId, true, {
+                    viewId,
+                    state: "active",
+                    target: "shell",
+                    action: "focus",
+                    params: popParams
+                });
+                publishTaskSync(upsertTask({
+                    id: taskId,
+                    viewId,
+                    state: "active",
+                    params: popParams
+                }));
+                globalThis.dispatchEvent?.(new CustomEvent("cw:view-task-sync", {
+                    detail: {
+                        taskId,
+                        viewId,
+                        params: popParams || {},
+                        state: "active",
+                        silent: true
+                    }
+                }));
 
                 // Keep in-memory history consistent with the browser stack.
                 const hist = this.navigationState.viewHistory;
@@ -744,6 +869,42 @@ export abstract class ShellBase implements Shell {
                         scheduleViewModulePrefetch(viewId);
                     })
                     .catch(console.error);
+            }
+        });
+
+        globalThis?.addEventListener?.("hashchange", () => {
+            const hashMeta = getTaskHashMeta();
+            const taskId = hashMeta?.taskId || getTaskFromHash();
+            if (!taskId) return;
+            let task = getTask(taskId);
+            if (!task && hashMeta?.viewId) {
+                task = upsertTask({
+                    id: taskId,
+                    viewId: hashMeta.viewId,
+                    state: hashMeta.state || "active",
+                    params: hashMeta.params || {},
+                    target: hashMeta.target
+                });
+                this.taskIdsByView.set(task.viewId, task.id);
+                publishTaskSync(task);
+            }
+            if (!task) return;
+            this.activeTaskId = task.id;
+            this.navigationState.currentTaskId = task.id;
+            if (task.state === "minimized" && hashMeta?.action !== "open") return;
+            const params = hashMeta?.params || task.params;
+            if (hashMeta?.action === "open" || task.viewId !== this.navigationState.currentView) {
+                void this.navigate(task.viewId, params);
+            } else {
+                globalThis.dispatchEvent?.(new CustomEvent("cw:view-task-sync", {
+                    detail: {
+                        taskId: task.id,
+                        viewId: task.viewId,
+                        params: params || {},
+                        state: task.state,
+                        silent: true
+                    }
+                }));
             }
         });
     }

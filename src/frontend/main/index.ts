@@ -26,6 +26,7 @@ export {
     quickBoot,
     bootFaint,
     bootMinimal,
+    bootWindow,
     bootBase,
     getRecommendedStyle,
     type StyleSystem,
@@ -208,8 +209,8 @@ export async function initializeApp(
     const finalConfig: BootConfig = {
         styleSystem: config?.styleSystem ?? urlConfig.styleSystem ?? savedConfig?.styleSystem ?? "vl-basic",
         shell: config?.shell ?? urlConfig.shell ?? savedConfig?.shell ?? "minimal",
-        defaultView: pickEnabledView(config?.defaultView ?? urlConfig.defaultView ?? savedConfig?.defaultView ?? "viewer"),
-        channels: config?.channels ?? ["workcenter", "settings", "viewer"].filter((channelId) => isEnabledView(channelId)),
+        defaultView: pickEnabledView(config?.defaultView ?? urlConfig.defaultView ?? savedConfig?.defaultView ?? "home"),
+        channels: config?.channels ?? ["home", "workcenter", "settings", "viewer"].filter((channelId) => isEnabledView(channelId)),
         rememberChoice: config?.rememberChoice ?? true,
         theme: config?.theme
     };
@@ -234,8 +235,8 @@ export async function initializeLegacy(
  */
 export async function quickInit(
     container: HTMLElement,
-    shell: "minimal" | "faint" | "base" = "minimal",
-    view: string = "viewer"
+    shell: "minimal" | "faint" | "window" | "base" = "minimal",
+    view: string = "home"
 ): Promise<Shell> {
     return initializeApp(container, {
         shell,

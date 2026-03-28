@@ -1,11 +1,12 @@
 @use "veela-lib" as *;
+@use "../../../../../../../modules/projects/veela.css/src/scss/lib/advanced/design/colorize" as colorize;
 
 //
 @layer view.settings {
 
     .settings-panel {
         @include panel-base;
-        @include solid-colorize("&", ("scope": "selector"));
+        @include colorize.solid-colorize("&", ("scope": "selector"));
 
         //
         & {
@@ -266,7 +267,7 @@
         border-style: solid;
         border-radius: var(--radius-lg);
 
-        @include solid-colorize("&", ("scope": "selector"));
+        @include colorize.solid-colorize("&", ("scope": "selector"));
 
         .settings-panels {
             display: grid;
@@ -351,7 +352,7 @@
             font-size: var(--font-sm);
             white-space: nowrap;
 
-            @include solid-colorize("&", ("scope": "selector"));
+            @include colorize.solid-colorize("&", ("scope": "selector"));
             @include flex-center;
             @include text-color(0);
 

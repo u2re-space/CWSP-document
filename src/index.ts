@@ -2,8 +2,8 @@
  * CrossWord Main Entry Point
  *
  * Path-based routing:
- * - `/` → Boot menu (shell selection)
- * - `/viewer` → Viewer
+ * - `/` → Home/webtop (default route)
+ * - `/viewer` → Viewer (opened automatically for markdown/textual sources)
  * - `/workcenter` → Work Center
  * - `/settings` → Settings
  * - `/explorer` → Explorer
@@ -16,10 +16,11 @@
  */
 
 import { initPWA, checkForUpdates, forceRefreshAssets } from "./frontend/pwa/pwa-handling";
-import { loadSubAppWithShell, loadBootMenu, getViewFromPath, isRootRoute, VALID_VIEWS } from "./frontend/main/routing";
+import { loadSubAppWithShell, VALID_VIEWS } from "./frontend/main/routing";
 import { initializeLayers } from "./frontend/shared/layer-manager";
 import type { ViewId } from "./frontend/shells/types";
 import { DEFAULT_VIEW_ID, pickEnabledView } from "./frontend/config/views";
+import { isFirstRun, showInstallerWelcome } from "./frontend/main/installer-welcome";
 
 import { loadAsAdopted } from "fest/dom";
 import viewStyles from "@rs-frontend/views/scss/_views.scss?inline";
@@ -81,12 +82,15 @@ const isValidViewPath = (path: string): path is ViewId =>
     (VALID_VIEWS as readonly string[]).includes(path);
 
 /** Valid shell identifiers */
-const VALID_SHELLS = ["base", "minimal", "faint"] as const;
-type ShellPreference = (typeof VALID_SHELLS)[number] | "minimal";
+const VALID_SHELLS = ["base", "minimal", "environment", "faint", "window"] as const;
+type ShellPreference = (typeof VALID_SHELLS)[number] | "minimal" | "environment";
 
-const normalizeShellPreference = (shell: ShellPreference | null): "base" | "minimal" => {
+const normalizeShellPreference = (shell: ShellPreference | null): "base" | "minimal" | "environment" => {
     if (shell === "base") return "base";
-    return "minimal";
+    if (shell === "faint") return "minimal";
+    if (shell === "window" || shell === "environment") return "environment";
+    if (shell === "minimal") return "environment";
+    return "environment";
 };
 
 const getShellFromQuery = (): ShellPreference | null => {
@@ -134,21 +138,12 @@ const getSavedShell = (): ShellPreference | null => {
 /**
  * Check if boot menu should be skipped (has saved preference with remember flag)
  */
-const shouldSkipBootMenu = (): boolean => {
-    try {
-        const remember = localStorage.getItem("rs-boot-remember") === "1";
-        const shell = getSavedShell();
-        return remember && shell !== null;
-    } catch {
-        return false;
-    }
-};
-
-// ============================================================================
-// LOADING STATE MANAGEMENT
-// ============================================================================
-
-const setLoadingState = (mountElement: HTMLElement, message: string = "Loading...") => {
+const setLoadingState = (
+    mountElement: HTMLElement,
+    message: string = "Loading...",
+    progress: number = 0
+) => {
+    const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
     mountElement.innerHTML = `
         <div class="app-loading" style="
             display: flex;
@@ -161,6 +156,10 @@ const setLoadingState = (mountElement: HTMLElement, message: string = "Loading..
             font-size: 1.1rem;
             color: #666;
             background: #fff;
+            background-image: linear-gradient(180deg, rgba(10, 20, 36, 0.42), rgba(8, 16, 28, 0.68)), url('/assets/wallpaper.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
             position: absolute;
             inset: 0;
             z-index: 10000;
@@ -175,6 +174,21 @@ const setLoadingState = (mountElement: HTMLElement, message: string = "Loading..
                 margin-bottom: 1rem;
             "></div>
             <div class="loading-text">${message}</div>
+            <div style="
+                inline-size: min(320px, 72vw);
+                block-size: 6px;
+                border-radius: 999px;
+                background: #e7e7e7;
+                margin-top: 0.85rem;
+                overflow: hidden;
+            ">
+                <div style="
+                    inline-size: ${safeProgress}%;
+                    block-size: 100%;
+                    background: #007acc;
+                    transition: inline-size 180ms ease;
+                "></div>
+            </div>
             <style>
                 @keyframes spin {
                     0% { transform: rotate(0deg); }
@@ -208,9 +222,13 @@ const showErrorState = (mountElement: HTMLElement, error: any, retryFn?: () => v
             font-family: system-ui, sans-serif;
             text-align: center;
             background: #fff;
+            background-image: linear-gradient(180deg, rgba(10, 20, 36, 0.42), rgba(8, 16, 28, 0.68)), url('/assets/wallpaper.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
             color: #333;
         ">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+            <div style="font-size: 3rem; margin-bottom: 1rem;"><ui-icon icon="warning-circle" icon-style="duotone"></ui-icon></div>
             <h2 style="margin: 0 0 1rem 0; color: #d32f2f;">Application Error</h2>
             <p style="margin: 0 0 1.5rem 0; color: #666; max-inline-size: 500px;">${errorMessage}</p>
             ${retryFn ? `<button data-action="retry" style="
@@ -288,7 +306,7 @@ export default async function index(mountElement: HTMLElement) {
     console.log('[Index] Initializing uniform channels...');
     initializeAppChannels();
 
-    setLoadingState(mountElement, 'Initializing CrossWord...');
+    setLoadingState(mountElement, "Initializing CrossWord...", 8);
 
     try {
         // Initialize PWA features (non-blocking)
@@ -296,7 +314,7 @@ export default async function index(mountElement: HTMLElement) {
 
         // Load CSS (non-extension only)
         if (!isExtension()) {
-            setLoadingState(mountElement, 'Loading styles...');
+            setLoadingState(mountElement, "Loading styles...", 24);
             await ensureAppCss();
         }
 
@@ -349,20 +367,22 @@ export default async function index(mountElement: HTMLElement) {
         // ROUTE HANDLING
         // ====================================================================
 
-        // Share target route → load default shell with viewer
+        // Share target route -> load default shell with viewer
         if (pathname === "share-target" || pathname === "share_target") {
             console.log('[Index] Share target route');
+            setLoadingState(mountElement, "Preparing share target...", 66);
             clearLoadingState(mountElement);
-            const appLoader = await loadSubAppWithShell(getSavedShell() || "minimal", pickEnabledView("viewer"));
+            const appLoader = await loadSubAppWithShell(getSavedShell() || "environment", pickEnabledView("viewer"));
             await appLoader.mount(mountElement);
             return;
         }
 
-        // Root with share/markdown params → load default shell with viewer
+        // Root with share/markdown params -> load default shell with viewer
         if ((!pathname || pathname === "") && (sharedFlag === "1" || sharedFlag === "true" || markdownContent)) {
             console.log('[Index] Root with share/markdown params');
+            setLoadingState(mountElement, "Opening markdown content...", 70);
             clearLoadingState(mountElement);
-            const appLoader = await loadSubAppWithShell(getSavedShell() || "minimal", pickEnabledView("viewer"));
+            const appLoader = await loadSubAppWithShell(getSavedShell() || "environment", pickEnabledView("viewer"));
             await appLoader.mount(mountElement);
             return;
         }
@@ -370,50 +390,62 @@ export default async function index(mountElement: HTMLElement) {
         // View routes: /viewer, /workcenter, /settings, /explorer, /history, /editor, /airpad, /print
         if (pathname && isValidViewPath(pathname)) {
             console.log('[Index] View route:', pathname);
+            setLoadingState(mountElement, "Booting webtop shell...", 76);
+            try {
+                const search = globalThis.location.search || "";
+                const hash = globalThis.location.hash || "";
+                const canonical = `/${search}${hash}`;
+                const current = `${globalThis.location.pathname}${search}${hash}`;
+                if (current !== canonical) {
+                    globalThis.history.replaceState(
+                        {
+                            ...(globalThis.history.state || {}),
+                            redirectedFromViewPath: pathname
+                        },
+                        "",
+                        canonical
+                    );
+                }
+            } catch {
+                // ignore canonical URL normalization issues
+            }
             clearLoadingState(mountElement);
 
             // Print stays on raw shell; other views follow user shell preference.
             const shell = (pathname === "print")
                 ? "base"
-                : (getSavedShell() || "minimal");
+                : (getSavedShell() || "environment");
 
             const appLoader = await loadSubAppWithShell(shell, pathname);
             await appLoader.mount(mountElement);
             return;
         }
 
-        // Root route (/) → Boot menu or auto-redirect if has saved preference
+        // Root route (/): always boot home/webtop.
+        // First run shows installer welcome instead of legacy boot menu.
         if (!pathname || pathname === "") {
             console.log('[Index] Root route');
-
-            // If user has saved shell preference with "remember", skip boot menu
-            if (shouldSkipBootMenu()) {
-                console.log('[Index] Skipping boot menu (remembered preference)');
-                // Redirect to default view
-                globalThis.location.href = `/${DEFAULT_VIEW_ID}`;
-                return;
-            }
-
-            // Extension always goes to default view (no boot menu)
+            const defaultHomeView = pickEnabledView("home", DEFAULT_VIEW_ID);
+            let targetShell = getSavedShell() || "environment";
             if (isExtension()) {
-                console.log('[Index] Extension mode - loading default view');
+                targetShell = "base";
+            } else if (isFirstRun()) {
                 clearLoadingState(mountElement);
-                const appLoader = await loadSubAppWithShell("base", pickEnabledView("viewer"));
-                await appLoader.mount(mountElement);
-                return;
+                const installer = await showInstallerWelcome(mountElement);
+                targetShell = installer.shell;
+            } else {
+                setLoadingState(mountElement, "Starting webtop...", 80);
             }
 
-            // Show boot menu for shell selection
-            console.log('[Index] Showing boot menu');
             clearLoadingState(mountElement);
-            const bootMenu = await loadBootMenu();
-            await bootMenu.mount(mountElement);
+            const appLoader = await loadSubAppWithShell(targetShell, defaultHomeView);
+            await appLoader.mount(mountElement);
             return;
         }
 
-        // Unknown route → redirect to viewer
-        console.log('[Index] Unknown route, redirecting to /viewer');
-        globalThis.location.href = `/${DEFAULT_VIEW_ID}`;
+        // Unknown route -> redirect to root/home.
+        console.log("[Index] Unknown route, redirecting to /");
+        globalThis.location.href = "/";
 
     } catch (error) {
         console.error('[Index] Frontend loader failed:', error);

@@ -3,7 +3,7 @@
  * 
  * Shell selection screen displayed at root (/) route.
  * User selects a shell (Basic, Faint, etc.) which is saved to preferences.
- * Then navigates to the default view (/viewer).
+ * Then navigates to the default view (/home).
  */
 
 import { H } from "fest/lure";
@@ -62,7 +62,7 @@ const navigateToDefaultView = (shell: ShellId, remember: boolean): void => {
     saveShellPreference(normalizedShell, remember);
     
     // Navigate to the configured default view.
-    const defaultView = pickEnabledView("viewer");
+    const defaultView = pickEnabledView("home");
     globalThis?.history?.pushState?.({ shell: normalizedShell, view: defaultView }, "", `/${defaultView}`);
     
     // Dispatch route change event

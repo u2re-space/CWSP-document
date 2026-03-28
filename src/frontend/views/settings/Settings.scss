@@ -218,6 +218,20 @@
             align-items: center;
             inline-size: stretch;
             container-type: inline-size;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: thin;
+            scrollbar-gutter: stable both-edges;
+            padding-block-end: 2px;
+
+            h2 {
+                position: sticky;
+                inset-inline-start: 0;
+                margin-inline-start: auto;
+                background: var(--color-surface, transparent);
+                padding-inline-start: var(--space-sm, 8px);
+                white-space: nowrap;
+            }
         }
 
         .settings-tab-btn {
@@ -230,6 +244,8 @@
             font-weight: var(--font-weight-medium, 500);
             cursor: pointer;
             transition: all var(--motion-fast);
+            white-space: nowrap;
+            flex: 0 0 auto;
 
             &:hover {
                 background: var(--color-surface-container);
@@ -321,6 +337,15 @@
                 .btn.primary {
                     margin-inline-start: auto;
                 }
+            }
+
+            .settings-tab-actions {
+                -webkit-overflow-scrolling: touch;
+                scroll-snap-type: inline proximity;
+            }
+
+            .settings-tab-btn {
+                scroll-snap-align: start;
             }
         }
 

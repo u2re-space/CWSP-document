@@ -10,7 +10,7 @@ import { Sidebar } from "./Sidebar";
 import { MakeCardElement } from "../../../items/Cards";
 import { initBackNavigation, registerCloseable, historyViewRef, historyState } from "fest/lure";
 import { $byKind, $insideOfDay } from "../../../../core/utils/Utils";
-import { createCtxMenu, SpeedDial } from "../../../views/from-faint/SpeedDial";
+import { createWebTopEnvironment } from "../../../environment";
 import { ViewPage } from "../../../views/from-faint/Viewer";
 
 // @ts-ignore
@@ -396,6 +396,7 @@ export async function frontend(mountElement) {
 
     console.log("[faint] Creating layout components");
     console.time("[faint] Layout creation time");
+    const webTop = createWebTopEnvironment(makeView);
 
     // Add timeout protection for layout creation
     const layoutPromise = Promise.race([
@@ -408,7 +409,7 @@ export async function frontend(mountElement) {
             console.log("[faint] Main layout created, mounting to DOM");
 
             mountElement?.append?.(layout);
-            mountElement?.append?.(createCtxMenu());
+            mountElement?.append?.(webTop.contextMenu);
             return true;
         })(),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Layout creation timeout")), 10000))

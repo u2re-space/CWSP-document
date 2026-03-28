@@ -28,6 +28,7 @@ import { isEnabledView, pickEnabledView } from "../config/views";
 
 import { loadVeelaVariant, type VeelaVariant } from "fest/veela";
 import { initializeLayers } from "../shared/layer-manager";
+import { ensureAppWallpaperHost } from "./wallpaper-host";
 
 // ============================================================================
 // BOOT TYPES
@@ -110,7 +111,7 @@ const STYLE_CONFIGS: Record<StyleSystem, {
         name: "Basic Veela Styles",
         stylesheets: [],
         description: "Minimal styling for basic functionality",
-        recommendedShells: ["minimal", "base"]
+        recommendedShells: ["minimal", "window", "base"]
     },
     "vl-advanced": {
         name: "Advanced (Full-Featured Styling)",
@@ -134,6 +135,8 @@ export function getRecommendedStyle(shell: ShellId): StyleSystem {
         case "faint":
             return "vl-basic";
         case "minimal":
+        case "window":
+        case "environment":
             return "vl-basic";
         case "base":
             return "vl-core";
@@ -211,6 +214,9 @@ export class BootLoader {
 
             // Establish canonical cascade layer order before any stylesheet loads.
             initializeLayers();
+
+            // Wallpaper sits under the shell host (home speed-dial / faint / new-tab).
+            ensureAppWallpaperHost(container);
 
             // Phase 0–1: Settings + Veela in parallel (both are on the critical path to first paint).
             const [persistedSettings] = await Promise.all([
@@ -531,7 +537,7 @@ export const bootLoader = BootLoader.getInstance();
 export async function quickBoot(
     container: HTMLElement,
     shell: ShellId = "minimal",
-    view: ViewId = "viewer"
+    view: ViewId = "home"
 ): Promise<Shell> {
     return bootLoader.boot(container, {
         styleSystem: getRecommendedStyle(shell),
@@ -547,7 +553,7 @@ export async function quickBoot(
  */
 export async function bootFaint(
     container: HTMLElement,
-    view: ViewId = "viewer"
+    view: ViewId = "home"
 ): Promise<Shell> {
     return bootMinimal(container, view);
 }
@@ -557,12 +563,12 @@ export async function bootFaint(
  */
 export async function bootMinimal(
     container: HTMLElement,
-    view: ViewId = "viewer"
+    view: ViewId = "home"
 ): Promise<Shell> {
-    const channels = ["workcenter", "settings", "viewer"].filter((channelId) =>
+    const channels = ["home", "workcenter", "settings", "viewer"].filter((channelId) =>
         isEnabledView(channelId)
     ) as ServiceChannelId[];
-    const defaultView = pickEnabledView(view, "viewer");
+    const defaultView = pickEnabledView(view, "home");
     const channelPriorityId: ServiceChannelId | undefined =
         (channels.find((c) => c === defaultView) ?? channels[0]) as ServiceChannelId | undefined;
     return bootLoader.boot(container, {
@@ -576,16 +582,62 @@ export async function bootMinimal(
 }
 
 /**
+ * Boot with Environment shell (home desktop + windowed/maximized child views).
+ */
+export async function bootEnvironment(
+    container: HTMLElement,
+    view: ViewId = "home"
+): Promise<Shell> {
+    const channels = ["home", "workcenter", "settings", "viewer"].filter((channelId) =>
+        isEnabledView(channelId)
+    ) as ServiceChannelId[];
+    const defaultView = pickEnabledView(view, "home");
+    const channelPriorityId: ServiceChannelId | undefined =
+        (channels.find((c) => c === defaultView) ?? channels[0]) as ServiceChannelId | undefined;
+    return bootLoader.boot(container, {
+        styleSystem: "vl-basic",
+        shell: "environment",
+        defaultView,
+        channels,
+        channelPriorityId,
+        rememberChoice: true
+    });
+}
+
+/**
+ * Boot with Window shell (base-derived with draggable/resizable frame).
+ */
+export async function bootWindow(
+    container: HTMLElement,
+    view: ViewId = "home"
+): Promise<Shell> {
+    const channels = ["home", "workcenter", "settings", "viewer"].filter((channelId) =>
+        isEnabledView(channelId)
+    ) as ServiceChannelId[];
+    const defaultView = pickEnabledView(view, "home");
+    const channelPriorityId: ServiceChannelId | undefined =
+        (channels.find((c) => c === defaultView) ?? channels[0]) as ServiceChannelId | undefined;
+    return bootLoader.boot(container, {
+        styleSystem: "vl-basic",
+        shell: "window",
+        defaultView,
+        channels,
+        channelPriorityId,
+        rememberChoice: true
+    });
+}
+
+/**
  * Boot with Raw shell (minimal)
  */
 export async function bootBase(
     container: HTMLElement,
-    view: ViewId = "viewer"
+    view: ViewId = "home"
 ): Promise<Shell> {
     return bootLoader.boot(container, {
         styleSystem: "vl-core",
         shell: "base",
-        defaultView: pickEnabledView(view, "viewer"),
+        defaultView: pickEnabledView(view, "home"),
         channels: [],
         rememberChoice: false
     });

@@ -104,6 +104,16 @@
         }
     }
 
+    .view-home--webtop {
+        position: relative;
+        display: block;
+        inline-size: 100%;
+        block-size: 100%;
+        padding: 0;
+        background: transparent;
+        overflow: hidden;
+    }
+
     @container (max-width: 768px) {
         .view-home {
             --view-hero-padding: var(--space-8);

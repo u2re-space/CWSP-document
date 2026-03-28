@@ -181,6 +181,26 @@ export type AppSettings = {
         theme?: "light" | "dark" | "auto";
         fontSize?: "small" | "medium" | "large";
         color?: string;
+        launcher?: {
+            showDock?: boolean;
+            showTaskbarOverlay?: boolean;
+            dockPosition?: "bottom" | "left" | "right";
+            iconSize?: "small" | "medium" | "large";
+            urlPasteMode?: "shortcut" | "open-now";
+            urlOpenTarget?: "_self" | "_blank";
+        };
+        environment?: {
+            wallpaperOpacity?: number;
+            wallpaperBlur?: number;
+            wallpaperRotate?: number;
+            statusbarWidgets?: boolean;
+            mobileFullscreenStatusbar?: boolean;
+        };
+        layout?: {
+            desktopWindowMode?: "windowed" | "maximized";
+            mobileWindowMode?: "maximized" | "windowed";
+            mobileScrollableTabs?: boolean;
+        };
         markdown?: {
             customCss?: string;
             printCss?: string;
@@ -266,6 +286,26 @@ export const DEFAULT_SETTINGS: AppSettings = {
         theme: "auto",
         fontSize: "medium",
         color: "",
+        launcher: {
+            showDock: true,
+            showTaskbarOverlay: true,
+            dockPosition: "bottom",
+            iconSize: "medium",
+            urlPasteMode: "shortcut",
+            urlOpenTarget: "_blank"
+        },
+        environment: {
+            wallpaperOpacity: 1,
+            wallpaperBlur: 0,
+            wallpaperRotate: 0,
+            statusbarWidgets: true,
+            mobileFullscreenStatusbar: true
+        },
+        layout: {
+            desktopWindowMode: "windowed",
+            mobileWindowMode: "maximized",
+            mobileScrollableTabs: true
+        },
         markdown: {
             customCss: "",
             printCss: "",

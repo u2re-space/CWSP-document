@@ -9,6 +9,7 @@ import { setString, StorageKeys } from "../../../core/storage";
 import { navigateToView } from "../../main/routing";
 import { createCustomInstructionsEditor } from "../../items/CustomInstructionsEditor";
 import { loadAsAdopted } from "fest/dom";
+import { wallpaperState, persistWallpaper } from "@rs-core/storage/StateStorage";
 
 export type SettingsViewOptions = {
     isExtension: boolean;
@@ -93,6 +94,9 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     <section class="actions">
         <div class="settings-tab-actions" data-settings-tabs data-active-tab="ai">
         <button class="settings-tab-btn" type="button" data-action="switch-settings-tab" data-tab="appearance" aria-selected="false">Appearance</button>
+        <button class="settings-tab-btn" type="button" data-action="switch-settings-tab" data-tab="launcher" aria-selected="false">Launcher</button>
+        <button class="settings-tab-btn" type="button" data-action="switch-settings-tab" data-tab="environment" aria-selected="false">Environment</button>
+        <button class="settings-tab-btn" type="button" data-action="switch-settings-tab" data-tab="layout" aria-selected="false">Layout</button>
         <button class="settings-tab-btn" type="button" data-action="switch-settings-tab" data-tab="markdown" aria-selected="false">Markdown</button>
         <button class="settings-tab-btn is-active" type="button" data-action="switch-settings-tab" data-tab="ai" aria-selected="true">AI</button>
         <button class="settings-tab-btn" type="button" data-action="switch-settings-tab" data-tab="mcp" aria-selected="false">MCP</button>
@@ -100,6 +104,94 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         <button class="settings-tab-btn" type="button" data-action="switch-settings-tab" data-tab="extension" aria-selected="false" data-extension-tab hidden>Extension</button>
         <h2>Settings</h2>
         </div>
+    </section>
+
+    <section class="card settings-tab-panel" data-tab-panel="launcher">
+      <h3>Launcher</h3>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="appearance.launcher.showDock" />
+        <span>Show dock</span>
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="appearance.launcher.showTaskbarOverlay" />
+        <span>Show taskbar overlay (desktop)</span>
+      </label>
+      <label class="field">
+        <span>Dock position</span>
+        <select class="form-select" data-field="appearance.launcher.dockPosition">
+          <option value="bottom">Bottom</option>
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Launcher icon size</span>
+        <select class="form-select" data-field="appearance.launcher.iconSize">
+          <option value="small">Small</option>
+          <option value="medium">Medium</option>
+          <option value="large">Large</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>URL paste behavior (home screen)</span>
+        <select class="form-select" data-field="appearance.launcher.urlPasteMode">
+          <option value="shortcut">Create shortcut</option>
+          <option value="open-now">Open directly</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>URL open target</span>
+        <select class="form-select" data-field="appearance.launcher.urlOpenTarget">
+          <option value="_blank">New window/tab</option>
+          <option value="_self">Same tab</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="card settings-tab-panel" data-tab-panel="environment">
+      <h3>Environment</h3>
+      <label class="field">
+        <span>Wallpaper opacity (0-1)</span>
+        <input class="form-input" type="number" inputmode="decimal" min="0" max="1" step="0.05" data-field="appearance.environment.wallpaperOpacity" />
+      </label>
+      <label class="field">
+        <span>Wallpaper blur (px)</span>
+        <input class="form-input" type="number" inputmode="decimal" min="0" max="24" step="0.5" data-field="appearance.environment.wallpaperBlur" />
+      </label>
+      <label class="field">
+        <span>Wallpaper rotate (deg)</span>
+        <input class="form-input" type="number" inputmode="numeric" min="-360" max="360" step="1" data-field="appearance.environment.wallpaperRotate" />
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="appearance.environment.statusbarWidgets" />
+        <span>Enable status bar widgets</span>
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="appearance.environment.mobileFullscreenStatusbar" />
+        <span>Mobile fullscreen status bar</span>
+      </label>
+    </section>
+
+    <section class="card settings-tab-panel" data-tab-panel="layout">
+      <h3>Layout</h3>
+      <label class="field">
+        <span>Desktop window mode</span>
+        <select class="form-select" data-field="appearance.layout.desktopWindowMode">
+          <option value="windowed">Windowed</option>
+          <option value="maximized">Maximized</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Mobile window mode</span>
+        <select class="form-select" data-field="appearance.layout.mobileWindowMode">
+          <option value="maximized">Maximized</option>
+          <option value="windowed">Windowed</option>
+        </select>
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="appearance.layout.mobileScrollableTabs" />
+        <span>Scrollable tabs on mobile</span>
+      </label>
     </section>
 
     <section class="card settings-tab-panel" data-tab-panel="appearance">
@@ -439,6 +531,20 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     const speechLanguage = field('[data-field="speech.language"]') as HTMLSelectElement | null;
     const theme = field('[data-field="appearance.theme"]') as HTMLSelectElement | null;
     const fontSize = field('[data-field="appearance.fontSize"]') as HTMLSelectElement | null;
+    const launcherShowDock = field('[data-field="appearance.launcher.showDock"]') as HTMLInputElement | null;
+    const launcherShowTaskbarOverlay = field('[data-field="appearance.launcher.showTaskbarOverlay"]') as HTMLInputElement | null;
+    const launcherDockPosition = field('[data-field="appearance.launcher.dockPosition"]') as HTMLSelectElement | null;
+    const launcherIconSize = field('[data-field="appearance.launcher.iconSize"]') as HTMLSelectElement | null;
+    const launcherUrlPasteMode = field('[data-field="appearance.launcher.urlPasteMode"]') as HTMLSelectElement | null;
+    const launcherUrlOpenTarget = field('[data-field="appearance.launcher.urlOpenTarget"]') as HTMLSelectElement | null;
+    const environmentWallpaperOpacity = field('[data-field="appearance.environment.wallpaperOpacity"]') as HTMLInputElement | null;
+    const environmentWallpaperBlur = field('[data-field="appearance.environment.wallpaperBlur"]') as HTMLInputElement | null;
+    const environmentWallpaperRotate = field('[data-field="appearance.environment.wallpaperRotate"]') as HTMLInputElement | null;
+    const environmentStatusbarWidgets = field('[data-field="appearance.environment.statusbarWidgets"]') as HTMLInputElement | null;
+    const environmentMobileFullscreenStatusbar = field('[data-field="appearance.environment.mobileFullscreenStatusbar"]') as HTMLInputElement | null;
+    const layoutDesktopWindowMode = field('[data-field="appearance.layout.desktopWindowMode"]') as HTMLSelectElement | null;
+    const layoutMobileWindowMode = field('[data-field="appearance.layout.mobileWindowMode"]') as HTMLSelectElement | null;
+    const layoutMobileScrollableTabs = field('[data-field="appearance.layout.mobileScrollableTabs"]') as HTMLInputElement | null;
     const markdownPreset = field('[data-field="appearance.markdown.preset"]') as HTMLSelectElement | null;
     const markdownFontFamily = field('[data-field="appearance.markdown.fontFamily"]') as HTMLSelectElement | null;
     const markdownFontSizePx = field('[data-field="appearance.markdown.fontSizePx"]') as HTMLInputElement | null;
@@ -525,7 +631,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         const normalized = (raw || "").trim().toLowerCase();
         if (!normalized) return "ai";
         if (normalized === "style" || normalized === "styles" || normalized === "styling") return "markdown";
-        const availableTabs = new Set(["appearance", "markdown", "ai", "mcp", "instructions", "extension"]);
+        const availableTabs = new Set(["appearance", "launcher", "environment", "layout", "markdown", "ai", "mcp", "instructions", "extension"]);
         return availableTabs.has(normalized) ? normalized : "ai";
     };
 
@@ -643,6 +749,26 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
             if (speechLanguage) speechLanguage.value = (s?.speech?.language || "en-US") as any;
             if (theme) theme.value = (s?.appearance?.theme || "auto") as any;
             if (fontSize) fontSize.value = (s?.appearance?.fontSize || "medium") as any;
+            if (launcherShowDock) launcherShowDock.checked = (s?.appearance?.launcher?.showDock ?? true) !== false;
+            if (launcherShowTaskbarOverlay) launcherShowTaskbarOverlay.checked = (s?.appearance?.launcher?.showTaskbarOverlay ?? true) !== false;
+            if (launcherDockPosition) launcherDockPosition.value = (s?.appearance?.launcher?.dockPosition || "bottom") as any;
+            if (launcherIconSize) launcherIconSize.value = (s?.appearance?.launcher?.iconSize || "medium") as any;
+            if (launcherUrlPasteMode) launcherUrlPasteMode.value = (s?.appearance?.launcher?.urlPasteMode || "shortcut") as any;
+            if (launcherUrlOpenTarget) launcherUrlOpenTarget.value = (s?.appearance?.launcher?.urlOpenTarget || "_blank") as any;
+            try {
+                localStorage.setItem("cw::env::url-paste-mode", String(s?.appearance?.launcher?.urlPasteMode || "shortcut"));
+                localStorage.setItem("cw::env::url-paste-target", String(s?.appearance?.launcher?.urlOpenTarget || "_blank"));
+            } catch {
+                // no-op
+            }
+            if (environmentWallpaperOpacity) environmentWallpaperOpacity.value = String(s?.appearance?.environment?.wallpaperOpacity ?? wallpaperState.opacity ?? 1);
+            if (environmentWallpaperBlur) environmentWallpaperBlur.value = String(s?.appearance?.environment?.wallpaperBlur ?? wallpaperState.blur ?? 0);
+            if (environmentWallpaperRotate) environmentWallpaperRotate.value = String(s?.appearance?.environment?.wallpaperRotate ?? wallpaperState.rotate ?? 0);
+            if (environmentStatusbarWidgets) environmentStatusbarWidgets.checked = (s?.appearance?.environment?.statusbarWidgets ?? true) !== false;
+            if (environmentMobileFullscreenStatusbar) environmentMobileFullscreenStatusbar.checked = (s?.appearance?.environment?.mobileFullscreenStatusbar ?? true) !== false;
+            if (layoutDesktopWindowMode) layoutDesktopWindowMode.value = (s?.appearance?.layout?.desktopWindowMode || "windowed") as any;
+            if (layoutMobileWindowMode) layoutMobileWindowMode.value = (s?.appearance?.layout?.mobileWindowMode || "maximized") as any;
+            if (layoutMobileScrollableTabs) layoutMobileScrollableTabs.checked = (s?.appearance?.layout?.mobileScrollableTabs ?? true) !== false;
             if (markdownPreset) markdownPreset.value = (s?.appearance?.markdown?.preset || "default") as any;
             if (markdownFontFamily) markdownFontFamily.value = (s?.appearance?.markdown?.fontFamily || "system") as any;
             if (markdownFontSizePx) markdownFontSizePx.value = String(s?.appearance?.markdown?.fontSizePx ?? 16);
@@ -783,6 +909,26 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                 appearance: {
                     theme: (theme?.value as any) || "auto",
                     fontSize: (fontSize?.value as any) || "medium",
+                    launcher: {
+                        showDock: (launcherShowDock?.checked ?? true) !== false,
+                        showTaskbarOverlay: (launcherShowTaskbarOverlay?.checked ?? true) !== false,
+                        dockPosition: (launcherDockPosition?.value as any) || "bottom",
+                        iconSize: (launcherIconSize?.value as any) || "medium",
+                        urlPasteMode: (launcherUrlPasteMode?.value as any) || "shortcut",
+                        urlOpenTarget: (launcherUrlOpenTarget?.value as any) || "_blank",
+                    },
+                    environment: {
+                        wallpaperOpacity: parseFloatInRange(environmentWallpaperOpacity?.value, 1, 0, 1),
+                        wallpaperBlur: parseFloatInRange(environmentWallpaperBlur?.value, 0, 0, 24),
+                        wallpaperRotate: parseNumberOrDefault(environmentWallpaperRotate?.value, 0),
+                        statusbarWidgets: (environmentStatusbarWidgets?.checked ?? true) !== false,
+                        mobileFullscreenStatusbar: (environmentMobileFullscreenStatusbar?.checked ?? true) !== false,
+                    },
+                    layout: {
+                        desktopWindowMode: (layoutDesktopWindowMode?.value as any) || "windowed",
+                        mobileWindowMode: (layoutMobileWindowMode?.value as any) || "maximized",
+                        mobileScrollableTabs: (layoutMobileScrollableTabs?.checked ?? true) !== false,
+                    },
                     markdown: {
                         preset: (markdownPreset?.value as any) || "default",
                         fontFamily: (markdownFontFamily?.value as any) || "system",
@@ -815,6 +961,17 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                 },
             };
             const saved = await saveSettings(next);
+            wallpaperState.opacity = Math.max(0, Math.min(1, Number(saved?.appearance?.environment?.wallpaperOpacity ?? 1)));
+            wallpaperState.blur = Math.max(0, Number(saved?.appearance?.environment?.wallpaperBlur ?? 0));
+            wallpaperState.rotate = Number(saved?.appearance?.environment?.wallpaperRotate ?? 0);
+            persistWallpaper();
+            try {
+                const launcherCfg = saved?.appearance?.launcher;
+                localStorage.setItem("cw::env::url-paste-mode", String(launcherCfg?.urlPasteMode || "shortcut"));
+                localStorage.setItem("cw::env::url-paste-target", String(launcherCfg?.urlOpenTarget || "_blank"));
+            } catch {
+                // optional sync for home speed-dial behavior
+            }
             applyTheme(saved);
             opts.onTheme?.((saved.appearance?.theme as any) || "auto");
             setNote("Saved.");

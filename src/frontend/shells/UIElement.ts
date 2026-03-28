@@ -3,99 +3,15 @@ import type { ShellId } from "./types";
 const SHELL_ELEMENT_TAG_PREFIX = "cw-shell";
 const shellElementCtorByTag = new Map<string, CustomElementConstructor>();
 
-const MINIMAL_SHELL_HOST_STYLES = `
-:host {
-    display: block;
-    inline-size: 100%;
-    block-size: 100%;
-    container-type: size;
-    contain: strict;
-    isolation: isolate;
-    overflow: hidden;
-    /* Minimal shell: align with .app-shell__nav via --shell-nav-bg (set in minimal.scss) */
-    background-color: var(--shell-nav-bg, var(--color-surface-container-high, var(--color-background, Canvas)));
-}
-
-.app-shell__content > slot[name="view"]::slotted([data-view]) {
-    position: absolute;
-    inset: 0;
-    overflow: auto;
-    scrollbar-width: thin;
-    inline-size: stretch;
-    block-size: stretch;
-    min-inline-size: 0;
-    min-block-size: 0;
-    display: block;
-    container-type: size;
-}
-
-::slotted([data-cw-view-host="true"]) {
-    display: block;
-    inline-size: 100%;
-    block-size: 100%;
-    min-block-size: 0;
-    min-inline-size: 0;
-    container-type: size;
-}
-
-@media print {
-    :host {
-        overflow: visible !important;
-        contain: none !important;
-        container-type: normal !important;
-        block-size: auto !important;
-        max-block-size: none !important;
-    }
-
-    ::slotted(*) {
-        overflow: visible !important;
-        contain: none !important;
-        container-type: normal !important;
-        block-size: auto !important;
-        max-block-size: none !important;
-    }
-}
-`;
+const WEBTOP_ENV_TAG = "cw-webtop-environment";
 
 /**
- * Minimal shell: full `app-shell` chrome lives in shadow DOM; active view (`cw-view-*`) is a
- * light-DOM child with `slot="view"` projected into `<main>`.
+ * Web desktop / home-tab host: full `app-shell` chrome in the **light DOM** (no shadow).
+ * Replaces legacy `cw-shell-minimal` shadow host; views mount as direct children of `[data-shell-content]`.
  */
-export class MinimalShellHostElement extends HTMLElement {
-    private chromeMounted = false;
-
+export class WebtopEnvironmentHostElement extends HTMLElement {
     mountShellLayout(layout: HTMLElement): void {
-        if (this.chromeMounted) return;
-
-        const shadow = this.shadowRoot ?? this.attachShadow({ mode: "open" });
-
-        const hostStyle = document.createElement("style");
-        hostStyle.textContent = MINIMAL_SHELL_HOST_STYLES;
-        shadow.appendChild(hostStyle);
-
-        const main = layout.querySelector("[data-shell-content]");
-        if (main) {
-            const loading = main.querySelector(":scope > .app-shell__loading");
-            const frag = document.createDocumentFragment();
-            if (loading) {
-                frag.appendChild(loading);
-            }
-            const viewSlot = document.createElement("slot");
-            viewSlot.name = "view";
-            frag.appendChild(viewSlot);
-            main.replaceChildren(frag);
-        }
-
-        const statusEl = layout.querySelector("[data-shell-status]");
-        if (statusEl) {
-            statusEl.replaceChildren();
-            const stSlot = document.createElement("slot");
-            stSlot.name = "shell-status";
-            statusEl.appendChild(stSlot);
-        }
-
-        shadow.appendChild(layout);
-        this.chromeMounted = true;
+        this.replaceChildren(layout);
     }
 }
 
@@ -199,8 +115,13 @@ export class ShellElement extends HTMLElement {
     }
 }
 
-export const getShellElementTagName = (shellId: ShellId | string): string =>
-    `${SHELL_ELEMENT_TAG_PREFIX}-${String(shellId || "unknown").toLowerCase()}`;
+export const getShellElementTagName = (shellId: ShellId | string): string => {
+    const sid = String(shellId || "unknown").toLowerCase();
+    if (sid === "minimal" || sid === "environment") {
+        return WEBTOP_ENV_TAG;
+    }
+    return `${SHELL_ELEMENT_TAG_PREFIX}-${sid}`;
+};
 
 export const ensureShellElementDefined = (shellId: ShellId | string): string => {
     const tagName = getShellElementTagName(shellId);
@@ -209,8 +130,8 @@ export const ensureShellElementDefined = (shellId: ShellId | string): string => 
         if (!ctor) {
             const sid = String(shellId || "").toLowerCase();
             ctor =
-                sid === "minimal"
-                    ? MinimalShellHostElement
+                sid === "minimal" || sid === "environment"
+                    ? WebtopEnvironmentHostElement
                     : class extends ShellElement { };
             shellElementCtorByTag.set(tagName, ctor);
         }

@@ -246,7 +246,7 @@ const showPageNotification = (message: string, type: "success" | "error" | "info
         document.querySelectorAll(".crossword-crx-notification").forEach((el) => el.remove());
 
         const colors = { success: "#10b981", error: "#ef4444", info: "#3b82f6" };
-        const icons = { success: "✅", error: "❌", info: "ℹ️" };
+        const labels = { success: "Success", error: "Error", info: "Info" };
 
         const el = document.createElement("div");
         el.className = "crossword-crx-notification";
@@ -262,7 +262,7 @@ const showPageNotification = (message: string, type: "success" | "error" | "info
             border: "1px solid rgba(255,255,255,0.2)", backdropFilter: "blur(10px)",
             cursor: "pointer",
         });
-        el.innerHTML = `<div style="display:flex;align-items:center;gap:12px"><span style="font-size:18px">${icons[type]}</span><div style="flex:1;line-height:1.4">${message}</div></div>`;
+        el.innerHTML = `<div style="display:flex;align-items:flex-start;gap:12px"><strong style="font-size:12px;line-height:1.4;letter-spacing:.02em;text-transform:uppercase">${labels[type]}</strong><div style="flex:1;line-height:1.4">${message}</div></div>`;
         el.addEventListener("click", () => { el.style.opacity = "0"; el.style.transform = "translateY(-20px) scale(0.95)"; setTimeout(() => el.remove(), 400); });
 
         (document.body || document.documentElement).appendChild(el);
@@ -280,7 +280,7 @@ const resultBC = new BroadcastChannel("rs-content-script");
 resultBC.onmessage = ({ data }) => {
     if (data?.type === "crx-result-delivered" && data.result?.type === "processed" && typeof data.result.content === "string") {
         const preview = data.result.content.length > 60 ? data.result.content.slice(0, 60) + "..." : data.result.content;
-        showPageNotification(`📋 Copied to clipboard!\n${preview}`, "success");
+        showPageNotification(`Copied to clipboard.\n${preview}`, "success");
     }
 };
 
@@ -288,6 +288,6 @@ resultBC.onmessage = ({ data }) => {
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === "crx-result-delivered" && msg.result?.type === "processed" && typeof msg.result.content === "string") {
         const preview = msg.result.content.length > 60 ? msg.result.content.slice(0, 60) + "..." : msg.result.content;
-        showPageNotification(`📋 Copied to clipboard!\n${preview}`, "success");
+        showPageNotification(`Copied to clipboard.\n${preview}`, "success");
     }
 });

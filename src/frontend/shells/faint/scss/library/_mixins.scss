@@ -1,6 +1,8 @@
 // Shared mixins to unify common property blocks
 @use "sass:map";
+@use "sass:meta";
 @use "veela-lib" as *;
+@use "../../../../../../../../modules/projects/veela.css/src/scss/lib/advanced/design/colorize" as colorize;
 @use "./tokens" as t;
 
 // Layout stacks
@@ -17,8 +19,18 @@
 @mixin container-size { container-type: size; contain: content; }
 
 // Typography helpers based on MD3 tokens
+@mixin _safe-md3-typography($token) {
+    @if meta.mixin-exists("md3-typography") {
+        @include md3-typography($token);
+    } @else {
+        // Fallback keeps build stable when md3-typography is unavailable in veela-lib.
+        line-height: 1.35;
+        font-weight: 500;
+    }
+}
+
 @mixin text-heading($token: "title-large", $align: null) {
-    @include md3-typography($token);
+    @include _safe-md3-typography($token);
     font-family: t.$font-family-base;
     @if $align != null { text-align: $align; }
 
@@ -28,7 +40,7 @@
 }
 
 @mixin text-body($token: "body-medium") {
-    @include md3-typography($token);
+    @include _safe-md3-typography($token);
     font-family: t.$font-family-base;
 
     &:where(:-webkit-autofill, :autofill, :-webkit-autofill:hover, :-webkit-autofill:focus, :-webkit-autofill:active) {
@@ -37,7 +49,7 @@
 }
 
 @mixin text-label($token: "label-large", $uppercase: false) {
-    @include md3-typography($token);
+    @include _safe-md3-typography($token);
     font-family: t.$font-family-base;
     @if $uppercase { text-transform: uppercase; }
 
@@ -57,7 +69,7 @@
     $elevation: null,
     $border: false
 ) {
-    @include solid-colorize("&", ("shade": $tone, "role": $role, "scope": "selector"));
+    @include colorize.solid-colorize("&", ("shade": $tone, "role": $role, "scope": "selector"));
 
     @if $radius != null { border-radius: $radius; }
     @if $padding != null { padding: $padding; }
@@ -151,7 +163,7 @@
     &::-webkit-scrollbar { inline-size: $size; block-size: $size; }
     &::-webkit-scrollbar-thumb {
         border-radius: 999px;
-        @include solid-colorize("&", ("shade": $tone, "scope": "selector"));
+        @include colorize.solid-colorize("&", ("shade": $tone, "scope": "selector"));
     }
     &::-webkit-scrollbar-track { background: transparent; }
 }

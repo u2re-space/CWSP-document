@@ -29,18 +29,21 @@ export const cssBackgroundToOpaqueHex = (css: string): string | null => {
 };
 
 /**
- * Sample the top shell chrome (minimal nav or faint toolbar) from mounted shell shadow roots
+ * Sample the top shell chrome (minimal/webtop nav or faint toolbar) from mounted shells
  * so PWA Window Controls Overlay / title bar can match the real toolbar background.
+ * Supports shadow hosts (task-tab / faint) and light-DOM `cw-webtop-environment` (minimal / environment shells).
  */
 export const samplePwaToolbarBackgroundColor = (): string | null => {
     if (typeof document === "undefined") return null;
 
     const hosts = document.querySelectorAll("[data-shell]");
     for (const host of hosts) {
-        const sr = (host as HTMLElement).shadowRoot;
-        if (!sr) continue;
-
-        const bar = sr.querySelector<HTMLElement>(".app-shell__nav, .app-shell__toolbar");
+        const el = host as HTMLElement;
+        const sr = el.shadowRoot;
+        const bar =
+            (sr?.querySelector<HTMLElement>(".app-shell__nav, .app-shell__toolbar") ??
+                null) ||
+            el.querySelector<HTMLElement>(".app-shell__nav, .app-shell__toolbar");
         if (!bar) continue;
 
         const bg = getComputedStyle(bar).backgroundColor;

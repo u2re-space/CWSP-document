@@ -1741,20 +1741,10 @@
 
     .form-error {
         color: var(--color-error);
-
-        &::before {
-            content: "⚠";
-            font-size: var(--text-base);
-        }
     }
 
     .form-success {
         color: var(--color-success);
-
-        &::before {
-            content: "✓";
-            font-size: var(--text-base);
-        }
     }
 
     .form-hint {

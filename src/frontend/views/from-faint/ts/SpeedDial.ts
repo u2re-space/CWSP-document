@@ -19,18 +19,53 @@ import {
     wallpaperState,
     persistWallpaper,
     gridLayoutState,
+    persistGridLayout,
     createSpeedDialItemFromClipboard,
+    parseSpeedDialItemFromJSON,
+    parseSpeedDialItemFromURL,
     type SpeedDialItem,
     type GridCell
 } from "@rs-core/storage/StateStorage";
 import { getBoundingOrientRect, isInFocus, MOCElement, orientOf } from "fest/dom";
 import { writeFileSmart } from "@rs-core/storage/WriteFileSmart-v2";
 import { convertOrientPxToCX, cvt_cs_to_os, type GridItemType } from "fest/core";
+import { emitEnvironmentEvent, runEnvironmentTrigger } from "@rs-frontend/environment/registries";
+import { getAppOverlayRoot } from "@rs-frontend/main/wallpaper-host";
 
 let viewMaker: any = null;
 const layout = observe([gridLayoutState.columns ?? 4, gridLayoutState.rows ?? 8]);
 const items = speedDialItems;
 const meta = speedDialMeta;
+
+const DESKTOP_DEFAULT_SHORTCUTS = [
+    { id: "shortcut-viewer", view: "viewer", label: "Viewer", icon: "eye", cell: [0, 0] as GridCell },
+    { id: "shortcut-explorer", view: "explorer", label: "Explorer", icon: "books", cell: [1, 0] as GridCell },
+    { id: "shortcut-workcenter", view: "workcenter", label: "Work Center", icon: "lightning", cell: [2, 0] as GridCell },
+    { id: "shortcut-airpad", view: "airpad", label: "Airpad", icon: "hand", cell: [3, 0] as GridCell },
+    { id: "shortcut-settings", view: "settings", label: "Settings", icon: "gear-six", cell: [0, 1] as GridCell },
+    { id: "shortcut-history", view: "history", label: "History", icon: "history", cell: [1, 1] as GridCell }
+] as const;
+
+const ensureDesktopShortcuts = () => {
+    let changed = false;
+    for (const shortcut of DESKTOP_DEFAULT_SHORTCUTS) {
+        if (findSpeedDialItem(shortcut.id)) continue;
+        const item = observe({
+            id: shortcut.id,
+            cell: observe([...shortcut.cell] as GridCell),
+            icon: stringRef(shortcut.icon),
+            label: stringRef(shortcut.label),
+            action: "open-view"
+        }) as unknown as SpeedDialItem;
+        addSpeedDialItem(item);
+        ensureSpeedDialMeta(shortcut.id, { action: "open-view", view: shortcut.view });
+        changed = true;
+    }
+    if (changed) {
+        persistSpeedDialItems();
+        persistSpeedDialMeta();
+    }
+};
 
 // Subscribe to grid layout changes
 affected(gridLayoutState, () => {
@@ -53,6 +88,34 @@ const ACTION_OPTIONS = [
 const getRefValue = (ref: any, fallback = "") => {
     if (ref && typeof ref === "object" && "value" in ref) return ref.value ?? fallback;
     return ref ?? fallback;
+};
+
+const getOverlayRoot = (): HTMLElement | null => {
+    if (typeof document === "undefined") return null;
+    return getAppOverlayRoot(document);
+};
+
+const URL_PASTE_MODE_KEY = "cw::env::url-paste-mode";
+const URL_PASTE_TARGET_KEY = "cw::env::url-paste-target";
+type UrlPasteMode = "shortcut" | "open-now";
+type UrlPasteTarget = "_self" | "_blank";
+
+const getUrlPasteMode = (): UrlPasteMode => {
+    const raw = String(localStorage.getItem(URL_PASTE_MODE_KEY) || "").trim();
+    return raw === "open-now" ? "open-now" : "shortcut";
+};
+
+const setUrlPasteMode = (mode: UrlPasteMode) => {
+    localStorage.setItem(URL_PASTE_MODE_KEY, mode);
+};
+
+const getUrlPasteTarget = (): UrlPasteTarget => {
+    const raw = String(localStorage.getItem(URL_PASTE_TARGET_KEY) || "").trim();
+    return raw === "_self" ? "_self" : "_blank";
+};
+
+const setUrlPasteTarget = (target: UrlPasteTarget) => {
+    localStorage.setItem(URL_PASTE_TARGET_KEY, target);
 };
 
 const buildDescriptor = (item: SpeedDialItem) => {
@@ -105,12 +168,14 @@ const runItemAction = (item: SpeedDialItem, actionId?: string, extras: { event?:
 const attachItemNode = (item: SpeedDialItem, el?: HTMLElement | null, interactive = true) => {
     if (!el) return;
     const args = { layout, items, item, meta };
+    let lastDragAt = 0;
     el.dataset.id = item.id;
     el.dataset.speedDialItem = "true";
     el.addEventListener("dragstart", (ev)=>ev.preventDefault());
     if (interactive) {
         el.addEventListener("click", (ev)=>{
             ev?.preventDefault?.();
+            if (Date.now() - lastDragAt < 250) return;
             if (!MOCElement(ev?.target as any, "[data-dragging]")) {
                 runItemAction(item, undefined, { event: ev, initiator: el });
             }
@@ -129,11 +194,32 @@ const attachItemNode = (item: SpeedDialItem, el?: HTMLElement | null, interactiv
     if (el.dataset.layer === "icons") {
         bindInteraction(el, args);
         const cell = item?.cell ?? [0, 0];
+        let prevCell = `${cell?.[0] ?? 0}:${cell?.[1] ?? 0}`;
+        let didMove = false;
         E(el, {
             style: {
                 "--cell-x": propRef(cell, 0),
                 "--cell-y": propRef(cell, 1)
             }
+        });
+        affected(cell as any, () => {
+            const next = `${cell?.[0] ?? 0}:${cell?.[1] ?? 0}`;
+            if (next !== prevCell) {
+                prevCell = next;
+                didMove = true;
+                el.classList.remove("speed-dial-item-placed");
+                requestAnimationFrame(() => el.classList.add("speed-dial-item-placed"));
+            }
+        });
+        el.addEventListener("m-dragstart", () => {
+            didMove = false;
+            el.setAttribute("data-dragging", "true");
+        });
+        el.addEventListener("m-dragend", () => {
+            el.removeAttribute("data-dragging");
+            if (!didMove) return;
+            lastDragAt = Date.now();
+            persistSpeedDialItems();
         });
     }
 };
@@ -210,9 +296,47 @@ const createMenuEntryForAction = (actionId: string, item: SpeedDialItem, fallbac
 //
 export function makeWallpaper() {
     const oRef = orientRef();
-    const srcRef = stringRef("./assets/imgs/test.webp");
-    affected([wallpaperState, "src"], (s) => provide("/user" + (s?.src || (typeof s == "string" ? s : null)))?.then?.(blob => (srcRef.value = URL.createObjectURL(blob)))?.catch?.(console.warn.bind(console)) || "./assets/imgs/test.webp");
-    const CE = H`<canvas slot="backdrop" style="position: absolute; pointer-events: none; min-inline-size: 0px; min-block-size: 0px; inline-size: stretch; block-size: stretch; max-block-size: stretch; max-inline-size: stretch; transform: none; scale: 1; inset: 0; pointer-events: none;" data-orient=${oRef} is="ui-canvas" data-src=${srcRef}></canvas>`;
+    const DEFAULT_WALLPAPER = "/assets/wallpaper.jpg";
+    const srcRef = stringRef(DEFAULT_WALLPAPER);
+    affected([wallpaperState, "src"], (s) => {
+        const raw = String(s?.src || (typeof s == "string" ? s : "") || "").trim();
+        if (!raw) {
+            srcRef.value = DEFAULT_WALLPAPER;
+            return;
+        }
+        if (/^(https?:|blob:|data:)/.test(raw) || raw.startsWith("/assets/") || raw.startsWith("./assets/")) {
+            srcRef.value = raw;
+            return;
+        }
+        const userPath = raw.startsWith("/user/") ? raw : `/user${raw.startsWith("/") ? "" : "/"}${raw}`;
+        provide(userPath)
+            ?.then?.((blob) => (srcRef.value = URL.createObjectURL(blob)))
+            ?.catch?.(() => {
+                srcRef.value = DEFAULT_WALLPAPER;
+            });
+    });
+    const CE = H`<canvas
+        slot="backdrop"
+        class="speed-dial-wallpaper"
+        style="position: absolute; pointer-events: none; min-inline-size: 0px; min-block-size: 0px; inline-size: stretch; block-size: stretch; max-block-size: stretch; max-inline-size: stretch; inset: 0;"
+        data-orient=${oRef}
+        is="ui-canvas"
+        data-src=${srcRef}
+    ></canvas>`;
+    affected(wallpaperState as any, (wallpaper) => {
+        const opacity = Math.max(0, Math.min(1, Number(wallpaper?.opacity ?? 1)));
+        const blur = Math.max(0, Number(wallpaper?.blur ?? 0));
+        const rotate = Number(wallpaper?.rotate ?? 0);
+        CE.style.opacity = `${opacity}`;
+        CE.style.filter = `blur(${blur}px)`;
+        CE.style.transform = `rotate(${rotate}deg) scale(1.08)`;
+        CE.style.transformOrigin = "center center";
+    });
+    const wpHost =
+        typeof document !== "undefined" ? document.querySelector("[data-cw-app-wallpaper]") : null;
+    if (wpHost) {
+        wpHost.appendChild(CE);
+    }
     return CE;
 }
 
@@ -270,6 +394,24 @@ const handleSpeedDialPaste = async (event: ClipboardEvent, suggestedCell?: GridC
 //
 const coordinateRef = typeof document != "undefined" ? pointerAnchorRef() : [numberRef(0), numberRef(0)];
 
+const rotateWallpaperBy = (angle: number) => {
+    const next = (((Number((wallpaperState as any)?.rotate || 0) + angle) % 360) + 360) % 360;
+    (wallpaperState as any).rotate = next;
+    persistWallpaper();
+    emitEnvironmentEvent("cw:env-wallpaper-rotate", { rotate: (wallpaperState as any)?.rotate ?? 0 });
+};
+
+const createItemByText = (text: string, suggestedCell?: GridCell): SpeedDialItem | null => {
+    const jsonItem = parseSpeedDialItemFromJSON(text, suggestedCell);
+    if (jsonItem) return jsonItem;
+    const urlItem = parseSpeedDialItemFromURL(text, suggestedCell);
+    if (!urlItem) return null;
+    const meta = ensureSpeedDialMeta(urlItem.id, {});
+    meta.target = getUrlPasteTarget();
+    persistSpeedDialMeta();
+    return urlItem;
+};
+
 //
 const handleWallpaperDropOrPaste = (event: DragEvent | ClipboardEvent) => {
     if (isInFocus(event?.target as HTMLElement, "#home") ||
@@ -284,8 +426,28 @@ const handleWallpaperDropOrPaste = (event: DragEvent | ClipboardEvent) => {
 
         event.preventDefault();
         event.stopPropagation();
+        const root = Q("#home") as HTMLElement | null;
+        root?.classList?.remove?.("speed-dial-dropping");
+        requestAnimationFrame(() => root?.classList?.add?.("speed-dial-dropping"));
 
         const dt = dataTransfer || ((event as any).clipboardData || (event as any).dataTransfer);
+        const textPayload = dt?.getData?.("application/json") || dt?.getData?.("text/plain") || "";
+        if (textPayload) {
+            const suggested = deriveCellFromCoordinate([coordinateRef[0].value, coordinateRef[1].value]);
+            const item = createItemByText(String(textPayload), suggested);
+            if (item) {
+                const itemMeta = getSpeedDialMeta(item.id);
+                if (getUrlPasteMode() === "open-now" && itemMeta?.href) {
+                    runItemAction(item, "open-link", { event, initiator: root || undefined });
+                    showSuccess("URL opened");
+                    return;
+                }
+                addSpeedDialItem(item);
+                persistSpeedDialItems();
+                persistSpeedDialMeta();
+                showSuccess("Shortcut added from drop/paste");
+            }
+        }
         // Defer heavy file/clipboard scanning so the UI thread can process preventDefault first.
         queueMicrotask(() => {
             handleIncomingEntries(dt, "/images/wallpaper/", null, (file, path) => {
@@ -294,6 +456,7 @@ const handleWallpaperDropOrPaste = (event: DragEvent | ClipboardEvent) => {
                     wallpaperState.src = path;
                     persistWallpaper();
                     showSuccess("Wallpaper updated");
+                    emitEnvironmentEvent("cw:env-wallpaper-updated", { path });
                 }
             });
         });
@@ -303,6 +466,7 @@ const handleWallpaperDropOrPaste = (event: DragEvent | ClipboardEvent) => {
 
 export function SpeedDial(makeView: any) {
     viewMaker = makeView;
+    ensureDesktopShortcuts();
 
     const columnsRef = propRef(gridLayoutState, "columns", 4);
     const rowsRef = propRef(gridLayoutState, "rows", 8);
@@ -334,6 +498,58 @@ export function SpeedDial(makeView: any) {
         </div>
         <div style="background-color: transparent; pointer-events: none;" class="speed-dial-grid" data-layer="items" data-mixin="ui-gridbox" data-grid-columns=${columnsRef} data-grid-rows=${rowsRef} data-grid-shape=${shapeRef}>
             ${M(items, renderIconItem)}
+        </div>
+        <div class="speed-dial-statusbar" aria-label="Environment status bar">
+            <div class="speed-dial-statusbar__clock" ref=${(el) => {
+                if (!el) return;
+                const render = () => {
+                    const now = new Date();
+                    (el as HTMLElement).textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                };
+                render();
+                const interval = setInterval(render, 1000 * 15);
+                (el as any).__timer = interval;
+            }}></div>
+            <div class="speed-dial-statusbar__widgets">
+                <span class="speed-dial-status-widget" ref=${(el) => {
+                    if (!el) return;
+                    const render = () => {
+                        const anyNav = navigator as any;
+                        const conn = anyNav?.connection;
+                        const status = navigator.onLine ? (conn?.effectiveType || "online") : "offline";
+                        (el as HTMLElement).textContent = `Net: ${status}`;
+                    };
+                    render();
+                    globalThis.addEventListener?.("online", render);
+                    globalThis.addEventListener?.("offline", render);
+                    (navigator as any)?.connection?.addEventListener?.("change", render);
+                    document.addEventListener("cw:env-status-refresh", render as EventListener);
+                }}>Net: --</span>
+                <span class="speed-dial-status-widget" ref=${(el) => {
+                    if (!el) return;
+                    const render = async () => {
+                        try {
+                            const battery = await (navigator as any)?.getBattery?.();
+                            if (!battery) { (el as HTMLElement).textContent = "Battery: n/a"; return; }
+                            (el as HTMLElement).textContent = `Battery: ${Math.round((battery.level || 0) * 100)}%`;
+                        } catch {
+                            (el as HTMLElement).textContent = "Battery: n/a";
+                        }
+                    };
+                    render();
+                    document.addEventListener("cw:env-status-refresh", render as EventListener);
+                }}>Battery: --</span>
+            </div>
+            <div class="speed-dial-statusbar__actions">
+                <button type="button" class="speed-dial-chip" on:click=${() => makeView("settings", { focus: true })}>Settings</button>
+                <button type="button" class="speed-dial-chip" on:click=${() => makeView("explorer", { focus: true })}>Explorer</button>
+                <button type="button" class="speed-dial-chip" on:click=${() => runEnvironmentTrigger("refresh-status")}>Refresh</button>
+            </div>
+        </div>
+        <div class="speed-dial-dock" aria-label="Launcher dock">
+            <button type="button" class="speed-dial-dock__item" on:click=${() => makeView("explorer", { focus: true })}><ui-icon icon="books"></ui-icon></button>
+            <button type="button" class="speed-dial-dock__item" on:click=${() => makeView("viewer", { focus: true })}><ui-icon icon="eye"></ui-icon></button>
+            <button type="button" class="speed-dial-dock__item" on:click=${() => makeView("settings", { focus: true })}><ui-icon icon="gear-six"></ui-icon></button>
         </div>
     </div>`;
 
@@ -480,7 +696,8 @@ const openItemEditor = (item?: SpeedDialItem, opts?: { suggestedCell?: GridCell 
         }
     });
 
-    document.body.append(modal);
+    const overlayRoot = getOverlayRoot();
+    (overlayRoot || document.body).append(modal);
 };
 
 export function createCtxMenu() {
@@ -575,11 +792,97 @@ export function createCtxMenu() {
                         }
                     }
                 }, {
+                    id: "new-shortcut-from-url",
+                    label: "Add shortcut from URL",
+                    icon: "link-simple",
+                    action: async ()=>{
+                        const input = prompt("Paste URL or shortcut JSON");
+                        if (!input?.trim?.()) return;
+                        const item = createItemByText(input, context.guessedCell);
+                        if (!item) {
+                            showError("Not a valid URL or shortcut JSON");
+                            return;
+                        }
+                        addSpeedDialItem(item);
+                        persistSpeedDialItems();
+                        persistSpeedDialMeta();
+                        showSuccess("Shortcut created");
+                    }
+                }, {
+                    id: "url-paste-as-shortcut",
+                    label: "URL paste: Create shortcut",
+                    icon: "push-pin-simple",
+                    action: ()=>{
+                        setUrlPasteMode("shortcut");
+                        showSuccess("URL paste set to: create shortcut");
+                    }
+                }, {
+                    id: "url-paste-open-now",
+                    label: "URL paste: Open directly",
+                    icon: "arrow-square-out",
+                    action: ()=>{
+                        setUrlPasteMode("open-now");
+                        showSuccess("URL paste set to: open directly");
+                    }
+                }, {
+                    id: "url-open-target-self",
+                    label: "URL target: Same tab",
+                    icon: "browser",
+                    action: ()=>{
+                        setUrlPasteTarget("_self");
+                        showSuccess("URL target set to same tab");
+                    }
+                }, {
+                    id: "url-open-target-blank",
+                    label: "URL target: New window/tab",
+                    icon: "app-window",
+                    action: ()=>{
+                        setUrlPasteTarget("_blank");
+                        showSuccess("URL target set to new window/tab");
+                    }
+                }, {
                     id: "change-wallpaper",
                     label: "Change wallpaper",
                     icon: "image",
                     action: pickWallpaper
+                    }, {
+                        id: "rotate-wallpaper-left",
+                        label: "Rotate wallpaper left",
+                        icon: "arrow-counter-clockwise",
+                        action: ()=>rotateWallpaperBy(-90)
+                    }, {
+                        id: "rotate-wallpaper-right",
+                        label: "Rotate wallpaper right",
+                        icon: "arrow-clockwise",
+                        action: ()=>rotateWallpaperBy(90)
+                    }, {
+                        id: "reset-wallpaper-rotation",
+                        label: "Reset wallpaper rotation",
+                        icon: "scan-smiley",
+                        action: ()=>{
+                            (wallpaperState as any).rotate = 0;
+                            persistWallpaper();
+                        }
                     }],
+                [{
+                    id: "layout-compact",
+                    label: "Compact icon grid",
+                    icon: "squares-four",
+                    action: ()=>{
+                        gridLayoutState.columns = 6;
+                        gridLayoutState.rows = 10;
+                        persistGridLayout();
+                    }
+                }, {
+                    id: "layout-comfy",
+                    label: "Comfort icon grid",
+                    icon: "grid-four",
+                    action: ()=>{
+                        gridLayoutState.columns = 4;
+                        gridLayoutState.rows = 8;
+                        persistGridLayout();
+                    }
+                }],
                 [{ id: "open-explorer", label: "Explorer", icon: "books", action: ()=>{
                     actionRegistry.get(`open-view-explorer`)?.({ id: "", items, meta, viewMaker }, {})
                 } },
@@ -600,6 +903,14 @@ export function createCtxMenu() {
     };
 
     const ctxMenu = H`<ul class="grid-rows round-decor ctx-menu ux-anchor"></ul>`;
-    ctxMenuTrigger(Q("#home") || document.body, ctxMenuDesc as any, ctxMenu);
+    const overlayRoot = getOverlayRoot();
+    if (overlayRoot) {
+        overlayRoot.appendChild(ctxMenu as unknown as Node);
+    }
+    const triggerEl =
+        document.querySelector<HTMLElement>("#home") ??
+        ((Q("#home") as any)?.element as HTMLElement | undefined) ??
+        document.body;
+    ctxMenuTrigger(triggerEl, ctxMenuDesc as any, ctxMenu);
     return ctxMenu;
 }

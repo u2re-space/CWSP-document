@@ -33,11 +33,49 @@ const spaFallbackPlugin = () => ({
         server.middlewares.use((req, res, next) => {
             const url = req.url || '';
             const pathname = url.split('?')[0];
+            const query = new URL(url, "https://local.dev").searchParams;
+            const viewSeg = pathname.replace(/^\/+|\/+$/g, '').split('/')[0]?.toLowerCase();
 
-            // POST /{view} — same contract as PWA SW: JSON ack + devRelay body for local BroadcastChannel.
-            if (req.method === 'POST') {
-                const seg = pathname.replace(/^\/+|\/+$/g, '').split('/')[0]?.toLowerCase();
-                if (seg && VIEW_POST_API_SEGMENTS.has(seg)) {
+            // /{view} API bridge for dev server.
+            // - GET/HEAD/OPTIONS => metadata envelope
+            // - POST => same contract as PWA SW (+ method/query echo)
+            if (viewSeg && VIEW_POST_API_SEGMENTS.has(viewSeg)) {
+                if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+                    const format = String(query.get("format") || "json").toLowerCase();
+                    const payload = {
+                        ok: true,
+                        viewId: viewSeg,
+                        method: req.method,
+                        target: String(query.get("target") || "shell"),
+                        frame: String(query.get("frame") || ""),
+                        query: Object.fromEntries(query.entries()),
+                        runtime: "vite-dev"
+                    };
+                    if (req.method === 'OPTIONS') {
+                        res.statusCode = 204;
+                        res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,POST,OPTIONS');
+                        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+                        res.setHeader('Cache-Control', 'no-store');
+                        res.end();
+                        return;
+                    }
+                    if (format === "text") {
+                        res.statusCode = 200;
+                        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+                        res.setHeader('Cache-Control', 'no-store');
+                        if (req.method === 'HEAD') { res.end(); return; }
+                        res.end(`view=${viewSeg}\nmethod=${req.method}\ntarget=${payload.target}\nruntime=vite-dev\n`);
+                        return;
+                    }
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                    res.setHeader('Cache-Control', 'no-store');
+                    if (req.method === 'HEAD') { res.end(); return; }
+                    res.end(JSON.stringify(payload));
+                    return;
+                }
+
+                if (req.method === 'POST') {
                     const chunks = [];
                     req.on('data', (c) => chunks.push(c));
                     req.on('end', () => {
@@ -48,10 +86,13 @@ const spaFallbackPlugin = () => ({
                             res.setHeader('Cache-Control', 'no-store');
                             res.end(JSON.stringify({
                                 ok: true,
-                                viewId: seg,
+                                viewId: viewSeg,
                                 devRelay: true,
                                 bodyText,
                                 contentType: String(req.headers['content-type'] || ''),
+                                target: String(query.get("target") || "shell"),
+                                frame: String(query.get("frame") || ""),
+                                query: Object.fromEntries(query.entries()),
                             }));
                         } catch (e) {
                             res.statusCode = 500;

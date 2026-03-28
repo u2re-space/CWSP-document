@@ -144,7 +144,7 @@ export function createErrorElement(message: string, retryFn?: () => void): HTMLE
     const el = document.createElement("div");
     el.className = "view-error";
     el.innerHTML = `
-        <div class="view-error__icon">⚠️</div>
+        <div class="view-error__icon"><ui-icon icon="warning-circle" icon-style="duotone"></ui-icon></div>
         <h3 class="view-error__title">Error</h3>
         <p class="view-error__message">${message}</p>
         ${retryFn ? '<button class="view-error__retry" type="button">Try Again</button>' : ''}

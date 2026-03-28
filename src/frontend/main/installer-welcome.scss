@@ -1,0 +1,79 @@
+@layer view.installer-welcome {
+    .installer-welcome {
+        display: grid;
+        gap: 1rem;
+        max-inline-size: 720px;
+        margin: 0 auto;
+        padding: clamp(1rem, 2vw, 1.5rem);
+        border: 1px solid color-mix(in oklab, var(--color-on-surface, #111) 12%, transparent);
+        border-radius: 14px;
+        background: color-mix(in oklab, var(--color-surface, #fff) 84%, transparent);
+        backdrop-filter: blur(8px) saturate(1.05);
+        box-shadow: 0 16px 48px #00000020;
+    }
+
+    .installer-welcome__header {
+        display: grid;
+        gap: 0.35rem;
+    }
+
+    .installer-welcome__header h1 {
+        margin: 0;
+        font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+        line-height: 1.25;
+    }
+
+    .installer-welcome__header p {
+        margin: 0;
+        opacity: 0.8;
+        font-size: 0.95rem;
+    }
+
+    .installer-welcome__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.85rem;
+    }
+
+    .installer-welcome__field {
+        display: grid;
+        gap: 0.45rem;
+        font-size: 0.9rem;
+    }
+
+    .installer-welcome__field select {
+        inline-size: 100%;
+        min-block-size: 2.4rem;
+        border-radius: 10px;
+        border: 1px solid color-mix(in oklab, var(--color-on-surface, #111) 15%, transparent);
+        background: var(--color-surface, #fff);
+        color: var(--color-on-surface, #111);
+        padding-inline: 0.65rem;
+    }
+
+    .installer-welcome__checkbox {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        font-size: 0.9rem;
+    }
+
+    .installer-welcome__actions {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .installer-welcome__btn {
+        border: 0;
+        border-radius: 10px;
+        min-block-size: 2.5rem;
+        padding-inline: 1rem;
+        cursor: pointer;
+    }
+
+    .installer-welcome__btn--primary {
+        background: var(--color-primary, #0a7fff);
+        color: var(--color-on-primary, #fff);
+    }
+}
+

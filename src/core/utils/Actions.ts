@@ -430,8 +430,10 @@ export const actionRegistry = new Map<string, (entityItem: EntityInterface<any, 
         //
         if (!href) { showError("Link is missing"); return; }
 
-        // TODO: detect origin of the link and open in the same tab if same origin
-        const target = isSameOrigin(href) ? "_self" : "_blank";
+        const configuredTarget = String(meta?.target || context?.target || "").trim();
+        const target = configuredTarget === "_self" || configuredTarget === "_blank"
+            ? configuredTarget
+            : (isSameOrigin(href) ? "_self" : "_blank");
         try {
             window?.open?.(href, target, "noopener,noreferrer");
         } catch (error) {
@@ -486,7 +488,11 @@ export const actionRegistry = new Map<string, (entityItem: EntityInterface<any, 
             showError("No view target");
             return;
         }
-        ensureHashNavigation(targetView, context?.viewMaker, context?.meta);
+        const payload = {
+            ...(meta || {}),
+            view: targetView
+        };
+        ensureHashNavigation(targetView, context?.viewMaker, payload);
     }],
 
     //

@@ -11,22 +11,22 @@ export function createKeyboardHTML(): string {
     return `
         <div class="virtual-keyboard-container" data-hidden="true" aria-hidden="true">
             <div class="keyboard-header">
-                <button type="button" name="airpad-keyboard-close" class="keyboard-close" aria-label="Close keyboard">✕</button>
+                <button type="button" name="airpad-keyboard-close" class="keyboard-close" aria-label="Close keyboard"><ui-icon icon="x"></ui-icon></button>
                 <div class="keyboard-tabs">
                     <button type="button" name="airpad-keyboard-tab-letters" class="keyboard-tab active" data-tab="letters">ABC</button>
-                    <button type="button" name="airpad-keyboard-tab-emoji" class="keyboard-tab" data-tab="emoji">😀</button>
+                    <button type="button" name="airpad-keyboard-tab-emoji" class="keyboard-tab" data-tab="emoji"><ui-icon icon="smiley" icon-style="duotone"></ui-icon></button>
                 </div>
             </div>
             <div class="keyboard-content">
                 <div class="keyboard-panel active" data-panel="letters">
                     <div class="keyboard-shift-container">
-                        <button type="button" name="airpad-keyboard-shift" class="keyboard-shift" data-shift="lower">⇧</button>
+                        <button type="button" name="airpad-keyboard-shift" class="keyboard-shift" data-shift="lower"><ui-icon icon="arrow-fat-up"></ui-icon></button>
                     </div>
                     <div class="keyboard-rows" id="keyboardRows"></div>
                     <div class="keyboard-special">
                         <button class="keyboard-key special space" data-key=" ">Space</button>
-                        <button class="keyboard-key special backspace" data-key="backspace">⌫</button>
-                        <button class="keyboard-key special enter" data-key="enter">↵</button>
+                        <button class="keyboard-key special backspace" data-key="backspace"><ui-icon icon="backspace"></ui-icon></button>
+                        <button class="keyboard-key special enter" data-key="enter"><ui-icon icon="arrow-bend-down-left"></ui-icon></button>
                     </div>
                 </div>
                 <div class="keyboard-panel" data-panel="emoji">

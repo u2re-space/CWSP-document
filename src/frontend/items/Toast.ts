@@ -1,4 +1,5 @@
 import { scheduleFrame } from "@rs-core/utils/Runtime";
+import { getAppOverlayRoot } from "../main/wallpaper-host";
 
 /**
  * Standalone Toast System
@@ -241,7 +242,8 @@ const getToastLayer = (config: Required<ToastLayerConfig>, doc: Document = docum
         layer.className = "rs-toast-layer";
         layer.setAttribute("aria-live", "polite");
         layer.setAttribute("aria-atomic", "true");
-        doc.body.appendChild(layer);
+        const overlayRoot = getAppOverlayRoot(doc);
+        (overlayRoot || doc.body).appendChild(layer);
     }
 
     layer.setAttribute("data-position", config.position);

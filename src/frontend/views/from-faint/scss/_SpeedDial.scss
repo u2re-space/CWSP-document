@@ -1,5 +1,6 @@
 @use "veela-lib" as *;
-@use "../../library/mixins" as ui;
+@use "../../../shells/faint/scss/library/mixins" as ui;
+@use "../../../../../../../modules/projects/veela.css/src/scss/lib/advanced/design/colorize" as colorize;
 
 //
 @layer layer.shell.faint {
@@ -22,6 +23,32 @@
         background-color: transparent;
         overflow: hidden;
         border-radius: 0px;
+        transition: filter var(--transition-fast), transform var(--transition-fast);
+
+        @supports (corner-shape: squircle) {
+            corner-shape: squircle;
+        }
+
+        &.speed-dial-dropping {
+            animation: speedDialDropPulse 420ms var(--ease-out) 1;
+        }
+        transition: filter var(--transition-fast), transform var(--transition-fast);
+
+        @supports (corner-shape: squircle) {
+            corner-shape: squircle;
+        }
+
+        &.speed-dial-dropping {
+            animation: speedDialDropPulse 420ms var(--ease-out) 1;
+        }
+
+        .speed-dial-wallpaper {
+            opacity: 1;
+            filter: blur(0px);
+            transform: rotate(0deg) scale(1.08);
+            transform-origin: center center;
+            transition: transform var(--transition-fast), filter var(--transition-colors), opacity var(--transition-colors);
+        }
     }
 
     .speed-dial-grid {
@@ -52,8 +79,8 @@
         --layout-c: var(--grid-cols, 4);
         --layout-r: var(--grid-rows, 8);
 
-        grid-template-columns: repeat(var(--cs-layout-c, 4), minmax(0px, 1fr));
-        grid-template-rows: repeat(var(--cs-layout-r, 8), minmax(0px, 1fr));
+        grid-template-columns: repeat(var(--cs-layout-c, var(--layout-c, 4)), minmax(0px, 1fr));
+        grid-template-rows: repeat(var(--cs-layout-r, var(--layout-r, 8)), minmax(0px, 1fr));
 
         min-inline-size: 0px;
         min-block-size: 0px;
@@ -87,16 +114,18 @@
             grid-template-columns: minmax(0px, 1fr);
             grid-template-rows: minmax(0px, 1fr);
 
-            box-shadow: none;
-            filter: drop-shadow(0px 0px 0.25rem #0004) !important;
+            filter: drop-shadow(0 8px 18px #0008) drop-shadow(0 1px 0 #fff1);
 
             // Visuals
-            transition: transform var(--transition-fast) var(--ease-out);
+            transition:
+                transform 180ms cubic-bezier(0.22, 0.8, 0.3, 1),
+                filter 180ms cubic-bezier(0.22, 0.8, 0.3, 1);
             contain: none;
             overflow: visible;
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
+            will-change: transform, filter;
 
             &:hover {
                 transform: scale(1.05);
@@ -136,8 +165,13 @@
                 max-block-size: stretch;
                 padding: 1rem;
 
-                box-shadow: none;
-                filter: none;
+                box-shadow:
+                    0 8px 20px color-mix(in oklch, black 45%, transparent),
+                    inset 0 1px 0 color-mix(in oklch, white 24%, transparent);
+                filter: saturate(1.04);
+                color: #e8eefc;
+                background-color: color-mix(in oklch, black 22%, transparent);
+                border: 0.5px solid color-mix(in oklch, white 16%, transparent);
 
                 // Default tonal surface background
                 @include ui.tonal-surface(surface-container, var(--surface-opacity-default), var(--border-radius), null, 1);
@@ -146,8 +180,21 @@
                     border-radius: var(--border-radius);
                 }
 
+                &[data-shape] {
+                    clip-path: var(--clip-path, none);
+                    border-radius: var(--border-radius, var(--radius-lg));
+                }
+
+                @supports (corner-shape: squircle) {
+                    corner-shape: squircle;
+                }
+
+                @supports (corner-shape: squircle) {
+                    corner-shape: squircle;
+                }
+
                 ui-icon {
-                    --icon-size: clamp(2rem, 100%, 3rem);
+                    --icon-size: clamp(1.8rem, 100%, 3rem);
                     color: var(--on-surface-variant, var(--on-surface-color, currentColor));
                     aspect-ratio: 1 / 1;
                     max-inline-size: var(--icon-size, 2rem);
@@ -167,7 +214,7 @@
             }
 
             .ui-ws-item-label {
-                @include solid-colorize("&");
+                @include colorize.solid-colorize("&", ("scope": "selector"));
 
                 position: absolute;
                 inset: 0;
@@ -201,7 +248,7 @@
                     place-items: center;
 
                     @include ui.text-label("label-medium");
-                    color: var(--on-surface-color, currentColor);
+                    color: var(--on-surface-color, #f3f7ff);
                     background-color: transparent;
                     background-image: none;
 
@@ -209,7 +256,7 @@
                     white-space: nowrap;
                     text-overflow: ellipsis;
                     padding-inline: var(--padding-xs);
-                    background: rgba(0,0,0,0.2); // Subtle backdrop for readability
+                    background: rgba(0, 0, 0, 0.35); // Stronger fallback for readability
                     border-radius: var(--radius-sm);
                     pointer-events: none;
                     text-align: center;
@@ -234,6 +281,9 @@
             &[data-dragging] {
                 will-change: transform;
                 cursor: grabbing;
+                transform: scale(1.04);
+                z-index: 220;
+                transition-duration: 0ms;
 
                 .ui-ws-item-label {
                     opacity: 0.0;
@@ -248,8 +298,130 @@
 
             &[data-layer="icons"] {
                 z-index: 99;
-                filter: none;
+                pointer-events: auto;
+                cursor: grab;
+            }
+
+            &.speed-dial-item-placed {
+                animation: speedDialItemPlaced 260ms var(--ease-out) 1;
             }
         }
+    }
+
+    .speed-dial-root[prop\:orient="1"],
+    .speed-dial-root[prop\:orient="3"] {
+        .speed-dial-grid .ui-ws-item .ui-ws-item-icon ui-icon {
+            --icon-size: clamp(1.4rem, 100%, 2.4rem);
+        }
+    }
+
+    .speed-dial-statusbar {
+        position: absolute;
+        inset-inline: 0;
+        inset-block-start: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--padding-sm);
+        padding: var(--padding-sm) var(--padding-md);
+        pointer-events: auto;
+        z-index: 110;
+        background: linear-gradient(to bottom, #0006, transparent);
+    }
+
+    .speed-dial-statusbar__clock {
+        @include ui.text-label("label-medium");
+        color: var(--on-surface-color, currentColor);
+        text-shadow: 0px 0px 0.25rem #0007;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    .speed-dial-statusbar__actions {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--padding-xs);
+    }
+
+    .speed-dial-statusbar__widgets {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--padding-xs);
+        min-inline-size: 0;
+        overflow: hidden;
+    }
+
+    .speed-dial-status-widget {
+        @include ui.text-label("label-small");
+        color: var(--on-surface-color, currentColor);
+        text-shadow: 0px 0px 0.25rem #0007;
+        padding-inline: 0.35rem;
+        border-radius: var(--radius-sm);
+        background-color: color-mix(in oklch, black 30%, transparent);
+        white-space: nowrap;
+    }
+
+    .speed-dial-chip {
+        @include ui.tonal-surface(surface-container-high, 0.75, var(--radius-full), null, 1);
+        @include ui.text-label("label-small");
+        color: var(--on-surface-color, currentColor);
+        border: 0;
+        cursor: pointer;
+        padding: 0.3rem 0.55rem;
+        transition: transform var(--transition-fast);
+
+        &:active {
+            transform: scale(0.96);
+        }
+    }
+
+    .speed-dial-dock {
+        position: absolute;
+        inset-inline: 50%;
+        inset-block-end: var(--padding-lg);
+        transform: translateX(-50%);
+        display: inline-flex;
+        align-items: center;
+        gap: var(--padding-xs);
+        padding: var(--padding-xs) var(--padding-sm);
+        border-radius: var(--radius-xl);
+        pointer-events: auto;
+        z-index: 110;
+        @include ui.tonal-surface(surface-container-high, 0.85, var(--radius-xl), null, 1);
+        backdrop-filter: blur(8px);
+    }
+
+    .speed-dial-dock__item {
+        @include ui.tonal-surface(surface-container, 0.8, var(--radius-lg), null, 1);
+        inline-size: 2.6rem;
+        block-size: 2.6rem;
+        border: 0;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        transition: transform var(--transition-fast), background-color var(--transition-colors);
+
+        &:hover {
+            transform: translateY(-2px) scale(1.03);
+        }
+
+        &:active {
+            transform: scale(0.95);
+        }
+
+        ui-icon {
+            --icon-size: 1.25rem;
+        }
+    }
+
+    @keyframes speedDialDropPulse {
+        0% { filter: saturate(1); }
+        35% { filter: saturate(1.35); }
+        100% { filter: saturate(1); }
+    }
+
+    @keyframes speedDialItemPlaced {
+        0% { transform: translateY(2px) scale(0.96); }
+        100% { transform: translateY(0) scale(1); }
     }
 }

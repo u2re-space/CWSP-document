@@ -21,8 +21,8 @@ import { getAirpadOwnerDocument } from '../utils/utils';
 const AIRPAD_CONFIG_MARKER = 'airpad-config-overlay';
 
 /**
- * Mount on the owner `document.body` (not `cw-shell-minimal` / task-tab host).
- * Minimal shell uses `contain: strict` + `overflow: hidden`; children with `position: fixed`
+ * Mount on the owner `document.body` (not `cw-webtop-environment` / task-tab host).
+ * The shell uses `contain: strict` + `overflow: hidden`; children with `position: fixed`
  * are still clipped to that host, so the dialog stays in the DOM but is not visible.
  */
 function getConfigOverlayMountParent(): HTMLElement {
@@ -33,7 +33,8 @@ function getConfigOverlayMountParent(): HTMLElement {
 /** Body-portaled overlay is not under `[data-shell][data-theme]`, so copy theme for SCSS tokens. */
 function syncAirpadConfigOverlayShellTheme(overlay: HTMLElement, doc: Document): void {
     const shell =
-        (doc.querySelector("cw-shell-minimal[data-theme]") as HTMLElement | null) ??
+        (doc.querySelector("cw-webtop-environment[data-theme]") as HTMLElement | null) ??
+        (doc.querySelector("[data-shell-system=\"environment\"][data-theme]") as HTMLElement | null) ??
         (doc.querySelector("[data-shell-system=\"task-tab\"][data-theme]") as HTMLElement | null) ??
         (doc.querySelector("[data-shell][data-theme]") as HTMLElement | null);
     const theme = shell?.getAttribute("data-theme");

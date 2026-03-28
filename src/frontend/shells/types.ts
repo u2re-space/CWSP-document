@@ -14,7 +14,7 @@ import type { refType } from "fest/object";
 /**
  * Available shell identifiers
  */
-export type ShellId = "minimal" | "faint" | "base";
+export type ShellId = "minimal" | "environment" | "faint" | "base" | "window";
 
 /**
  * Available view identifiers
@@ -49,6 +49,7 @@ export interface ShellNavigationState {
     previousView?: ViewId;
     viewHistory: ViewId[];
     params?: Record<string, string>;
+    currentTaskId?: string;
 }
 
 /**

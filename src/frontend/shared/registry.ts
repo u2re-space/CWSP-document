@@ -96,7 +96,13 @@ class ShellRegistryClass {
         }
 
         const module = await registration.loader();
-        const factory = (module as any).default || (module as any).createShell;
+        const raw = (module as any).default ?? (module as any).createShell;
+        const factory =
+            typeof raw === "function"
+                ? raw
+                : raw && typeof (raw as { default?: unknown }).default === "function"
+                  ? (raw as { default: (...args: unknown[]) => unknown }).default
+                  : undefined;
 
         if (typeof factory !== "function") {
             throw new Error(`Invalid shell module: ${id}`);
@@ -299,12 +305,26 @@ export function registerDefaultShells(): void {
         loader: () => import("../shells/base/index")
     });
 
+    ShellRegistry.register({
+        id: "window",
+        name: "Window",
+        description: "Windowed shell with draggable/resizable frame",
+        loader: () => import("../shells/window/index")
+    });
+
     // Minimalshell (simple toolbar-based navigation)
     ShellRegistry.register({
         id: "minimal",
         name: "Minimal",
         description: "Minimal toolbar-based navigation",
         loader: () => import("../shells/minimal/index")
+    });
+
+    ShellRegistry.register({
+        id: "environment",
+        name: "Environment",
+        description: "Desktop shell: home wallpaper under maximized app views",
+        loader: () => import("../environment/factory")
     });
 
     // Faint shell (tabbed sidebar navigation)

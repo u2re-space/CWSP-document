@@ -46,11 +46,11 @@ export class CwAirpadActionRailElement extends HTMLElement {
         if (this.querySelector("#clipboardToolbar")) return;
         this.innerHTML = `
             <div class="bottom-toolbar" id="clipboardToolbar" aria-label="Clipboard actions">
-                <button type="button" id="btnCut" name="airpad-clipboard-cut" class="toolbar-btn" aria-label="Cut (Ctrl+X)">✂️</button>
-                <button type="button" id="btnCopy" name="airpad-clipboard-copy" class="toolbar-btn" aria-label="Copy (Ctrl+C)">📋</button>
-                <button type="button" id="btnPaste" name="airpad-clipboard-paste" class="toolbar-btn" aria-label="Paste (Ctrl+V)">📥</button>
+                <button type="button" id="btnCut" name="airpad-clipboard-cut" class="toolbar-btn" aria-label="Cut (Ctrl+X)"><ui-icon icon="scissors" icon-style="duotone"></ui-icon></button>
+                <button type="button" id="btnCopy" name="airpad-clipboard-copy" class="toolbar-btn" aria-label="Copy (Ctrl+C)"><ui-icon icon="copy" icon-style="duotone"></ui-icon></button>
+                <button type="button" id="btnPaste" name="airpad-clipboard-paste" class="toolbar-btn" aria-label="Paste (Ctrl+V)"><ui-icon icon="clipboard-text" icon-style="duotone"></ui-icon></button>
                 <button type="button" id="btnConnect" name="airpad-ws-connect" class="toolbar-btn connect-fab connect-fab--ws">WS ↔</button>
-                <button type="button" id="btnConfig" name="airpad-config" class="toolbar-btn" aria-label="Configuration" title="Configuration">⚙️</button>
+                <button type="button" id="btnConfig" name="airpad-config" class="toolbar-btn" aria-label="Configuration" title="Configuration"><ui-icon icon="gear-six" icon-style="duotone"></ui-icon></button>
             </div>
             <div id="clipboardPreview" class="clipboard-preview" aria-live="polite"></div>
         `;

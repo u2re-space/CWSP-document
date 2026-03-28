@@ -14,6 +14,17 @@ import { summarizeForLog } from "@rs-com/core/LogSanitizer";
 let _pwaClipboardInitialized = false;
 let _cleanupFns: (() => void)[] = [];
 
+/** Dev servers / missing routes can leave `fetch` hanging forever and wedge the tab. */
+const fetchWithTimeout = async (input: string, init: RequestInit = {}, timeoutMs = 4000): Promise<Response> => {
+    const ac = new AbortController();
+    const id = globalThis.setTimeout(() => ac.abort(), timeoutMs);
+    try {
+        return await fetch(input, { ...init, signal: ac.signal });
+    } finally {
+        globalThis.clearTimeout(id);
+    }
+};
+
 const sendShareTargetResultToWorkcenter = async (data: Record<string, unknown>, priority: "high" | "normal" = "high"): Promise<void> => {
     await unifiedMessaging.sendMessage({
         type: "share-target-result",
@@ -161,7 +172,7 @@ const checkPendingClipboardOperations = async (): Promise<void> => {
         }
 
         console.log('[PWA-Copy] Checking for pending clipboard operations...');
-        const response = await fetch('/clipboard/pending');
+        const response = await fetchWithTimeout("/clipboard/pending", {}, 4000);
         const responseType = String(response.headers.get('content-type') || '').toLowerCase();
         if (!response.ok || !responseType.includes('application/json')) {
             console.log('[PWA-Copy] Pending clipboard endpoint is unavailable in this context, skipping');
@@ -193,7 +204,7 @@ const checkPendingClipboardOperations = async (): Promise<void> => {
 
                     // Remove the processed operation from the queue
                     try {
-                        await fetch(`/clipboard/remove/${operation.id}`, { method: 'DELETE' });
+                        await fetchWithTimeout(`/clipboard/remove/${operation.id}`, { method: "DELETE" }, 4000);
                     } catch (error) {
                         console.warn('[PWA-Copy] Failed to remove processed operation:', error);
                     }
@@ -262,7 +273,7 @@ export const initPWAClipboard = (): (() => void) => {
 
                         // Remove the processed operation from the queue
                         try {
-                            await fetch(`/clipboard/remove/${operation.id}`, { method: 'DELETE' });
+                            await fetchWithTimeout(`/clipboard/remove/${operation.id}`, { method: "DELETE" }, 4000);
                         } catch (error) {
                             console.warn('[PWA-Copy] Failed to remove processed operation:', error);
                         }

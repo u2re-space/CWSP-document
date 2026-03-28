@@ -7,7 +7,7 @@
  * - `GET /{view}` → SPA shell loads the matching view in the shell content slot (see `index.ts`).
  * - `POST /{view}` → In-app API (PWA: service worker; dev: Vite middleware): request body is relayed
  *   on BroadcastChannel `rs-view-{view}`; use `postViewApi()` from `@rs-frontend/shared/view-api`.
- * - `/` → Boot menu or default view (shell selection)
+ * - `/` → Home/webtop view (default startup route)
  * - `/viewer` → Viewer
  * - `/workcenter` → Work Center
  * - `/settings` → Settings
@@ -22,7 +22,7 @@
 
 import type { ShellId, ViewId, Shell } from "../shells/types";
 import type { FrontendChoice } from "./boot-menu";
-import { bootMinimal, bootBase, type BootConfig, type StyleSystem } from "./BootLoader";
+import { bootMinimal, bootEnvironment, bootBase, bootWindow, type BootConfig, type StyleSystem } from "./BootLoader";
 import { ENABLED_VIEW_IDS, DEFAULT_VIEW_ID, isEnabledView, pickEnabledView } from "../config/views";
 
 // ============================================================================
@@ -52,17 +52,30 @@ const normalizeShellPreference = (shell: ShellId | null | undefined): ShellId =>
     if (shell === "faint") {
         return "minimal";
     }
-    if (shell === "base" || shell === "minimal") {
+    if ((shell as any) === "window") {
+        return "window";
+    }
+    /** Legacy `minimal` preference → environment (desktop underlay + window stage). */
+    if (shell === "minimal") {
+        return "environment";
+    }
+    if (shell === "base" || shell === "environment" || shell === "window") {
         return shell;
     }
-    return "minimal";
+    return "environment";
 };
 
 const getShellFromQuery = (): ShellId | null => {
     try {
         const params = new URLSearchParams(location.search);
         const shell = (params.get("shell") || "").trim().toLowerCase();
-        if (shell === "minimal" || shell === "faint" || shell === "base") {
+        if (
+            shell === "minimal" ||
+            shell === "environment" ||
+            shell === "faint" ||
+            shell === "base" ||
+            shell === "window"
+        ) {
             return normalizeShellPreference(shell as ShellId);
         }
     } catch {
@@ -174,7 +187,7 @@ export function navigateToView(view: ViewId, params?: Record<string, string>): v
 }
 
 /**
- * Navigate to root (boot menu / shell selection)
+ * Navigate to root (home/webtop)
  */
 export function navigateToRoot(): void {
     const url = buildRootUrl();
@@ -203,7 +216,7 @@ export function getViewFromPath(): ViewId | null {
     const pathname = normalizePathname(location.pathname);
     
     if (!pathname || pathname === "/" || pathname === "") {
-        return null; // Root route - show boot menu
+        return null; // Root route
     }
     
     if (isValidView(pathname)) {
@@ -264,7 +277,7 @@ export function getSavedShellPreference(): ShellId | null {
 
     try {
         const saved = localStorage.getItem("rs-boot-shell");
-        if (saved === "minimal" || saved === "faint" || saved === "base") {
+        if (saved === "minimal" || saved === "environment" || saved === "faint" || saved === "base" || saved === "window") {
             const normalized = normalizeShellPreference(saved as ShellId);
             if (normalized !== saved) {
                 localStorage.setItem("rs-boot-shell", normalized);
@@ -284,7 +297,7 @@ export const loadSubAppWithShell = async (
     shellId?: ShellId,
     initialView?: ViewId
 ): Promise<AppLoaderResult> => {
-    const shell = normalizeShellPreference(shellId || getSavedShellPreference() || "minimal");
+    const shell = normalizeShellPreference(shellId || getSavedShellPreference() || "environment");
     const view = pickEnabledView(initialView || getViewFromPath() || DEFAULT_VIEW_ID, DEFAULT_VIEW_ID);
     
     console.log('[App] Loading sub-app with shell:', shell, 'view:', view);
@@ -305,11 +318,18 @@ export const loadSubAppWithShell = async (
                     }
                 };
 
-            case "minimal":
+            case "window":
+                return {
+                    mount: async (el: HTMLElement) => {
+                        await bootWindow(el, view);
+                    }
+                };
+
+            case "environment":
             default:
                 return {
                     mount: async (el: HTMLElement) => {
-                        await bootMinimal(el, view);
+                        await bootEnvironment(el, view);
                     }
                 };
         }
@@ -320,7 +340,7 @@ export const loadSubAppWithShell = async (
 };
 
 /**
- * Load boot menu for shell selection
+ * @deprecated Boot menu loader (legacy)
  */
 export const loadBootMenu = async (): Promise<AppLoaderResult> => {
     const module = await import("./boot-menu");
@@ -342,14 +362,14 @@ export function resolvePathToView(pathname: string): ViewId | null {
     const normalized = pathname.replace(/^\//, "").toLowerCase().trim();
     
     if (!normalized || normalized === "/" || normalized === "") {
-        return null; // Root - boot menu
+        return null; // Root
     }
     
     if (isValidView(normalized)) {
         return normalized;
     }
     
-    return DEFAULT_VIEW_ID; // Default fallback
+    return pickEnabledView("home", DEFAULT_VIEW_ID); // Default fallback
 }
 
 /**
@@ -357,7 +377,7 @@ export function resolvePathToView(pathname: string): ViewId | null {
  */
 export function createBootConfigFromUrl(): BootConfig {
     const view = pickEnabledView(getViewFromPath() || DEFAULT_VIEW_ID, DEFAULT_VIEW_ID);
-    const shell = normalizeShellPreference(getSavedShellPreference() || "minimal");
+    const shell = normalizeShellPreference(getSavedShellPreference() || "environment");
     const params = Object.fromEntries(new URLSearchParams(location.search));
 
     let styleSystem: StyleSystem = "vl-basic";
@@ -368,6 +388,9 @@ export function createBootConfigFromUrl(): BootConfig {
             break;
         case "base":
             styleSystem = "vl-core";
+            break;
+        case "window":
+            styleSystem = "vl-basic";
             break;
         default:
             styleSystem = "vl-basic";

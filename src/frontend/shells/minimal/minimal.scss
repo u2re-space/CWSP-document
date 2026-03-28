@@ -26,7 +26,8 @@
         --shell-padding: 0;
     }
 
-    :is(:root, html):has([data-shell="minimal"][data-theme="dark"]) {
+    :is(:root, html):has([data-shell="minimal"][data-theme="dark"]),
+    :is(:root, html):has([data-shell="environment"][data-theme="dark"]) {
         --shell-bg: var(--color-surface);
         --shell-fg: var(--color-on-surface);
         --shell-nav-bg: var(--color-surface-container-high);
@@ -34,21 +35,34 @@
         --shell-nav-border: var(--color-outline-variant);
     }
 
-    /* cw-shell-minimal :host — same nav token as toolbar (inherits document --color-* from light DOM) */
-    :host:has(> .app-shell) {
+    /* Legacy shadow host + light-DOM `cw-webtop-environment` (replaces cw-shell-minimal) */
+    :host:has(> .app-shell),
+    cw-webtop-environment:has(> .app-shell) {
         --shell-bg: light-dark(var(--color-surface), var(--color-surface));
         --shell-nav-bg: light-dark(var(--color-surface-container-high), var(--color-surface-container-high));
     }
 
-    :host([data-theme="dark"]):has(> .app-shell) {
+    :host([data-theme="dark"]):has(> .app-shell),
+    cw-webtop-environment[data-theme="dark"]:has(> .app-shell) {
         --shell-bg: var(--color-surface);
         --shell-nav-bg: var(--color-surface-container-high);
     }
 }
 
 @layer shell.base {
+    cw-webtop-environment {
+        display: block;
+        inline-size: 100%;
+        block-size: 100%;
+        container-type: size;
+        contain: strict;
+        isolation: isolate;
+        overflow: hidden;
+    }
+
     /* Match toolbar chrome; avoids host vs .app-shell__nav mismatch when meta/theme updates */
-    :host:has(> .app-shell) {
+    :host:has(> .app-shell),
+    cw-webtop-environment:has(> .app-shell) {
         background-color: var(--shell-nav-bg);
     }
 
@@ -156,6 +170,50 @@
             box-sizing: border-box !important;
             padding-block: 0.125rem !important;
         }
+    }
+
+    .app-shell__window-titlebar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-block-size: 2rem;
+        padding-inline: var(--space-md, 0.75rem);
+        background: color-mix(in oklch, var(--shell-nav-bg) 80%, black 6%);
+        border-block-end: 1px solid var(--shell-nav-border);
+        -webkit-app-region: drag;
+        app-region: drag;
+    }
+
+    .app-shell__window-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        opacity: 0.85;
+        user-select: none;
+    }
+
+    .app-shell__window-controls {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+        -webkit-app-region: no-drag;
+        app-region: no-drag;
+    }
+
+    .app-shell__window-btn {
+        border: 0;
+        border-radius: var(--radius-md, 8px);
+        background: transparent;
+        color: var(--shell-fg);
+        inline-size: 1.8rem;
+        block-size: 1.5rem;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        transition: background-color 120ms ease, transform 120ms ease;
+
+        &:hover { background: var(--shell-btn-hover); }
+        &:active { transform: scale(0.95); }
+        &.danger:hover { background: color-mix(in oklch, red 45%, transparent); }
     }
 
     .app-shell__nav-left,
@@ -326,6 +384,118 @@
         }
     }
 
+    /* Environment shell: `home` in desktop layer; other views in window stage */
+    .app-shell__content--environment {
+        position: relative;
+        display: block;
+        background: transparent;
+        background-color: transparent;
+    }
+
+    [data-shell="environment"] .app-shell__desktop {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+        min-inline-size: 0;
+        min-block-size: 0;
+        pointer-events: auto;
+    }
+
+    [data-shell="environment"] .app-shell__window-stage {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        overflow: auto;
+        min-inline-size: 0;
+        min-block-size: 0;
+        pointer-events: auto;
+        background: var(--shell-bg);
+        background-color: var(--shell-bg);
+        contain: strict;
+    }
+
+    [data-shell="environment"] .app-shell__window-frame {
+        position: absolute;
+        inset: clamp(0.35rem, 1vmin, 0.75rem);
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-inline-size: 0;
+        min-block-size: 0;
+        border-radius: clamp(10px, 1.4vmin, 14px);
+        border: 1px solid color-mix(in oklch, var(--shell-nav-border, #fff2) 72%, transparent);
+        background: color-mix(in oklch, var(--shell-bg) 92%, black 8%);
+        box-shadow: 0 16px 44px #0008;
+        overflow: hidden;
+        pointer-events: auto;
+        isolation: isolate;
+    }
+
+    [data-shell="environment"] .app-shell__window-frame-titlebar {
+        display: flex;
+        align-items: center;
+        min-block-size: 2rem;
+        padding-inline: 0.75rem;
+        border-block-end: 1px solid color-mix(in oklch, var(--shell-nav-border, #fff2) 68%, transparent);
+        background: color-mix(in oklch, var(--shell-nav-bg, #10131a) 88%, black 12%);
+    }
+
+    [data-shell="environment"] .app-shell__window-frame-title {
+        font-size: 0.78rem;
+        font-weight: 600;
+        opacity: 0.88;
+        text-transform: capitalize;
+        user-select: none;
+    }
+
+    [data-shell="environment"] .app-shell__window-frame-content {
+        position: relative;
+        min-inline-size: 0;
+        min-block-size: 0;
+        overflow: auto;
+        background: color-mix(in oklch, var(--shell-bg) 96%, black 4%);
+    }
+
+    [data-shell="environment"] .app-shell__window-frame-content > [data-view] {
+        inline-size: 100%;
+        block-size: 100%;
+        min-inline-size: 0;
+        min-block-size: 0;
+    }
+
+    [data-shell="environment"] .app-shell__window-stage[hidden] {
+        display: none !important;
+        pointer-events: none;
+    }
+
+    /* Home should look like desktop surface, not framed app window. */
+    .app-shell[data-shell="environment"][data-env-surface-mode="desktop"] .app-shell__window-titlebar,
+    .app-shell[data-shell="environment"][data-env-surface-mode="desktop"] .app-shell__nav {
+        display: none !important;
+    }
+
+    .app-shell[data-shell="environment"][data-env-surface-mode="desktop"] {
+        grid-template-rows: minmax(0, 1fr);
+    }
+
+    .app-shell[data-shell="environment"][data-env-surface-mode="window"] {
+        grid-template-rows: auto auto minmax(0, 1fr);
+    }
+
+    .app-shell[data-shell="environment"] .app-shell__desktop:empty {
+        display: none;
+    }
+
+    [data-shell="environment"] .app-shell__content--environment[data-current-view="home"] {
+        background: transparent;
+        background-color: transparent;
+        pointer-events: none;
+    }
+
+    [data-shell="environment"] .app-shell__content--environment[data-current-view="home"] .app-shell__window-stage {
+        pointer-events: none;
+    }
+
     .app-shell__status {
         position: fixed;
         inset-block-end: var(--space-2xl, 1.5rem);
@@ -372,6 +542,35 @@
             animation: app-shell-spin 0.8s linear infinite;
         }
     }
+
+    .app-shell[data-shell-window-mode="windowed"] {
+        inline-size: min(100vi, 1200px);
+        block-size: min(100vb, 860px);
+        margin: auto;
+        border-radius: clamp(10px, 2vmin, 16px);
+        box-shadow: 0 20px 60px #0004;
+        overflow: clip;
+    }
+
+    /* Environment desktop should always be fullscreen layer, not centered window. */
+    .app-shell[data-shell="environment"][data-shell-window-mode="windowed"] {
+        inline-size: 100%;
+        block-size: 100%;
+        margin: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .app-shell[data-shell-window-mode="maximized"] {
+        inline-size: 100%;
+        block-size: 100%;
+        border-radius: 0;
+        margin: 0;
+    }
+
+    .app-shell.is-minimized {
+        animation: app-shell-minimize 220ms var(--ease-out) 1;
+    }
 }
 
 @layer shell.utilities {
@@ -392,10 +591,18 @@
             transform: translate(-50%, 0);
         }
     }
+
+    @keyframes app-shell-minimize {
+        0% { transform: translateY(0) scale(1); opacity: 1; }
+        100% { transform: translateY(12px) scale(0.985); opacity: 0.94; }
+    }
 }
 
 @layer shell.overrides {
     @media (max-width: 640px) {
+        .app-shell__window-title {
+            display: none;
+        }
         .app-shell__nav-label {
             display: none;
         }

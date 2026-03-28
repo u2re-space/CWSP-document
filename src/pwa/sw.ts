@@ -1074,11 +1074,16 @@ registerRoute(
         try {
             const bodyText = await request.text();
             const contentType = request.headers.get('content-type') || '';
+            const urlObj = new URL(request.url);
+            const target = String(urlObj.searchParams.get("target") || "shell");
+            const frame = String(urlObj.searchParams.get("frame") || "");
             const payload = {
                 type: 'view-post',
                 viewId,
                 bodyText,
-                contentType
+                contentType,
+                target,
+                frame
             };
             broadcast(viewBroadcastChannelName(viewId), payload);
             return new Response(JSON.stringify({ ok: true, viewId }), {
@@ -1096,6 +1101,46 @@ registerRoute(
         }
     },
     'POST'
+);
+
+registerRoute(
+    ({ url, request }) => request?.method === "GET" && !!isViewPostApiPath(url?.pathname || ""),
+    async (workboxEvent: any) => {
+        const request: Request = workboxEvent?.request ?? workboxEvent;
+        const urlObj = new URL(request.url);
+        const viewId = isViewPostApiPath(urlObj.pathname);
+        if (!viewId) return fetch(request);
+        const format = String(urlObj.searchParams.get("format") || "json").toLowerCase();
+        const target = String(urlObj.searchParams.get("target") || "shell");
+        const frame = String(urlObj.searchParams.get("frame") || "");
+        if (format === "text") {
+            return new Response(
+                `view=${viewId}\nmethod=GET\ntarget=${target}\nframe=${frame}\nruntime=service-worker\n`,
+                {
+                    status: 200,
+                    headers: {
+                        "Content-Type": "text/plain; charset=utf-8",
+                        "Cache-Control": "no-store"
+                    }
+                }
+            );
+        }
+        return new Response(JSON.stringify({
+            ok: true,
+            viewId,
+            method: "GET",
+            target,
+            frame,
+            runtime: "service-worker"
+        }), {
+            status: 200,
+            headers: {
+                "Content-Type": "application/json; charset=utf-8",
+                "Cache-Control": "no-store"
+            }
+        });
+    },
+    "GET"
 );
 
 /**

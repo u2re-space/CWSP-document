@@ -3,7 +3,8 @@ import { H, C } from "fest/lure";
 import { navigate, historyState } from "fest/lure";
 import { isPrimitive } from "fest/core";
 import { scheduleFrame } from "@rs-core/utils/Runtime";
-import { makeWallpaper, SpeedDial } from "../../../views/from-faint/SpeedDial";
+import { createWebTopEnvironment } from "../../../environment";
+import { isWallpaperOnGlobalHost } from "../../../main/wallpaper-host";
 
 //
 let skipCreateNewView = false;
@@ -57,7 +58,8 @@ const $defaultView = (location?.hash?.replace?.(/^#/, "") || "home");
 export const $comment$ = document.createComment("");
 export const $toolbar$ = document.createComment("");
 export const AppLayout = (currentView: any, existsViews: Map<string, any>, makeView: (key: string) => any, sidebar: HTMLElement) => {
-    const rPair = observe([document.createComment(""), document.createComment("")])
+    const rPair = observe([document.createComment(""), document.createComment("")]);
+    const webTop = createWebTopEnvironment((view: string) => { currentView.value = view; });
 
     // Prevent recursive setView calls
     let isSettingView = false;
@@ -121,6 +123,8 @@ export const AppLayout = (currentView: any, existsViews: Map<string, any>, makeV
     });
 
     // TODO: add support for async loading views (Object.TS, LUR.E)
+    const wallpaperInGlobalHost = isWallpaperOnGlobalHost(webTop.wallpaper);
+
     const $layout = H`<ui-tabbed-with-sidebar on:tab-changed=${(ev) => {
         const $homeView = "home";//(location.hash?.replace?.(/^#/, "") || "home");
         const newTab = (ev?.newTab?.replace?.(/^#/, "") || $homeView)?.replace?.(/^#/, "");
@@ -137,8 +141,8 @@ export const AppLayout = (currentView: any, existsViews: Map<string, any>, makeV
         });
     }} prop:currentTab=${currentView} prop:userContent=${true} prop:tabs=${existsViews} class="app-layout">
         ${sidebar}
-        ${SpeedDial((view: string, props: any) => { currentView.value = view; })}
-        ${makeWallpaper()}
+        ${webTop.desktop}
+        ${wallpaperInGlobalHost ? $comment$ : webTop.wallpaper}
         <div class="toolbar" style="pointer-events: none; will-change: contents; background-color: transparent;" slot="bar">
             ${C(propRef(rPair, 0))}
         </div>

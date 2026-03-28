@@ -10,7 +10,7 @@ export const VIEW_ENABLED_HISTORY = __RS_VIEW_HISTORY__;
 export const VIEW_ENABLED_HOME = __RS_VIEW_HOME__;
 export const VIEW_ENABLED_PRINT = __RS_VIEW_PRINT__;
 
-export const DEFAULT_VIEW_ID = (__RS_DEFAULT_VIEW__ || "viewer") as ViewId;
+export const DEFAULT_VIEW_ID = (__RS_DEFAULT_VIEW__ || "home") as ViewId;
 
 const VIEW_FLAGS: Record<string, boolean> = {
     viewer: VIEW_ENABLED_VIEWER,
@@ -39,5 +39,5 @@ export const pickEnabledView = (
     if (isEnabledView(preferred)) return preferred;
     if (isEnabledView(fallback)) return fallback;
     if (ENABLED_VIEW_IDS.length > 0) return ENABLED_VIEW_IDS[0];
-    return "viewer";
+    return "home";
 };
