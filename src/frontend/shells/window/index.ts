@@ -194,7 +194,7 @@ export class WindowShell extends ShellBase {
                     data-window-home-frame
                     data-title="Settings"
                     data-pid="home"
-                    style="left:40px;top:32px;width:min(920px,calc(100% - 80px));height:min(640px,calc(100% - 96px));z-index:2;"
+                    style="pointer-events:auto;left:40px;top:32px;width:min(920px,calc(100% - 80px));height:min(640px,calc(100% - 96px));z-index:2;"
                 >
                 </cw-window-frame>
             ` as HTMLElement;
@@ -286,7 +286,7 @@ export class WindowShell extends ShellBase {
                 data-window-frame
                 data-pid="${pid}"
                 data-title="${title}"
-                style="left:${96 + offset}px;top:${72 + offset}px;width:780px;height:520px;z-index:${this.zCounter};"
+                style="pointer-events:auto;left:${96 + offset}px;top:${72 + offset}px;width:780px;height:520px;z-index:${this.zCounter};"
             >
             </cw-window-frame>
         ` as HTMLElement;

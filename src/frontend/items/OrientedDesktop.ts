@@ -1,4 +1,4 @@
-import { convertOrientPxToCX, cvt_cs_to_os } from "fest/core";
+import { cvt_cs_to_os } from "fest/core";
 import { orientOf } from "fest/dom";
 import { requestOpenView } from "../shared/view-api";
 import type { ViewId } from "../shells/types";
@@ -81,6 +81,11 @@ const applyCellVars = (node: HTMLElement, cell: [number, number]): void => {
     node.style.setProperty("--p-cell-y", String(cell[1]));
 };
 
+const applyDragVars = (node: HTMLElement, dx: number, dy: number): void => {
+    node.style.setProperty("--drag-x", String(dx));
+    node.style.setProperty("--drag-y", String(dy));
+};
+
 const resolveCellAtPointer = (
     grid: HTMLElement,
     columns: number,
@@ -95,18 +100,13 @@ const resolveCellAtPointer = (
         clientY - (rect.top || 0)
     ];
     const orientedPoint = cvt_cs_to_os(local, [rect.width || 1, rect.height || 1], orient);
-    const projected = convertOrientPxToCX(
-        orientedPoint,
-        {
-            layout: [columns, rows],
-            size: [rect.width || 1, rect.height || 1],
-            item: {} as any,
-            list: [],
-            items: new Map()
-        },
-        orient
-    );
-    return clampCell([projected[0], projected[1]], columns, rows);
+    const orientedWidth = orient % 2 ? (rect.height || 1) : (rect.width || 1);
+    const orientedHeight = orient % 2 ? (rect.width || 1) : (rect.height || 1);
+    const cellW = orientedWidth / Math.max(columns, 1);
+    const cellH = orientedHeight / Math.max(rows, 1);
+    const nextX = Math.floor((orientedPoint[0] || 0) / Math.max(cellW, 1));
+    const nextY = Math.floor((orientedPoint[1] || 0) / Math.max(cellH, 1));
+    return clampCell([nextX, nextY], columns, rows);
 };
 
 const makeIconItem = (item: DesktopItem): HTMLElement => {
@@ -206,21 +206,22 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
             const iconLayerNode = iconNodeById.get(item.id);
             const labelLayerNode = labelNodeById.get(item.id);
             if (!iconLayerNode || !labelLayerNode) return;
+            downEvent.preventDefault();
 
             const startX = downEvent.clientX;
             const startY = downEvent.clientY;
             let moved = false;
-            let raf = 0;
-
-            const setDragTransform = (dx: number, dy: number) => {
-                iconLayerNode.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
-                labelLayerNode.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
-            };
+            let lastDx = 0;
+            let lastDy = 0;
 
             const pointerId = downEvent.pointerId;
             iconShape.setPointerCapture(pointerId);
             iconLayerNode.dataset.dragging = "true";
             labelLayerNode.dataset.dragging = "true";
+            iconLayerNode.style.transition = "none";
+            labelLayerNode.style.transition = "none";
+            applyDragVars(iconLayerNode, 0, 0);
+            applyDragVars(labelLayerNode, 0, 0);
 
             const onMove = (moveEvent: PointerEvent) => {
                 const dx = moveEvent.clientX - startX;
@@ -230,13 +231,16 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
                 }
                 if (!moved) return;
                 moveEvent.preventDefault();
-                if (raf) cancelAnimationFrame(raf);
-                raf = requestAnimationFrame(() => setDragTransform(dx, dy));
+                lastDx = dx;
+                lastDy = dy;
+                applyDragVars(iconLayerNode, lastDx, lastDy);
+                applyDragVars(labelLayerNode, lastDx, lastDy);
             };
 
             const onEnd = (endEvent: PointerEvent) => {
-                if (raf) cancelAnimationFrame(raf);
-                iconShape.releasePointerCapture(pointerId);
+                if (iconShape.hasPointerCapture(pointerId)) {
+                    iconShape.releasePointerCapture(pointerId);
+                }
                 iconShape.removeEventListener("pointermove", onMove);
                 iconShape.removeEventListener("pointerup", onEnd);
                 iconShape.removeEventListener("pointercancel", onEnd);
@@ -254,16 +258,19 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
                     suppressClickUntil = performance.now() + SUPPRESS_CLICK_MS;
                 }
 
-                iconLayerNode.style.transition = "transform 180ms ease-out";
-                labelLayerNode.style.transition = "transform 180ms ease-out";
-                iconLayerNode.style.transform = "translate3d(0, 0, 0)";
-                labelLayerNode.style.transform = "translate3d(0, 0, 0)";
+                // Animate drag offset back to zero using ui-gridbox transform vars.
+                requestAnimationFrame(() => {
+                    iconLayerNode.style.transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)";
+                    labelLayerNode.style.transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)";
+                    applyDragVars(iconLayerNode, 0, 0);
+                    applyDragVars(labelLayerNode, 0, 0);
+                });
                 globalThis.setTimeout(() => {
                     iconLayerNode.style.removeProperty("transition");
                     labelLayerNode.style.removeProperty("transition");
                     iconLayerNode.removeAttribute("data-dragging");
                     labelLayerNode.removeAttribute("data-dragging");
-                }, 200);
+                }, 240);
             };
 
             iconShape.addEventListener("pointermove", onMove);
