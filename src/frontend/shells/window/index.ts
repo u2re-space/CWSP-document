@@ -57,12 +57,13 @@ export class WindowShell extends ShellBase {
     private popstateHandler: ((event: PopStateEvent) => void) | null = null;
     private hashHandler: (() => void) | null = null;
     private openRequestHandler: ((event: Event) => void) | null = null;
+    private statusTimer: ReturnType<typeof setInterval> | null = null;
 
     protected createLayout(): HTMLElement {
         return H`
             <div class="app-window-shell" data-shell="window">
                 <main class="app-window-shell__stage" data-shell-content role="main"></main>
-                <cw-shell-dock class="app-window-shell__dock" data-window-dock aria-label="Window dock"></cw-shell-dock>
+                <div class="app-window-shell__dock-host" data-window-dock-slot></div>
                 <div class="app-window-shell__status" data-shell-status hidden aria-live="polite"></div>
             </div>
         ` as HTMLElement;
@@ -74,10 +75,19 @@ export class WindowShell extends ShellBase {
 
     async mount(container: HTMLElement): Promise<void> {
         await super.mount(container);
-        this.stageElement = this.rootElement?.querySelector("[data-shell-content]") as HTMLElement | null;
+        this.stageElement = this.rootElement?.shadowRoot?.querySelector("[data-shell-content]") as HTMLElement | null;
         this.homeFrameElement = this.rootElement?.querySelector("[data-window-home-frame]") as HTMLElement | null;
-        this.dockElement = this.rootElement?.shadowRoot?.querySelector("[data-window-dock]") as HTMLElement | null;
+        this.dockElement = this.rootElement?.querySelector("[data-window-dock]") as HTMLElement | null;
+        if (!this.dockElement && this.rootElement) {
+            const dock = H`
+                <cw-shell-dock class="app-window-shell__dock" data-window-dock aria-label="Window dock"></cw-shell-dock>
+            ` as HTMLElement;
+            dock.slot = "dock";
+            this.rootElement.appendChild(dock);
+            this.dockElement = dock;
+        }
 
+        this.initStatusBar();
         this.bindBrowserNavigation();
         await this.syncInitialRoute();
     }
@@ -94,6 +104,10 @@ export class WindowShell extends ShellBase {
         if (this.openRequestHandler) {
             globalThis?.removeEventListener?.("cw:view-open-request", this.openRequestHandler);
             this.openRequestHandler = null;
+        }
+        if (this.statusTimer) {
+            clearInterval(this.statusTimer);
+            this.statusTimer = null;
         }
         this.processes.clear();
         this.activePid = null;
@@ -114,6 +128,7 @@ export class WindowShell extends ShellBase {
             this.currentView.value = "home";
             this.activePid = null;
             this.updateUrlState("home", null, params, false);
+            this.updateStatusBar();
             return;
         }
 
@@ -121,6 +136,7 @@ export class WindowShell extends ShellBase {
         const proc = this.processes.get(pid);
         if (!proc) return;
         this.focusProcess(proc.pid, true);
+        this.updateStatusBar();
     }
 
     private async syncInitialRoute(): Promise<void> {
@@ -208,11 +224,12 @@ export class WindowShell extends ShellBase {
         }
         this.homeFrameElement.appendChild(homeEl);
         this.homeFrameElement.hidden = false;
+        this.updateStatusBar();
     }
 
     private async openWindowProcess(viewId: ViewId, params?: Record<string, string>): Promise<string> {
-        if (!this.stageElement || !this.dockElement) {
-            throw new Error("[window] Shell stage is not mounted");
+        if (!this.rootElement || !this.dockElement) {
+            throw new Error("[window] Shell host/dock is not mounted");
         }
 
         const requestedPid = sanitizePid(String(params?.pid || ""));
@@ -266,6 +283,7 @@ export class WindowShell extends ShellBase {
         this.processes.set(pid, proc);
         this.installWindowInteractions(proc);
         this.mountHomeSurface().catch(() => undefined);
+        this.updateStatusBar();
         return pid;
     }
 
@@ -319,6 +337,7 @@ export class WindowShell extends ShellBase {
                     this.activePid = null;
                     this.updateUrlState(this.navigationState.currentView, null, proc.params, true);
                 }
+                this.updateStatusBar();
             }
             if (action === "close") {
                 proc.state = "hidden";
@@ -329,6 +348,7 @@ export class WindowShell extends ShellBase {
                     this.activePid = null;
                     void this.navigate("home");
                 }
+                this.updateStatusBar();
             }
         });
 
@@ -431,6 +451,7 @@ export class WindowShell extends ShellBase {
         if (syncUrl) {
             this.updateUrlState(proc.viewId, proc.pid, proc.params, true);
         }
+        this.updateStatusBar();
     }
 
     private updateUrlState(
@@ -453,6 +474,36 @@ export class WindowShell extends ShellBase {
         this.pidCounter += 1;
         const prefix = String(viewId || "view").slice(0, 3).toLowerCase().replace(/[^a-z0-9]/g, "") || "pid";
         return `${prefix}-${this.pidCounter}`;
+    }
+
+    private initStatusBar(): void {
+        if (!this.statusContainer) return;
+        this.statusContainer.hidden = false;
+        this.statusContainer.setAttribute("role", "status");
+        this.updateStatusBar();
+        if (this.statusTimer) {
+            clearInterval(this.statusTimer);
+        }
+        this.statusTimer = setInterval(() => this.updateStatusBar(), 1000);
+    }
+
+    private updateStatusBar(): void {
+        if (!this.statusContainer) return;
+        const processes = [...this.processes.values()];
+        const total = processes.length;
+        const minimized = processes.filter((proc) => proc.state === "minimized").length;
+        const active = this.activePid
+            ? `${this.navigationState.currentView} #${this.activePid}`
+            : String(this.navigationState.currentView || "home");
+        const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+        this.statusContainer.innerHTML = `
+            <span class="app-window-shell__status-item"><b>Active:</b> ${active}</span>
+            <span class="app-window-shell__status-item"><b>Windows:</b> ${total}</span>
+            <span class="app-window-shell__status-item"><b>Minimized:</b> ${minimized}</span>
+            <span class="app-window-shell__status-spacer"></span>
+            <span class="app-window-shell__status-item">${time}</span>
+        `;
     }
 }
 

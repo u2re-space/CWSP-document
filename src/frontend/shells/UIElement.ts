@@ -329,6 +329,13 @@ export class WindowShellHostElement extends HTMLElement {
             stage.replaceChildren(slot);
         }
 
+        const dock = layout.querySelector("[data-window-dock-slot]");
+        if (dock) {
+            const slot = document.createElement("slot");
+            slot.name = "dock";
+            dock.replaceChildren(slot);
+        }
+
         const statusEl = layout.querySelector("[data-shell-status]");
         if (statusEl) {
             statusEl.replaceChildren();

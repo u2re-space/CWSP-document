@@ -20,7 +20,7 @@
         position: absolute;
         inset: 0;
         display: grid;
-        grid-template-rows: minmax(0, 1fr) auto;
+        grid-template-rows: auto minmax(0, 1fr) auto;
         color: var(--window-shell-fg);
         background: transparent;
         background-color: transparent;
@@ -30,6 +30,7 @@
     }
 
     .app-window-shell__stage {
+        grid-row: 2;
         position: relative;
         overflow: hidden;
         min-inline-size: 0;
@@ -42,6 +43,7 @@
     }
 
     .app-window-shell__dock {
+        grid-row: 3;
         min-block-size: 48px;
         padding: 0.45rem 0.55rem;
         display: flex;
@@ -51,6 +53,36 @@
         background: var(--window-dock-bg);
         border-block-start: 1px solid var(--window-dock-border);
         backdrop-filter: blur(8px);
+    }
+
+    .app-window-shell__status {
+        grid-row: 1;
+        min-block-size: 30px;
+        padding: 0.25rem 0.65rem;
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        font-size: 0.75rem;
+        color: color-mix(in oklab, var(--window-shell-fg) 90%, #ffffff 10%);
+        background: color-mix(in oklab, #03060c 82%, #1f2a44 18%);
+        border-block-start: 1px solid rgba(130, 160, 235, 0.24);
+    }
+
+    .app-window-shell__status-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        white-space: nowrap;
+        opacity: 0.92;
+    }
+
+    .app-window-shell__status-item b {
+        font-weight: 600;
+        opacity: 0.86;
+    }
+
+    .app-window-shell__status-spacer {
+        flex: 1 1 auto;
     }
 }
 
