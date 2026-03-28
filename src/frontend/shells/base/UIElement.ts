@@ -2,6 +2,9 @@ import type { ShellId } from "../types";
 
 const SHELL_ELEMENT_TAG_PREFIX = "cw-shell";
 const shellElementCtorByTag = new Map<string, CustomElementConstructor>();
+const SHELL_ELEMENT_TAG_ALIAS: Partial<Record<ShellId, string>> = {
+    window: "cw-shell-container",
+};
 
 export class ShellElement extends HTMLElement {
     private initialized = false;
@@ -103,8 +106,10 @@ export class ShellElement extends HTMLElement {
     }
 }
 
-export const getShellElementTagName = (shellId: ShellId | string): string =>
-    `${SHELL_ELEMENT_TAG_PREFIX}-${String(shellId || "unknown").toLowerCase()}`;
+export const getShellElementTagName = (shellId: ShellId | string): string => {
+    const sid = String(shellId || "unknown").toLowerCase() as ShellId;
+    return SHELL_ELEMENT_TAG_ALIAS[sid] || `${SHELL_ELEMENT_TAG_PREFIX}-${sid}`;
+};
 
 export const ensureShellElementDefined = (shellId: ShellId | string): string => {
     const tagName = getShellElementTagName(shellId);

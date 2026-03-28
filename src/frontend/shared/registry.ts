@@ -307,6 +307,13 @@ export function registerDefaultShells(): void {
         loader: () => import("../shells/minimal/index")
     });
 
+    ShellRegistry.register({
+        id: "window",
+        name: "Window",
+        description: "Desktop-like multi-window shell",
+        loader: () => import("../shells/window/index")
+    });
+
     // Faint shell (tabbed sidebar navigation)
     ShellRegistry.register({
         id: "faint",
@@ -433,8 +440,8 @@ export const darkTheme: ShellTheme = {
  */
 export function getDefaultBootConfig(): BootConfig {
     return {
-        defaultShell: "minimal",
-        defaultView: "viewer",
+        defaultShell: "window",
+        defaultView: "home",
         theme: defaultTheme,
         rememberShellChoice: true,
         availableShells: ShellRegistry.getAll(),

@@ -14,7 +14,7 @@ import type { refType } from "fest/object";
 /**
  * Available shell identifiers
  */
-export type ShellId = "minimal" | "faint" | "base";
+export type ShellId = "minimal" | "faint" | "base" | "window";
 
 /**
  * Available view identifiers

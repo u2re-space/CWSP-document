@@ -176,16 +176,22 @@ export abstract class ShellBase implements Shell {
     protected syncNavigationFromUrl(): void {
         if (typeof window === "undefined" || typeof window == "undefined") return;
 
+        const stateView = (globalThis?.history?.state as { viewId?: ViewId } | null)?.viewId;
         const fromPath = this.getViewFromPathname();
-        if (!fromPath || !isEnabledView(fromPath)) return;
+        const resolved = stateView && isEnabledView(String(stateView))
+            ? stateView
+            : fromPath && isEnabledView(String(fromPath))
+              ? fromPath
+              : null;
+        if (!resolved) return;
 
-        this.navigationState.currentView = fromPath;
+        this.navigationState.currentView = resolved;
         this.navigationState.previousView = undefined;
         this.navigationState.params = Object.fromEntries(
             new URLSearchParams(globalThis.location?.search || "")
         );
-        this.currentView.value = fromPath;
-        this.navigationState.viewHistory = [fromPath];
+        this.currentView.value = resolved;
+        this.navigationState.viewHistory = [resolved];
     }
 
     unmount(): void {
@@ -254,13 +260,12 @@ export abstract class ShellBase implements Shell {
         // Update reactive state
         this.currentView.value = viewId;
 
-        // Update URL pathname (path-based routing, no hash); include search when comparing.
+        // Canonical URL contract: pathname always "/", view lives in history.state.
         if (typeof window !== "undefined" && typeof window != "undefined") {
-            const pathname = `/${viewId}`;
             const search = params && Object.keys(params).length > 0
                 ? "?" + new URLSearchParams(params).toString()
                 : "";
-            const newPathAndSearch = pathname + search;
+            const newPathAndSearch = "/" + search;
             try {
                 const next = new URL(newPathAndSearch, globalThis.location.origin);
                 const cur = new URL(globalThis.location.href);
@@ -273,7 +278,7 @@ export abstract class ShellBase implements Shell {
                 }
             } catch {
                 if (
-                    globalThis?.location?.pathname !== pathname ||
+                    globalThis?.location?.pathname !== "/" ||
                     (globalThis?.location?.search || "") !== search
                 ) {
                     globalThis?.history?.pushState?.({ viewId, params }, "", newPathAndSearch);
@@ -707,9 +712,8 @@ export abstract class ShellBase implements Shell {
 
         globalThis?.addEventListener?.("popstate", (event) => {
             const navToken = ++this.navigationToken;
-            // Get view from pathname
-            const pathname = globalThis?.location?.pathname?.replace(/^\//, "").toLowerCase();
-            const viewId = (event.state?.viewId || pathname || "viewer") as ViewId;
+            const fallbackView = this.getViewFromPathname();
+            const viewId = (event.state?.viewId || fallbackView || "home") as ViewId;
             const popParams = (event.state?.params ??
                 Object.fromEntries(new URLSearchParams(globalThis.location.search || ""))) as
                 | Record<string, string>
@@ -766,9 +770,10 @@ export abstract class ShellBase implements Shell {
 
         const pathname = globalThis?.location?.pathname?.replace(/^\//, "").toLowerCase();
         if (!pathname || pathname === "/") {
-            return null; // Root route
+            const stateView = (globalThis?.history?.state as { viewId?: ViewId } | null)?.viewId;
+            return stateView && isEnabledView(String(stateView)) ? stateView : null;
         }
-        return pathname as ViewId;
+        return isEnabledView(pathname) ? (pathname as ViewId) : null;
     }
 }
 

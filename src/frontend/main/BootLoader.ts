@@ -110,7 +110,7 @@ const STYLE_CONFIGS: Record<StyleSystem, {
         name: "Basic Veela Styles",
         stylesheets: [],
         description: "Minimal styling for basic functionality",
-        recommendedShells: ["minimal", "base"]
+        recommendedShells: ["window", "minimal", "base"]
     },
     "vl-advanced": {
         name: "Advanced (Full-Featured Styling)",
@@ -132,6 +132,8 @@ const STYLE_CONFIGS: Record<StyleSystem, {
 export function getRecommendedStyle(shell: ShellId): StyleSystem {
     switch (shell) {
         case "faint":
+            return "vl-basic";
+        case "window":
             return "vl-basic";
         case "minimal":
             return "vl-basic";
@@ -489,7 +491,7 @@ export class BootLoader {
         try {
             const remember = localStorage.getItem("rs-boot-remember");
             if (remember !== "1") return null;
-            const shell = normalizeShellId((localStorage.getItem("rs-boot-shell") as ShellId) || "minimal");
+            const shell = normalizeShellId((localStorage.getItem("rs-boot-shell") as ShellId) || "window");
             
             return {
                 styleSystem: (localStorage.getItem("rs-boot-style") as StyleSystem) || undefined,
@@ -530,8 +532,8 @@ export const bootLoader = BootLoader.getInstance();
  */
 export async function quickBoot(
     container: HTMLElement,
-    shell: ShellId = "minimal",
-    view: ViewId = "viewer"
+    shell: ShellId = "window",
+    view: ViewId = "home"
 ): Promise<Shell> {
     return bootLoader.boot(container, {
         styleSystem: getRecommendedStyle(shell),
@@ -557,17 +559,36 @@ export async function bootFaint(
  */
 export async function bootMinimal(
     container: HTMLElement,
-    view: ViewId = "viewer"
+    view: ViewId = "home"
 ): Promise<Shell> {
     const channels = ["workcenter", "settings", "viewer"].filter((channelId) =>
         isEnabledView(channelId)
     ) as ServiceChannelId[];
-    const defaultView = pickEnabledView(view, "viewer");
+    const defaultView = pickEnabledView(view, "home");
     const channelPriorityId: ServiceChannelId | undefined =
         (channels.find((c) => c === defaultView) ?? channels[0]) as ServiceChannelId | undefined;
     return bootLoader.boot(container, {
         styleSystem: "vl-basic",
         shell: "minimal",
+        defaultView,
+        channels,
+        channelPriorityId,
+        rememberChoice: true
+    });
+}
+
+export async function bootWindow(
+    container: HTMLElement,
+    view: ViewId = "home"
+): Promise<Shell> {
+    const channels = ["workcenter", "settings", "viewer", "explorer", "history", "editor", "airpad", "home"]
+        .filter((channelId) => isEnabledView(channelId)) as ServiceChannelId[];
+    const defaultView = pickEnabledView(view, "home");
+    const channelPriorityId: ServiceChannelId | undefined =
+        (channels.find((c) => c === defaultView) ?? channels[0]) as ServiceChannelId | undefined;
+    return bootLoader.boot(container, {
+        styleSystem: "vl-basic",
+        shell: "window",
         defaultView,
         channels,
         channelPriorityId,

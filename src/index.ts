@@ -1,25 +1,18 @@
 /**
  * CrossWord Main Entry Point
  *
- * Path-based routing:
- * - `/` → Boot menu (shell selection)
- * - `/viewer` → Viewer
- * - `/workcenter` → Work Center
- * - `/settings` → Settings
- * - `/explorer` → Explorer
- * - `/history` → History
- * - `/editor` → Editor
- * - `/airpad` → Airpad
- * - `/print` → Print view
- *
- * Shell is saved in localStorage, not in URL.
+ * Canonical URL mode:
+ * - pathname always `/`
+ * - legacy `/${view}` routes are accepted as entry links and normalized to `/`
+ * - active view/process is stored in `history.state` and (for focused windows) in `location.hash`
  */
 
 import { initPWA, checkForUpdates, forceRefreshAssets } from "./frontend/pwa/pwa-handling";
-import { loadSubAppWithShell, loadBootMenu, getViewFromPath, isRootRoute, VALID_VIEWS } from "./frontend/main/routing";
+import { loadSubAppWithShell, VALID_VIEWS } from "./frontend/main/routing";
 import { initializeLayers } from "./frontend/shared/layer-manager";
 import type { ViewId } from "./frontend/shells/types";
-import { DEFAULT_VIEW_ID, pickEnabledView } from "./frontend/config/views";
+import { pickEnabledView } from "./frontend/config/views";
+import { initializeAppCanvasLayer } from "./frontend/items/Canvas";
 
 import { loadAsAdopted } from "fest/dom";
 import viewStyles from "@rs-frontend/views/scss/_views.scss?inline";
@@ -61,8 +54,8 @@ const getNormalizedPathname = (): string => {
 const isExtension = (): boolean => {
     try {
         const location = globalThis.location;
-        const chrome = (typeof chrome != "undefined") ? chrome : (globalThis as any).chrome;
-        return location.protocol === "chrome-extension:" || Boolean(chrome?.runtime?.id);
+        const chromeApi = (globalThis as any).chrome;
+        return location.protocol === "chrome-extension:" || Boolean(chromeApi?.runtime?.id);
     } catch {
         return false;
     }
@@ -81,12 +74,12 @@ const isValidViewPath = (path: string): path is ViewId =>
     (VALID_VIEWS as readonly string[]).includes(path);
 
 /** Valid shell identifiers */
-const VALID_SHELLS = ["base", "minimal", "faint"] as const;
-type ShellPreference = (typeof VALID_SHELLS)[number] | "minimal";
+const VALID_SHELLS = ["base", "minimal", "faint", "window"] as const;
+type ShellPreference = (typeof VALID_SHELLS)[number] | "window";
 
-const normalizeShellPreference = (shell: ShellPreference | null): "base" | "minimal" => {
+const normalizeShellPreference = (shell: ShellPreference | null): "base" | "window" => {
     if (shell === "base") return "base";
-    return "minimal";
+    return "window";
 };
 
 const getShellFromQuery = (): ShellPreference | null => {
@@ -131,17 +124,58 @@ const getSavedShell = (): ShellPreference | null => {
     return null;
 };
 
-/**
- * Check if boot menu should be skipped (has saved preference with remember flag)
- */
-const shouldSkipBootMenu = (): boolean => {
-    try {
-        const remember = localStorage.getItem("rs-boot-remember") === "1";
-        const shell = getSavedShell();
-        return remember && shell !== null;
-    } catch {
-        return false;
+type AppLayers = {
+    canvasLayer: HTMLElement;
+    shellLayer: HTMLElement;
+    overlayLayer: HTMLElement;
+};
+
+const ensureAppLayers = (mountElement: HTMLElement): AppLayers => {
+    const existingCanvas = mountElement.querySelector<HTMLElement>('[data-app-layer="canvas"]');
+    const existingShell = mountElement.querySelector<HTMLElement>('[data-app-layer="shell"]');
+    const existingOverlay = mountElement.querySelector<HTMLElement>('[data-app-layer="overlay"]');
+
+    if (existingCanvas && existingShell && existingOverlay) {
+        return { canvasLayer: existingCanvas, shellLayer: existingShell, overlayLayer: existingOverlay };
     }
+
+    mountElement.replaceChildren();
+    mountElement.style.position = "relative";
+    mountElement.style.overflow = "hidden";
+    mountElement.dataset.appLayerRoot = "true";
+
+    const canvasLayer = document.createElement("div");
+    canvasLayer.dataset.appLayer = "canvas";
+    canvasLayer.className = "app-layer app-layer--canvas";
+    canvasLayer.style.position = "absolute";
+    canvasLayer.style.inset = "0";
+    canvasLayer.style.zIndex = "0";
+    canvasLayer.style.pointerEvents = "none";
+
+    const shellLayer = document.createElement("div");
+    shellLayer.dataset.appLayer = "shell";
+    shellLayer.className = "app-layer app-layer--shell";
+    shellLayer.style.position = "absolute";
+    shellLayer.style.inset = "0";
+    shellLayer.style.zIndex = "10";
+    shellLayer.style.pointerEvents = "auto";
+    shellLayer.style.overflow = "hidden";
+    shellLayer.style.background = "transparent";
+    shellLayer.style.backgroundColor = "transparent";
+
+    const overlayLayer = document.createElement("div");
+    overlayLayer.dataset.appLayer = "overlay";
+    overlayLayer.className = "app-layer app-layer--overlay";
+    overlayLayer.style.position = "absolute";
+    overlayLayer.style.inset = "0";
+    overlayLayer.style.zIndex = "1000";
+    overlayLayer.style.pointerEvents = "none";
+    overlayLayer.style.background = "transparent";
+    overlayLayer.style.backgroundColor = "transparent";
+
+    mountElement.append(canvasLayer, shellLayer, overlayLayer);
+    initializeAppCanvasLayer(canvasLayer);
+    return { canvasLayer, shellLayer, overlayLayer };
 };
 
 // ============================================================================
@@ -346,74 +380,44 @@ export default async function index(mountElement: HTMLElement) {
         console.log('[Index] Route:', pathname || '(root)');
 
         // ====================================================================
-        // ROUTE HANDLING
+        // ROUTE HANDLING (canonical root)
         // ====================================================================
 
-        // Share target route → load default shell with viewer
-        if (pathname === "share-target" || pathname === "share_target") {
-            console.log('[Index] Share target route');
-            clearLoadingState(mountElement);
-            const appLoader = await loadSubAppWithShell(getSavedShell() || "minimal", pickEnabledView("viewer"));
-            await appLoader.mount(mountElement);
-            return;
+        const layers = ensureAppLayers(mountElement);
+        clearLoadingState(mountElement);
+
+        // Legacy /{view} links are still accepted as entry points, then normalized to "/".
+        const isLegacyViewRoute = Boolean(pathname && isValidViewPath(pathname));
+        const requestedView = isLegacyViewRoute
+            ? pickEnabledView(pathname as ViewId, "home")
+            : (sharedFlag === "1" || sharedFlag === "true" || markdownContent)
+              ? pickEnabledView("viewer", "home")
+              : pickEnabledView("home", "home");
+
+        if (isLegacyViewRoute || pathname === "share-target" || pathname === "share_target") {
+            const state = {
+                ...(globalThis?.history?.state || {}),
+                viewId: requestedView,
+                redirectedFrom: pathname || null
+            };
+            const search = globalThis?.location?.search || "";
+            const hash = globalThis?.location?.hash || "";
+            globalThis?.history?.replaceState?.(state, "", `/${search}${hash}`);
+        } else if (pathname && pathname !== "") {
+            const state = {
+                ...(globalThis?.history?.state || {}),
+                viewId: pickEnabledView("home", "home"),
+                redirectedFrom: pathname
+            };
+            globalThis?.history?.replaceState?.(state, "", "/");
         }
 
-        // Root with share/markdown params → load default shell with viewer
-        if ((!pathname || pathname === "") && (sharedFlag === "1" || sharedFlag === "true" || markdownContent)) {
-            console.log('[Index] Root with share/markdown params');
-            clearLoadingState(mountElement);
-            const appLoader = await loadSubAppWithShell(getSavedShell() || "minimal", pickEnabledView("viewer"));
-            await appLoader.mount(mountElement);
-            return;
-        }
-
-        // View routes: /viewer, /workcenter, /settings, /explorer, /history, /editor, /airpad, /print
-        if (pathname && isValidViewPath(pathname)) {
-            console.log('[Index] View route:', pathname);
-            clearLoadingState(mountElement);
-
-            // Print stays on raw shell; other views follow user shell preference.
-            const shell = (pathname === "print")
-                ? "base"
-                : (getSavedShell() || "minimal");
-
-            const appLoader = await loadSubAppWithShell(shell, pathname);
-            await appLoader.mount(mountElement);
-            return;
-        }
-
-        // Root route (/) → Boot menu or auto-redirect if has saved preference
-        if (!pathname || pathname === "") {
-            console.log('[Index] Root route');
-
-            // If user has saved shell preference with "remember", skip boot menu
-            if (shouldSkipBootMenu()) {
-                console.log('[Index] Skipping boot menu (remembered preference)');
-                // Redirect to default view
-                globalThis.location.href = `/${DEFAULT_VIEW_ID}`;
-                return;
-            }
-
-            // Extension always goes to default view (no boot menu)
-            if (isExtension()) {
-                console.log('[Index] Extension mode - loading default view');
-                clearLoadingState(mountElement);
-                const appLoader = await loadSubAppWithShell("base", pickEnabledView("viewer"));
-                await appLoader.mount(mountElement);
-                return;
-            }
-
-            // Show boot menu for shell selection
-            console.log('[Index] Showing boot menu');
-            clearLoadingState(mountElement);
-            const bootMenu = await loadBootMenu();
-            await bootMenu.mount(mountElement);
-            return;
-        }
-
-        // Unknown route → redirect to viewer
-        console.log('[Index] Unknown route, redirecting to /viewer');
-        globalThis.location.href = `/${DEFAULT_VIEW_ID}`;
+        const preferredShell = requestedView === "print"
+            ? "base"
+            : (getSavedShell() || "window");
+        const appLoader = await loadSubAppWithShell(preferredShell as any, requestedView);
+        await appLoader.mount(layers.shellLayer);
+        return;
 
     } catch (error) {
         console.error('[Index] Frontend loader failed:', error);

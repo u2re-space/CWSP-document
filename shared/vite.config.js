@@ -66,6 +66,14 @@ const spaFallbackPlugin = () => ({
                 }
             }
 
+            // Legacy GET /{view} deep links should still resolve, but canonical URL is "/".
+            if (req.method === 'GET' || req.method === 'HEAD') {
+                const seg = pathname.replace(/^\/+|\/+$/g, '').split('/')[0]?.toLowerCase();
+                if (seg && VIEW_POST_API_SEGMENTS.has(seg)) {
+                    req.url = '/index.html';
+                }
+            }
+
             // Never treat /user/* as SPA shell routes.
             // If SW did not intercept on first navigation, return SW handoff page for documents
             // (and explicit 404 for non-document requests) instead of index.html -> /viewer redirect chain.

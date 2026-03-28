@@ -26,6 +26,7 @@ export {
     quickBoot,
     bootFaint,
     bootMinimal,
+    bootWindow,
     bootBase,
     getRecommendedStyle,
     type StyleSystem,
@@ -234,8 +235,8 @@ export async function initializeLegacy(
  */
 export async function quickInit(
     container: HTMLElement,
-    shell: "minimal" | "faint" | "base" = "minimal",
-    view: string = "viewer"
+    shell: "minimal" | "faint" | "base" | "window" = "window",
+    view: string = "home"
 ): Promise<Shell> {
     return initializeApp(container, {
         shell,

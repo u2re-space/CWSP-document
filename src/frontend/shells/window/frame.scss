@@ -1,0 +1,191 @@
+@layer shell.tokens, shell.base, shell.components, shell.utilities;
+
+@layer shell.tokens {
+    :host,
+    .app-window-shell {
+        --window-shell-bg: radial-gradient(circle at 20% 15%, #1e2a42 0%, #0a0f1c 45%, #060910 100%);
+        --window-shell-fg: #e8eefc;
+        --window-frame-bg: color-mix(in oklab, #0f1728 90%, #ffffff 10%);
+        --window-frame-border: color-mix(in oklab, #7ea4ff 35%, #1f2a44 65%);
+        --window-frame-header: color-mix(in oklab, #24324f 80%, #8bb7ff 20%);
+        --window-frame-shadow: 0 12px 36px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.04);
+        --window-dock-bg: color-mix(in oklab, #060910 74%, #1f2a44 26%);
+        --window-dock-border: rgba(130, 160, 235, 0.32);
+        --window-focus: #8bb7ff;
+    }
+}
+
+@layer shell.base {
+    .app-window-shell {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        color: var(--window-shell-fg);
+        background: transparent;
+        background-color: transparent;
+        overflow: hidden;
+        container-type: size;
+        contain: strict;
+    }
+
+    .app-window-shell__stage {
+        position: relative;
+        overflow: hidden;
+        min-inline-size: 0;
+        min-block-size: 0;
+    }
+
+    .app-window-shell__home-view {
+        inline-size: 100%;
+        block-size: 100%;
+    }
+
+    .app-window-shell__dock {
+        min-block-size: 48px;
+        padding: 0.45rem 0.55rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem;
+        background: var(--window-dock-bg);
+        border-block-start: 1px solid var(--window-dock-border);
+        backdrop-filter: blur(8px);
+    }
+}
+
+@layer shell.components {
+    .app-window-shell__frame {
+        position: absolute;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-inline-size: 360px;
+        min-block-size: 240px;
+        border: 1px solid var(--window-frame-border);
+        border-radius: 12px;
+        background: var(--window-frame-bg);
+        box-shadow: var(--window-frame-shadow);
+        overflow: hidden;
+        user-select: none;
+    }
+
+    .app-window-shell__frame--home {
+        border-color: color-mix(in oklab, var(--window-focus) 40%, transparent);
+    }
+
+    .app-window-shell__frame.is-active {
+        box-shadow: 0 0 0 1px var(--window-focus), 0 14px 40px rgba(0, 0, 0, 0.48);
+    }
+
+    .app-window-shell__frame-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        min-block-size: 38px;
+        padding-inline: 0.55rem;
+        background: var(--window-frame-header);
+        border-block-end: 1px solid rgba(255, 255, 255, 0.08);
+        cursor: move;
+    }
+
+    .app-window-shell__frame-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-inline-size: 0;
+    }
+
+    .app-window-shell__frame-title-text {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 600;
+        font-size: 0.86rem;
+    }
+
+    .app-window-shell__frame-pid {
+        opacity: 0.72;
+        font-size: 0.72rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .app-window-shell__frame-actions {
+        display: inline-flex;
+        gap: 0.35rem;
+    }
+
+    .app-window-shell__frame-actions > button {
+        inline-size: 1.65rem;
+        block-size: 1.45rem;
+        border: none;
+        border-radius: 8px;
+        color: inherit;
+        background: rgba(255, 255, 255, 0.12);
+        cursor: pointer;
+        font-size: 0.95rem;
+        line-height: 1;
+    }
+
+    .app-window-shell__frame-actions > button:hover {
+        background: rgba(255, 255, 255, 0.24);
+    }
+
+    .app-window-shell__frame-body {
+        position: relative;
+        overflow: auto;
+        min-inline-size: 0;
+        min-block-size: 0;
+        background: color-mix(in oklab, #0e1524 88%, #ffffff 12%);
+    }
+
+    .app-window-shell__resize {
+        position: absolute;
+        inset-inline-end: 0;
+        inset-block-end: 0;
+        inline-size: 14px;
+        block-size: 14px;
+        border: none;
+        padding: 0;
+        margin: 0;
+        cursor: nwse-resize;
+        background:
+            linear-gradient(135deg, transparent 45%, rgba(255, 255, 255, 0.35) 46%, rgba(255, 255, 255, 0.35) 54%, transparent 55%);
+    }
+
+    .app-window-shell__dock-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        color: inherit;
+        background: rgba(255, 255, 255, 0.08);
+        padding: 0.32rem 0.65rem;
+        cursor: pointer;
+    }
+
+    .app-window-shell__dock-item small {
+        opacity: 0.65;
+        font-size: 0.72rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .app-window-shell__dock-item.is-active {
+        border-color: var(--window-focus);
+        background: color-mix(in oklab, var(--window-focus) 25%, transparent);
+    }
+}
+
+@layer shell.utilities {
+    @media (max-width: 900px) {
+        .app-window-shell__frame {
+            inset: 0 !important;
+            inline-size: auto !important;
+            block-size: auto !important;
+            min-inline-size: 0;
+            min-block-size: 0;
+            border-radius: 0;
+        }
+    }
+}

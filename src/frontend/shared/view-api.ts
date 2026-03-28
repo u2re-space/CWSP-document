@@ -18,6 +18,15 @@ export type ViewTransferChannelPayload = {
     message: unknown;
 };
 
+export type ViewOpenTarget = "window" | "frame" | "shell" | "base" | "headless";
+
+export type ViewOpenRequest = {
+    viewId: string;
+    target?: ViewOpenTarget;
+    params?: Record<string, string>;
+    pid?: string;
+};
+
 export function postViewChannelPayload(viewId: string, payload: unknown): void {
     if (typeof BroadcastChannel === "undefined") return;
     try {
@@ -81,4 +90,21 @@ export function subscribeViewChannel(
         bc.removeEventListener("message", handler);
         bc.close();
     };
+}
+
+/**
+ * Ask active shell/router to open a view using query-like envelope semantics.
+ * Window shell listens to this event and can map request to a process frame.
+ */
+export function requestOpenView(request: ViewOpenRequest): void {
+    const viewId = String(request?.viewId || "").trim().toLowerCase();
+    if (!viewId) return;
+    globalThis?.dispatchEvent?.(new CustomEvent("cw:view-open-request", {
+        detail: {
+            viewId,
+            target: request?.target || "window",
+            params: request?.params || {},
+            pid: request?.pid || null
+        }
+    }));
 }
