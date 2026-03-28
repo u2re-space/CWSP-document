@@ -1,12 +1,10 @@
-@use "veela-lib" as *;
-@use "../../library/mixins" as ui;
-
-//
-@layer layer.shell.faint {
+@layer views {
 
     // Speed Dial (Home) Styles
     .speed-dial-root {
         display: grid;
+        grid-row: 1 / -1;
+        grid-column: 1 / -1;
         grid-template-columns: minmax(0px, 1fr);
         grid-template-rows: minmax(0px, 1fr);
         pointer-events: auto;
@@ -30,6 +28,8 @@
         --grid-cols: 4;
         --grid-rows: 8;
 
+        grid-row: 1 / -1;
+        grid-column: 1 / -1;
         display: grid;
         gap: 0;
         padding: var(--padding-lg);
@@ -102,7 +102,8 @@
                 transform: scale(1.05);
 
                 .ui-ws-item-icon {
-                    @include ui.tonal-surface(surface-container-high, var(--surface-opacity-default), var(--radius-lg), null, 2);
+                    background: color-mix(in oklab, var(--color-surface-container-high, #1f2937) 82%, transparent);
+                    box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.65);
                 }
             }
 
@@ -139,8 +140,9 @@
                 box-shadow: none;
                 filter: none;
 
-                // Default tonal surface background
-                @include ui.tonal-surface(surface-container, var(--surface-opacity-default), var(--border-radius), null, 1);
+                // Lightweight fallback surface (avoid advanced mixin dependency).
+                background: color-mix(in oklab, var(--color-surface-container, #111827) 78%, transparent);
+                border: 1px solid color-mix(in oklab, var(--color-on-surface, #e5e7eb) 20%, transparent);
 
                 &, &:hover, &:active {
                     border-radius: var(--border-radius);
@@ -167,8 +169,6 @@
             }
 
             .ui-ws-item-label {
-                @include solid-colorize("&");
-
                 position: absolute;
                 inset: 0;
                 pointer-events: none;
@@ -200,7 +200,9 @@
                     place-content: center;
                     place-items: center;
 
-                    @include ui.text-label("label-medium");
+                    font-size: var(--text-sm, 0.8rem);
+                    font-weight: 500;
+                    letter-spacing: 0.01em;
                     color: var(--on-surface-color, currentColor);
                     background-color: transparent;
                     background-image: none;

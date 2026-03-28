@@ -27,6 +27,7 @@
         overflow: hidden;
         container-type: size;
         contain: strict;
+        pointer-events: none;
     }
 
     .app-window-shell__stage {
@@ -34,6 +35,7 @@
         overflow: hidden;
         min-inline-size: 0;
         min-block-size: 0;
+        pointer-events: none;
     }
 
     .app-window-shell__home-view {

@@ -32,6 +32,7 @@ export class ShellElement extends HTMLElement {
                     contain: strict;
                     isolation: isolate;
                     overflow: clip;
+                    pointer-events: none;
                 }
 
                 .cw-shell-frame {

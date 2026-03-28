@@ -7,6 +7,7 @@ const SHELL_ELEMENT_TAG_ALIAS: Partial<Record<ShellId, string>> = {
 };
 const WINDOW_FRAME_TAG_NAME = "cw-window-frame";
 const WINDOW_SHELL_HOST_STYLES = `
+
 :host {
     display: block;
     inline-size: 100%;
@@ -15,6 +16,7 @@ const WINDOW_SHELL_HOST_STYLES = `
     contain: strict;
     isolation: isolate;
     overflow: hidden;
+    pointer-events: none;
 }
 
 [data-shell-content] > slot[name="window-frame"]::slotted(cw-window-frame) {

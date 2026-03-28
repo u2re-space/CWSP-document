@@ -13,6 +13,7 @@ import { initializeLayers } from "./frontend/shared/layer-manager";
 import type { ViewId } from "./frontend/shells/types";
 import { pickEnabledView } from "./frontend/config/views";
 import { initializeAppCanvasLayer } from "./frontend/items/Canvas";
+import { initializeOrientedDesktop } from "./frontend/items/OrientedDesktop";
 import { fixOrientToScreen, loadAsAdopted } from "fest/dom";
 import viewStyles from "@rs-frontend/views/scss/_views.scss?inline";
 
@@ -167,10 +168,11 @@ const ensureAppLayers = (mountElement: HTMLElement): AppLayers => {
     orientBox.setAttribute("data-mixin", "ui-orientbox");
     (orientBox as HTMLElement).style.position = "absolute";
     (orientBox as HTMLElement).style.inset = "0";
-    (orientBox as HTMLElement).style.pointerEvents = "none";
+    (orientBox as HTMLElement).style.pointerEvents = "auto";
     (orientBox as HTMLElement).style.background = "transparent";
     orientLayer.appendChild(orientBox);
     fixOrientToScreen(orientBox as any);
+    initializeOrientedDesktop(orientBox as HTMLElement);
 
     const shellLayer = document.createElement("div");
     shellLayer.dataset.appLayer = "shell";
@@ -178,7 +180,7 @@ const ensureAppLayers = (mountElement: HTMLElement): AppLayers => {
     shellLayer.style.position = "absolute";
     shellLayer.style.inset = "0";
     shellLayer.style.zIndex = "10";
-    shellLayer.style.pointerEvents = "auto";
+    shellLayer.style.pointerEvents = "none";
     shellLayer.style.overflow = "hidden";
     shellLayer.style.background = "transparent";
     shellLayer.style.backgroundColor = "transparent";
