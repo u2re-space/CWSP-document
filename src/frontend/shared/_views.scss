@@ -2138,6 +2138,33 @@
 
 @layer print {
     @media print {
+        /* Print only the document content; hide desktop/background/overlay infrastructure. */
+        [data-app-layer="canvas"],
+        [data-app-layer="orient"],
+        [data-app-layer="overlay"],
+        cw-app-dock,
+        cw-status-bar,
+        [data-window-dock],
+        [data-window-status] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        [data-app-layer="shell"] {
+            background: transparent !important;
+            background-color: transparent !important;
+            overflow: visible !important;
+        }
+
+        :is(html, body):has([data-shell="base"]),
+        :is(html, body):has([data-shell="minimal"]) {
+            background: #fff !important;
+            color: #000 !important;
+            overflow: visible !important;
+        }
+
         /* Keep markdown web-component content printable across all shells. */
         [data-cw-view-host="true"][data-view-id="viewer"],
         .cw-view-viewer-shell,

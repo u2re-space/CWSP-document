@@ -21,6 +21,8 @@ import {
     persistWallpaper,
     gridLayoutState,
     createSpeedDialItemFromClipboard,
+    parseSpeedDialItemFromJSON,
+    parseSpeedDialItemFromURL,
     type SpeedDialItem,
     type GridCell
 } from "@rs-core/storage/StateStorage";
@@ -51,6 +53,7 @@ const ACTION_OPTIONS = [
     { value: "copy-link", label: "Copy link" },
     { value: "copy-state-desc", label: "Copy state + desc" }
 ];
+const WALLPAPER_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg", "avif"]);
 
 const getRefValue = (ref: any, fallback = "") => {
     if (ref && typeof ref === "object" && "value" in ref) return ref.value ?? fallback;
@@ -111,9 +114,34 @@ const attachItemNode = (item: SpeedDialItem, el?: HTMLElement | null, interactiv
     el.dataset.speedDialItem = "true";
     el.addEventListener("dragstart", (ev)=>ev.preventDefault());
     if (interactive) {
+        let pointerDownAt: [number, number] | null = null;
+        let pointerDownTs = 0;
+        let suppressClickUntil = 0;
         el.addEventListener("click", (ev)=>{
+            if (Date.now() < suppressClickUntil) {
+                ev?.preventDefault?.();
+                ev?.stopPropagation?.();
+                return;
+            }
             ev?.preventDefault?.();
             if (!MOCElement(ev?.target as any, "[data-dragging]")) {
+                runItemAction(item, undefined, { event: ev, initiator: el });
+            }
+        });
+        el.addEventListener("pointerdown", (ev: PointerEvent)=>{
+            pointerDownAt = [ev.clientX, ev.clientY];
+            pointerDownTs = Date.now();
+        });
+        el.addEventListener("pointerup", (ev: PointerEvent)=>{
+            if (!pointerDownAt) return;
+            const dx = ev.clientX - pointerDownAt[0];
+            const dy = ev.clientY - pointerDownAt[1];
+            const distance = Math.hypot(dx, dy);
+            const elapsed = Date.now() - pointerDownTs;
+            pointerDownAt = null;
+            if (distance <= 6 && elapsed <= 350) {
+                // PointerAPI drag helper may swallow synthetic click even for tap-like gestures.
+                suppressClickUntil = Date.now() + 250;
                 runItemAction(item, undefined, { event: ev, initiator: el });
             }
         });
@@ -129,7 +157,7 @@ const attachItemNode = (item: SpeedDialItem, el?: HTMLElement | null, interactiv
         bindCell(el, args);
     }
     if (el.dataset.layer === "icons") {
-        bindInteraction(el, args);
+        bindInteraction(el, { ...args, immediateDragStyles: true });
         const cell = item?.cell ?? [0, 0];
         E(el, {
             style: {
@@ -199,6 +227,35 @@ const deriveCellFromCoordinate = (coordinate: [number, number]): GridCell =>{
     return clampCell(floorCell(projected));
 };
 
+const looksLikeImageFile = (file?: File | null): boolean => {
+    if (!file) return false;
+    const type = String(file.type || "").toLowerCase();
+    if (type.startsWith("image/")) return true;
+    const name = String(file.name || "").trim().toLowerCase();
+    const ext = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : "";
+    return WALLPAPER_EXTENSIONS.has(ext);
+};
+
+const parseUrlFromHtml = (html?: string | null): string | null => {
+    const source = String(html || "").trim();
+    if (!source) return null;
+    const hrefMatch = source.match(/href\s*=\s*["']([^"']+)["']/i);
+    const href = String(hrefMatch?.[1] || "").trim();
+    if (!href) return null;
+    return href;
+};
+
+const parseShortcutFromTransfer = (transfer: DataTransfer | null | undefined, suggestedCell: GridCell): SpeedDialItem | null => {
+    if (!transfer) return null;
+    const plain = String(transfer.getData("text/plain") || "").trim();
+    const uriList = String(transfer.getData("text/uri-list") || "").trim();
+    const html = String(transfer.getData("text/html") || "").trim();
+    const preferred = plain || uriList || parseUrlFromHtml(html) || "";
+    if (!preferred) return null;
+    return parseSpeedDialItemFromJSON(preferred, suggestedCell)
+        || parseSpeedDialItemFromURL(preferred, suggestedCell);
+};
+
 const createMenuEntryForAction = (actionId: string, item: SpeedDialItem, fallbackLabel: string = "") => {
     const descriptor = buildDescriptor(item) as any;
     return {
@@ -253,7 +310,9 @@ const handleSpeedDialPaste = async (event: ClipboardEvent, suggestedCell?: GridC
     event.stopPropagation();
 
     try {
-        const item = await createSpeedDialItemFromClipboard(suggestedCell ?? deriveCellFromCoordinate([coordinateRef[0].value, coordinateRef[1].value]));
+        const targetCell = suggestedCell ?? deriveCellFromCoordinate([coordinateRef[0].value, coordinateRef[1].value]);
+        const fromClipboardData = parseShortcutFromTransfer(event.clipboardData, targetCell);
+        const item = fromClipboardData || await createSpeedDialItemFromClipboard(targetCell);
         if (!item) {
             return false;
         }
@@ -278,21 +337,51 @@ const handleWallpaperDropOrPaste = (event: DragEvent | ClipboardEvent) => {
         isInFocus(event?.target as HTMLElement, "#home:is(:hover, :focus, :focus-visible), #home:has(:hover, :focus, :focus-visible)", "child")
     ) {
         const isPaste = event instanceof ClipboardEvent;
+        const targetEl = event.target as HTMLElement | null;
+        const droppedOnItem = !!targetEl?.closest?.("[data-speed-dial-item]");
+        const suggestedCell = deriveCellFromCoordinate([coordinateRef[0].value, coordinateRef[1].value]);
         const dataTransfer = isPaste ? (event as ClipboardEvent).clipboardData : (event as DragEvent).dataTransfer;
 
         if (isPaste) {
-            void handleSpeedDialPaste(event as ClipboardEvent);
+            const fromTransfer = parseShortcutFromTransfer(dataTransfer, suggestedCell);
+            if (fromTransfer) {
+                event.preventDefault();
+                event.stopPropagation();
+                addSpeedDialItem(fromTransfer);
+                persistSpeedDialItems();
+                persistSpeedDialMeta();
+                showSuccess("Shortcut created from pasted link");
+                return;
+            }
+            void handleSpeedDialPaste(event as ClipboardEvent, suggestedCell);
+        }
+
+        if (!isPaste) {
+            const parsed = parseShortcutFromTransfer(dataTransfer, suggestedCell);
+            if (parsed) {
+                event.preventDefault();
+                event.stopPropagation();
+                addSpeedDialItem(parsed);
+                persistSpeedDialItems();
+                persistSpeedDialMeta();
+                showSuccess("Shortcut created from dropped link");
+                return;
+            }
         }
 
         event.preventDefault();
         event.stopPropagation();
 
         const dt = dataTransfer || ((event as any).clipboardData || (event as any).dataTransfer);
+        const hasImageFile = !!Array.from((dt as DataTransfer | null)?.files || []).find((file) => looksLikeImageFile(file));
+        if (!hasImageFile || droppedOnItem) {
+            return;
+        }
         // Defer heavy file/clipboard scanning so the UI thread can process preventDefault first.
         queueMicrotask(() => {
             handleIncomingEntries(dt, "/images/wallpaper/", null, (file, path) => {
                 console.log(file, path);
-                if (file.type.startsWith("image/")) {
+                if (looksLikeImageFile(file)) {
                     wallpaperState.src = path;
                     persistWallpaper();
                     showSuccess("Wallpaper updated");
@@ -344,10 +433,33 @@ export function SpeedDial(makeView: any) {
 }
 
 //
-const openItemEditor = (item?: SpeedDialItem, opts?: { suggestedCell?: GridCell })=>{
+const openItemEditor = (item?: SpeedDialItem, opts?: {
+    suggestedCell?: GridCell;
+    seed?: Partial<{ label: string; icon: string; action: string; view: string; href: string; description: string }>;
+})=>{
     const workingItem = item ?? createEmptySpeedDialItem(opts?.suggestedCell ?? deriveCellFromCoordinate([coordinateRef[0].value, coordinateRef[1].value]));
     const isNew = !item;
     const workingMeta = ensureSpeedDialMeta(workingItem.id);
+    const seed = opts?.seed || {};
+    if (isNew && seed?.action) {
+        workingItem.action = seed.action;
+        workingMeta.action = seed.action;
+    }
+    if (isNew && seed?.label) {
+        workingItem.label.value = seed.label;
+    }
+    if (isNew && seed?.icon) {
+        workingItem.icon.value = seed.icon;
+    }
+    if (isNew && seed?.view) {
+        workingMeta.view = seed.view;
+    }
+    if (isNew && seed?.href) {
+        workingMeta.href = seed.href;
+    }
+    if (isNew && seed?.description) {
+        workingMeta.description = seed.description;
+    }
     const draft = {
         label: getRefValue(workingItem.label, "New shortcut"),
         icon: getRefValue(workingItem.icon, "sparkle"),
@@ -531,7 +643,7 @@ export function createCtxMenu() {
                         icon: "wrench",
                         action: () => {},
                         children: [
-                            { id: "edit", label: "Edit shortcut", icon: "pencil-simple-line", action: ()=>openItemEditor(item) },
+                            { id: "edit", label: "Edit Properties", icon: "pencil-simple-line", action: ()=>openItemEditor(item) },
                             {
                                 id: "remove",
                                 label: "Remove",
@@ -560,6 +672,23 @@ export function createCtxMenu() {
                                 icon: "plus",
                                 action: ()=>{
                                     openItemEditor(undefined, { suggestedCell: guessedCell });
+                                }
+                            },
+                            {
+                                id: "create-link-shortcut",
+                                label: "Create link shortcut",
+                                icon: "link",
+                                action: ()=>{
+                                    openItemEditor(undefined, {
+                                        suggestedCell: guessedCell,
+                                        seed: {
+                                            action: "open-link",
+                                            icon: "link",
+                                            label: "New link",
+                                            href: "",
+                                            description: ""
+                                        }
+                                    });
                                 }
                             },
                             {

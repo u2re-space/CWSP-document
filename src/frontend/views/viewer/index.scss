@@ -512,11 +512,17 @@
     }
 
     @media print {
+        @page {
+            margin: 12mm;
+        }
+
         .cw-view-viewer-shell {
             display: block !important;
             block-size: auto !important;
             inline-size: 100% !important;
             overflow: visible !important;
+            contain: none !important;
+            container-type: normal !important;
         }
 
         .view-viewer {
@@ -568,6 +574,42 @@
             inline-size: 100% !important;
             color: #000 !important;
             background: transparent !important;
+        }
+
+        .markdown-viewer-content,
+        [data-render-target] {
+            break-before: auto !important;
+            break-after: auto !important;
+            break-inside: auto !important;
+            page-break-before: auto !important;
+            page-break-after: auto !important;
+            page-break-inside: auto !important;
+            widows: 3;
+            orphans: 3;
+        }
+
+        .markdown-viewer-content h1,
+        .markdown-viewer-content h2,
+        .markdown-viewer-content h3,
+        .markdown-viewer-content h4,
+        .markdown-viewer-content h5,
+        .markdown-viewer-content h6 {
+            break-after: avoid-page;
+            page-break-after: avoid;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .markdown-viewer-content pre,
+        .markdown-viewer-content table,
+        .markdown-viewer-content blockquote,
+        .markdown-viewer-content figure,
+        .markdown-viewer-content img,
+        .markdown-viewer-content ul,
+        .markdown-viewer-content ol,
+        .markdown-viewer-content li {
+            break-inside: avoid-page;
+            page-break-inside: avoid;
         }
     }
 }

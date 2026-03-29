@@ -266,6 +266,18 @@ export function getSavedShellPreference(): ShellId | null {
         return fromQuery;
     }
 
+    // Canonical origin entry should always boot desktop shell unless explicitly overridden by ?shell=...
+    // This keeps "/" consistent even if a previous tab stored "base" for detached flows.
+    try {
+        const isOriginRoot = normalizePathname(location.pathname) === "";
+        if (isOriginRoot) {
+            localStorage.setItem("rs-boot-shell", "window");
+            return "window";
+        }
+    } catch {
+        // ignore URL/storage issues and continue with stored preference fallback
+    }
+
     try {
         const saved = localStorage.getItem("rs-boot-shell");
         if (saved === "minimal" || saved === "faint" || saved === "base") {

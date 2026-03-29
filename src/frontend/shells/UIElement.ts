@@ -391,6 +391,7 @@ export class WindowFrameElement extends HTMLElement {
                 <div class="app-window-shell__frame-actions">
                     <button type="button" data-window-action="minimize" aria-label="Minimize">−</button>
                     <button type="button" data-window-action="maximize" aria-label="Maximize">□</button>
+                    <button type="button" data-window-action="detach" aria-label="Open in separate tab">↗</button>
                     <button type="button" data-window-action="close" aria-label="Close">×</button>
                 </div>
             </header>

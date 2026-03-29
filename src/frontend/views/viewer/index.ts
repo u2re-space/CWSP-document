@@ -343,11 +343,18 @@ export class ViewerView implements View {
         this.options = options;
         this.shellContext = options.shellContext;
         this.sourceUrl = this.normalizeSourceUrl(options.source);
+        this.applyRouteParams(options.params);
         this.markdownSettingsPromise = this.loadMarkdownSettings();
 
         // Load initial content
         const savedState = this.stateManager.load();
         this.contentRef.value = options.initialContent || savedState?.content || DEFAULT_CONTENT;
+        if (!options.initialContent) {
+            const fromParams = (options.params?.content || "").trim();
+            if (fromParams) {
+                this.contentRef.value = fromParams;
+            }
+        }
     }
 
     render(options?: ViewOptions): HTMLElement {
@@ -357,6 +364,7 @@ export class ViewerView implements View {
         if (options) {
             this.options = { ...this.options, ...options };
             this.shellContext = options.shellContext || this.shellContext;
+            this.applyRouteParams(options.params);
         }
 
         // Load styles (idempotent — returns cached sheet)
@@ -806,6 +814,51 @@ export class ViewerView implements View {
             return new URL(raw, globalThis.location.href).toString();
         } catch {
             return null;
+        }
+    }
+
+    private applyRouteParams(params?: Record<string, string>): void {
+        if (!params) return;
+        const detachKey = String(params.detachKey || "").trim();
+        if (detachKey) {
+            try {
+                const payloadRaw = globalThis?.sessionStorage?.getItem?.(detachKey) || "";
+                if (payloadRaw) {
+                    const payload = JSON.parse(payloadRaw) as {
+                        content?: string;
+                        filename?: string;
+                        source?: string;
+                    };
+                    const detachedContent = String(payload?.content || "");
+                    if (detachedContent.trim()) {
+                        this.contentRef.value = detachedContent;
+                    }
+                    if (payload?.filename) {
+                        this.options.filename = String(payload.filename);
+                    }
+                    const detachedSource = String(payload?.source || "");
+                    if (detachedSource) {
+                        this.sourceUrl = this.normalizeSourceUrl(detachedSource);
+                        this.options.source = detachedSource;
+                    }
+                }
+                globalThis?.sessionStorage?.removeItem?.(detachKey);
+            } catch (error) {
+                console.warn("[Viewer] Failed to restore detached payload:", error);
+            }
+        }
+        const sourceParam = params.source || params.src || params.path || params.url;
+        if (sourceParam) {
+            this.sourceUrl = this.normalizeSourceUrl(sourceParam);
+            this.options.source = sourceParam;
+        }
+        const filenameParam = params.filename || params.name;
+        if (filenameParam) {
+            this.options.filename = filenameParam;
+        }
+        const contentParam = String(params.content || "");
+        if (contentParam.trim()) {
+            this.contentRef.value = contentParam;
         }
     }
 

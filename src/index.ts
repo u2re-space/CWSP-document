@@ -77,8 +77,9 @@ const isValidViewPath = (path: string): path is ViewId =>
 const VALID_SHELLS = ["base", "minimal", "faint", "window"] as const;
 type ShellPreference = (typeof VALID_SHELLS)[number] | "window";
 
-const normalizeShellPreference = (shell: ShellPreference | null): "base" | "window" => {
+const normalizeShellPreference = (shell: ShellPreference | null): "base" | "minimal" | "window" => {
     if (shell === "base") return "base";
+    if (shell === "minimal" || shell === "faint") return "minimal";
     return "window";
 };
 
@@ -411,15 +412,23 @@ export default async function index(mountElement: HTMLElement) {
         const layers = ensureAppLayers(mountElement);
         clearLoadingState(mountElement);
 
-        // Legacy /{view} links are still accepted as entry points, then normalized to "/".
+        // Legacy /{view} links are accepted as entry points.
         const isLegacyViewRoute = Boolean(pathname && isValidViewPath(pathname));
         const requestedView = isLegacyViewRoute
             ? pickEnabledView(pathname as ViewId, "home")
             : (sharedFlag === "1" || sharedFlag === "true" || markdownContent)
               ? pickEnabledView("viewer", "home")
               : pickEnabledView("home", "home");
+        const queryShell = getShellFromQuery();
+        const savedShell = getSavedShell();
+        const preferredShell = queryShell || (
+            requestedView === "print"
+                ? "base"
+                : (savedShell || "window")
+        );
+        const allowPathRoutedShell = preferredShell === "base" || preferredShell === "minimal";
 
-        if (isLegacyViewRoute || pathname === "share-target" || pathname === "share_target") {
+        if (!allowPathRoutedShell && (isLegacyViewRoute || pathname === "share-target" || pathname === "share_target")) {
             const state = {
                 ...(globalThis?.history?.state || {}),
                 viewId: requestedView,
@@ -428,7 +437,7 @@ export default async function index(mountElement: HTMLElement) {
             const search = globalThis?.location?.search || "";
             const hash = globalThis?.location?.hash || "";
             globalThis?.history?.replaceState?.(state, "", `/${search}${hash}`);
-        } else if (pathname && pathname !== "") {
+        } else if (!allowPathRoutedShell && pathname && pathname !== "") {
             const state = {
                 ...(globalThis?.history?.state || {}),
                 viewId: pickEnabledView("home", "home"),
@@ -437,9 +446,6 @@ export default async function index(mountElement: HTMLElement) {
             globalThis?.history?.replaceState?.(state, "", "/");
         }
 
-        const preferredShell = requestedView === "print"
-            ? "base"
-            : (getSavedShell() || "window");
         const appLoader = await loadSubAppWithShell(preferredShell as any, requestedView);
         await appLoader.mount(layers.shellLayer);
         return;

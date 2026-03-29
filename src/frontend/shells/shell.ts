@@ -124,6 +124,16 @@ export abstract class ShellBase implements Shell {
         // This enables :has([data-shell="...""]) selectors to cascade automatically
         this.rootElement.setAttribute('data-shell', this.id);
         this.rootElement.setAttribute('data-shell-system', 'task-tab');
+        // Shell layer is now a 3-row grid (status/content/dock). Every shell host must be
+        // explicitly anchored to the content row, otherwise auto-placement can collapse it
+        // into `max-content` rows (observed as ~1px shell height in base/minimal).
+        this.rootElement.style.gridColumn = "content-column";
+        this.rootElement.style.gridRow = "content-row";
+        this.rootElement.style.alignSelf = "stretch";
+        this.rootElement.style.justifySelf = "stretch";
+        this.rootElement.style.minInlineSize = "0";
+        this.rootElement.style.minBlockSize = "0";
+        this.rootElement.style.pointerEvents = "auto";
 
         // Find containers
         this.contentContainer = shellLayout.querySelector("[data-shell-content]") || shellLayout;
@@ -260,12 +270,22 @@ export abstract class ShellBase implements Shell {
         // Update reactive state
         this.currentView.value = viewId;
 
-        // Canonical URL contract: pathname always "/", view lives in history.state.
+        // URL contract:
+        // - base/minimal shells are path-based (`/${view}?shell=...`) for standalone tabs
+        // - other shells keep canonical root (`/?...`) with view in history.state
         if (typeof window !== "undefined" && typeof window != "undefined") {
-            const search = params && Object.keys(params).length > 0
-                ? "?" + new URLSearchParams(params).toString()
+            const searchParams = new URLSearchParams(params || {});
+            const isPathRoutedShell = this.id === "base" || this.id === "minimal";
+            if (isPathRoutedShell) {
+                searchParams.set("shell", this.id);
+            }
+            const search = searchParams.toString()
+                ? "?" + searchParams.toString()
                 : "";
-            const newPathAndSearch = "/" + search;
+            const pathname = isPathRoutedShell
+                ? `/${String(viewId || "home").replace(/^\/+/, "")}`
+                : "/";
+            const newPathAndSearch = pathname + search;
             try {
                 const next = new URL(newPathAndSearch, globalThis.location.origin);
                 const cur = new URL(globalThis.location.href);

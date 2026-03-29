@@ -12,6 +12,15 @@ import type { BaseViewOptions } from "../types";
 import { getString, setString } from "../../../core/storage";
 import { openUnifiedContextMenu } from "@rs-frontend/items/ContextMenu";
 import { requestOpenView } from "../../shared/view-api";
+import { sendMessage } from "@rs-com/core/UnifiedMessaging";
+import {
+    addSpeedDialItem,
+    ensureSpeedDialMeta,
+    persistSpeedDialItems,
+    persistSpeedDialMeta,
+    createEmptySpeedDialItem,
+    speedDialItems
+} from "@rs-core/storage/StateStorage";
 
 // Import the view-explorer web component from fl.ui
 import { FileManager, type FileItem } from "fest/fl-ui";
@@ -22,12 +31,56 @@ export { FileManager, FileManagerContent } from "fest/fl-ui";
 // @ts-ignore
 import style from "./index.scss?inline";
 export type ExplorerOptions = BaseViewOptions;
+type WorkCenterAttachMode = "active" | "queued" | "headless";
+
+const TEXT_FILE_EXTENSIONS = new Set([
+    "md", "markdown", "txt", "text", "json", "xml", "yml", "yaml",
+    "html", "htm", "css", "js", "mjs", "cjs", "ts", "tsx", "jsx",
+    "log", "ini", "conf", "cfg", "csv"
+]);
 
 const buildExplorerProcessId = (path?: string): string => {
     const suffix = Math.random().toString(36).slice(2, 8);
     const stamp = Date.now().toString(36);
     const key = String(path || "root").replace(/[^a-z0-9_-]/gi, "-").slice(0, 18) || "root";
     return `explorer-${key}-${stamp}-${suffix}`;
+};
+
+const extOf = (filename = ""): string => {
+    const next = String(filename).trim().toLowerCase();
+    const idx = next.lastIndexOf(".");
+    if (idx <= 0 || idx >= next.length - 1) return "";
+    return next.slice(idx + 1);
+};
+
+const isTextLikeFile = (file?: File | null): boolean => {
+    if (!file) return false;
+    const type = String(file.type || "").toLowerCase();
+    if (!type || type.startsWith("text/")) return true;
+    if (type.includes("markdown") || type.includes("json") || type.includes("xml")) return true;
+    return TEXT_FILE_EXTENSIONS.has(extOf(file.name || ""));
+};
+
+const buildViewerProcessId = (path?: string): string => {
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const stamp = Date.now().toString(36);
+    const key = String(path || "viewer").replace(/[^a-z0-9_-]/gi, "-").slice(0, 18) || "viewer";
+    return `viewer-${key}-${stamp}-${suffix}`;
+};
+
+const guessNextShortcutCell = (): [number, number] => {
+    const occupied = new Set(
+        (speedDialItems || []).map((item) => `${Math.round(item?.cell?.[0] || 0)}:${Math.round(item?.cell?.[1] || 0)}`)
+    );
+    const maxRows = 12;
+    const maxCols = 8;
+    for (let row = 0; row < maxRows; row += 1) {
+        for (let col = 0; col < maxCols; col += 1) {
+            const key = `${col}:${row}`;
+            if (!occupied.has(key)) return [col, row];
+        }
+    }
+    return [0, 0];
 };
 
 // ============================================================================
@@ -100,35 +153,188 @@ export class ExplorerView implements View {
     private setupExplorerEvents(): void {
         if (!this.explorer) return;
         const explorer = this.explorer as unknown as FileManager & HTMLElement;
+        const readFileDetail = (event: Event): { item?: FileItem; path?: string } => {
+            const detail = (event as CustomEvent<{ item?: FileItem; path?: string }>).detail || {};
+            return { item: detail?.item, path: detail?.path };
+        };
+        const openFileInViewer = async (
+            item: FileItem | undefined,
+            fullPath: string | undefined,
+            target: "window" | "base" = "window"
+        ) => {
+            const file = item?.file as File | undefined;
+            if (!file || !isTextLikeFile(file)) return false;
+            const sourcePath = String(fullPath || "");
+            if (target === "base") {
+                requestOpenView({
+                    viewId: "viewer",
+                    target: "base",
+                    params: {
+                        src: sourcePath,
+                        filename: file.name || "",
+                        processId: buildViewerProcessId(sourcePath)
+                    }
+                });
+                return true;
+            }
+
+            const processId = buildViewerProcessId(sourcePath);
+            requestOpenView({
+                viewId: "viewer",
+                target: "window",
+                params: {
+                    processId,
+                    src: sourcePath,
+                    filename: file.name || ""
+                }
+            });
+
+            try {
+                const sent = await sendMessage({
+                    type: "content-view",
+                    source: "explorer",
+                    destination: "viewer",
+                    contentType: file.type || "text/plain",
+                    data: {
+                        file,
+                        filename: file.name,
+                        path: sourcePath,
+                        source: sourcePath
+                    },
+                    metadata: {
+                        processId,
+                        openTarget: "window"
+                    }
+                });
+                if (!sent) {
+                    this.showMessage("Viewer is not ready yet, retrying in background");
+                }
+            } catch (error) {
+                console.warn("[Explorer] Failed to send viewer payload:", error);
+            }
+            return true;
+        };
+        const attachToWorkCenter = async (item: FileItem | undefined, mode: WorkCenterAttachMode) => {
+            const file = item?.file as File | undefined;
+            if (!file) {
+                this.showMessage("No file selected");
+                return;
+            }
+            const sourcePath = `${this.explorer?.path || "/"}${item?.name || file.name}`;
+            if (mode === "headless") {
+                requestOpenView({
+                    viewId: "workcenter",
+                    target: "headless",
+                    params: {
+                        queue: "1",
+                        mode: "headless",
+                        sourcePath
+                    }
+                });
+            } else if (mode === "active") {
+                requestOpenView({ viewId: "workcenter", target: "window" });
+            } else {
+                requestOpenView({
+                    viewId: "workcenter",
+                    target: "window",
+                    params: { minimized: "1", queue: "1", sourcePath }
+                });
+            }
+
+            const sent = await sendMessage({
+                type: "content-share",
+                source: "explorer",
+                destination: "workcenter",
+                contentType: file.type || "application/octet-stream",
+                data: {
+                    file,
+                    filename: file.name,
+                    path: sourcePath,
+                    source: "explorer-attach",
+                    queued: mode !== "active"
+                },
+                metadata: {
+                    queueState: mode === "active" ? "awaiting" : mode === "queued" ? "pending" : "queued",
+                    mode,
+                    sourcePath
+                }
+            });
+            if (sent) {
+                this.showMessage(mode === "active"
+                    ? `Attached ${file.name} to Work Center`
+                    : `Queued ${file.name} for Work Center (${mode})`);
+            } else {
+                this.showMessage("Work Center queue is unavailable");
+            }
+        };
+        const pinToHome = (item: FileItem | undefined) => {
+            const file = item?.file as File | undefined;
+            const name = String(item?.name || file?.name || "").trim();
+            if (!name) {
+                this.showMessage("Nothing to pin");
+                return;
+            }
+            const path = `${this.explorer?.path || "/"}${name}`;
+            const cell = guessNextShortcutCell();
+            const shortcut = createEmptySpeedDialItem(cell);
+            shortcut.label.value = name;
+            shortcut.icon.value = item?.kind === "directory" ? "folder" : "file-text";
+            shortcut.action = "open-link";
+            addSpeedDialItem(shortcut);
+            const meta = ensureSpeedDialMeta(shortcut.id, { action: "open-link" });
+            meta.action = "open-link";
+            meta.href = path;
+            meta.description = `Pinned from Explorer: ${path}`;
+            persistSpeedDialItems();
+            persistSpeedDialMeta();
+            this.showMessage(`Pinned ${name} to Home`);
+        };
 
         // Handle file open
-        explorer.addEventListener("rs-open", async (e: Event) => {
-            const detail = (e as CustomEvent<{ item: FileItem }>).detail;
-            const item = detail?.item;
-
-            if (item?.kind === "file" && item?.file) {
-                const file = item.file as File;
-                const isMarkdown = file.name.toLowerCase().endsWith(".md") ||
-                                   file.type === "text/markdown";
-
-                if (isMarkdown) {
-                    try {
-                        const content = await file.text();
-                        this.shellContext?.navigate("viewer", { content });
-                    } catch (error) {
-                        console.error("[Explorer] Failed to read file:", error);
-                        this.showMessage("Failed to open file");
-                    }
-                } else {
-                    // Send to work center
-                    this.shellContext?.navigate("workcenter");
-                }
+        const onFileOpen = async (e: Event) => {
+            const { item, path } = readFileDetail(e);
+            if (item?.kind !== "file" || !item?.file) return;
+            const opened = await openFileInViewer(item, path, "window");
+            if (!opened) {
+                requestOpenView({ viewId: "workcenter", target: "window" });
             }
-        });
+        };
+        explorer.addEventListener("open-item", onFileOpen);
+        explorer.addEventListener("open", onFileOpen);
+        explorer.addEventListener("rs-open", onFileOpen);
 
         // Handle path changes
         explorer.addEventListener("rs-navigate", () => {
             this.saveCurrentPath();
+        });
+        explorer.addEventListener("context-action", async (event: Event) => {
+            const detail = (event as CustomEvent<{ action?: string; item?: FileItem }>).detail || {};
+            const action = String(detail.action || "");
+            const item = detail.item;
+            if (!action) return;
+            if (action === "view") {
+                await openFileInViewer(item, `${this.explorer?.path || "/"}${item?.name || ""}`, "window");
+                return;
+            }
+            if (action === "view-base") {
+                await openFileInViewer(item, `${this.explorer?.path || "/"}${item?.name || ""}`, "base");
+                return;
+            }
+            if (action === "attach-workcenter") {
+                await attachToWorkCenter(item, "active");
+                return;
+            }
+            if (action === "attach-workcenter-queued") {
+                await attachToWorkCenter(item, "queued");
+                return;
+            }
+            if (action === "attach-workcenter-headless") {
+                await attachToWorkCenter(item, "headless");
+                return;
+            }
+            if (action === "pin-home") {
+                pinToHome(item);
+            }
         });
 
         explorer.addEventListener("contextmenu", (event: MouseEvent) => {

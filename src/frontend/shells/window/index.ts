@@ -270,6 +270,10 @@ export class WindowShell extends ShellBase {
             if (!viewId || !isEnabledView(viewId)) return;
             const params = { ...(detail?.params || {}) };
             if (detail?.pid) params.pid = String(detail.pid);
+            if (detail?.target === "base") {
+                this.openProcessInBaseShell(viewId as ViewId, params);
+                return;
+            }
             if (detail?.target === "headless") {
                 void this.openWindowProcess(viewId as ViewId, { ...params, headless: "1" });
                 return;
@@ -371,6 +375,10 @@ export class WindowShell extends ShellBase {
         task.lastActivePid = pid;
         task.headless = false;
         this.installWindowInteractions(proc);
+        if (params?.minimized === "1") {
+            proc.state = "minimized";
+            proc.frame.hidden = true;
+        }
         this.updateStatusBar();
         return pid;
     }
@@ -456,6 +464,9 @@ export class WindowShell extends ShellBase {
                     void this.navigate("home");
                 }
                 this.updateStatusBar();
+            }
+            if (action === "detach") {
+                this.openProcessInBaseShell(proc.viewId, proc.params, proc);
             }
         });
 
@@ -596,6 +607,61 @@ export class WindowShell extends ShellBase {
         this.pidCounter += 1;
         const prefix = String(viewId || "view").slice(0, 3).toLowerCase().replace(/[^a-z0-9]/g, "") || "pid";
         return `${prefix}-${this.pidCounter}`;
+    }
+
+    private buildBaseViewUrl(viewId: ViewId, params?: Record<string, string>): string {
+        const query = new URLSearchParams();
+        query.set("shell", "base");
+        for (const [key, value] of Object.entries(params || {})) {
+            if (value == null) continue;
+            if (key === "pid" || key === "minimized" || key === "headless") continue;
+            query.set(String(key), String(value));
+        }
+        const suffix = query.toString();
+        return `/${String(viewId || "home")}${suffix ? `?${suffix}` : ""}`;
+    }
+
+    private createViewerDetachParams(proc: WindowProcess): Record<string, string> {
+        const nextParams: Record<string, string> = { ...(proc.params || {}) };
+        const rawTarget = proc.frame.querySelector("[data-raw-target]") as HTMLElement | null;
+        const content = String(rawTarget?.textContent || "").trim();
+        if (!content) return nextParams;
+
+        const token = `cw:detach:viewer:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
+        try {
+            globalThis?.sessionStorage?.setItem?.(token, JSON.stringify({
+                content,
+                filename: String(nextParams.filename || ""),
+                source: String(nextParams.source || nextParams.src || nextParams.path || "")
+            }));
+            nextParams.detachKey = token;
+            delete nextParams.content;
+        } catch {
+            // Fallback when sessionStorage is blocked: pass inline content.
+            nextParams.content = content;
+        }
+        return nextParams;
+    }
+
+    private openProcessInBaseShell(
+        viewId: ViewId,
+        params?: Record<string, string>,
+        procForDetach?: WindowProcess | null
+    ): void {
+        let nextParams = { ...(params || {}) };
+        const viewerProc = procForDetach?.viewId === "viewer"
+            ? procForDetach
+            : (this.activePid ? this.processes.get(this.activePid) : null);
+        if (viewId === "viewer" && viewerProc?.viewId === "viewer") {
+            nextParams = this.createViewerDetachParams(viewerProc);
+        }
+        const url = this.buildBaseViewUrl(viewId, nextParams);
+        try {
+            globalThis?.open?.(url, "_blank", "noopener,noreferrer");
+        } catch (error) {
+            console.warn("[window] Failed to open base shell tab:", error);
+            this.showMessage("Unable to open separate tab");
+        }
     }
 
     private initStatusBar(): void {
