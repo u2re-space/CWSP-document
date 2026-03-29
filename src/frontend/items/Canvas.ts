@@ -53,6 +53,18 @@ export const initializeAppCanvasLayer = (container: HTMLElement): CanvasLayerSta
     return { root, canvas, glow };
 };
 
+export const setAppWallpaper = (wallpaperUrl: string): void => {
+    const value = String(wallpaperUrl || "").trim() || DEFAULT_WALLPAPER_URL;
+    try {
+        localStorage.setItem(WALLPAPER_STORAGE_KEY, value);
+    } catch {
+        // ignore storage errors
+    }
+
+    const canvases = document.querySelectorAll<HTMLCanvasElement>('[data-app-layer="canvas"] canvas[is="ui-canvas"]');
+    canvases.forEach((canvas) => canvas.setAttribute("data-src", value));
+};
+
 const loadWallpaperUrl = (): string => {
     try {
         const value = localStorage.getItem(WALLPAPER_STORAGE_KEY);

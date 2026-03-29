@@ -44,10 +44,9 @@
     }
 
     .app-window-shell__dock {
-        position: absolute;
-        inset-inline: 0;
-        inset-block-end: 0;
-        z-index: 1200;
+        position: relative;
+        inline-size: 100%;
+        z-index: 3;
         min-block-size: 48px;
         padding: 0.45rem 0.55rem;
         display: flex;
@@ -60,10 +59,9 @@
     }
 
     .app-window-shell__status {
-        position: absolute;
-        inset-inline: 0;
-        inset-block-start: 0;
-        z-index: 1300;
+        position: relative;
+        inline-size: 100%;
+        z-index: 3;
         min-block-size: 30px;
         padding: 0.25rem 0.65rem;
         display: flex;

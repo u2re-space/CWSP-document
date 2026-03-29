@@ -1,8 +1,9 @@
 import { observe, numberRef, propRef, stringRef, affected } from "fest/object";
-import { ctxMenuTrigger, E, H, orientRef, M, Q, provide, registerModal, handleIncomingEntries, pointerAnchorRef } from "fest/lure";
+import { E, H, orientRef, M, provide, registerModal, handleIncomingEntries, pointerAnchorRef } from "fest/lure";
 import { bindInteraction } from "fest/lure";
 import { actionRegistry, iconsPerAction, labelsPerAction } from "@rs-core/utils/Actions";
 import { showSuccess, showError } from "@rs-frontend/items/Toast";
+import { openUnifiedContextMenu, type ContextMenuEntry } from "@rs-frontend/items/ContextMenu";
 import {
     speedDialMeta,
     speedDialItems,
@@ -28,6 +29,7 @@ import { writeFileSmart } from "@rs-core/storage/WriteFileSmart-v2";
 import { convertOrientPxToCX, cvt_cs_to_os, type GridItemType } from "fest/core";
 
 let viewMaker: any = null;
+let ctxMenuBound = false;
 const layout = observe([gridLayoutState.columns ?? 4, gridLayoutState.rows ?? 8]);
 const items = speedDialItems;
 const meta = speedDialMeta;
@@ -484,122 +486,138 @@ const openItemEditor = (item?: SpeedDialItem, opts?: { suggestedCell?: GridCell 
 };
 
 export function createCtxMenu() {
-    const ctxMenuDesc = {
-        openedWith: null,
-        items: [],
-        meta: {},
-        context: null,
-        buildItems(details){
-            const targetEl = (details.event?.target as HTMLElement | null)?.closest?.("[data-speed-dial-item]");
+    if (!ctxMenuBound) {
+        ctxMenuBound = true;
+        document.addEventListener("contextmenu", (event: MouseEvent) => {
+            const homeRoot = (event.target as HTMLElement | null)?.closest?.("#home");
+            if (!homeRoot) return;
+            event.preventDefault();
+            const targetEl = (event.target as HTMLElement | null)?.closest?.("[data-speed-dial-item]");
             const itemId = targetEl?.getAttribute?.("data-id");
             const item = findSpeedDialItem(itemId);
-            const context = {
-                items,
-                type: item ? "item" : "void",
-                item,
-                meta,
-                event: details.event,
-                guessedCell: deriveCellFromEvent(details.event),
-                initiator: targetEl as HTMLElement
-            };
-            (ctxMenuDesc as any).context = context;
+            const guessedCell = deriveCellFromEvent(event) ?? deriveCellFromCoordinate([coordinateRef[0].value, coordinateRef[1].value]);
+            const toLeaf = (entry: any): ContextMenuEntry => ({
+                id: String(entry?.id || "menu-action"),
+                label: String(entry?.label || "Action"),
+                icon: String(entry?.icon || "command"),
+                action: () => entry?.action?.(targetEl as HTMLElement, entry, event)
+            });
 
-            if (item) {
-                const currentAction = resolveItemAction(item);
-                const sections: any[] = [];
-                if (currentAction != "open-link") {
-                    sections.push([
-                        createMenuEntryForAction(currentAction || "open-view", item, "Run action")
-                    ]);
-                }
-                const utilities: any[] = [];
-                const $meta = getSpeedDialMeta(item.id);
-                if ($meta?.href) {
-                    utilities.push(createMenuEntryForAction("open-link", item, "Open link"));
-                    utilities.push(createMenuEntryForAction("copy-link", item, "Copy link"));
-                }
-                utilities.push(createMenuEntryForAction("copy-state-desc", item, "Copy shortcut JSON"));
-                sections.push(utilities);
-                sections.push([
-                    { id: "edit", label: "Edit shortcut", icon: "pencil-simple-line", action: ()=>openItemEditor(item) },
-                    { id: "remove", label: "Remove", icon: "trash", action: ()=>{
-                        removeSpeedDialItem(item.id);
-                        persistSpeedDialItems();
-                        persistSpeedDialMeta();
-                        showSuccess("Shortcut removed");
-                    } }
-                ]);
-                sections.push([
-                    { id: "open-explorer", label: "Explorer", icon: "books", action: ()=>{
-                        actionRegistry.get(`open-view-explorer`)?.({ id: "", items, meta, viewMaker }, {})
-                    } },
-                    { id: "open-settings", label: "Settings", icon: "gear-six", action: ()=>{
-                        actionRegistry.get(`open-view-settings`)?.({ id: "", items, meta, viewMaker }, {})
-                    } }
-                ]);
-                /*sections.push(NAVIGATION_SHORTCUTS.map((shortcut)=>({
-                    id: `open-${shortcut.view}`,
-                    label: `Open ${shortcut.label}`,
-                    icon: shortcut.icon,
-                    action: ()=>actionRegistry.get(`open-view-${shortcut.view}`)?.({id: itemId || "", items, meta, shortcut, viewMaker}, item)
-                })));*/
-                return sections.filter((section)=>section?.length);
-            }
-
-            const emptySections = [
-                [{
-                    id: "create-shortcut",
-                    label: "Create shortcut",
-                    icon: "plus",
-                    action: ()=>{
-                        openItemEditor(undefined, { suggestedCell: context.guessedCell ?? deriveCellFromCoordinate([coordinateRef[0].value, coordinateRef[1].value]) });
-                    }
-                }, {
-                    id: "paste-shortcut",
-                    label: "Paste shortcut",
-                    icon: "clipboard",
-                    action: async ()=>{
-                        try {
-                            const item = await createSpeedDialItemFromClipboard(context.guessedCell ?? deriveCellFromCoordinate([coordinateRef[0].value, coordinateRef[1].value]));
-                            if (!item) {
-                                showError("Clipboard does not contain a valid URL or shortcut JSON");
-                                return;
+            const menuItems: ContextMenuEntry[] = item
+                ? [
+                    {
+                        id: "open",
+                        label: "Open",
+                        icon: "play",
+                        action: () => runItemAction(item, undefined, { event, initiator: targetEl as HTMLElement })
+                    },
+                    {
+                        id: "actions",
+                        label: "Actions",
+                        icon: "dots-three",
+                        action: () => {},
+                        children: [
+                            toLeaf(createMenuEntryForAction(resolveItemAction(item) || "open-view", item, "Run action")),
+                            ...(getSpeedDialMeta(item.id)?.href ? [
+                                toLeaf(createMenuEntryForAction("open-link", item, "Open link")),
+                                toLeaf(createMenuEntryForAction("copy-link", item, "Copy link"))
+                            ] : []),
+                            toLeaf(createMenuEntryForAction("copy-state-desc", item, "Copy shortcut JSON"))
+                        ]
+                    },
+                    {
+                        id: "manage",
+                        label: "Manage",
+                        icon: "wrench",
+                        action: () => {},
+                        children: [
+                            { id: "edit", label: "Edit shortcut", icon: "pencil-simple-line", action: ()=>openItemEditor(item) },
+                            {
+                                id: "remove",
+                                label: "Remove",
+                                icon: "trash",
+                                danger: true,
+                                action: ()=>{
+                                    removeSpeedDialItem(item.id);
+                                    persistSpeedDialItems();
+                                    persistSpeedDialMeta();
+                                    showSuccess("Shortcut removed");
+                                }
                             }
-                            addSpeedDialItem(item);
-                            persistSpeedDialItems();
-                            persistSpeedDialMeta();
-                            showSuccess("Shortcut created from clipboard");
-                        } catch (e) {
-                            console.warn(e);
-                            showError("Failed to paste shortcut");
-                        }
+                        ]
                     }
-                }, {
-                    id: "change-wallpaper",
-                    label: "Change wallpaper",
-                    icon: "image",
-                    action: pickWallpaper
-                    }],
-                [{ id: "open-explorer", label: "Explorer", icon: "books", action: ()=>{
-                    actionRegistry.get(`open-view-explorer`)?.({ id: "", items, meta, viewMaker }, {})
-                } },
-                { id: "open-settings", label: "Settings", icon: "gear-six", action: ()=>{
-                    actionRegistry.get(`open-view-settings`)?.({ id: "", items, meta, viewMaker }, {})
-                } }]
-                /*NAVIGATION_SHORTCUTS.map((shortcut)=>({
-                    id: `open-${shortcut.view}`,
-                    label: `Open ${shortcut.label}`,
-                    icon: shortcut.icon,
-                    action: ()=>{
-                        actionRegistry.get(`open-view-${shortcut.view}`)?.({ id: "", items, meta, shortcut, viewMaker }, {})
+                ]
+                : [
+                    {
+                        id: "new",
+                        label: "New",
+                        icon: "plus",
+                        action: () => {},
+                        children: [
+                            {
+                                id: "create-shortcut",
+                                label: "Create shortcut",
+                                icon: "plus",
+                                action: ()=>{
+                                    openItemEditor(undefined, { suggestedCell: guessedCell });
+                                }
+                            },
+                            {
+                                id: "paste-shortcut",
+                                label: "Paste shortcut",
+                                icon: "clipboard",
+                                action: async ()=>{
+                                    try {
+                                        const speedDialItem = await createSpeedDialItemFromClipboard(guessedCell);
+                                        if (!speedDialItem) {
+                                            showError("Clipboard does not contain a valid URL or shortcut JSON");
+                                            return;
+                                        }
+                                        addSpeedDialItem(speedDialItem);
+                                        persistSpeedDialItems();
+                                        persistSpeedDialMeta();
+                                        showSuccess("Shortcut created from clipboard");
+                                    } catch (e) {
+                                        console.warn(e);
+                                        showError("Failed to paste shortcut");
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        id: "open",
+                        label: "Open",
+                        icon: "squares-four",
+                        action: () => {},
+                        children: [
+                            { id: "open-explorer", label: "Explorer", icon: "books", action: ()=>{
+                                actionRegistry.get("open-view-explorer")?.({ id: "", items, meta, viewMaker }, {});
+                            } },
+                            { id: "open-settings", label: "Settings", icon: "gear-six", action: ()=>{
+                                actionRegistry.get("open-view-settings")?.({ id: "", items, meta, viewMaker }, {});
+                            } }
+                        ]
+                    },
+                    {
+                        id: "wallpaper",
+                        label: "Wallpaper",
+                        icon: "image",
+                        action: () => {},
+                        children: [
+                            { id: "change-wallpaper", label: "Change wallpaper", icon: "image", action: pickWallpaper }
+                        ]
                     }
-                }))*/
-            ];
-            return emptySections;
-        }
-    };
+                ];
 
-    const ctxMenu = H`<ul class="grid-rows round-decor ctx-menu ux-anchor"></ul>`;
-    ctxMenuTrigger(Q("#home") || document.body, ctxMenuDesc as any, ctxMenu);
-    return ctxMenu;
+            openUnifiedContextMenu({
+                x: event.clientX,
+                y: event.clientY,
+                items: menuItems,
+                compact: true
+            });
+        }, { capture: true });
+    }
+
+    return H`<div data-home-ctx-menu style="display:none;"></div>` as HTMLElement;
 }

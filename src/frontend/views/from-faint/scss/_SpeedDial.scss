@@ -68,6 +68,18 @@
         place-items: center;
         border-radius: 0px;
 
+        &.app-oriented-desktop__grid--labels {
+            z-index: 1;
+            background: transparent !important;
+            pointer-events: none !important;
+        }
+
+        &.app-oriented-desktop__grid--icons {
+            z-index: 2;
+            background: transparent !important;
+            pointer-events: none;
+        }
+
         // Items
         .ui-ws-item {
             --drag-x: 0;
@@ -145,9 +157,23 @@
                 // Lightweight fallback surface (avoid advanced mixin dependency).
                 background: color-mix(in oklab, var(--color-surface-container, #111827) 78%, transparent);
                 border: 1px solid color-mix(in oklab, var(--color-on-surface, #e5e7eb) 20%, transparent);
+                backdrop-filter: blur(10px) saturate(1.12);
+                -webkit-backdrop-filter: blur(10px) saturate(1.12);
 
                 &, &:hover, &:active {
                     border-radius: var(--border-radius);
+                }
+
+                .ui-ws-item-icon-image {
+                    position: absolute;
+                    inset: 0.45rem;
+                    inline-size: calc(100% - 0.9rem);
+                    block-size: calc(100% - 0.9rem);
+                    object-fit: contain;
+                    object-position: center;
+                    pointer-events: none;
+                    z-index: 3;
+                    filter: drop-shadow(0px 0px 0.25rem #0006);
                 }
 
                 ui-icon {
@@ -248,7 +274,7 @@
                     translate3d(var(--translate-x, 0px), var(--translate-y, 0px), 0px) !important;
 
                 .ui-ws-item-label {
-                    opacity: 0.0;
+                    opacity: 1;
                     pointer-events: none;
                 }
             }
@@ -256,6 +282,16 @@
             &[data-layer="labels"] {
                 z-index: 0;
                 filter: none;
+                background: transparent !important;
+                pointer-events: none !important;
+
+                .ui-ws-item-label,
+                .ui-ws-item-label span {
+                    background: transparent !important;
+                    background-color: transparent !important;
+                    background-image: none !important;
+                    pointer-events: none !important;
+                }
             }
 
             &[data-layer="icons"] {

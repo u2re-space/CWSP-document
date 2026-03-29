@@ -26,6 +26,7 @@ interface WindowProcess {
     frame: HTMLElement;
     body: HTMLElement | null;
     frameEl: WindowFrameElement | null;
+    disposeView?: (() => void) | null;
 }
 
 interface ProcessTask {
@@ -87,7 +88,43 @@ export class WindowShell extends ShellBase {
     private dockAppsElement: HTMLElement | null = null;
     private dockStartElement: HTMLElement | null = null;
     private dockQuickElement: HTMLElement | null = null;
-    private pinnedViews: ViewId[] = ["home", "viewer", "explorer", "settings"];
+    private pinnedViews: ViewId[] = [];
+
+    private async loadWindowView(
+        viewId: ViewId,
+        params?: Record<string, string>
+    ): Promise<{ element: HTMLElement; disposeView?: (() => void) | null }> {
+        // Explorer needs true per-window instances in window shell.
+        if (viewId === "explorer") {
+            const mod = await import("../../views/explorer");
+            const factory = (mod as any).createExplorerView || (mod as any).createView || (mod as any).default;
+            if (typeof factory === "function") {
+                const view = factory({
+                    shellContext: this.getContext(),
+                    params
+                }) as any;
+                const element = view.render({
+                    shellContext: this.getContext(),
+                    params
+                }) as HTMLElement;
+                if (view.lifecycle?.onMount) {
+                    await view.lifecycle.onMount();
+                }
+                return {
+                    element,
+                    disposeView: () => {
+                        try {
+                            view.lifecycle?.onUnmount?.();
+                        } catch {
+                            // ignore lifecycle cleanup errors
+                        }
+                    }
+                };
+            }
+        }
+        const element = await this.loadView(viewId, params);
+        return { element, disposeView: null };
+    }
 
     protected createLayout(): HTMLElement {
         return H`
@@ -105,6 +142,15 @@ export class WindowShell extends ShellBase {
         await super.mount(container);
         this.stageElement = this.rootElement?.shadowRoot?.querySelector("[data-shell-content]") as HTMLElement | null;
         this.homeFrameElement = this.rootElement?.querySelector("[data-window-home-frame]") as HTMLElement | null;
+        if (this.rootElement) {
+            this.rootElement.style.gridColumn = "content-column";
+            this.rootElement.style.gridRow = "content-row";
+            this.rootElement.style.minInlineSize = "0";
+            this.rootElement.style.minBlockSize = "0";
+            this.rootElement.style.pointerEvents = "none";
+            this.rootElement.style.position = "relative";
+            this.rootElement.style.zIndex = "1";
+        }
         this.bindOverlayChrome();
 
         this.initStatusBar();
@@ -132,6 +178,9 @@ export class WindowShell extends ShellBase {
         for (const task of this.processTasks.values()) {
             task.unsubscribeChannel?.();
         }
+        for (const proc of this.processes.values()) {
+            proc.disposeView?.();
+        }
         this.processTasks.clear();
         this.processes.clear();
         this.activePid = null;
@@ -151,6 +200,12 @@ export class WindowShell extends ShellBase {
             this.navigationState.params = params;
             this.currentView.value = "home";
             this.activePid = null;
+            for (const item of this.processes.values()) {
+                item.frame.classList.remove("is-active");
+            }
+            for (const task of this.processTasks.values()) {
+                task.dockItem.classList.remove("is-active");
+            }
             this.updateUrlState("home", null, params, false);
             this.updateStatusBar();
             return;
@@ -225,33 +280,11 @@ export class WindowShell extends ShellBase {
     }
 
     private async mountHomeSurface(params?: Record<string, string>): Promise<void> {
-        if (!this.homeFrameElement) {
-            this.homeFrameElement = H`
-                <cw-window-frame
-                    class="app-window-shell__frame app-window-shell__frame--home"
-                    data-window-home-frame
-                    data-title="Settings"
-                    data-pid="home"
-                    style="pointer-events:auto;--shift-x:40;--shift-y:32;--initial-inline-size:min(920px,calc(100% - 80px));--initial-block-size:min(640px,calc(100% - 96px));z-index:2;"
-                >
-                </cw-window-frame>
-            ` as HTMLElement;
-            this.homeFrameElement.slot = "window-frame";
-            this.rootElement?.appendChild(this.homeFrameElement);
+        // Home should be desktop/icons layer, not a shell window/process.
+        if (this.homeFrameElement?.isConnected) {
+            this.homeFrameElement.remove();
         }
-        // Temporary test target requested by user: mount settings inside cw-window-frame.
-        const homeEl = await this.loadView("settings", params);
-        homeEl.dataset.view = "settings";
-        homeEl.classList.add("app-window-shell__home-view");
-        homeEl.slot = "window-view";
-        for (const child of Array.from(this.homeFrameElement.children)) {
-            const childEl = child as HTMLElement;
-            if (childEl.slot === "window-view") {
-                childEl.remove();
-            }
-        }
-        this.homeFrameElement.appendChild(homeEl);
-        this.homeFrameElement.hidden = false;
+        this.homeFrameElement = null;
         this.updateStatusBar();
     }
 
@@ -305,7 +338,8 @@ export class WindowShell extends ShellBase {
         const pid = requestedPid || this.generatePid(viewId);
         const frame = this.createFrame(pid, viewId);
         const frameEl = frame as unknown as WindowFrameElement;
-        const element = await this.loadView(viewId, params);
+        const viewPayload = await this.loadWindowView(viewId, params);
+        const element = viewPayload.element;
         element.dataset.view = String(viewId);
         element.slot = "window-view";
         for (const child of Array.from(frame.children)) {
@@ -329,28 +363,34 @@ export class WindowShell extends ShellBase {
             state: "open",
             frame,
             body: null,
-            frameEl
+            frameEl,
+            disposeView: viewPayload.disposeView || null
         };
         this.processes.set(pid, proc);
         task.instances.add(pid);
         task.lastActivePid = pid;
         task.headless = false;
         this.installWindowInteractions(proc);
-        if (viewId !== "home") this.mountHomeSurface().catch(() => undefined);
         this.updateStatusBar();
         return pid;
     }
 
     private createFrame(pid: string, viewId: ViewId): HTMLElement {
         const title = toTitle(viewId);
-        const offset = 32 * Math.min(this.processes.size, 6);
+        const frameWidth = 780;
+        const frameHeight = 520;
+        const stageRect = this.stageElement?.getBoundingClientRect?.();
+        const viewportWidth = stageRect?.width || globalThis?.innerWidth || frameWidth;
+        const viewportHeight = stageRect?.height || globalThis?.innerHeight || frameHeight;
+        const centerX = Math.max(0, Math.round((viewportWidth - frameWidth) / 2));
+        const centerY = Math.max(0, Math.round((viewportHeight - frameHeight) / 2));
         const frame = H`
             <cw-window-frame
                 class="app-window-shell__frame"
                 data-window-frame
                 data-pid="${pid}"
                 data-title="${title}"
-                style="pointer-events:auto;--shift-x:${96 + offset};--shift-y:${72 + offset};--initial-inline-size:780px;--initial-block-size:520px;z-index:${this.zCounter};"
+                style="pointer-events:auto;--shift-x:${centerX};--shift-y:${centerY};--initial-inline-size:${frameWidth}px;--initial-block-size:${frameHeight}px;z-index:${this.zCounter};"
             >
             </cw-window-frame>
         ` as HTMLElement;
@@ -398,6 +438,7 @@ export class WindowShell extends ShellBase {
             }
             if (action === "close") {
                 proc.state = "hidden";
+                proc.disposeView?.();
                 proc.frame.remove();
                 this.processes.delete(proc.pid);
                 const task = this.processTasks.get(proc.processId);
@@ -623,26 +664,29 @@ export class WindowShell extends ShellBase {
 
     private bindOverlayChrome(): void {
         const overlayLayer = document.querySelector('[data-app-layer="overlay"]') as HTMLElement | null;
-        if (!overlayLayer) return;
-        overlayLayer.style.position = overlayLayer.style.position || "absolute";
-        overlayLayer.style.inset = overlayLayer.style.inset || "0";
-        overlayLayer.style.pointerEvents = overlayLayer.style.pointerEvents || "none";
+        if (overlayLayer) {
+            overlayLayer.querySelector("cw-app-dock[data-window-dock]")?.remove();
+            overlayLayer.querySelector("cw-status-bar[data-window-status]")?.remove();
+        }
+        const shellLayer = document.querySelector('[data-app-layer="shell"]') as HTMLElement | null;
+        if (!shellLayer) return;
+        shellLayer.style.pointerEvents = shellLayer.style.pointerEvents || "none";
 
         if (!this.dockElement) {
-            let dock = overlayLayer.querySelector("cw-app-dock[data-window-dock]") as HTMLElement | null;
+            let dock = shellLayer.querySelector("cw-app-dock[data-window-dock]") as HTMLElement | null;
             if (!dock) {
                 dock = document.createElement("cw-app-dock");
                 dock.setAttribute("data-window-dock", "true");
                 dock.className = "app-window-shell__dock";
                 dock.setAttribute("aria-label", "Window dock");
                 dock.style.pointerEvents = "auto";
-                overlayLayer.appendChild(dock);
+                shellLayer.appendChild(dock);
             }
             dock.style.display = "flex";
-            dock.style.position = "absolute";
-            dock.style.insetInline = "0";
-            dock.style.insetBlockEnd = "0";
-            dock.style.zIndex = "1200";
+            dock.style.position = "relative";
+            dock.style.gridColumn = "content-column";
+            dock.style.gridRow = "dock-row";
+            dock.style.zIndex = "3";
             dock.style.minBlockSize = "48px";
             dock.style.padding = "0.45rem 0.55rem";
             dock.style.alignItems = "center";
@@ -664,27 +708,29 @@ export class WindowShell extends ShellBase {
         }
 
         if (!this.statusContainer) {
-            let status = overlayLayer.querySelector("cw-status-bar[data-window-status]") as HTMLElement | null;
+            let status = shellLayer.querySelector("cw-status-bar[data-window-status]") as HTMLElement | null;
             if (!status) {
                 status = document.createElement("cw-status-bar");
                 status.setAttribute("data-window-status", "true");
                 status.className = "app-window-shell__status";
                 status.setAttribute("aria-live", "polite");
                 status.style.pointerEvents = "auto";
-                overlayLayer.appendChild(status);
+                shellLayer.appendChild(status);
             }
+            status.style.pointerEvents = "none";
             status.style.display = "flex";
-            status.style.position = "absolute";
-            status.style.insetInline = "0";
-            status.style.insetBlockStart = "0";
-            status.style.zIndex = "1300";
+            status.style.position = "relative";
+            status.style.gridColumn = "content-column";
+            status.style.gridRow = "status-row";
+            status.style.zIndex = "3";
             status.style.minBlockSize = "30px";
             status.style.padding = "0.25rem 0.65rem";
             status.style.alignItems = "center";
             status.style.gap = "0.55rem";
             status.style.fontSize = "0.75rem";
             status.style.color = "var(--window-shell-fg, #e8eefc)";
-            status.style.background = "color-mix(in oklab, #03060c 82%, #1f2a44 18%)";
+            //status.style.background = "color-mix(in oklab, #03060c 82%, #1f2a44 18%)";
+            status.style.background = "transparent";
             status.style.borderBlockStart = "1px solid rgba(130, 160, 235, 0.24)";
             this.statusContainer = status;
         }

@@ -181,6 +181,9 @@ const ensureAppLayers = (mountElement: HTMLElement): AppLayers => {
     shellLayer.style.inset = "0";
     shellLayer.style.zIndex = "10";
     shellLayer.style.pointerEvents = "none";
+    shellLayer.style.display = "grid";
+    shellLayer.style.gridTemplateColumns = "[content-column] minmax(0px, 1fr)";
+    shellLayer.style.gridTemplateRows = "[status-row] minmax(0px, max-content) [content-row] minmax(0px, 1fr) [dock-row] minmax(0px, max-content)";
     shellLayer.style.overflow = "hidden";
     shellLayer.style.background = "transparent";
     shellLayer.style.backgroundColor = "transparent";
