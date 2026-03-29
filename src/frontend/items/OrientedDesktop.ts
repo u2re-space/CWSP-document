@@ -1,5 +1,4 @@
-import { cvt_cs_to_os } from "fest/core";
-import { orientOf } from "fest/dom";
+import { bindInteraction } from "fest/lure";
 import { requestOpenView } from "../shared/view-api";
 import type { ViewId } from "../shells/types";
 
@@ -18,7 +17,6 @@ type DesktopState = {
 };
 
 const STORAGE_KEY = "cw-oriented-desktop-layout-v1";
-const DRAG_THRESHOLD_PX = 8;
 const SUPPRESS_CLICK_MS = 280;
 
 const DEFAULT_STATE: DesktopState = {
@@ -81,34 +79,6 @@ const applyCellVars = (node: HTMLElement, cell: [number, number]): void => {
     node.style.setProperty("--p-cell-y", String(cell[1]));
 };
 
-const applyDragVars = (node: HTMLElement, dx: number, dy: number): void => {
-    node.style.setProperty("--drag-x", String(dx));
-    node.style.setProperty("--drag-y", String(dy));
-};
-
-const resolveCellAtPointer = (
-    grid: HTMLElement,
-    columns: number,
-    rows: number,
-    clientX: number,
-    clientY: number
-): [number, number] => {
-    const rect = grid.getBoundingClientRect();
-    const orient = orientOf(grid) || 0;
-    const local: [number, number] = [
-        clientX - (rect.left || 0),
-        clientY - (rect.top || 0)
-    ];
-    const orientedPoint = cvt_cs_to_os(local, [rect.width || 1, rect.height || 1], orient);
-    const orientedWidth = orient % 2 ? (rect.height || 1) : (rect.width || 1);
-    const orientedHeight = orient % 2 ? (rect.width || 1) : (rect.height || 1);
-    const cellW = orientedWidth / Math.max(columns, 1);
-    const cellH = orientedHeight / Math.max(rows, 1);
-    const nextX = Math.floor((orientedPoint[0] || 0) / Math.max(cellW, 1));
-    const nextY = Math.floor((orientedPoint[1] || 0) / Math.max(cellH, 1));
-    return clampCell([nextX, nextY], columns, rows);
-};
-
 const makeIconItem = (item: DesktopItem): HTMLElement => {
     const el = document.createElement("div");
     el.className = "ui-ws-item";
@@ -144,6 +114,7 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
 
     const state = readState();
     const itemById = new Map(state.items.map((item) => [item.id, item] as const));
+    const itemIdList = state.items.map((item) => item.id);
 
     const desktopRoot = document.createElement("div");
     desktopRoot.className = "speed-dial-root app-oriented-desktop";
@@ -173,15 +144,6 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
     const iconNodeById = new Map<string, HTMLElement>();
     const labelNodeById = new Map<string, HTMLElement>();
 
-    const placeItem = (itemId: string, cell: [number, number]): void => {
-        const iconNode = iconNodeById.get(itemId);
-        const labelNode = labelNodeById.get(itemId);
-        if (iconNode) applyCellVars(iconNode, cell);
-        if (labelNode) applyCellVars(labelNode, cell);
-        const src = itemById.get(itemId);
-        if (src) src.cell = cell;
-    };
-
     for (const item of state.items) {
         const iconNode = makeIconItem(item);
         const labelNode = makeLabelItem(item);
@@ -195,87 +157,51 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
         iconShape.style.pointerEvents = "auto";
         iconShape.style.touchAction = "none";
 
+        // Bind to native lur.e grid mechanics (drag, orient-aware placement, animation).
+        bindInteraction(iconNode, {
+            layout: [state.columns, state.rows],
+            items: itemById,
+            list: itemIdList,
+            item
+        });
+
+        iconNode.addEventListener("m-dragstart", () => {
+            iconNode.dataset.dragging = "true";
+            const labelNode = labelNodeById.get(item.id);
+            if (labelNode) {
+                labelNode.dataset.dragging = "true";
+                applyCellVars(labelNode, item.cell);
+            }
+        });
+
+        iconNode.addEventListener("m-dragging", () => {
+            const labelNode = labelNodeById.get(item.id);
+            if (labelNode) {
+                labelNode.style.setProperty("--drag-x", iconNode.style.getPropertyValue("--drag-x") || "0");
+                labelNode.style.setProperty("--drag-y", iconNode.style.getPropertyValue("--drag-y") || "0");
+            }
+        });
+
+        iconNode.addEventListener("m-dragend", () => {
+            suppressClickUntil = performance.now() + SUPPRESS_CLICK_MS;
+        });
+
+        iconNode.addEventListener("m-dragsettled", () => {
+            const labelNode = labelNodeById.get(item.id);
+            if (labelNode) {
+                labelNode.removeAttribute("data-dragging");
+                labelNode.style.setProperty("--drag-x", "0");
+                labelNode.style.setProperty("--drag-y", "0");
+                applyCellVars(labelNode, item.cell);
+            }
+            persistState(state);
+        });
+
         iconShape.addEventListener("click", (event) => {
             event.preventDefault();
             event.stopPropagation();
             if (performance.now() < suppressClickUntil) return;
             requestOpenView({ viewId: item.viewId, target: "window" });
-        });
-
-        iconShape.addEventListener("pointerdown", (downEvent: PointerEvent) => {
-            const iconLayerNode = iconNodeById.get(item.id);
-            const labelLayerNode = labelNodeById.get(item.id);
-            if (!iconLayerNode || !labelLayerNode) return;
-            downEvent.preventDefault();
-
-            const startX = downEvent.clientX;
-            const startY = downEvent.clientY;
-            let moved = false;
-            let lastDx = 0;
-            let lastDy = 0;
-
-            const pointerId = downEvent.pointerId;
-            iconShape.setPointerCapture(pointerId);
-            iconLayerNode.dataset.dragging = "true";
-            labelLayerNode.dataset.dragging = "true";
-            iconLayerNode.style.transition = "none";
-            labelLayerNode.style.transition = "none";
-            applyDragVars(iconLayerNode, 0, 0);
-            applyDragVars(labelLayerNode, 0, 0);
-
-            const onMove = (moveEvent: PointerEvent) => {
-                const dx = moveEvent.clientX - startX;
-                const dy = moveEvent.clientY - startY;
-                if (!moved && Math.hypot(dx, dy) >= DRAG_THRESHOLD_PX) {
-                    moved = true;
-                }
-                if (!moved) return;
-                moveEvent.preventDefault();
-                lastDx = dx;
-                lastDy = dy;
-                applyDragVars(iconLayerNode, lastDx, lastDy);
-                applyDragVars(labelLayerNode, lastDx, lastDy);
-            };
-
-            const onEnd = (endEvent: PointerEvent) => {
-                if (iconShape.hasPointerCapture(pointerId)) {
-                    iconShape.releasePointerCapture(pointerId);
-                }
-                iconShape.removeEventListener("pointermove", onMove);
-                iconShape.removeEventListener("pointerup", onEnd);
-                iconShape.removeEventListener("pointercancel", onEnd);
-
-                if (moved) {
-                    const nextCell = resolveCellAtPointer(
-                        iconsGrid,
-                        state.columns,
-                        state.rows,
-                        endEvent.clientX,
-                        endEvent.clientY
-                    );
-                    placeItem(item.id, nextCell);
-                    persistState(state);
-                    suppressClickUntil = performance.now() + SUPPRESS_CLICK_MS;
-                }
-
-                // Animate drag offset back to zero using ui-gridbox transform vars.
-                requestAnimationFrame(() => {
-                    iconLayerNode.style.transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)";
-                    labelLayerNode.style.transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)";
-                    applyDragVars(iconLayerNode, 0, 0);
-                    applyDragVars(labelLayerNode, 0, 0);
-                });
-                globalThis.setTimeout(() => {
-                    iconLayerNode.style.removeProperty("transition");
-                    labelLayerNode.style.removeProperty("transition");
-                    iconLayerNode.removeAttribute("data-dragging");
-                    labelLayerNode.removeAttribute("data-dragging");
-                }, 240);
-            };
-
-            iconShape.addEventListener("pointermove", onMove);
-            iconShape.addEventListener("pointerup", onEnd);
-            iconShape.addEventListener("pointercancel", onEnd);
         });
     }
 };

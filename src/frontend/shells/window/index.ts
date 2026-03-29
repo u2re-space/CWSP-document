@@ -10,6 +10,7 @@ import type { ShellId, ShellLayoutConfig, ViewId } from "../types";
 import { ShellBase } from "../shell";
 import { isEnabledView } from "../../config/views";
 import type { WindowFrameElement } from "../UIElement";
+import { subscribeViewChannel } from "../../shared/view-api";
 
 // @ts-ignore - SCSS import
 import style from "./frame.scss?inline";
@@ -18,13 +19,25 @@ type WindowState = "open" | "minimized" | "hidden";
 
 interface WindowProcess {
     pid: string;
+    processId: string;
     viewId: ViewId;
     params?: Record<string, string>;
     state: WindowState;
     frame: HTMLElement;
     body: HTMLElement | null;
     frameEl: WindowFrameElement | null;
+}
+
+interface ProcessTask {
+    processId: string;
+    viewId: ViewId;
+    params?: Record<string, string>;
+    instances: Set<string>;
     dockItem: HTMLButtonElement;
+    pinned: boolean;
+    headless: boolean;
+    lastActivePid: string | null;
+    unsubscribeChannel: (() => void) | null;
 }
 
 const toTitle = (viewId: ViewId): string => {
@@ -34,6 +47,18 @@ const toTitle = (viewId: ViewId): string => {
 };
 
 const sanitizePid = (value: string): string => value.replace(/[^a-z0-9_-]/gi, "");
+const processKeyOf = (viewId: ViewId, params?: Record<string, string>): string =>
+    sanitizePid(String(params?.processId || viewId || "process")) || String(viewId || "process");
+const iconForView = (viewId: ViewId): string => ({
+    home: "house",
+    viewer: "article",
+    explorer: "books",
+    settings: "gear-six",
+    airpad: "paper-plane-tilt",
+    history: "clock-counter-clockwise",
+    editor: "note-pencil",
+    workcenter: "circles-three-plus"
+}[viewId] || "app-window");
 
 export class WindowShell extends ShellBase {
     id: ShellId = "window";
@@ -51,6 +76,7 @@ export class WindowShell extends ShellBase {
     private dockElement: HTMLElement | null = null;
     private homeFrameElement: HTMLElement | null = null;
     private processes = new Map<string, WindowProcess>();
+    private processTasks = new Map<string, ProcessTask>();
     private zCounter = 10;
     private pidCounter = 0;
     private activePid: string | null = null;
@@ -58,6 +84,10 @@ export class WindowShell extends ShellBase {
     private hashHandler: (() => void) | null = null;
     private openRequestHandler: ((event: Event) => void) | null = null;
     private statusTimer: ReturnType<typeof setInterval> | null = null;
+    private dockAppsElement: HTMLElement | null = null;
+    private dockStartElement: HTMLElement | null = null;
+    private dockQuickElement: HTMLElement | null = null;
+    private pinnedViews: ViewId[] = ["home", "viewer", "explorer", "settings"];
 
     protected createLayout(): HTMLElement {
         return H`
@@ -99,6 +129,10 @@ export class WindowShell extends ShellBase {
             clearInterval(this.statusTimer);
             this.statusTimer = null;
         }
+        for (const task of this.processTasks.values()) {
+            task.unsubscribeChannel?.();
+        }
+        this.processTasks.clear();
         this.processes.clear();
         this.activePid = null;
         super.unmount();
@@ -181,6 +215,10 @@ export class WindowShell extends ShellBase {
             if (!viewId || !isEnabledView(viewId)) return;
             const params = { ...(detail?.params || {}) };
             if (detail?.pid) params.pid = String(detail.pid);
+            if (detail?.target === "headless") {
+                void this.openWindowProcess(viewId as ViewId, { ...params, headless: "1" });
+                return;
+            }
             void this.navigate(viewId as ViewId, params);
         };
         globalThis?.addEventListener?.("cw:view-open-request", this.openRequestHandler);
@@ -194,7 +232,7 @@ export class WindowShell extends ShellBase {
                     data-window-home-frame
                     data-title="Settings"
                     data-pid="home"
-                    style="pointer-events:auto;left:40px;top:32px;width:min(920px,calc(100% - 80px));height:min(640px,calc(100% - 96px));z-index:2;"
+                    style="pointer-events:auto;--shift-x:40;--shift-y:32;--initial-inline-size:min(920px,calc(100% - 80px));--initial-block-size:min(640px,calc(100% - 96px));z-index:2;"
                 >
                 </cw-window-frame>
             ` as HTMLElement;
@@ -218,8 +256,41 @@ export class WindowShell extends ShellBase {
     }
 
     private async openWindowProcess(viewId: ViewId, params?: Record<string, string>): Promise<string> {
-        if (!this.rootElement || !this.dockElement) {
+        if (!this.rootElement || !this.dockElement || !this.dockAppsElement) {
             throw new Error("[window] Shell host/dock is not mounted");
+        }
+
+        const processId = processKeyOf(viewId, params);
+        const isHeadless = params?.headless === "1";
+        let task = this.processTasks.get(processId);
+        if (!task) {
+            const dockItem = this.createProcessDockItem(processId, viewId, params);
+            task = {
+                processId,
+                viewId,
+                params,
+                instances: new Set<string>(),
+                dockItem,
+                pinned: this.pinnedViews.includes(viewId),
+                headless: isHeadless,
+                lastActivePid: null,
+                unsubscribeChannel: subscribeViewChannel(viewId, () => {
+                    const t = this.processTasks.get(processId);
+                    if (!t) return;
+                    t.headless = false;
+                    this.updateStatusBar();
+                })
+            };
+            this.processTasks.set(processId, task);
+            this.dockAppsElement.appendChild(dockItem);
+        } else {
+            task.params = params || task.params;
+            task.headless = task.headless || isHeadless;
+        }
+
+        if (isHeadless) {
+            this.updateStatusBar();
+            return task.lastActivePid || "";
         }
 
         const requestedPid = sanitizePid(String(params?.pid || ""));
@@ -227,22 +298,13 @@ export class WindowShell extends ShellBase {
             const existing = this.processes.get(requestedPid)!;
             existing.state = "open";
             existing.frame.hidden = false;
+            task.lastActivePid = existing.pid;
             return existing.pid;
-        }
-
-        for (const proc of this.processes.values()) {
-            if (proc.viewId === viewId && proc.state !== "hidden") {
-                proc.params = params;
-                proc.state = "open";
-                proc.frame.hidden = false;
-                return proc.pid;
-            }
         }
 
         const pid = requestedPid || this.generatePid(viewId);
         const frame = this.createFrame(pid, viewId);
         const frameEl = frame as unknown as WindowFrameElement;
-        const dockItem = this.createDockItem(pid, viewId);
         const element = await this.loadView(viewId, params);
         element.dataset.view = String(viewId);
         element.slot = "window-view";
@@ -258,21 +320,23 @@ export class WindowShell extends ShellBase {
 
         frame.slot = "window-frame";
         this.rootElement?.appendChild(frame);
-        this.dockElement.appendChild(dockItem);
 
         const proc: WindowProcess = {
             pid,
+            processId,
             viewId,
             params,
             state: "open",
             frame,
             body: null,
-            frameEl,
-            dockItem
+            frameEl
         };
         this.processes.set(pid, proc);
+        task.instances.add(pid);
+        task.lastActivePid = pid;
+        task.headless = false;
         this.installWindowInteractions(proc);
-        this.mountHomeSurface().catch(() => undefined);
+        if (viewId !== "home") this.mountHomeSurface().catch(() => undefined);
         this.updateStatusBar();
         return pid;
     }
@@ -286,35 +350,35 @@ export class WindowShell extends ShellBase {
                 data-window-frame
                 data-pid="${pid}"
                 data-title="${title}"
-                style="pointer-events:auto;left:${96 + offset}px;top:${72 + offset}px;width:780px;height:520px;z-index:${this.zCounter};"
+                style="pointer-events:auto;--shift-x:${96 + offset};--shift-y:${72 + offset};--initial-inline-size:780px;--initial-block-size:520px;z-index:${this.zCounter};"
             >
             </cw-window-frame>
         ` as HTMLElement;
         return frame;
     }
 
-    private createDockItem(pid: string, viewId: ViewId): HTMLButtonElement {
+    private createProcessDockItem(processId: string, viewId: ViewId, _params?: Record<string, string>): HTMLButtonElement {
         return H`
-            <button type="button" class="app-window-shell__dock-item" data-window-dock-item data-pid="${pid}">
-                <span>${toTitle(viewId)}</span>
-                <small>#${pid}</small>
+            <button
+                type="button"
+                class="app-window-shell__dock-item app-window-shell__dock-item--icon"
+                data-window-dock-item
+                data-process-id="${processId}"
+                title="${toTitle(viewId)}"
+                aria-label="${toTitle(viewId)}"
+            >
+                <ui-icon icon="${iconForView(viewId)}"></ui-icon>
             </button>
         ` as HTMLButtonElement;
     }
 
     private installWindowInteractions(proc: WindowProcess): void {
-        const { frame, dockItem } = proc;
+        const { frame } = proc;
         const frameEl = frame as unknown as WindowFrameElement;
         const dragHandle = frameEl?.getDragHandle?.() || null;
         const resizeHandle = frameEl?.getResizeHandle?.() || null;
 
         frame.addEventListener("pointerdown", () => this.focusProcess(proc.pid, true));
-        dockItem.addEventListener("click", () => {
-            proc.state = "open";
-            proc.frame.hidden = false;
-            this.focusProcess(proc.pid, true);
-        });
-
         frame.addEventListener("window-action", (event) => {
             const action = (event as CustomEvent<{ action?: string }>).detail?.action;
             if (!action) return;
@@ -322,18 +386,30 @@ export class WindowShell extends ShellBase {
                 proc.state = "minimized";
                 proc.frame.hidden = true;
                 proc.frame.classList.remove("is-active");
-                proc.dockItem.classList.remove("is-active");
                 if (this.activePid === proc.pid) {
                     this.activePid = null;
                     this.updateUrlState(this.navigationState.currentView, null, proc.params, true);
                 }
                 this.updateStatusBar();
             }
+            if (action === "maximize") {
+                this.toggleMaximize(proc.frame);
+                this.updateStatusBar();
+            }
             if (action === "close") {
                 proc.state = "hidden";
                 proc.frame.remove();
-                proc.dockItem.remove();
                 this.processes.delete(proc.pid);
+                const task = this.processTasks.get(proc.processId);
+                task?.instances.delete(proc.pid);
+                if (task && task.lastActivePid === proc.pid) {
+                    task.lastActivePid = [...task.instances][0] || null;
+                }
+                if (task && task.instances.size === 0 && !task.pinned && !task.headless) {
+                    task.unsubscribeChannel?.();
+                    task.dockItem.remove();
+                    this.processTasks.delete(task.processId);
+                }
                 if (this.activePid === proc.pid) {
                     this.activePid = null;
                     void this.navigate("home");
@@ -342,78 +418,88 @@ export class WindowShell extends ShellBase {
             }
         });
 
-        if (dragHandle) {
-            this.installDrag(frame, dragHandle);
-        }
-        if (resizeHandle) {
-            this.installResize(frame, resizeHandle);
-        }
+        if (dragHandle) this.installPointerDrag(frame, dragHandle);
+        if (resizeHandle) this.installPointerResize(frame, resizeHandle);
     }
 
-    private installDrag(frame: HTMLElement, handle: HTMLElement): void {
+    private installPointerDrag(frame: HTMLElement, handle: HTMLElement): void {
         handle.addEventListener("pointerdown", (event: PointerEvent) => {
             const target = event.target as HTMLElement | null;
             if (target?.closest("[data-window-action]")) return;
+            if (frame.classList.contains("is-maximized")) return;
             event.preventDefault();
-
-            const rect = frame.getBoundingClientRect();
-            const startX = event.clientX;
-            const startY = event.clientY;
-            const startLeft = rect.left;
-            const startTop = rect.top;
-
             const pointerId = event.pointerId;
             handle.setPointerCapture(pointerId);
+            frame.setAttribute("data-dragging", "");
+
+            const startX = event.clientX;
+            const startY = event.clientY;
+            const shiftX = parseFloat(frame.style.getPropertyValue("--shift-x") || "0") || 0;
+            const shiftY = parseFloat(frame.style.getPropertyValue("--shift-y") || "0") || 0;
 
             const onMove = (moveEvent: PointerEvent) => {
-                const nextLeft = Math.max(0, startLeft + (moveEvent.clientX - startX));
-                const nextTop = Math.max(0, startTop + (moveEvent.clientY - startY));
-                frame.style.left = `${nextLeft}px`;
-                frame.style.top = `${nextTop}px`;
+                const dx = moveEvent.clientX - startX;
+                const dy = moveEvent.clientY - startY;
+                frame.style.setProperty("--drag-x", String(dx));
+                frame.style.setProperty("--drag-y", String(dy));
             };
 
-            const onUp = () => {
-                handle.releasePointerCapture(pointerId);
+            const onEnd = (endEvent: PointerEvent) => {
+                if (handle.hasPointerCapture(pointerId)) handle.releasePointerCapture(pointerId);
                 handle.removeEventListener("pointermove", onMove);
-                handle.removeEventListener("pointerup", onUp);
-                handle.removeEventListener("pointercancel", onUp);
+                handle.removeEventListener("pointerup", onEnd);
+                handle.removeEventListener("pointercancel", onEnd);
+                frame.removeAttribute("data-dragging");
+
+                const dx = endEvent.clientX - startX;
+                const dy = endEvent.clientY - startY;
+                frame.style.setProperty("--shift-x", String(Math.max(0, shiftX + dx)));
+                frame.style.setProperty("--shift-y", String(Math.max(0, shiftY + dy)));
+                frame.style.setProperty("--drag-x", "0");
+                frame.style.setProperty("--drag-y", "0");
             };
 
             handle.addEventListener("pointermove", onMove);
-            handle.addEventListener("pointerup", onUp);
-            handle.addEventListener("pointercancel", onUp);
+            handle.addEventListener("pointerup", onEnd);
+            handle.addEventListener("pointercancel", onEnd);
         });
     }
 
-    private installResize(frame: HTMLElement, handle: HTMLElement): void {
+    private installPointerResize(frame: HTMLElement, handle: HTMLElement): void {
         handle.addEventListener("pointerdown", (event: PointerEvent) => {
             event.preventDefault();
-
-            const rect = frame.getBoundingClientRect();
-            const startX = event.clientX;
-            const startY = event.clientY;
-            const startW = rect.width;
-            const startH = rect.height;
             const pointerId = event.pointerId;
             handle.setPointerCapture(pointerId);
+            frame.setAttribute("data-resizing", "");
+
+            const rect = frame.getBoundingClientRect();
+            const startW = rect.width;
+            const startH = rect.height;
+            const startX = event.clientX;
+            const startY = event.clientY;
 
             const onMove = (moveEvent: PointerEvent) => {
-                const nextW = Math.max(360, startW + (moveEvent.clientX - startX));
-                const nextH = Math.max(240, startH + (moveEvent.clientY - startY));
-                frame.style.width = `${nextW}px`;
-                frame.style.height = `${nextH}px`;
+                const dx = moveEvent.clientX - startX;
+                const dy = moveEvent.clientY - startY;
+                const nextW = Math.max(360, startW + dx);
+                const nextH = Math.max(240, startH + dy);
+                frame.style.setProperty("--initial-inline-size", `${nextW}px`);
+                frame.style.setProperty("--initial-block-size", `${nextH}px`);
+                frame.style.setProperty("--resize-x", "0");
+                frame.style.setProperty("--resize-y", "0");
             };
 
-            const onUp = () => {
-                handle.releasePointerCapture(pointerId);
+            const onEnd = () => {
+                if (handle.hasPointerCapture(pointerId)) handle.releasePointerCapture(pointerId);
                 handle.removeEventListener("pointermove", onMove);
-                handle.removeEventListener("pointerup", onUp);
-                handle.removeEventListener("pointercancel", onUp);
+                handle.removeEventListener("pointerup", onEnd);
+                handle.removeEventListener("pointercancel", onEnd);
+                frame.removeAttribute("data-resizing");
             };
 
             handle.addEventListener("pointermove", onMove);
-            handle.addEventListener("pointerup", onUp);
-            handle.addEventListener("pointercancel", onUp);
+            handle.addEventListener("pointerup", onEnd);
+            handle.addEventListener("pointercancel", onEnd);
         });
     }
 
@@ -424,6 +510,8 @@ export class WindowShell extends ShellBase {
         proc.state = "open";
         proc.frame.hidden = false;
         this.activePid = proc.pid;
+        const task = this.processTasks.get(proc.processId);
+        if (task) task.lastActivePid = proc.pid;
         this.zCounter += 1;
         proc.frame.style.zIndex = String(this.zCounter);
         this.navigationState.previousView = this.navigationState.currentView;
@@ -435,7 +523,10 @@ export class WindowShell extends ShellBase {
         for (const item of this.processes.values()) {
             const active = item.pid === proc.pid;
             item.frame.classList.toggle("is-active", active);
-            item.dockItem.classList.toggle("is-active", active);
+        }
+        for (const taskItem of this.processTasks.values()) {
+            const active = taskItem.lastActivePid === proc.pid;
+            taskItem.dockItem.classList.toggle("is-active", active);
         }
 
         if (syncUrl) {
@@ -485,6 +576,7 @@ export class WindowShell extends ShellBase {
         const processes = [...this.processes.values()];
         const total = processes.length;
         const minimized = processes.filter((proc) => proc.state === "minimized").length;
+        const processCount = this.processTasks.size;
         const active = this.activePid
             ? `${this.navigationState.currentView} #${this.activePid}`
             : String(this.navigationState.currentView || "home");
@@ -492,11 +584,41 @@ export class WindowShell extends ShellBase {
 
         this.statusContainer.innerHTML = `
             <span class="app-window-shell__status-item"><b>Active:</b> ${active}</span>
+            <span class="app-window-shell__status-item"><b>Processes:</b> ${processCount}</span>
             <span class="app-window-shell__status-item"><b>Windows:</b> ${total}</span>
             <span class="app-window-shell__status-item"><b>Minimized:</b> ${minimized}</span>
             <span class="app-window-shell__status-spacer"></span>
             <span class="app-window-shell__status-item">${time}</span>
         `;
+    }
+
+    private toggleMaximize(frame: HTMLElement): void {
+        const isMaximized = frame.classList.contains("is-maximized");
+        if (isMaximized) {
+            const prevShiftX = frame.dataset.prevShiftX || "0";
+            const prevShiftY = frame.dataset.prevShiftY || "0";
+            const prevWidth = frame.dataset.prevWidth || "780px";
+            const prevHeight = frame.dataset.prevHeight || "520px";
+            frame.style.setProperty("--shift-x", prevShiftX);
+            frame.style.setProperty("--shift-y", prevShiftY);
+            frame.style.setProperty("--initial-inline-size", prevWidth);
+            frame.style.setProperty("--initial-block-size", prevHeight);
+            frame.style.setProperty("--resize-x", "0");
+            frame.style.setProperty("--resize-y", "0");
+            frame.classList.remove("is-maximized");
+            return;
+        }
+        frame.dataset.prevShiftX = frame.style.getPropertyValue("--shift-x") || "0";
+        frame.dataset.prevShiftY = frame.style.getPropertyValue("--shift-y") || "0";
+        frame.dataset.prevWidth = frame.style.getPropertyValue("--initial-inline-size") || "780px";
+        frame.dataset.prevHeight = frame.style.getPropertyValue("--initial-block-size") || "520px";
+        frame.style.setProperty("--shift-x", "0");
+        frame.style.setProperty("--shift-y", "0");
+        frame.style.setProperty("--initial-inline-size", "100%");
+        frame.style.setProperty("--initial-block-size", "100%");
+        frame.style.setProperty("--resize-x", "0");
+        frame.style.setProperty("--resize-y", "0");
+        frame.classList.add("is-maximized");
     }
 
     private bindOverlayChrome(): void {
@@ -529,6 +651,15 @@ export class WindowShell extends ShellBase {
             dock.style.background = "var(--window-dock-bg, rgba(9,12,20,0.78))";
             dock.style.borderBlockStart = "1px solid var(--window-dock-border, rgba(130,160,235,0.32))";
             dock.style.backdropFilter = "blur(8px)";
+            dock.innerHTML = `
+                <div class="app-window-shell__dock-start" data-dock-start></div>
+                <div class="app-window-shell__dock-apps" data-dock-apps></div>
+                <div class="app-window-shell__dock-quick" data-dock-quick></div>
+            `;
+            this.dockStartElement = dock.querySelector("[data-dock-start]") as HTMLElement | null;
+            this.dockAppsElement = dock.querySelector("[data-dock-apps]") as HTMLElement | null;
+            this.dockQuickElement = dock.querySelector("[data-dock-quick]") as HTMLElement | null;
+            this.renderDockControls();
             this.dockElement = dock;
         }
 
@@ -557,6 +688,66 @@ export class WindowShell extends ShellBase {
             status.style.borderBlockStart = "1px solid rgba(130, 160, 235, 0.24)";
             this.statusContainer = status;
         }
+    }
+
+    private renderDockControls(): void {
+        if (!this.dockStartElement || !this.dockQuickElement || !this.dockAppsElement) return;
+
+        this.dockStartElement.innerHTML = `
+            <button type="button" class="app-window-shell__dock-item app-window-shell__dock-item--icon app-window-shell__dock-item--start" data-dock-action="start" title="Start" aria-label="Start">
+                <ui-icon icon="squares-four"></ui-icon>
+            </button>
+        `;
+        this.dockQuickElement.innerHTML = `
+            <button type="button" class="app-window-shell__dock-item app-window-shell__dock-item--icon app-window-shell__dock-item--quick" data-dock-action="quick-settings" title="Quick settings" aria-label="Quick settings">
+                <ui-icon icon="sliders-horizontal"></ui-icon>
+            </button>
+        `;
+        const pinned = this.pinnedViews.map((viewId) => `
+            <button
+                type="button"
+                class="app-window-shell__dock-item app-window-shell__dock-item--icon app-window-shell__dock-item--pinned"
+                data-dock-action="open-pinned"
+                data-view-id="${viewId}"
+                title="${toTitle(viewId)}"
+                aria-label="${toTitle(viewId)}"
+            >
+                <ui-icon icon="${iconForView(viewId)}"></ui-icon>
+            </button>
+        `).join("");
+        this.dockAppsElement.insertAdjacentHTML("afterbegin", pinned);
+
+        this.dockElement?.addEventListener("click", (event) => {
+            const target = (event.target as HTMLElement | null)?.closest?.("[data-dock-action], [data-window-dock-item]") as HTMLElement | null;
+            if (!target) return;
+            const action = target.dataset.dockAction || "";
+            if (action === "start") {
+                void this.navigate("home");
+                return;
+            }
+            if (action === "quick-settings") {
+                this.showMessage("Quick settings: WIP");
+                return;
+            }
+            if (action === "open-pinned") {
+                const viewId = (target.dataset.viewId || "home") as ViewId;
+                void this.navigate(viewId);
+                return;
+            }
+            const processId = target.dataset.processId || "";
+            if (!processId) return;
+            const task = this.processTasks.get(processId);
+            if (!task) return;
+            const pid = task.lastActivePid || [...task.instances][0];
+            if (pid && this.processes.has(pid)) {
+                const proc = this.processes.get(pid)!;
+                proc.state = "open";
+                proc.frame.hidden = false;
+                this.focusProcess(pid, true);
+            } else {
+                void this.openWindowProcess(task.viewId, task.params || {});
+            }
+        });
     }
 }
 

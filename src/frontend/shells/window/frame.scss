@@ -95,17 +95,36 @@
 
 @layer shell.components {
     .app-window-shell__frame {
+        --shift-x: 0;
+        --shift-y: 0;
+        --drag-x: 0;
+        --drag-y: 0;
+        --resize-x: 0;
+        --resize-y: 0;
+        --initial-inline-size: 780px;
+        --initial-block-size: 520px;
+        --self-size-x: calc(var(--initial-inline-size) + (var(--resize-x) * 1px));
+        --self-size-y: calc(var(--initial-block-size) + (var(--resize-y) * 1px));
         position: absolute;
+        inset-inline-start: clamp(0px, calc(var(--shift-x) * 1px), calc(100% - 1px));
+        inset-block-start: clamp(0px, calc(var(--shift-y) * 1px), calc(100% - 1px));
         display: grid;
         grid-template-rows: auto minmax(0, 1fr);
         min-inline-size: 360px;
         min-block-size: 240px;
+        inline-size: clamp(360px, var(--self-size-x), calc(100% - (var(--shift-x) * 1px)));
+        block-size: clamp(240px, var(--self-size-y), calc(100% - (var(--shift-y) * 1px)));
         border: 1px solid var(--window-frame-border);
         border-radius: 12px;
         background: var(--window-frame-bg);
         box-shadow: var(--window-frame-shadow);
         overflow: hidden;
         user-select: none;
+        touch-action: none;
+        pointer-events: auto;
+        transform:
+            scale3d(var(--scale, 1), var(--scale, 1), var(--scale, 1))
+            translate3d(calc(var(--drag-x, 0) * 1px), calc(var(--drag-y, 0) * 1px), 0px);
     }
 
     .app-window-shell__frame--home {
@@ -114,6 +133,12 @@
 
     .app-window-shell__frame.is-active {
         box-shadow: 0 0 0 1px var(--window-focus), 0 14px 40px rgba(0, 0, 0, 0.48);
+    }
+
+    .app-window-shell__frame.is-maximized {
+        border-radius: 0;
+        inline-size: 100% !important;
+        block-size: 100% !important;
     }
 
     .app-window-shell__frame-header {
@@ -204,6 +229,21 @@
         cursor: pointer;
     }
 
+    .app-window-shell__dock-item--icon {
+        justify-content: center;
+        inline-size: 2.1rem;
+        block-size: 2.1rem;
+        min-inline-size: 2.1rem;
+        min-block-size: 2.1rem;
+        padding: 0;
+        border-radius: 10px;
+    }
+
+    .app-window-shell__dock-item--icon ui-icon {
+        --icon-size: 1.1rem;
+        pointer-events: none;
+    }
+
     .app-window-shell__dock-item small {
         opacity: 0.65;
         font-size: 0.72rem;
@@ -213,6 +253,30 @@
     .app-window-shell__dock-item.is-active {
         border-color: var(--window-focus);
         background: color-mix(in oklab, var(--window-focus) 25%, transparent);
+    }
+
+    .app-window-shell__dock-start,
+    .app-window-shell__dock-apps,
+    .app-window-shell__dock-quick {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .app-window-shell__dock-start {
+        flex: 0 0 auto;
+    }
+
+    .app-window-shell__dock-apps {
+        flex: 1 1 auto;
+        min-inline-size: 0;
+        overflow: auto hidden;
+        scrollbar-width: thin;
+    }
+
+    .app-window-shell__dock-quick {
+        flex: 0 0 auto;
+        margin-inline-start: auto;
     }
 }
 

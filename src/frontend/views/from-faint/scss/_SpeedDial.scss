@@ -70,6 +70,8 @@
 
         // Items
         .ui-ws-item {
+            --drag-x: 0;
+            --drag-y: 0;
             background-color: transparent;
             pointer-events: none;
             display: grid;
@@ -236,6 +238,14 @@
             &[data-dragging] {
                 will-change: transform;
                 cursor: grabbing;
+                transform:
+                    translate3d(
+                        calc((var(--drag-x, 0) * 1px) + var(--cs-transition-c, 0px)),
+                        calc((var(--drag-y, 0) * 1px) + var(--cs-transition-r, 0px)),
+                        0px
+                    )
+                    scale3d(var(--scale, 1), var(--scale, 1), var(--scale, 1))
+                    translate3d(var(--translate-x, 0px), var(--translate-y, 0px), 0px) !important;
 
                 .ui-ws-item-label {
                     opacity: 0.0;

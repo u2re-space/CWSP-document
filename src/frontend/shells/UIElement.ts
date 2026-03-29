@@ -21,6 +21,7 @@ const WINDOW_SHELL_HOST_STYLES = `
 
 [data-shell-content] > slot[name="window-frame"]::slotted(cw-window-frame) {
     position: absolute;
+    pointer-events: auto;
 }
 `;
 const WINDOW_FRAME_STYLES = `
@@ -389,6 +390,7 @@ export class WindowFrameElement extends HTMLElement {
                 </div>
                 <div class="app-window-shell__frame-actions">
                     <button type="button" data-window-action="minimize" aria-label="Minimize">−</button>
+                    <button type="button" data-window-action="maximize" aria-label="Maximize">□</button>
                     <button type="button" data-window-action="close" aria-label="Close">×</button>
                 </div>
             </header>
