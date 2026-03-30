@@ -1,8 +1,8 @@
 import { bindInteraction } from "fest/lure";
-import { requestOpenView } from "../shared/view-api";
-import type { ViewId } from "../shells/types";
-import { openUnifiedContextMenu, closeUnifiedContextMenu, type ContextMenuEntry } from "./ContextMenu";
-import { setAppWallpaper } from "./Canvas";
+import { requestOpenView } from "../../shared/view-api";
+import type { ViewId } from "../../shells/types";
+import { openUnifiedContextMenu, closeUnifiedContextMenu, type ContextMenuEntry } from "../../items/ContextMenu";
+import { setAppWallpaper } from "../../items/Canvas";
 
 type DesktopAction = "open-view" | "open-link";
 
@@ -355,7 +355,9 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
     desktopRoot.style.inset = "0";
     desktopRoot.style.pointerEvents = "auto";
     desktopRoot.style.background = "transparent";
+    desktopRoot.style.display = "grid";
     desktopRoot.tabIndex = 0;
+
 
     const labelsGrid = document.createElement("div");
     labelsGrid.className = "speed-dial-grid app-oriented-desktop__grid app-oriented-desktop__grid--labels";
@@ -364,6 +366,7 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
     labelsGrid.dataset.gridRows = String(state.rows);
     labelsGrid.style.background = "transparent";
     labelsGrid.style.pointerEvents = "none";
+    labelsGrid.style.display = "grid";
     labelsGrid.style.zIndex = "1";
 
     const iconsGrid = document.createElement("div");
@@ -374,6 +377,7 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
     iconsGrid.style.background = "transparent";
     iconsGrid.style.pointerEvents = "none";
     iconsGrid.style.zIndex = "2";
+    iconsGrid.style.display = "grid";
 
     desktopRoot.append(labelsGrid, iconsGrid);
     host.appendChild(desktopRoot);

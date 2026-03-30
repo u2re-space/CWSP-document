@@ -13,7 +13,7 @@ import { initializeLayers } from "./frontend/shared/layer-manager";
 import type { ViewId } from "./frontend/shells/types";
 import { pickEnabledView } from "./frontend/config/views";
 import { initializeAppCanvasLayer } from "./frontend/items/Canvas";
-import { initializeOrientedDesktop } from "./frontend/items/OrientedDesktop";
+import { initializeOrientedDesktop } from "./frontend/views/home/OrientedDesktop";
 import { fixOrientToScreen, loadAsAdopted } from "fest/dom";
 import viewStyles from "@rs-frontend/views/scss/_views.scss?inline";
 
@@ -127,19 +127,49 @@ const getSavedShell = (): ShellPreference | null => {
 
 type AppLayers = {
     canvasLayer: HTMLElement;
-    orientLayer: HTMLElement;
+    orientLayer: HTMLElement | null;
     shellLayer: HTMLElement;
     overlayLayer: HTMLElement;
 };
 
-const ensureAppLayers = (mountElement: HTMLElement): AppLayers => {
+const ensureAppLayers = (
+    mountElement: HTMLElement,
+    options: { enableOrientLayer?: boolean } = {}
+): AppLayers => {
+    const enableOrientLayer = options.enableOrientLayer !== false;
     const existingCanvas = mountElement.querySelector<HTMLElement>('[data-app-layer="canvas"]');
     const existingOrient = mountElement.querySelector<HTMLElement>('[data-app-layer="orient"]');
     const existingShell = mountElement.querySelector<HTMLElement>('[data-app-layer="shell"]');
     const existingOverlay = mountElement.querySelector<HTMLElement>('[data-app-layer="overlay"]');
 
-    if (existingCanvas && existingOrient && existingShell && existingOverlay) {
-        return { canvasLayer: existingCanvas, orientLayer: existingOrient, shellLayer: existingShell, overlayLayer: existingOverlay };
+    if (existingCanvas && existingShell && existingOverlay) {
+        if (enableOrientLayer && !existingOrient) {
+            const orientLayer = document.createElement("div");
+            orientLayer.dataset.appLayer = "orient";
+            orientLayer.className = "app-layer app-layer--orient";
+            orientLayer.style.position = "absolute";
+            orientLayer.style.inset = "0";
+            orientLayer.style.zIndex = "5";
+            orientLayer.style.pointerEvents = "none";
+            orientLayer.style.background = "transparent";
+            const orientBox = document.createElement("cw-oriented-box");
+            orientBox.className = "ui-orientbox app-oriented-box";
+            orientBox.setAttribute("data-mixin", "ui-orientbox");
+            (orientBox as HTMLElement).style.position = "absolute";
+            (orientBox as HTMLElement).style.inset = "0";
+            (orientBox as HTMLElement).style.pointerEvents = "auto";
+            (orientBox as HTMLElement).style.background = "transparent";
+            orientLayer.appendChild(orientBox);
+            fixOrientToScreen(orientBox as any);
+            initializeOrientedDesktop(orientBox as HTMLElement);
+            mountElement.insertBefore(orientLayer, existingShell);
+            return { canvasLayer: existingCanvas, orientLayer, shellLayer: existingShell, overlayLayer: existingOverlay };
+        }
+        if (!enableOrientLayer && existingOrient) {
+            existingOrient.remove();
+            return { canvasLayer: existingCanvas, orientLayer: null, shellLayer: existingShell, overlayLayer: existingOverlay };
+        }
+        return { canvasLayer: existingCanvas, orientLayer: enableOrientLayer ? (existingOrient || null) : null, shellLayer: existingShell, overlayLayer: existingOverlay };
     }
 
     mountElement.replaceChildren();
@@ -155,25 +185,27 @@ const ensureAppLayers = (mountElement: HTMLElement): AppLayers => {
     canvasLayer.style.zIndex = "0";
     canvasLayer.style.pointerEvents = "none";
 
-    const orientLayer = document.createElement("div");
-    orientLayer.dataset.appLayer = "orient";
-    orientLayer.className = "app-layer app-layer--orient";
-    orientLayer.style.position = "absolute";
-    orientLayer.style.inset = "0";
-    orientLayer.style.zIndex = "5";
-    orientLayer.style.pointerEvents = "none";
-    orientLayer.style.background = "transparent";
+    const orientLayer = enableOrientLayer ? document.createElement("div") : null;
+    if (orientLayer) {
+        orientLayer.dataset.appLayer = "orient";
+        orientLayer.className = "app-layer app-layer--orient";
+        orientLayer.style.position = "absolute";
+        orientLayer.style.inset = "0";
+        orientLayer.style.zIndex = "5";
+        orientLayer.style.pointerEvents = "none";
+        orientLayer.style.background = "transparent";
 
-    const orientBox = document.createElement("cw-oriented-box");
-    orientBox.className = "ui-orientbox app-oriented-box";
-    orientBox.setAttribute("data-mixin", "ui-orientbox");
-    (orientBox as HTMLElement).style.position = "absolute";
-    (orientBox as HTMLElement).style.inset = "0";
-    (orientBox as HTMLElement).style.pointerEvents = "auto";
-    (orientBox as HTMLElement).style.background = "transparent";
-    orientLayer.appendChild(orientBox);
-    fixOrientToScreen(orientBox as any);
-    initializeOrientedDesktop(orientBox as HTMLElement);
+        const orientBox = document.createElement("cw-oriented-box");
+        orientBox.className = "ui-orientbox app-oriented-box";
+        orientBox.setAttribute("data-mixin", "ui-orientbox");
+        (orientBox as HTMLElement).style.position = "absolute";
+        (orientBox as HTMLElement).style.inset = "0";
+        (orientBox as HTMLElement).style.pointerEvents = "auto";
+        (orientBox as HTMLElement).style.background = "transparent";
+        orientLayer.appendChild(orientBox);
+        fixOrientToScreen(orientBox as any);
+        initializeOrientedDesktop(orientBox as HTMLElement);
+    }
 
     const shellLayer = document.createElement("div");
     shellLayer.dataset.appLayer = "shell";
@@ -199,7 +231,11 @@ const ensureAppLayers = (mountElement: HTMLElement): AppLayers => {
     overlayLayer.style.background = "transparent";
     overlayLayer.style.backgroundColor = "transparent";
 
-    mountElement.append(canvasLayer, orientLayer, shellLayer, overlayLayer);
+    if (orientLayer) {
+        mountElement.append(canvasLayer, orientLayer, shellLayer, overlayLayer);
+    } else {
+        mountElement.append(canvasLayer, shellLayer, overlayLayer);
+    }
     initializeAppCanvasLayer(canvasLayer);
     return { canvasLayer, orientLayer, shellLayer, overlayLayer };
 };
@@ -409,9 +445,6 @@ export default async function index(mountElement: HTMLElement) {
         // ROUTE HANDLING (canonical root)
         // ====================================================================
 
-        const layers = ensureAppLayers(mountElement);
-        clearLoadingState(mountElement);
-
         // Legacy /{view} links are accepted as entry points.
         const isLegacyViewRoute = Boolean(pathname && isValidViewPath(pathname));
         const requestedView = isLegacyViewRoute
@@ -427,6 +460,8 @@ export default async function index(mountElement: HTMLElement) {
                 : (savedShell || "window")
         );
         const allowPathRoutedShell = preferredShell === "base" || preferredShell === "minimal";
+        const layers = ensureAppLayers(mountElement, { enableOrientLayer: preferredShell === "window" });
+        clearLoadingState(mountElement);
 
         if (!allowPathRoutedShell && (isLegacyViewRoute || pathname === "share-target" || pathname === "share_target")) {
             const state = {

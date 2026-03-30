@@ -10,6 +10,7 @@ import { loadAsAdopted, removeAdopted } from "fest/dom";
 import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shells/types";
 import type { BaseViewOptions } from "../types";
 import { isEnabledView } from "../../config/views";
+import { SpeedDial, createCtxMenu } from "./SpeedDial";
 
 // @ts-ignore
 import style from "./home.scss?inline";
@@ -29,8 +30,11 @@ export class HomeView implements View {
     private _sheet: CSSStyleSheet | null = null;
 
     lifecycle: ViewLifecycle = {
-        onShow: () => { this._sheet = loadAsAdopted(style) as CSSStyleSheet; },
-        onHide: () => { removeAdopted(this._sheet); },
+        onShow: () => { this._sheet ??= loadAsAdopted(style) as CSSStyleSheet; },
+        onHide: () => {
+            removeAdopted(this._sheet);
+            this._sheet = null;
+        },
     };
 
     constructor(options: BaseViewOptions = {}) {
@@ -44,7 +48,25 @@ export class HomeView implements View {
             this.shellContext = options.shellContext || this.shellContext;
         }
 
-        this._sheet = loadAsAdopted(style) as CSSStyleSheet;
+        this._sheet ??= loadAsAdopted(style) as CSSStyleSheet;
+
+        const shellId = String(this.shellContext?.shellId || "").toLowerCase();
+        const renderAsDesktopGrid = shellId === "window" || shellId === "base" || shellId === "minimal";
+
+        if (renderAsDesktopGrid) {
+            const navigateHomeView = (view: string, params?: Record<string, string>) => {
+                if (!view) return;
+                this.shellContext?.navigate?.(view as any, params);
+            };
+            const desktop = H`
+                <div class="view-home view-home--grid" data-home-layout="grid"></div>
+            ` as HTMLElement;
+            const speedDial = SpeedDial(navigateHomeView);
+            desktop.append(speedDial);
+            createCtxMenu(navigateHomeView);
+            this.element = desktop;
+            return desktop;
+        }
 
         this.element = H`
             <div class="view-home">
