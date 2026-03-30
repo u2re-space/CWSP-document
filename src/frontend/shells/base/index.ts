@@ -33,6 +33,8 @@ export class BaseShell extends ShellBase {
         supportsMultiView: false,
         supportsWindowing: false
     };
+    private wcoGeometryHandler: (() => void) | null = null;
+    private wcoResizeHandler: (() => void) | null = null;
 
     protected createLayout(): HTMLElement {
         const root = H`
@@ -55,6 +57,63 @@ export class BaseShell extends ShellBase {
         // Base shell uses simplified navigation
         this.setupHashNavigation();
         this.setupPopstateNavigation();
+        this.bindWindowControlsOverlay();
+    }
+
+    unmount(): void {
+        this.unbindWindowControlsOverlay();
+        super.unmount();
+    }
+
+    private bindWindowControlsOverlay(): void {
+        const nav = (globalThis?.navigator as any) || {};
+        const overlay = nav?.windowControlsOverlay;
+        const host = this.rootElement as HTMLElement | null;
+        if (!host || !overlay) return;
+
+        const update = () => {
+            const isVisible = Boolean(overlay?.visible);
+            host.setAttribute("data-wco-visible", isVisible ? "true" : "false");
+            const rect = overlay?.getTitlebarAreaRect?.();
+            if (isVisible && rect) {
+                host.style.setProperty("--wco-titlebar-x", `${Math.max(0, Number(rect.x) || 0)}px`);
+                host.style.setProperty("--wco-titlebar-y", `${Math.max(0, Number(rect.y) || 0)}px`);
+                host.style.setProperty("--wco-titlebar-width", `${Math.max(0, Number(rect.width) || 0)}px`);
+                host.style.setProperty("--wco-titlebar-height", `${Math.max(0, Number(rect.height) || 0)}px`);
+            } else {
+                host.style.setProperty("--wco-titlebar-x", "0px");
+                host.style.setProperty("--wco-titlebar-y", "0px");
+                host.style.setProperty("--wco-titlebar-width", "0px");
+                host.style.setProperty("--wco-titlebar-height", "0px");
+            }
+        };
+
+        this.wcoGeometryHandler = () => update();
+        this.wcoResizeHandler = () => update();
+        try {
+            overlay?.addEventListener?.("geometrychange", this.wcoGeometryHandler);
+        } catch {
+            // ignore unsupported implementations
+        }
+        globalThis?.addEventListener?.("resize", this.wcoResizeHandler);
+        update();
+    }
+
+    private unbindWindowControlsOverlay(): void {
+        const nav = (globalThis?.navigator as any) || {};
+        const overlay = nav?.windowControlsOverlay;
+        if (overlay && this.wcoGeometryHandler) {
+            try {
+                overlay?.removeEventListener?.("geometrychange", this.wcoGeometryHandler);
+            } catch {
+                // ignore unsupported implementations
+            }
+        }
+        if (this.wcoResizeHandler) {
+            globalThis?.removeEventListener?.("resize", this.wcoResizeHandler);
+        }
+        this.wcoGeometryHandler = null;
+        this.wcoResizeHandler = null;
     }
 }
 

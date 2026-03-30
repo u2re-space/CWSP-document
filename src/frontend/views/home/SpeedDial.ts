@@ -1,5 +1,5 @@
 import { observe, numberRef, propRef, stringRef, affected } from "fest/object";
-import { E, H, orientRef, M, provide, registerModal, handleIncomingEntries, pointerAnchorRef, bindInteraction } from "fest/lure";
+import { E, H, orientRef, M, provide, handleIncomingEntries, pointerAnchorRef, bindInteraction } from "fest/lure";
 import * as LureModule from "fest/lure";
 import { actionRegistry, iconsPerAction, labelsPerAction } from "@rs-core/utils/Actions";
 import { showSuccess, showError } from "@rs-frontend/items/Toast";
@@ -29,6 +29,7 @@ import {
 import { isInFocus, MOCElement } from "fest/dom";
 import { writeFileSmart } from "@rs-core/storage/WriteFileSmart-v2";
 import type { GridItemType } from "fest/core";
+import { openShortcutEditor } from "./ShortcutEditor";
 let ctxMenuBound = false;
 let homeViewOpener: ((view: string, params?: Record<string, string>) => void) | null = null;
 let persistItemsTimer: ReturnType<typeof setTimeout> | null = null;
@@ -147,7 +148,9 @@ const attachItemNode = (item: SpeedDialItem, el?: HTMLElement | null, interactiv
                 return;
             }
             ev?.preventDefault?.();
-            if (!MOCElement(ev?.target as any, "[data-dragging]")) {
+            const interactionState = String((el as HTMLElement)?.dataset?.interactionState || "");
+            const blockedByInteraction = interactionState === "onGrab" || interactionState === "onMoving" || interactionState === "onRelax";
+            if (!blockedByInteraction && !MOCElement(ev?.target as any, '[data-interaction-state="onMoving"],[data-interaction-state="onGrab"],[data-interaction-state="onRelax"]')) {
                 runItemAction(item, undefined, { event: ev, initiator: el }, makeView);
             }
         });
@@ -192,7 +195,9 @@ const attachItemNode = (item: SpeedDialItem, el?: HTMLElement | null, interactiv
 };
 
 const deriveCellFromEvent = (ev?: MouseEvent): GridCell =>{
-    const grid = document.querySelector<HTMLElement>("#home .speed-dial-grid");
+    const grid = document.querySelector<HTMLElement>('#home .speed-dial-grid[data-grid-layer="icons"]')
+        || document.querySelector<HTMLElement>("#home .speed-dial-grid:last-of-type")
+        || document.querySelector<HTMLElement>("#home .speed-dial-grid");
     if (!grid || !ev) return [0, 0];
     if (resolveGridCellFromPoint) {
         return resolveGridCellFromPoint(grid, [ev.clientX, ev.clientY], {
@@ -211,7 +216,9 @@ const deriveCellFromEvent = (ev?: MouseEvent): GridCell =>{
 };
 
 const deriveCellFromCoordinate = (coordinate: [number, number]): GridCell =>{
-    const grid = document.querySelector<HTMLElement>("#home .speed-dial-grid");
+    const grid = document.querySelector<HTMLElement>('#home .speed-dial-grid[data-grid-layer="icons"]')
+        || document.querySelector<HTMLElement>("#home .speed-dial-grid:last-of-type")
+        || document.querySelector<HTMLElement>("#home .speed-dial-grid");
     if (!grid || !coordinate) return [0, 0];
     if (resolveGridCellFromPoint) {
         return resolveGridCellFromPoint(grid, coordinate, {
@@ -473,153 +480,50 @@ const openItemEditor = (item?: SpeedDialItem, opts?: {
         description: workingMeta?.description || ""
     };
 
-    const modal = H`<div class="rs-modal-backdrop speed-dial-editor">
-        <form class="modal-form speed-dial-editor__form">
-            <header class="modal-header">
-                <h2 class="modal-title">${isNew ? "Create shortcut" : "Edit shortcut"}</h2>
-                <p class="modal-description">Configure quick access tiles for frequently used views or links.</p>
-            </header>
-            <div class="modal-fields">
-                <label class="modal-field">
-                    <span>Label</span>
-                    <input name="label" type="text" minlength="1" required value="${draft.label}" />
-                </label>
-                <label class="modal-field">
-                    <span>Icon</span>
-                    <input name="icon" type="text" placeholder="phosphor icon name" value="${draft.icon}" />
-                </label>
-                <label class="modal-field">
-                    <span>Action</span>
-                    <select name="action"></select>
-                </label>
-                <label class="modal-field" data-field="view">
-                    <span>View</span>
-                    <select name="view">
-                        <option value="">Choose view</option>
-                    </select>
-                </label>
-                <label class="modal-field" data-field="href">
-                    <span>Link</span>
-                    <input name="href" type="url" placeholder="https://example.com" value="${draft.href}"/>
-                </label>
-                <label class="modal-field">
-                    <span>Description</span>
-                    <textarea name="description" rows="2" placeholder="Optional description">${draft.description}</textarea>
-                </label>
-            </div>
-            <footer class="modal-actions">
-                <div class="modal-actions-left">
-                    ${!isNew ? H`<button type="button" data-action="delete" class="btn danger">Delete</button>` : null}
-                </div>
-                <div class="modal-actions-right">
-                    <button type="button" data-action="cancel" class="btn secondary">Cancel</button>
-                    <button type="submit" class="btn save">Save</button>
-                </div>
-            </footer>
-        </form>
-    </div>`;
-
-    const form = modal.querySelector("form") as HTMLFormElement;
-    const actionSelect = form?.querySelector<HTMLSelectElement>('select[name="action"]');
-    const viewSelect = form?.querySelector<HTMLSelectElement>('select[name="view"]');
-    const viewField = form?.querySelector<HTMLElement>('[data-field="view"]');
-    const hrefField = form?.querySelector<HTMLElement>('[data-field="href"]');
-    const appendOption = (select: HTMLSelectElement | null, value: string, label: string, selected = false) => {
-        if (!select) return;
-        const option = document.createElement("option");
-        option.value = value;
-        option.textContent = label;
-        option.selected = selected;
-        select.append(option);
-    };
-    if (actionSelect) {
-        actionSelect.innerHTML = "";
-        ACTION_OPTIONS.forEach((option) => {
-            appendOption(actionSelect, option.value, option.label, option.value === draft.action);
-        });
-    }
-    if (viewSelect) {
-        // Keep first placeholder option from template and append registered views.
-        NAVIGATION_SHORTCUTS.forEach((shortcut) => {
-            appendOption(viewSelect, String(shortcut.view || ""), String(shortcut.label || shortcut.view || ""), shortcut.view === draft.view);
-        });
-        if (!draft.view) {
-            viewSelect.selectedIndex = 0;
-        }
-    }
-
-    const toggleFieldVisibility = ()=>{
-        const value = actionSelect?.value;
-        if (viewField) viewField.hidden = value !== "open-view";
-        if (hrefField) hrefField.hidden = !(value === "open-link" || value === "copy-link");
-    };
-
-    actionSelect?.addEventListener("change", toggleFieldVisibility);
-    toggleFieldVisibility();
-
-    let unregisterBackNav: (() => void) | null = null;
-
-    const closeModal = ()=>{
-        unregisterBackNav?.();
-        modal?.remove?.();
-        document.removeEventListener("keydown", escHandler);
-    };
-
-    const escHandler = (ev: KeyboardEvent)=>{
-        if (ev.key === "Escape") {
-            closeModal();
-        }
-    };
-    document.addEventListener("keydown", escHandler);
-
-    modal.addEventListener("click", (ev: Event)=>{
-        if (ev.target === modal) {
-            closeModal();
-        }
-    });
-
-    // Register modal with back navigation system for mobile back gesture support
-    unregisterBackNav = registerModal(modal as HTMLElement, undefined, closeModal);
-
-    form?.addEventListener("submit", (ev)=>{
-        ev?.preventDefault?.();
-        const formData = new FormData(form);
-        workingItem.label.value = (formData.get("label") as string || "").trim();
-        workingItem.icon.value = (formData.get("icon") as string || "").trim() || "sparkle";
-        workingItem.action = (formData.get("action") as string) || "open-view";
-        workingMeta.action = workingItem.action;
-        workingMeta.view = (formData.get("view") as string || "").trim();
-        workingMeta.href = (formData.get("href") as string || "").trim();
-        workingMeta.description = (formData.get("description") as string || "").trim();
-        if (isNew) {
-            addSpeedDialItem(workingItem);
-        } else {
-            upsertSpeedDialItem(workingItem);
-        }
-        persistSpeedDialItems();
-        persistSpeedDialMeta();
-        showSuccess(isNew ? "Shortcut created" : "Shortcut updated");
-        closeModal();
-    });
-
-    form?.addEventListener("click", (ev: Event)=>{
-        const target = ev.target as HTMLElement;
-        const action = target?.dataset?.action;
-        if (action === "cancel") {
-            ev.preventDefault();
-            closeModal();
-        }
-        if (action === "delete" && !isNew) {
-            ev.preventDefault();
-            removeSpeedDialItem(workingItem.id);
+    openShortcutEditor({
+        mode: isNew ? "create" : "edit",
+        initial: {
+            label: draft.label,
+            icon: draft.icon,
+            action: draft.action,
+            href: draft.href,
+            view: draft.view,
+            description: draft.description
+        },
+        actionOptions: ACTION_OPTIONS,
+        viewOptions: NAVIGATION_SHORTCUTS.map((shortcut) => ({
+            value: String(shortcut.view || ""),
+            label: String(shortcut.label || shortcut.view || "")
+        })),
+        registerForBackNavigation: true,
+        isViewAction: (value) => value === "open-view",
+        isHrefAction: (value) => value === "open-link" || value === "copy-link",
+        onSave: (next) => {
+            workingItem.label.value = next.label;
+            workingItem.icon.value = next.icon || "sparkle";
+            workingItem.action = next.action || "open-view";
+            workingMeta.action = workingItem.action;
+            workingMeta.view = next.view;
+            workingMeta.href = next.href;
+            workingMeta.description = next.description;
+            if (isNew) {
+                addSpeedDialItem(workingItem);
+            } else {
+                upsertSpeedDialItem(workingItem);
+            }
             persistSpeedDialItems();
             persistSpeedDialMeta();
-            showSuccess("Shortcut removed");
-            closeModal();
-        }
+            showSuccess(isNew ? "Shortcut created" : "Shortcut updated");
+        },
+        onDelete: isNew
+            ? undefined
+            : () => {
+                removeSpeedDialItem(workingItem.id);
+                persistSpeedDialItems();
+                persistSpeedDialMeta();
+                showSuccess("Shortcut removed");
+            }
     });
-
-    document.body.append(modal);
 };
 
 export function createCtxMenu(makeView?: any) {

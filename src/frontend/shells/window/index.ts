@@ -89,6 +89,7 @@ export class WindowShell extends ShellBase {
     private dockStartElement: HTMLElement | null = null;
     private dockQuickElement: HTMLElement | null = null;
     private pinnedViews: ViewId[] = [];
+    private shellPreferenceHandler: (() => void) | null = null;
 
     private async loadWindowView(
         viewId: ViewId,
@@ -152,6 +153,7 @@ export class WindowShell extends ShellBase {
             this.rootElement.style.zIndex = "1";
         }
         this.bindOverlayChrome();
+        this.bindShellPreferenceSync();
 
         this.initStatusBar();
         this.bindBrowserNavigation();
@@ -171,6 +173,13 @@ export class WindowShell extends ShellBase {
             globalThis?.removeEventListener?.("cw:view-open-request", this.openRequestHandler);
             this.openRequestHandler = null;
         }
+        if (this.shellPreferenceHandler) {
+            globalThis?.removeEventListener?.("focus", this.shellPreferenceHandler);
+            globalThis?.removeEventListener?.("blur", this.shellPreferenceHandler);
+            globalThis?.removeEventListener?.("pageshow", this.shellPreferenceHandler);
+            document?.removeEventListener?.("visibilitychange", this.shellPreferenceHandler);
+            this.shellPreferenceHandler = null;
+        }
         if (this.statusTimer) {
             clearInterval(this.statusTimer);
             this.statusTimer = null;
@@ -185,6 +194,24 @@ export class WindowShell extends ShellBase {
         this.processes.clear();
         this.activePid = null;
         super.unmount();
+    }
+
+    private bindShellPreferenceSync(): void {
+        const persistWindow = () => {
+            try {
+                localStorage.setItem("rs-boot-shell", "window");
+            } catch {
+                // ignore storage failures
+            }
+        };
+        persistWindow();
+        if (!this.shellPreferenceHandler) {
+            this.shellPreferenceHandler = () => persistWindow();
+            globalThis?.addEventListener?.("focus", this.shellPreferenceHandler);
+            globalThis?.addEventListener?.("blur", this.shellPreferenceHandler);
+            globalThis?.addEventListener?.("pageshow", this.shellPreferenceHandler);
+            document?.addEventListener?.("visibilitychange", this.shellPreferenceHandler);
+        }
     }
 
     async navigate(viewId: ViewId, params?: Record<string, string>): Promise<void> {

@@ -25,6 +25,10 @@
         --shell-sidebar-width: 0;
         --shell-status-height: 24px;
         --shell-padding: 0;
+        --wco-titlebar-x: env(titlebar-area-x, 0px);
+        --wco-titlebar-y: env(titlebar-area-y, 0px);
+        --wco-titlebar-width: env(titlebar-area-width, 100vi);
+        --wco-titlebar-height: env(titlebar-area-height, 0px);
     }
 
     :is(:root, html):has([data-shell="base"][data-theme="dark"]) {
@@ -322,6 +326,44 @@
 
         & > * {
             flex: 1;
+        }
+    }
+
+    /*
+     * Window Controls Overlay support for installed desktop PWA windows.
+     * Keep content clear of titlebar controls using both env() and runtime geometry vars.
+     */
+    @media (display-mode: window-controls-overlay) {
+        :where(.app-shell[data-wco-visible="true"], .app-shell[data-style="raw"][data-wco-visible="true"]) .app-shell__content {
+            --wco-safe-top: max(
+                env(safe-area-inset-top, 0px),
+                calc(var(--wco-titlebar-y, env(titlebar-area-y, 0px)) + var(--wco-titlebar-height, env(titlebar-area-height, 0px)))
+            );
+            padding-block-start: max(
+                0px,
+                var(--wco-safe-top)
+            );
+            padding-inline-start: 0;
+            padding-inline-end: 0;
+            position: relative;
+            isolation: isolate;
+        }
+
+        :where(.app-shell[data-wco-visible="true"], .app-shell[data-style="raw"][data-wco-visible="true"]) .app-shell__content::before {
+            content: "";
+            position: absolute;
+            inset-block-start: 0;
+            inset-inline: 0;
+            block-size: var(--wco-safe-top, 0px);
+            background: color-mix(in oklab, var(--shell-nav-bg, var(--color-surface-container-high, #1f2937)) 88%, transparent);
+            border-block-end: 1px solid color-mix(in oklab, var(--shell-nav-border, var(--color-outline-variant, #334155)) 70%, transparent);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        :where(.app-shell[data-wco-visible="true"], .app-shell[data-style="raw"][data-wco-visible="true"]) .app-shell__content > * {
+            position: relative;
+            z-index: 1;
         }
     }
 

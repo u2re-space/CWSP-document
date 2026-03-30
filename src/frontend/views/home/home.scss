@@ -115,7 +115,9 @@
             filter: drop-shadow(0px 0px 0.25rem #0004) !important;
 
             // Visuals
-            transition: filter var(--transition-fast) var(--ease-out);
+            transition:
+                transform var(--drag-settle-ms, 200ms) cubic-bezier(0.22, 0.8, 0.3, 1),
+                filter var(--transition-fast) var(--ease-out);
             contain: none;
             overflow: visible;
             user-select: none;
@@ -208,8 +210,7 @@
 
             .ui-ws-item-label {
                 position: absolute;
-                inset-inline: 50% auto auto;
-                inset-block-start: 100%;
+                inset: 0;
                 pointer-events: none;
                 text-align: center;
                 place-content: center;
@@ -218,18 +219,18 @@
                 grid-row: 1 / -1;
                 perspective: 1000;
                 backface-visibility: hidden;
-                transform: translate3d(-50%, 0.48rem, 0px);
+                transform: translate3d(0px, calc(50% + 0.68rem), 0px);
                 color: var(--on-surface-color, currentColor);
                 background-color: transparent;
                 background-image: none;
                 white-space: nowrap;
                 aspect-ratio: auto;
 
-                inline-size: max-content;
-                max-inline-size: min(11rem, 92%);
-                min-inline-size: 1px;
+                inline-size: 100%;
+                max-inline-size: 100%;
+                min-inline-size: 0px;
                 min-block-size: 1px;
-                block-size: auto;
+                block-size: 100%;
                 line-height: 1.2;
                 overflow: visible;
                 display: grid;
@@ -256,7 +257,7 @@
                     pointer-events: none;
                     text-align: center;
                     line-height: 1.25;
-                    inline-size: auto;
+                    inline-size: 100%;
 
                     min-block-size: 1px;
                     block-size: fit-content;
@@ -273,7 +274,8 @@
                 will-change: transform;
             }
 
-            &[data-dragging] {
+            &[data-interaction-state="onGrab"],
+            &[data-interaction-state="onMoving"] {
                 will-change: transform;
                 cursor: grabbing;
                 transition: none !important;
@@ -290,6 +292,18 @@
                     opacity: 1;
                     pointer-events: none;
                 }
+            }
+
+            &[data-interaction-state="onRelax"] {
+                will-change: transform;
+                transform:
+                    translate3d(
+                        calc(var(--cs-drag-x, calc(var(--drag-x, 0) * 1px)) + var(--cs-transition-c, 0px)),
+                        calc(var(--cs-drag-y, calc(var(--drag-y, 0) * 1px)) + var(--cs-transition-r, 0px)),
+                        0px
+                    )
+                    scale3d(var(--scale, 1), var(--scale, 1), var(--scale, 1))
+                    translate3d(var(--translate-x, 0px), var(--translate-y, 0px), 0px) !important;
             }
 
             &[data-layer="labels"] {

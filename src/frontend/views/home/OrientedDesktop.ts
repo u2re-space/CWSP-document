@@ -3,6 +3,8 @@ import { requestOpenView } from "../../shared/view-api";
 import type { ViewId } from "../../shells/types";
 import { openUnifiedContextMenu, closeUnifiedContextMenu, type ContextMenuEntry } from "../../items/ContextMenu";
 import { setAppWallpaper } from "../../items/Canvas";
+import { ENABLED_VIEW_IDS, pickEnabledView } from "../../config/views";
+import { openShortcutEditor } from "./ShortcutEditor";
 
 type DesktopAction = "open-view" | "open-link";
 
@@ -28,6 +30,10 @@ const SUPPRESS_CLICK_MS = 280;
 const ITEM_ENVELOPE_KIND = "cw-speed-dial-item";
 const REGISTRY_ENVELOPE_KIND = "cw-speed-dial-registry";
 const URL_PATTERN = /(https?:\/\/[^\s<>"']+)/i;
+const ACTION_OPTIONS: Array<{ value: DesktopAction; label: string }> = [
+    { value: "open-view", label: "Open view" },
+    { value: "open-link", label: "Open link" }
+];
 
 const DEFAULT_STATE: DesktopState = {
     columns: 6,
@@ -341,6 +347,12 @@ const openDesktopItem = (item: DesktopItem): void => {
     });
 };
 
+const prettifyView = (viewId: string): string => {
+    const value = String(viewId || "").trim();
+    if (!value) return "View";
+    return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
 export const initializeOrientedDesktop = (host: HTMLElement): void => {
     if (!host || host.dataset.desktopMounted === "true") return;
     host.dataset.desktopMounted = "true";
@@ -432,6 +444,41 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
         }
         if (added > 0) persistState(state);
         return added;
+    };
+    const refreshDesktopItemNodes = (item: DesktopItem): void => {
+        const iconNode = iconNodeById.get(item.id);
+        const labelNode = labelNodeById.get(item.id);
+        if (labelNode) {
+            const span = labelNode.querySelector(".ui-ws-item-label span") as HTMLElement | null;
+            if (span) span.textContent = item.label || "Item";
+            applyCellVars(labelNode, item.cell);
+        }
+        if (iconNode) {
+            const iconShape = iconNode.querySelector(".ui-ws-item-icon") as HTMLElement | null;
+            const iconElement = iconNode.querySelector("ui-icon") as HTMLElement | null;
+            if (iconElement) iconElement.setAttribute("icon", item.icon || "sparkle");
+            if (iconShape) {
+                const existingImage = iconShape.querySelector(".ui-ws-item-icon-image") as HTMLImageElement | null;
+                if (item.iconSrc) {
+                    if (existingImage) {
+                        existingImage.src = item.iconSrc;
+                    } else {
+                        const image = document.createElement("img");
+                        image.className = "ui-ws-item-icon-image";
+                        image.alt = "";
+                        image.loading = "lazy";
+                        image.decoding = "async";
+                        image.referrerPolicy = "no-referrer";
+                        image.src = item.iconSrc;
+                        image.addEventListener("error", () => image.remove());
+                        iconShape.insertBefore(image, iconShape.firstChild);
+                    }
+                } else if (existingImage) {
+                    existingImage.remove();
+                }
+            }
+            applyCellVars(iconNode, item.cell);
+        }
     };
     const guessCellFromPoint = (x: number, y: number): [number, number] => {
         const rect = iconsGrid.getBoundingClientRect();
@@ -554,17 +601,23 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
 
         iconNode.addEventListener("m-dragstart", () => {
             closeUnifiedContextMenu();
-            iconNode.dataset.dragging = "true";
+            iconNode.dataset.interactionState = "onGrab";
+            iconNode.dataset.gridCoordinateState = "source";
             const labelNode = labelNodeById.get(item.id);
             if (labelNode) {
-                labelNode.dataset.dragging = "true";
+                labelNode.dataset.interactionState = "onGrab";
+                labelNode.dataset.gridCoordinateState = "source";
                 applyCellVars(labelNode, item.cell);
             }
         });
 
         iconNode.addEventListener("m-dragging", () => {
+            iconNode.dataset.interactionState = "onMoving";
+            iconNode.dataset.gridCoordinateState = "intermediate";
             const labelNode = labelNodeById.get(item.id);
             if (labelNode) {
+                labelNode.dataset.interactionState = "onMoving";
+                labelNode.dataset.gridCoordinateState = "intermediate";
                 labelNode.style.setProperty("--drag-x", iconNode.style.getPropertyValue("--drag-x") || "0");
                 labelNode.style.setProperty("--drag-y", iconNode.style.getPropertyValue("--drag-y") || "0");
             }
@@ -572,18 +625,49 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
 
         iconNode.addEventListener("m-dragend", () => {
             suppressClickUntil = performance.now() + SUPPRESS_CLICK_MS;
-        });
-
-        iconNode.addEventListener("m-dragsettled", () => {
+            iconNode.dataset.interactionState = "onRelax";
+            iconNode.dataset.gridCoordinateState = "destination";
             const labelNode = labelNodeById.get(item.id);
             if (labelNode) {
-                labelNode.removeAttribute("data-dragging");
+                labelNode.dataset.interactionState = "onRelax";
+                labelNode.dataset.gridCoordinateState = "destination";
+            }
+        });
+
+        iconNode.addEventListener("m-dragsettled", (event: Event) => {
+            const settledCell = ((event as CustomEvent<{ cell?: [number, number] | null }>)?.detail?.cell || null) as [number, number] | null;
+            const preferredCell: [number, number] = settledCell
+                ? [settledCell[0], settledCell[1]]
+                : [item.cell[0], item.cell[1]];
+            const finalCell = placeItemIntoFreeCell(item, preferredCell, item.id);
+
+            const labelNode = labelNodeById.get(item.id);
+            if (labelNode) {
+                labelNode.dataset.interactionState = "onPlace";
+                labelNode.dataset.gridCoordinateState = "destination";
                 labelNode.style.setProperty("--drag-x", "0");
                 labelNode.style.setProperty("--drag-y", "0");
-                applyCellVars(labelNode, item.cell);
+                labelNode.style.setProperty("--cs-drag-x", "0px");
+                labelNode.style.setProperty("--cs-drag-y", "0px");
+                applyCellVars(labelNode, finalCell);
             }
-            placeItemIntoFreeCell(item, item.cell, item.id);
+            iconNode.dataset.interactionState = "onPlace";
+            iconNode.dataset.gridCoordinateState = "destination";
+            iconNode.style.setProperty("--drag-x", "0");
+            iconNode.style.setProperty("--drag-y", "0");
+            iconNode.style.setProperty("--cs-drag-x", "0px");
+            iconNode.style.setProperty("--cs-drag-y", "0px");
+            applyCellVars(iconNode, finalCell);
             persistState(state);
+            setTimeout(() => {
+                iconNode.dataset.interactionState = "onHover";
+                iconNode.dataset.gridCoordinateState = "source";
+                const nextLabelNode = labelNodeById.get(item.id);
+                if (nextLabelNode) {
+                    nextLabelNode.dataset.interactionState = "onHover";
+                    nextLabelNode.dataset.gridCoordinateState = "source";
+                }
+            }, 220);
         });
 
         iconShape.addEventListener("click", (event) => {
@@ -597,6 +681,72 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
     const createLinkShortcutFromClipboard = async (cell: [number, number]): Promise<boolean> => {
         return importFromClipboard(cell);
     };
+    const openItemEditor = (
+        item?: DesktopItem | null,
+        opts?: { suggestedCell?: [number, number]; seed?: Partial<{ label: string; icon: string; action: DesktopAction; viewId: string; href: string; description: string }> }
+    ): void => {
+        const isNew = !item;
+        const seed = opts?.seed || {};
+        const suggestedCell = opts?.suggestedCell || [0, 0];
+        const workingItem: DesktopItem = item ? item : {
+            id: createDesktopItemId("item"),
+            label: seed.label || "New shortcut",
+            icon: seed.icon || "sparkle",
+            iconSrc: "",
+            viewId: pickEnabledView(seed.viewId || "viewer", "home"),
+            cell: suggestedCell,
+            action: seed.action || "open-view",
+            href: seed.href || ""
+        };
+        openShortcutEditor({
+            mode: isNew ? "create" : "edit",
+            initial: {
+                label: workingItem.label || "Item",
+                icon: workingItem.icon || "sparkle",
+                action: workingItem.action || "open-view",
+                view: workingItem.viewId || "",
+                href: workingItem.href || "",
+                description: String(seed.description || "")
+            },
+            actionOptions: ACTION_OPTIONS,
+            viewOptions: ENABLED_VIEW_IDS.map((viewId) => ({ value: viewId, label: prettifyView(viewId) })),
+            onSave: (next) => {
+                const action = String(next.action || "open-view") as DesktopAction;
+                const nextHref = String(next.href || "").trim();
+                const nextView = pickEnabledView(String(next.view || workingItem.viewId || "viewer"), "home");
+                workingItem.label = String(next.label || "Item").trim() || "Item";
+                workingItem.icon = String(next.icon || "sparkle").trim() || "sparkle";
+                workingItem.action = action;
+                workingItem.href = action === "open-link" ? nextHref : "";
+                workingItem.viewId = action === "open-link" ? "home" : nextView;
+                if (action === "open-link" && nextHref) {
+                    try {
+                        workingItem.iconSrc = faviconForUrl(new URL(nextHref));
+                    } catch {
+                        workingItem.iconSrc = "";
+                    }
+                } else {
+                    workingItem.iconSrc = "";
+                }
+                if (isNew) {
+                    addItems([workingItem], suggestedCell);
+                } else {
+                    const existing = itemById.get(workingItem.id);
+                    if (existing) {
+                        Object.assign(existing, workingItem);
+                        itemById.set(existing.id, existing);
+                        refreshDesktopItemNodes(existing);
+                        persistState(state);
+                    }
+                }
+            },
+            onDelete: isNew
+                ? undefined
+                : () => {
+                    removeDesktopItem(workingItem.id);
+                }
+        });
+    };
 
     const openDesktopMenu = (event: MouseEvent, item: DesktopItem | null, cellHint: [number, number]): void => {
         const entries: ContextMenuEntry[] = item
@@ -608,7 +758,7 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
                     action: () => openDesktopItem(item)
                 },
                 {
-                    id: "item-actions",
+                    id: "actions",
                     label: "Actions",
                     icon: "dots-three",
                     action: () => {},
@@ -646,6 +796,20 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
                                 }
                             }
                         },
+                    ]
+                },
+                {
+                    id: "manage",
+                    label: "Manage",
+                    icon: "wrench",
+                    action: () => {},
+                    children: [
+                        {
+                            id: "edit",
+                            label: "Edit Properties",
+                            icon: "pencil-simple-line",
+                            action: () => openItemEditor(item, { suggestedCell: item.cell })
+                        },
                         {
                             id: "remove",
                             label: "Remove",
@@ -665,14 +829,31 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
                     action: () => {},
                     children: [
                         {
+                            id: "create-shortcut",
+                            label: "Create shortcut",
+                            icon: "plus",
+                            action: () => openItemEditor(undefined, { suggestedCell: cellHint })
+                        },
+                        {
                             id: "paste-link",
-                            label: "Paste from clipboard",
+                            label: "Paste shortcut",
                             icon: "clipboard",
                             action: async () => {
                                 const created = await createLinkShortcutFromClipboard(cellHint);
                                 if (!created) {
                                     requestOpenView({ viewId: "explorer", target: "window", params: { source: "home" } });
                                 }
+                            }
+                        },
+                        {
+                            id: "create-link-shortcut",
+                            label: "Create link shortcut",
+                            icon: "link",
+                            action: () => {
+                                openItemEditor(undefined, {
+                                    suggestedCell: cellHint,
+                                    seed: { action: "open-link", label: "New link", icon: "link", href: "", description: "" }
+                                });
                             }
                         }
                     ]

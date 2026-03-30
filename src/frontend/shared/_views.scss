@@ -1,4 +1,5 @@
 @use "veela-lib" as *;
+@use "../views/home/home";
 @layer tokens, base, layout, utilities, shells, shell, views, view, viewer, components, ux-layer, markdown, essentials, print, print-breaks, view-transitions, overrides;
 
 // ─── Cross-document View Transitions (CSS View Transitions Level 2) ───────────
