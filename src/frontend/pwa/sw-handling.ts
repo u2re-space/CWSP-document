@@ -125,7 +125,9 @@ export const initServiceWorker = async (_options: { immediate?: boolean, onRegis
     _swInitPromise = (async () => {
         // Skip in extension context
         if (typeof globalThis === 'undefined') return null;
-        if (globalThis?.location?.protocol === 'chrome-extension:') return null;
+        const protocol = (globalThis?.location?.protocol || '').toLowerCase();
+        if (protocol === 'chrome-extension:' || protocol === 'file:' || protocol === 'about:') return null;
+        if (protocol !== 'https:' && protocol !== 'http:') return null;
         if (!('serviceWorker' in navigator)) {
             console.warn('[PWA] Service workers not supported');
             return null;

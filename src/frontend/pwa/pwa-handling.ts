@@ -36,6 +36,12 @@ const isExtension = () => {
     }
 };
 
+const isServiceWorkerAllowedContext = () => {
+    const protocol = (globalThis?.location?.protocol || "").toLowerCase();
+    if (protocol === "chrome-extension:" || protocol === "file:" || protocol === "about:") return false;
+    return protocol === "https:" || protocol === "http:";
+};
+
 // ============================================================================
 // ASSET UPDATE SYSTEM
 // ============================================================================
@@ -250,7 +256,7 @@ class ServiceWorkerUpdateManager {
     }
 
     async register(): Promise<ServiceWorkerRegistration | null> {
-        if (!('serviceWorker' in navigator) || isExtension()) {
+        if (!('serviceWorker' in navigator) || isExtension() || !isServiceWorkerAllowedContext()) {
             return null;
         }
 

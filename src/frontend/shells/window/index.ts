@@ -89,7 +89,6 @@ export class WindowShell extends ShellBase {
     private dockStartElement: HTMLElement | null = null;
     private dockQuickElement: HTMLElement | null = null;
     private pinnedViews: ViewId[] = [];
-    private shellPreferenceHandler: (() => void) | null = null;
 
     private async loadWindowView(
         viewId: ViewId,
@@ -153,7 +152,6 @@ export class WindowShell extends ShellBase {
             this.rootElement.style.zIndex = "1";
         }
         this.bindOverlayChrome();
-        this.bindShellPreferenceSync();
 
         this.initStatusBar();
         this.bindBrowserNavigation();
@@ -173,13 +171,6 @@ export class WindowShell extends ShellBase {
             globalThis?.removeEventListener?.("cw:view-open-request", this.openRequestHandler);
             this.openRequestHandler = null;
         }
-        if (this.shellPreferenceHandler) {
-            globalThis?.removeEventListener?.("focus", this.shellPreferenceHandler);
-            globalThis?.removeEventListener?.("blur", this.shellPreferenceHandler);
-            globalThis?.removeEventListener?.("pageshow", this.shellPreferenceHandler);
-            document?.removeEventListener?.("visibilitychange", this.shellPreferenceHandler);
-            this.shellPreferenceHandler = null;
-        }
         if (this.statusTimer) {
             clearInterval(this.statusTimer);
             this.statusTimer = null;
@@ -194,24 +185,6 @@ export class WindowShell extends ShellBase {
         this.processes.clear();
         this.activePid = null;
         super.unmount();
-    }
-
-    private bindShellPreferenceSync(): void {
-        const persistWindow = () => {
-            try {
-                localStorage.setItem("rs-boot-shell", "window");
-            } catch {
-                // ignore storage failures
-            }
-        };
-        persistWindow();
-        if (!this.shellPreferenceHandler) {
-            this.shellPreferenceHandler = () => persistWindow();
-            globalThis?.addEventListener?.("focus", this.shellPreferenceHandler);
-            globalThis?.addEventListener?.("blur", this.shellPreferenceHandler);
-            globalThis?.addEventListener?.("pageshow", this.shellPreferenceHandler);
-            document?.addEventListener?.("visibilitychange", this.shellPreferenceHandler);
-        }
     }
 
     async navigate(viewId: ViewId, params?: Record<string, string>): Promise<void> {
@@ -232,6 +205,7 @@ export class WindowShell extends ShellBase {
             }
             for (const task of this.processTasks.values()) {
                 task.dockItem.classList.remove("is-active");
+                this.syncDockItemState(task.processId);
             }
             this.updateUrlState("home", null, params, false);
             this.updateStatusBar();
@@ -347,12 +321,15 @@ export class WindowShell extends ShellBase {
             };
             this.processTasks.set(processId, task);
             this.dockAppsElement.appendChild(dockItem);
+            this.syncDockItemState(processId);
         } else {
             task.params = params || task.params;
             task.headless = task.headless || isHeadless;
+            this.syncDockItemState(processId);
         }
 
         if (isHeadless) {
+            this.syncDockItemState(processId);
             this.updateStatusBar();
             return task.lastActivePid || "";
         }
@@ -363,6 +340,7 @@ export class WindowShell extends ShellBase {
             existing.state = "open";
             existing.frame.hidden = false;
             task.lastActivePid = existing.pid;
+            this.syncDockItemState(processId);
             return existing.pid;
         }
 
@@ -406,6 +384,7 @@ export class WindowShell extends ShellBase {
             proc.state = "minimized";
             proc.frame.hidden = true;
         }
+        this.syncDockItemState(processId);
         this.updateStatusBar();
         return pid;
     }
@@ -439,8 +418,10 @@ export class WindowShell extends ShellBase {
                 class="app-window-shell__dock-item app-window-shell__dock-item--icon"
                 data-window-dock-item
                 data-process-id="${processId}"
+                data-window-state="idle"
                 title="${toTitle(viewId)}"
                 aria-label="${toTitle(viewId)}"
+                aria-pressed="false"
             >
                 <ui-icon icon="${iconForView(viewId)}"></ui-icon>
             </button>
@@ -465,6 +446,7 @@ export class WindowShell extends ShellBase {
                     this.activePid = null;
                     this.updateUrlState(this.navigationState.currentView, null, proc.params, true);
                 }
+                this.syncDockItemState(proc.processId);
                 this.updateStatusBar();
             }
             if (action === "maximize") {
@@ -485,6 +467,8 @@ export class WindowShell extends ShellBase {
                     task.unsubscribeChannel?.();
                     task.dockItem.remove();
                     this.processTasks.delete(task.processId);
+                } else if (task) {
+                    this.syncDockItemState(task.processId);
                 }
                 if (this.activePid === proc.pid) {
                     this.activePid = null;
@@ -607,11 +591,58 @@ export class WindowShell extends ShellBase {
             const active = taskItem.lastActivePid === proc.pid;
             taskItem.dockItem.classList.toggle("is-active", active);
         }
+        this.syncDockItemState(proc.processId);
 
         if (syncUrl) {
             this.updateUrlState(proc.viewId, proc.pid, proc.params, true);
         }
         this.updateStatusBar();
+    }
+
+    private minimizeProcess(pid: string, syncUrl: boolean): void {
+        const proc = this.processes.get(pid);
+        if (!proc) return;
+        proc.state = "minimized";
+        proc.frame.hidden = true;
+        proc.frame.classList.remove("is-active");
+        if (this.activePid === pid) {
+            this.activePid = null;
+            if (syncUrl) {
+                this.updateUrlState(this.navigationState.currentView, null, proc.params, true);
+            }
+        }
+        this.syncDockItemState(proc.processId);
+        this.updateStatusBar();
+    }
+
+    private syncDockItemState(processId: string): void {
+        const task = this.processTasks.get(processId);
+        if (!task) return;
+        const dockItem = task.dockItem;
+        const pids = [...task.instances];
+        const windows = pids
+            .map((pid) => this.processes.get(pid))
+            .filter((entry): entry is WindowProcess => Boolean(entry));
+        const openCount = windows.filter((entry) => entry.state === "open").length;
+        const minimizedCount = windows.filter((entry) => entry.state === "minimized").length;
+        const hasAny = windows.length > 0;
+        const active = !!task.lastActivePid && this.activePid === task.lastActivePid;
+        const state = task.headless && !hasAny
+            ? "headless"
+            : active
+                ? "active"
+                : openCount > 0
+                    ? "open"
+                    : minimizedCount > 0
+                        ? "minimized"
+                        : "idle";
+        dockItem.dataset.windowState = state;
+        dockItem.dataset.windowCount = String(windows.length);
+        dockItem.setAttribute("aria-pressed", state === "active" || state === "open" ? "true" : "false");
+        dockItem.classList.toggle("is-active", state === "active");
+        dockItem.classList.toggle("is-open", state === "open" || state === "active");
+        dockItem.classList.toggle("is-minimized", state === "minimized");
+        dockItem.classList.toggle("is-headless", state === "headless");
     }
 
     private updateUrlState(
@@ -880,6 +911,11 @@ export class WindowShell extends ShellBase {
             const pid = task.lastActivePid || [...task.instances][0];
             if (pid && this.processes.has(pid)) {
                 const proc = this.processes.get(pid)!;
+                const isActive = this.activePid === pid && proc.state === "open" && !proc.frame.hidden;
+                if (isActive) {
+                    this.minimizeProcess(pid, true);
+                    return;
+                }
                 proc.state = "open";
                 proc.frame.hidden = false;
                 this.focusProcess(pid, true);

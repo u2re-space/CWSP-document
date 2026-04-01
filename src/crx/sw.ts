@@ -553,8 +553,9 @@ const toViewerUrl = (source?: string | null, markdownKey?: string | null) => {
     if (!source) return VIEWER_URL;
     const p = new URLSearchParams();
     const isFileUrl = source.startsWith("file:");
-    // Never pass file:// as src to viewer to avoid unique-origin fetch attempts.
-    if (!isFileUrl) {
+    // Prefer preloaded markdown key for file:// pages. If preload failed, pass src so
+    // viewer can fallback to service-worker fetch bridge instead of opening empty state.
+    if (!isFileUrl || !markdownKey) {
         p.set("src", source);
     }
     if (markdownKey) p.set("mdk", markdownKey);

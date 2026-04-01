@@ -55,7 +55,7 @@ const normalizeShellPreference = (shell: ShellId | null | undefined): ShellId =>
     if (shell === "base" || shell === "minimal" || shell === "window") {
         return shell;
     }
-    return "window";
+    return "minimal";
 };
 
 const getShellFromQuery = (): ShellId | null => {
@@ -266,13 +266,12 @@ export function getSavedShellPreference(): ShellId | null {
         return fromQuery;
     }
 
-    // Canonical origin entry should always boot desktop shell unless explicitly overridden by ?shell=...
-    // This keeps "/" consistent even if a previous tab stored "base" for detached flows.
+    // Canonical origin entry defaults to minimal shell unless explicitly overridden by ?shell=...
     try {
         const isOriginRoot = normalizePathname(location.pathname) === "";
         if (isOriginRoot) {
-            localStorage.setItem("rs-boot-shell", "window");
-            return "window";
+            localStorage.setItem("rs-boot-shell", "minimal");
+            return "minimal";
         }
     } catch {
         // ignore URL/storage issues and continue with stored preference fallback
@@ -300,8 +299,9 @@ export const loadSubAppWithShell = async (
     shellId?: ShellId,
     initialView?: ViewId
 ): Promise<AppLoaderResult> => {
-    const shell = normalizeShellPreference(shellId || getSavedShellPreference() || "window");
-    const view = pickEnabledView(initialView || getViewFromPath() || "home", "home");
+    const shell = normalizeShellPreference(shellId || getSavedShellPreference() || "minimal");
+    const shellDefaultView = shell === "base" || shell === "minimal" ? "viewer" : "home";
+    const view = pickEnabledView(initialView || getViewFromPath() || shellDefaultView, "home");
     
     console.log('[App] Loading sub-app with shell:', shell, 'view:', view);
 
@@ -338,7 +338,7 @@ export const loadSubAppWithShell = async (
             default:
                 return {
                     mount: async (el: HTMLElement) => {
-                        await bootWindow(el, view);
+                        await bootMinimal(el, view);
                     }
                 };
         }
@@ -385,8 +385,9 @@ export function resolvePathToView(pathname: string): ViewId | null {
  * Create boot config from URL
  */
 export function createBootConfigFromUrl(): BootConfig {
-    const view = pickEnabledView(getViewFromPath() || "home", "home");
-    const shell = normalizeShellPreference(getSavedShellPreference() || "window");
+    const shell = normalizeShellPreference(getSavedShellPreference() || "minimal");
+    const shellDefaultView = shell === "base" || shell === "minimal" ? "viewer" : "home";
+    const view = pickEnabledView(getViewFromPath() || shellDefaultView, "home");
     const params = Object.fromEntries(new URLSearchParams(location.search));
 
     let styleSystem: StyleSystem = "vl-basic";

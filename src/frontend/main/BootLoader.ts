@@ -559,12 +559,12 @@ export async function bootFaint(
  */
 export async function bootMinimal(
     container: HTMLElement,
-    view: ViewId = "home"
+    view: ViewId = "viewer"
 ): Promise<Shell> {
     const channels = ["workcenter", "settings", "viewer"].filter((channelId) =>
         isEnabledView(channelId)
     ) as ServiceChannelId[];
-    const defaultView = pickEnabledView(view, "home");
+    const defaultView = pickEnabledView(view, "viewer");
     const channelPriorityId: ServiceChannelId | undefined =
         (channels.find((c) => c === defaultView) ?? channels[0]) as ServiceChannelId | undefined;
     return bootLoader.boot(container, {

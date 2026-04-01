@@ -39,6 +39,13 @@ export const getServiceWorkerCandidates = (): string[] => {
 export const ensureServiceWorkerRegistered = async (): Promise<ServiceWorkerRegistration | null> => {
     if (typeof window === "undefined") return null;
     if (!("serviceWorker" in navigator)) return null;
+    const protocol = (globalThis?.location?.protocol || "").toLowerCase();
+    if (protocol === "chrome-extension:" || protocol === "file:" || protocol === "about:") {
+        return null;
+    }
+    if (protocol !== "https:" && protocol !== "http:") {
+        return null;
+    }
 
     // Prefer existing registration.
     try {

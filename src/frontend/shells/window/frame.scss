@@ -47,15 +47,16 @@
         position: relative;
         inline-size: 100%;
         z-index: 3;
-        min-block-size: 48px;
-        padding: 0.45rem 0.55rem;
+        min-block-size: 56px;
+        padding: 0.32rem 0.55rem 0.42rem;
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         align-items: center;
-        gap: 0.45rem;
+        justify-content: center;
+        gap: 0.5rem;
         background: var(--window-dock-bg);
         border-block-start: 1px solid var(--window-dock-border);
-        backdrop-filter: blur(8px);
+        backdrop-filter: blur(14px) saturate(1.12);
     }
 
     .app-window-shell__status {
@@ -218,27 +219,45 @@
     .app-window-shell__dock-item {
         display: inline-flex;
         align-items: center;
-        gap: 0.35rem;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 999px;
+        justify-content: center;
+        gap: 0;
+        border: 1px solid transparent;
+        border-radius: 12px;
         color: inherit;
-        background: rgba(255, 255, 255, 0.08);
-        padding: 0.32rem 0.65rem;
+        background: color-mix(in oklab, var(--window-dock-bg) 70%, #ffffff 8%);
+        padding: 0;
         cursor: pointer;
+        position: relative;
+        transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
     }
 
     .app-window-shell__dock-item--icon {
         justify-content: center;
-        inline-size: 2.1rem;
-        block-size: 2.1rem;
-        min-inline-size: 2.1rem;
-        min-block-size: 2.1rem;
+        inline-size: 2.35rem;
+        block-size: 2.35rem;
+        min-inline-size: 2.35rem;
+        min-block-size: 2.35rem;
         padding: 0;
-        border-radius: 10px;
+        border-radius: 12px;
     }
 
     .app-window-shell__dock-item--icon ui-icon {
-        --icon-size: 1.1rem;
+        --icon-size: 1.18rem;
+        pointer-events: none;
+    }
+
+    .app-window-shell__dock-item--icon::after {
+        content: "";
+        position: absolute;
+        inset-inline-start: 50%;
+        inset-block-end: 0.18rem;
+        inline-size: 0.28rem;
+        block-size: 0.28rem;
+        border-radius: 999px;
+        transform: translateX(-50%) scale(0.8);
+        background: transparent;
+        opacity: 0;
+        transition: transform 140ms ease, opacity 140ms ease, inline-size 140ms ease, background-color 140ms ease;
         pointer-events: none;
     }
 
@@ -248,9 +267,50 @@
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
 
+    .app-window-shell__dock-item:hover {
+        background: color-mix(in oklab, var(--window-dock-bg) 52%, #ffffff 16%);
+        border-color: color-mix(in oklab, var(--window-focus) 32%, transparent);
+    }
+
+    .app-window-shell__dock-item.is-open,
+    .app-window-shell__dock-item.is-minimized,
+    .app-window-shell__dock-item.is-active,
+    .app-window-shell__dock-item.is-headless {
+        border-color: color-mix(in oklab, var(--window-focus) 34%, transparent);
+    }
+
+    .app-window-shell__dock-item.is-open::after,
+    .app-window-shell__dock-item.is-minimized::after,
+    .app-window-shell__dock-item.is-active::after,
+    .app-window-shell__dock-item.is-headless::after {
+        opacity: 0.9;
+        transform: translateX(-50%) scale(1);
+    }
+
+    .app-window-shell__dock-item.is-open::after {
+        background: color-mix(in oklab, var(--window-focus) 72%, #a9c7ff 28%);
+    }
+
+    .app-window-shell__dock-item.is-minimized::after {
+        background: color-mix(in oklab, var(--window-focus) 45%, #9fb5df 55%);
+    }
+
+    .app-window-shell__dock-item.is-headless::after {
+        background: color-mix(in oklab, #8fa7d8 45%, transparent);
+    }
+
     .app-window-shell__dock-item.is-active {
-        border-color: var(--window-focus);
-        background: color-mix(in oklab, var(--window-focus) 25%, transparent);
+        border-color: color-mix(in oklab, var(--window-focus) 55%, transparent);
+        background: color-mix(in oklab, var(--window-focus) 19%, var(--window-dock-bg));
+    }
+
+    .app-window-shell__dock-item.is-active::after {
+        inline-size: 0.72rem;
+        background: var(--window-focus);
+    }
+
+    .app-window-shell__dock-item:active {
+        transform: scale(0.96);
     }
 
     .app-window-shell__dock-start,
@@ -258,7 +318,7 @@
     .app-window-shell__dock-quick {
         display: inline-flex;
         align-items: center;
-        gap: 0.4rem;
+        gap: 0.48rem;
     }
 
     .app-window-shell__dock-start {
@@ -266,10 +326,11 @@
     }
 
     .app-window-shell__dock-apps {
-        flex: 1 1 auto;
+        flex: 0 1 auto;
         min-inline-size: 0;
         overflow: auto hidden;
         scrollbar-width: thin;
+        justify-content: center;
     }
 
     .app-window-shell__dock-quick {

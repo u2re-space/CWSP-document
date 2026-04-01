@@ -80,7 +80,7 @@ type ShellPreference = (typeof VALID_SHELLS)[number] | "window";
 const normalizeShellPreference = (shell: ShellPreference | null): "base" | "minimal" | "window" => {
     if (shell === "base") return "base";
     if (shell === "minimal" || shell === "faint") return "minimal";
-    return "window";
+    return "minimal";
 };
 
 const getShellFromQuery = (): ShellPreference | null => {
@@ -447,17 +447,22 @@ export default async function index(mountElement: HTMLElement) {
 
         // Legacy /{view} links are accepted as entry points.
         const isLegacyViewRoute = Boolean(pathname && isValidViewPath(pathname));
-        const requestedView = isLegacyViewRoute
+        const explicitRequestedView: ViewId | null = isLegacyViewRoute
             ? pickEnabledView(pathname as ViewId, "home")
             : (sharedFlag === "1" || sharedFlag === "true" || markdownContent)
-              ? pickEnabledView("viewer", "home")
-              : pickEnabledView("home", "home");
+                ? pickEnabledView("viewer", "home")
+                : null;
         const queryShell = getShellFromQuery();
         const savedShell = getSavedShell();
         const preferredShell = queryShell || (
-            requestedView === "print"
+            explicitRequestedView === "print"
                 ? "base"
-                : (savedShell || "window")
+                : (savedShell || "minimal")
+        );
+        const requestedView = explicitRequestedView || (
+            preferredShell === "base" || preferredShell === "minimal"
+                ? pickEnabledView("viewer", "home")
+                : pickEnabledView("home", "home")
         );
         const allowPathRoutedShell = preferredShell === "base" || preferredShell === "minimal";
         const layers = ensureAppLayers(mountElement, { enableOrientLayer: preferredShell === "window" });
