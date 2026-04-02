@@ -30,7 +30,8 @@ export class ShellElement extends HTMLElementBase {
                     inline-size: 100%;
                     block-size: 100%;
                     container-type: size;
-                    contain: strict;
+                    /* `contain: strict` (size) can break % sizing for slotted shell vs extension grid. */
+                    contain: layout paint;
                     isolation: isolate;
                     overflow: clip;
                     pointer-events: none;
@@ -42,7 +43,7 @@ export class ShellElement extends HTMLElementBase {
                     inline-size: 100%;
                     block-size: 100%;
                     container-type: size;
-                    contain: strict;
+                    contain: layout paint;
                     isolation: isolate;
                 }
 

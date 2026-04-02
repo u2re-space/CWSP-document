@@ -47,8 +47,9 @@
         display: grid;
         grid-template-rows: [toolbar-row] auto [content-row] minmax(0, 1fr);
         grid-template-columns: minmax(0, 1fr);
-        align-items: center;
-        justify-content: center;
+        /* stretch: `center` shrink-wraps grid items (observed: viewer toolbar ~min-content width in CRX). */
+        align-items: stretch;
+        justify-items: stretch;
         gap: 0;
         padding: 0;
         margin: 0;
