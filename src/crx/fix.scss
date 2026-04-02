@@ -9,11 +9,9 @@
             box-sizing: border-box;
         }
 
-        :where(*):not(:defined) {
-            opacity: 0;
-            visibility: collapse;
-            pointer-events: none;
-        }
+        /* Do not blanket-hide :not(:defined) custom elements: any one late or failed
+         * registration (shell, md-view, ui-icon, …) made the whole UI invisible and
+         * broke intrinsic sizing (visibility:collapse + nested CEs). FOUC is acceptable. */
 
         :where(link, head, script, style, meta) {
             display: none !important;
@@ -118,12 +116,7 @@
                 max-inline-size: 100dvi !important;
             }
 
-            :where(*):not(:defined) {
-                opacity: 0 !important;
-                visibility: collapse !important;
-                pointer-events: none !important;
-                display: none !important;
-            }
+            /* Same as screen: avoid hiding all :not(:defined) nodes in print (blank output). */
 
             :where(link, head, script, style, meta) {
                 display: none !important;

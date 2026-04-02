@@ -2,6 +2,7 @@ import type { ShellId } from "./types";
 
 const SHELL_ELEMENT_TAG_PREFIX = "cw-shell";
 const shellElementCtorByTag = new Map<string, CustomElementConstructor>();
+const HTMLElementBase = ((globalThis as unknown as { HTMLElement?: typeof HTMLElement }).HTMLElement ?? class { }) as typeof HTMLElement;
 const SHELL_ELEMENT_TAG_ALIAS: Partial<Record<ShellId, string>> = {
     window: "cw-shell-container",
 };
@@ -176,7 +177,7 @@ const MINIMAL_SHELL_HOST_STYLES = `
  * Minimal shell: full `app-shell` chrome lives in shadow DOM; active view (`cw-view-*`) is a
  * light-DOM child with `slot="view"` projected into `<main>`.
  */
-export class MinimalShellHostElement extends HTMLElement {
+export class MinimalShellHostElement extends HTMLElementBase {
     private chromeMounted = false;
 
     mountShellLayout(layout: HTMLElement): void {
@@ -214,7 +215,7 @@ export class MinimalShellHostElement extends HTMLElement {
     }
 }
 
-export class ShellElement extends HTMLElement {
+export class ShellElement extends HTMLElementBase {
     private initialized = false;
 
     connectedCallback(): void {
@@ -314,7 +315,7 @@ export class ShellElement extends HTMLElement {
     }
 }
 
-export class WindowShellHostElement extends HTMLElement {
+export class WindowShellHostElement extends HTMLElementBase {
     private chromeMounted = false;
 
     mountShellLayout(layout: HTMLElement): void {
@@ -352,7 +353,7 @@ export class WindowShellHostElement extends HTMLElement {
     }
 }
 
-export class WindowFrameElement extends HTMLElement {
+export class WindowFrameElement extends HTMLElementBase {
     private initialized = false;
 
     connectedCallback(): void {
@@ -425,8 +426,10 @@ export class WindowFrameElement extends HTMLElement {
 }
 
 const ensureWindowFrameElementDefined = (): void => {
-    if (!customElements.get(WINDOW_FRAME_TAG_NAME)) {
-        customElements.define(WINDOW_FRAME_TAG_NAME, WindowFrameElement);
+    const ce = (globalThis as unknown as { customElements?: CustomElementRegistry | null }).customElements;
+    if (!ce || typeof ce.get !== "function" || typeof ce.define !== "function") return;
+    if (!ce.get(WINDOW_FRAME_TAG_NAME)) {
+        ce.define(WINDOW_FRAME_TAG_NAME, WindowFrameElement);
     }
 };
 
@@ -437,8 +440,10 @@ export const getShellElementTagName = (shellId: ShellId | string): string => {
 
 export const ensureShellElementDefined = (shellId: ShellId | string): string => {
     const tagName = getShellElementTagName(shellId);
+    const ce = (globalThis as unknown as { customElements?: CustomElementRegistry | null }).customElements;
+    if (!ce || typeof ce.get !== "function" || typeof ce.define !== "function") return tagName;
     ensureWindowFrameElementDefined();
-    if (!customElements.get(tagName)) {
+    if (!ce.get(tagName)) {
         let ctor = shellElementCtorByTag.get(tagName);
         if (!ctor) {
             const sid = String(shellId || "").toLowerCase();
@@ -450,7 +455,7 @@ export const ensureShellElementDefined = (shellId: ShellId | string): string => 
                     : class extends ShellElement { };
             shellElementCtorByTag.set(tagName, ctor);
         }
-        customElements.define(tagName, ctor);
+        ce.define(tagName, ctor);
     }
     return tagName;
 };

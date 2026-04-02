@@ -14,6 +14,7 @@ import { bootLoader } from "./BootLoader";
 import type { ViewId, Shell } from "../shells/types";
 import { ViewRegistry } from "../shared/registry";
 import { initializeLayers } from "../shared/layer-manager";
+import { ensureAppLayers } from "../shared/app-layers";
 import { pickEnabledView } from "../config/views";
 
 // ============================================================================
@@ -66,11 +67,15 @@ export default async function crxFrontend(
     // CRX pages can bypass main index entry, so initialize layers here too.
     initializeLayers();
 
+    // Same grid shell layer as PWA (`content-row` / `content-column`); ShellBase.mount
+    // positions cw-shell-* on those named lines — mounting directly on #app had no lines.
+    const layers = ensureAppLayers(mountElement, { enableOrientLayer: false });
+
     const view = resolveViewId(options.initialView);
     const hasViewParams = Boolean(options.viewParams && Object.keys(options.viewParams).length > 0);
     const hasPayload = options.viewPayload !== undefined && options.viewPayload !== null;
 
-    const shell = await bootLoader.boot(mountElement, {
+    const shell = await bootLoader.boot(layers.shellLayer, {
         styleSystem: "vl-basic",
         shell:       "base",
         defaultView: view,

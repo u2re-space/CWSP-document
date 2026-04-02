@@ -5,6 +5,7 @@ const rawPre = document.getElementById("raw-md") as HTMLPreElement | null;
 const appDiv = document.getElementById("app") as HTMLDivElement | null;
 
 const VIRTUAL_VIEW_TOKEN = "${view}";
+const markdownFallbackStorageKey = (key: string) => `md-fallback:${key}`;
 
 const loadFromSessionKey = async (key: string): Promise<string | null> => {
     try {
@@ -13,6 +14,15 @@ const loadFromSessionKey = async (key: string): Promise<string | null> => {
         if (typeof text === "string" && text.trim()) return text;
     } catch (e) {
         console.warn("[Viewer] session storage read failed:", e);
+    }
+    try {
+        const fallbackKey = markdownFallbackStorageKey(key);
+        const data = await chrome.storage?.local?.get?.(fallbackKey);
+        const payload = data?.[fallbackKey];
+        const text = typeof payload === "string" ? payload : payload?.text;
+        if (typeof text === "string" && text.trim()) return text;
+    } catch (e) {
+        console.warn("[Viewer] local fallback read failed:", e);
     }
     return null;
 };

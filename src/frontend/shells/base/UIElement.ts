@@ -2,11 +2,12 @@ import type { ShellId } from "../types";
 
 const SHELL_ELEMENT_TAG_PREFIX = "cw-shell";
 const shellElementCtorByTag = new Map<string, CustomElementConstructor>();
+const HTMLElementBase = ((globalThis as unknown as { HTMLElement?: typeof HTMLElement }).HTMLElement ?? class { }) as typeof HTMLElement;
 const SHELL_ELEMENT_TAG_ALIAS: Partial<Record<ShellId, string>> = {
     window: "cw-shell-container",
 };
 
-export class ShellElement extends HTMLElement {
+export class ShellElement extends HTMLElementBase {
     private initialized = false;
 
     connectedCallback(): void {
@@ -114,13 +115,14 @@ export const getShellElementTagName = (shellId: ShellId | string): string => {
 
 export const ensureShellElementDefined = (shellId: ShellId | string): string => {
     const tagName = getShellElementTagName(shellId);
-    if (!customElements.get(tagName)) {
+    const ce = (globalThis as unknown as { customElements?: CustomElementRegistry | null }).customElements;
+    if (ce && typeof ce.get === "function" && typeof ce.define === "function" && !ce.get(tagName)) {
         let ctor = shellElementCtorByTag.get(tagName);
         if (!ctor) {
             ctor = class extends ShellElement { };
             shellElementCtorByTag.set(tagName, ctor);
         }
-        customElements.define(tagName, ctor);
+        ce.define(tagName, ctor);
     }
     return tagName;
 };

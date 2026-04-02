@@ -1,6 +1,26 @@
 import type { ClipboardResult, ImageProcessingOptions, PlatformAdapter } from "../shared/types";
 import { readText, requestCopyViaCRX, writeText } from "@rs-core/modules/Clipboard";
-import { showToast } from "@rs-frontend/items/Toast";
+
+const showToastNotification = (
+	message: string,
+	options?: { type?: "info" | "success" | "warning" | "error"; duration?: number },
+): void => {
+	if (typeof document === "undefined") {
+		console.log(message);
+		return;
+	}
+	void import("@rs-frontend/items/Toast")
+		.then(({ showToast }) => {
+			showToast({
+				message,
+				kind: options?.type || "info",
+				duration: options?.duration || 3000,
+			});
+		})
+		.catch(() => {
+			console.log(message);
+		});
+};
 
 const createPwaAdapter = (): PlatformAdapter => ({
 	async copyToClipboard(data: string): Promise<ClipboardResult> {
@@ -27,15 +47,7 @@ const createPwaAdapter = (): PlatformAdapter => ({
 		message: string,
 		options?: { type?: "info" | "success" | "warning" | "error"; duration?: number },
 	): void {
-		try {
-			showToast({
-				message,
-				kind: options?.type || "info",
-				duration: options?.duration || 3000,
-			});
-		} catch {
-			console.log(message);
-		}
+		showToastNotification(message, options);
 	},
 });
 

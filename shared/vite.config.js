@@ -500,7 +500,6 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
         modulePreload: {
             polyfill: true,
             include: [
-                "fest/fl-ui",
                 "fest/dom",
                 "fest/lure",
                 "fest/object",

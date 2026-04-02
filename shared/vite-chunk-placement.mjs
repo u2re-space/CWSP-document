@@ -2,8 +2,8 @@
  * Rollup chunk → dist/ layout for hot-swappable deploy slices:
  * dist/views, dist/shells, dist/fest, dist/pwa, dist/core/*, dist/com/*, dist/workers/*, dist/vendor, dist/assets.
  *
- * `src/core`, `src/com`, and `fest/lure` (lur.e) are co-located into `com/app.js`
- * to avoid cross-chunk circular init ordering (TDZ: e.g. `makeUIState` / `observe`).
+ * `src/core`, `src/com`, `fest/lure` (lur.e), and `fest/fl-ui` (fl.ui) are co-located into `com/app.js`
+ * to avoid cross-chunk circular init ordering (TDZ: e.g. `makeUIState` / `observe`, fl-ui ↔ lure).
  * Rollup may still warn about circular chunks between slices; the build completes.
  */
 
@@ -96,6 +96,7 @@ export function manualChunks(id) {
     const sharedFest = p.match(/\/shared\/fest\/([^/]+)\//);
     if (sharedFest) {
         if (sharedFest[1] === "lure") return "com-app";
+        if (sharedFest[1] === "fl-ui") return "com-app";
         return `fest-${sharedFest[1]}`;
     }
 
@@ -103,6 +104,7 @@ export function manualChunks(id) {
     if (proj) {
         const dir = proj[1];
         if (dir === "lur.e") return "com-app";
+        if (dir === "fl.ui") return "com-app";
         const key = FEST_DIR_TO_IMPORT[dir];
         if (key) return `fest-${key}`;
     }

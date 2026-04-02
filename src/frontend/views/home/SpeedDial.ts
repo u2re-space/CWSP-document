@@ -1,6 +1,5 @@
 import { observe, numberRef, propRef, stringRef, affected } from "fest/object";
 import { E, H, orientRef, M, provide, handleIncomingEntries, pointerAnchorRef, bindInteraction } from "fest/lure";
-import * as LureModule from "fest/lure";
 import { actionRegistry, iconsPerAction, labelsPerAction } from "@rs-core/utils/Actions";
 import { showSuccess, showError } from "@rs-frontend/items/Toast";
 import { openUnifiedContextMenu, type ContextMenuEntry } from "@rs-frontend/items/ContextMenu";
@@ -28,25 +27,38 @@ import {
 } from "@rs-core/storage/StateStorage";
 import { isInFocus, MOCElement } from "fest/dom";
 import { writeFileSmart } from "@rs-core/storage/WriteFileSmart-v2";
-import type { GridItemType } from "fest/core";
 import { openShortcutEditor } from "./ShortcutEditor";
 let ctxMenuBound = false;
 let homeViewOpener: ((view: string, params?: Record<string, string>) => void) | null = null;
 let persistItemsTimer: ReturnType<typeof setTimeout> | null = null;
-const layout = observe([gridLayoutState.columns ?? 4, gridLayoutState.rows ?? 8]);
-const items = speedDialItems;
-const meta = speedDialMeta;
-const resolveGridCellFromPoint = (
-    LureModule as any
-)?.resolveGridCellFromClientPoint as
-    | ((gridSystem: HTMLElement | null | undefined, clientPoint: [number, number], args?: Partial<GridItemType> & { layout?: [number, number] }, mode?: "floor" | "round") => [number, number])
-    | undefined;
 
-// Subscribe to grid layout changes
-affected(gridLayoutState, () => {
-    layout[0] = gridLayoutState.columns ?? 4;
-    layout[1] = gridLayoutState.rows ?? 8;
-});
+/** Lazy-init: top-level `observe` + `pointerAnchorRef` ran during chunk eval and hit TDZ vs `com-app` (see vite-chunk-placement). */
+let layoutSingleton: ReturnType<typeof observe<[number, number]>> | null = null;
+
+function getLayout(): ReturnType<typeof observe<[number, number]>> {
+    if (!layoutSingleton) {
+        layoutSingleton = observe([gridLayoutState.columns ?? 4, gridLayoutState.rows ?? 8]);
+        affected(gridLayoutState, () => {
+            layoutSingleton![0] = gridLayoutState.columns ?? 4;
+            layoutSingleton![1] = gridLayoutState.rows ?? 8;
+        });
+    }
+    return layoutSingleton;
+}
+
+type PointerAnchorPair = ReturnType<typeof pointerAnchorRef>;
+type NumberRefPair = [ReturnType<typeof numberRef>, ReturnType<typeof numberRef>];
+let coordinateRefSingleton: PointerAnchorPair | NumberRefPair | null = null;
+
+function getCoordinateRef(): PointerAnchorPair | NumberRefPair {
+    if (!coordinateRefSingleton) {
+        coordinateRefSingleton =
+            typeof document !== "undefined" ? pointerAnchorRef() : [numberRef(0), numberRef(0)];
+    }
+    return coordinateRefSingleton;
+}
+
+/** Grid cell from client coords: manual math only. Do not read `resolveGridCellFromClientPoint` from lure at module scope — bundlers hoist it to `com-app` and hit TDZ (see vite-chunk-placement). */
 const schedulePersistItems = () => {
     if (persistItemsTimer) clearTimeout(persistItemsTimer);
     persistItemsTimer = setTimeout(() => {
@@ -107,8 +119,8 @@ const runItemAction = (item: SpeedDialItem, actionId?: string, extras: { event?:
     //const $meta = getSpeedDialMeta(item.id);
     const context = {
         id: item.id,
-        items,
-        meta,
+        items: speedDialItems,
+        meta: speedDialMeta,
         action: resolvedAction,
         viewMaker: makeView
     };
@@ -122,7 +134,7 @@ const runItemAction = (item: SpeedDialItem, actionId?: string, extras: { event?:
 
 const attachItemNode = (item: SpeedDialItem, el?: HTMLElement | null, interactive = true, makeView?: any) => {
     if (!el) return;
-    const args = { layout, items, item, meta };
+    const args = { layout: getLayout(), items: speedDialItems, item, meta: speedDialMeta };
     el.dataset.id = item.id;
     el.dataset.speedDialItem = "true";
     el.addEventListener("dragstart", (ev)=>ev.preventDefault());
@@ -199,17 +211,10 @@ const deriveCellFromEvent = (ev?: MouseEvent): GridCell =>{
         || document.querySelector<HTMLElement>("#home .speed-dial-grid:last-of-type")
         || document.querySelector<HTMLElement>("#home .speed-dial-grid");
     if (!grid || !ev) return [0, 0];
-    if (resolveGridCellFromPoint) {
-        return resolveGridCellFromPoint(grid, [ev.clientX, ev.clientY], {
-            layout: [layout[0], layout[1]] as [number, number],
-            item: {} as GridItemType,
-            list: [],
-            items: new Map()
-        } as any);
-    }
     const rect = grid.getBoundingClientRect();
-    const cols = Math.max(1, layout[0] || 1);
-    const rows = Math.max(1, layout[1] || 1);
+    const L = getLayout();
+    const cols = Math.max(1, L[0] || 1);
+    const rows = Math.max(1, L[1] || 1);
     const x = Math.floor(((ev.clientX - rect.left) / Math.max(rect.width, 1)) * cols);
     const y = Math.floor(((ev.clientY - rect.top) / Math.max(rect.height, 1)) * rows);
     return [Math.min(cols - 1, Math.max(0, x)), Math.min(rows - 1, Math.max(0, y))];
@@ -220,24 +225,19 @@ const deriveCellFromCoordinate = (coordinate: [number, number]): GridCell =>{
         || document.querySelector<HTMLElement>("#home .speed-dial-grid:last-of-type")
         || document.querySelector<HTMLElement>("#home .speed-dial-grid");
     if (!grid || !coordinate) return [0, 0];
-    if (resolveGridCellFromPoint) {
-        return resolveGridCellFromPoint(grid, coordinate, {
-            layout: [layout[0], layout[1]] as [number, number],
-            item: {} as GridItemType,
-            list: [],
-            items: new Map()
-        } as any);
-    }
     const rect = grid.getBoundingClientRect();
-    const cols = Math.max(1, layout[0] || 1);
-    const rows = Math.max(1, layout[1] || 1);
+    const L = getLayout();
+    const cols = Math.max(1, L[0] || 1);
+    const rows = Math.max(1, L[1] || 1);
     const x = Math.floor(((coordinate[0] - rect.left) / Math.max(rect.width, 1)) * cols);
     const y = Math.floor(((coordinate[1] - rect.top) / Math.max(rect.height, 1)) * rows);
     return [Math.min(cols - 1, Math.max(0, x)), Math.min(rows - 1, Math.max(0, y))];
 };
 
-const deriveCellFromAnchor = (): GridCell =>
-    deriveCellFromCoordinate([coordinateRef[0].value, coordinateRef[1].value]);
+const deriveCellFromAnchor = (): GridCell => {
+    const ref = getCoordinateRef();
+    return deriveCellFromCoordinate([ref[0].value, ref[1].value]);
+};
 
 const looksLikeImageFile = (file?: File | null): boolean => {
     if (!file) return false;
@@ -341,9 +341,6 @@ const handleSpeedDialPaste = async (event: ClipboardEvent, suggestedCell?: GridC
 };
 
 //
-const coordinateRef = typeof document != "undefined" ? pointerAnchorRef() : [numberRef(0), numberRef(0)];
-
-//
 const handleWallpaperDropOrPaste = (event: DragEvent | ClipboardEvent) => {
     if (isInFocus(event?.target as HTMLElement, "#home") ||
         isInFocus(event?.target as HTMLElement, "#home:is(:hover, :focus, :focus-visible), #home:has(:hover, :focus, :focus-visible)", "child")
@@ -405,6 +402,8 @@ const handleWallpaperDropOrPaste = (event: DragEvent | ClipboardEvent) => {
 
 
 export function SpeedDial(makeView: any) {
+    getLayout();
+    getCoordinateRef();
     homeViewOpener = makeView;
     const columnsRef = propRef(gridLayoutState, "columns", 4);
     const rowsRef = propRef(gridLayoutState, "rows", 8);
@@ -432,10 +431,10 @@ export function SpeedDial(makeView: any) {
     const oRef = orientRef();
     const box = H`<div slot="underlay" style="pointer-events: auto; position: relative; contain: strict; overflow: hidden; display: grid;" id="home" data-mixin="ui-orientbox" class="speed-dial-root" prop:orient=${oRef} on:dragover=${(ev: DragEvent) => ev.preventDefault()} on:drop=${(ev: DragEvent) => handleWallpaperDropOrPaste(ev)} prop:onPaste=${async (ev: ClipboardEvent) => await handleWallpaperDropOrPaste(ev)}>
         <div style="background-color: transparent; color-scheme: dark; pointer-events: none;" class="speed-dial-grid speed-dial-grid--labels" data-layer="items" data-grid-layer="labels" data-mixin="ui-gridbox" data-grid-columns=${columnsRef} data-grid-rows=${rowsRef} data-grid-shape=${shapeRef}>
-            ${M(items, renderLabelItem)}
+            ${M(speedDialItems, renderLabelItem)}
         </div>
         <div style="background-color: transparent; pointer-events: none;" class="speed-dial-grid speed-dial-grid--icons" data-layer="items" data-grid-layer="icons" data-mixin="ui-gridbox" data-grid-columns=${columnsRef} data-grid-rows=${rowsRef} data-grid-shape=${shapeRef}>
-            ${M(items, renderIconItem)}
+            ${M(speedDialItems, renderIconItem)}
         </div>
     </div>`;
 
@@ -527,6 +526,8 @@ const openItemEditor = (item?: SpeedDialItem, opts?: {
 };
 
 export function createCtxMenu(makeView?: any) {
+    getLayout();
+    getCoordinateRef();
     homeViewOpener = makeView || homeViewOpener;
     if (!ctxMenuBound) {
         ctxMenuBound = true;
@@ -651,10 +652,10 @@ export function createCtxMenu(makeView?: any) {
                         action: () => {},
                         children: [
                             { id: "open-explorer", label: "Explorer", icon: "books", action: ()=>{
-                                actionRegistry.get("open-view-explorer")?.({ id: "", items, meta, viewMaker: homeViewOpener }, {});
+                                actionRegistry.get("open-view-explorer")?.({ id: "", items: speedDialItems, meta: speedDialMeta, viewMaker: homeViewOpener }, {});
                             } },
                             { id: "open-settings", label: "Settings", icon: "gear-six", action: ()=>{
-                                actionRegistry.get("open-view-settings")?.({ id: "", items, meta, viewMaker: homeViewOpener }, {});
+                                actionRegistry.get("open-view-settings")?.({ id: "", items: speedDialItems, meta: speedDialMeta, viewMaker: homeViewOpener }, {});
                             } }
                         ]
                     },

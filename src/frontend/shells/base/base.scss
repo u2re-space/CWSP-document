@@ -43,7 +43,7 @@
 @layer shell.base {
     :where(.app-shell, .app-shell[data-style="raw"]) {
         position: absolute;
-        inset: -1;
+        inset: 0;
         display: grid;
         grid-template-rows: [toolbar-row] auto [content-row] minmax(0, 1fr);
         grid-template-columns: minmax(0, 1fr);
@@ -159,7 +159,7 @@
 
     .app-shell__loading {
         position: absolute;
-        inset: -1;
+        inset: 0;
         display: none;
         flex-direction: column;
         align-items: center;

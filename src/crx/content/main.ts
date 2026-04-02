@@ -77,6 +77,49 @@ document.addEventListener("selectionchange", () => {
 });
 setTimeout(() => notifySelectionState(), 120);
 
+const maybeRedirectFileMarkdownToViewer = () => {
+    try {
+        const href = String(globalThis?.location?.href || "");
+        if (!href.startsWith("file:")) return;
+        const pathname = String(globalThis?.location?.pathname || "");
+        if (!/\.(?:md|markdown|mdown|mkd|mkdn|mdtxt|mdtext)(?:$|[?#])/i.test(pathname)) return;
+        if (globalThis?.sessionStorage?.getItem("crx-file-markdown-redirected") === "1") return;
+        const maxAttempts = 8;
+        const attemptDelayMs = 120;
+        let attempts = 0;
+        const sendWhenReady = () => {
+            attempts += 1;
+            const text = (document?.body?.innerText || document?.documentElement?.innerText || "").trim();
+            if (!text) {
+                if (attempts < maxAttempts) {
+                    globalThis.setTimeout(sendWhenReady, attemptDelayMs);
+                }
+                return;
+            }
+            globalThis?.sessionStorage?.setItem?.("crx-file-markdown-redirected", "1");
+            chrome.runtime.sendMessage({ type: "crx:file-markdown-open", url: href, text }, () => {
+                if (chrome.runtime.lastError) {
+                    // Keep quiet in stale contexts / disabled runtime.
+                    return;
+                }
+            });
+        };
+        sendWhenReady();
+    } catch {
+        /* ignore */
+    }
+};
+
+if (document.readyState === "loading") {
+    globalThis.setTimeout(maybeRedirectFileMarkdownToViewer, 0);
+    document.addEventListener("DOMContentLoaded", () => {
+        globalThis.setTimeout(maybeRedirectFileMarkdownToViewer, 40);
+    }, { once: true });
+} else {
+    globalThis.setTimeout(maybeRedirectFileMarkdownToViewer, 0);
+    globalThis.setTimeout(maybeRedirectFileMarkdownToViewer, 120);
+}
+
 const savePosition = (e: PointerEvent | MouseEvent) => {
     coordinate[0] = e.clientX;
     coordinate[1] = e.clientY;

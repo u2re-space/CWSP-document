@@ -7,7 +7,7 @@
  *   `__content` wrapping `<slot name="raw">` + default `<slot>`); light DOM = `<pre slot="raw">` + prose `[data-render-target]`.
  */
 
-import { H, normalizeDataAsset, parseDataUrl, isBase64Like, openDirectory, provide } from "fest/lure";
+import { H, normalizeDataAsset, parseDataUrl, isBase64Like, decodeBase64ToBytes, openDirectory, provide } from "fest/lure";
 import { ref, affected } from "fest/object";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
 import DOMPurify from 'dompurify';
@@ -866,6 +866,63 @@ export class ViewerView implements View {
         return /^(?:javascript|vbscript|data:text\/html)/i.test((value || "").trim());
     }
 
+    /**
+     * Markdown/HTML sometimes emits bare base64 (no `data:` scheme). Resolving that against
+     * `chrome-extension://…/viewer.html` produces bogus URLs and net::ERR_FILE_NOT_FOUND.
+     */
+    private normalizeBareBase64Candidate(raw: string): string | null {
+        const trimmed = (raw || "").trim();
+        if (!trimmed || parseDataUrl(trimmed)) return null;
+
+        const candidates = [
+            trimmed,
+            trimmed.replace(/[\s>]+$/g, ""),
+            trimmed.replace(/[^A-Za-z0-9+/=_-]/g, ""),
+        ];
+        for (const c of candidates) {
+            const t = c.trim();
+            if (t.length >= 8 && isBase64Like(t)) return t;
+        }
+        return null;
+    }
+
+    private sniffImageMimeFromBytes(bytes: Uint8Array): string {
+        const n = bytes.byteLength;
+        if (n >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+            return "image/png";
+        }
+        if (n >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+            return "image/jpeg";
+        }
+        if (n >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+            return "image/gif";
+        }
+        if (n >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+            return "image/webp";
+        }
+        if (n >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) {
+            return "image/bmp";
+        }
+        const head = new TextDecoder("utf-8", { fatal: false }).decode(bytes.subarray(0, Math.min(400, n)));
+        const t = head.trimStart();
+        if (t.startsWith("<svg") || t.startsWith("<?xml")) return "image/svg+xml";
+        return "image/png";
+    }
+
+    /** `undefined` = not bare base64; `null` = looked like base64 but decode failed (do not resolve as path). */
+    private coerceBareBase64ToDataUrl(value: string): string | null | undefined {
+        const bare = this.normalizeBareBase64Candidate(value);
+        if (!bare) return undefined;
+        try {
+            const bytes = decodeBase64ToBytes(bare);
+            const mime = this.sniffImageMimeFromBytes(bytes);
+            const compact = bare.replace(/\s/g, "");
+            return `data:${mime};base64,${compact}`;
+        } catch {
+            return null;
+        }
+    }
+
     private resolveUrlAgainstSource(rawValue: string): string | null {
         const value = (rawValue || "").trim();
         if (!value) return null;
@@ -880,6 +937,9 @@ export class ViewerView implements View {
                 return value;
             }
         }
+
+        const dataFromBare = this.coerceBareBase64ToDataUrl(value);
+        if (dataFromBare !== undefined) return dataFromBare;
 
         if (!this.sourceUrl) {
             return value;
@@ -931,6 +991,10 @@ export class ViewerView implements View {
     private async fetchMarkdownFromUrl(source: string): Promise<string | null> {
         const src = (source || "").trim();
         if (!src) return null;
+        if (/^file:/i.test(src)) {
+            // file:// is a unique origin; direct fetch from viewer context is blocked in Chromium.
+            return null;
+        }
         try {
             const response = await fetch(src, { credentials: "include", cache: "no-store" });
             if (!response.ok) return null;

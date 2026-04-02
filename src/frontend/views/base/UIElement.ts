@@ -2,6 +2,7 @@ import type { View, ViewLifecycle, ViewOptions } from "../../shells/types";
 
 const VIEW_ELEMENT_TAG_PREFIX = "cw-view";
 const viewElementCtorByTag = new Map<string, CustomElementConstructor>();
+const HTMLElementBase = ((globalThis as unknown as { HTMLElement?: typeof HTMLElement }).HTMLElement ?? class { }) as typeof HTMLElement;
 
 type ViewElementLifecycleEvent = "before-mount" | "after-mount" | "before-update" | "after-update";
 
@@ -23,7 +24,7 @@ const dispatchCwViewLifecycle = (
  * Markdown viewer host: open shadow with mount → shell → view-viewer (toolbar + empty __content) → slots.
  * Raw `<pre slot="raw">` and default-slot prose live in light DOM (assigned nodes).
  */
-export class CwViewViewerHostElement extends HTMLElement {
+export class CwViewViewerHostElement extends HTMLElementBase {
     private initialized = false;
 
     mountView(view: View, options?: ViewOptions): void {
@@ -47,7 +48,7 @@ export class CwViewViewerHostElement extends HTMLElement {
     }
 }
 
-export class ViewElement extends HTMLElement {
+export class ViewElement extends HTMLElementBase {
     private innerView: View | null = null;
     private mountRoot: HTMLElement | null = null;
     private initialized = false;
@@ -146,7 +147,8 @@ export const getViewElementTagName = (viewId: string): string =>
 
 export const ensureViewElementDefined = (viewId: string): string => {
     const tagName = getViewElementTagName(viewId);
-    if (!customElements.get(tagName)) {
+    const ce = (globalThis as unknown as { customElements?: CustomElementRegistry | null }).customElements;
+    if (ce && typeof ce.get === "function" && typeof ce.define === "function" && !ce.get(tagName)) {
         let ctor: CustomElementConstructor;
         if (viewId === "viewer") {
             ctor = CwViewViewerHostElement;
@@ -156,7 +158,7 @@ export const ensureViewElementDefined = (viewId: string): string => {
                 viewElementCtorByTag.set(tagName, ctor);
             }
         }
-        customElements.define(tagName, ctor);
+        ce.define(tagName, ctor);
     }
     ensureViewElementStyle();
     return tagName;

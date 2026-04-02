@@ -574,10 +574,32 @@ const createSessionKey = () => {
     catch { return `md:${Date.now()}:${Math.random().toString(16).slice(2)}`; }
 };
 
+const markdownFallbackStorageKey = (key: string) => `md-fallback:${key}`;
+
 const putMarkdownToSession = async (text: string) => {
     const key = createSessionKey();
-    try { await chrome.storage?.session?.set?.({ [key]: text }); return key; }
-    catch { return null; }
+    let stored = false;
+
+    try {
+        await chrome.storage?.session?.set?.({ [key]: text });
+        stored = true;
+    } catch {
+        /* ignore */
+    }
+
+    try {
+        await chrome.storage?.local?.set?.({
+            [markdownFallbackStorageKey(key)]: {
+                text,
+                createdAt: Date.now()
+            }
+        });
+        stored = true;
+    } catch {
+        /* ignore */
+    }
+
+    return stored ? key : null;
 };
 
 const fetchMarkdownText = async (candidate: string) => {
@@ -865,6 +887,31 @@ const processWithBuiltInInstruction = async (
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message?.type) return false;
 
+    if (message.type === "crx:file-markdown-open") {
+        (async () => {
+            const source = String(message?.url || "").trim();
+            const tabId = typeof sender?.tab?.id === "number" ? sender.tab.id : -1;
+            if (!source || !source.startsWith("file:") || !isMarkdownUrl(source)) {
+                sendResponse({ ok: false, error: "unsupported-source" });
+                return;
+            }
+            if (tabId > 0 && shouldThrottleMarkdownRedirect(tabId)) {
+                sendResponse({ ok: true, redirected: false, reason: "throttled" });
+                return;
+            }
+            let text = typeof message?.text === "string" ? message.text : "";
+            if (!text.trim() && tabId > 0) {
+                text = await tryReadMarkdownFromTab(tabId, source);
+            }
+            const key = text.trim() ? await putMarkdownToSession(text) : null;
+            openViewer(source, tabId > 0 ? tabId : undefined, key);
+            sendResponse({ ok: true, redirected: true, key: key || null });
+        })().catch((error) => {
+            sendResponse({ ok: false, error: String(error) });
+        });
+        return true;
+    }
+
     if (message.type === "crx-query-active-tab") {
         (async () => {
             const activeTab = await getChronologicalActiveTab();
@@ -1138,6 +1185,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         if (message?.type === "md:load") {
             const src = typeof message.src === "string" ? message.src : "";
             if (!src) { sendResponse({ ok: false, error: "missing src" }); return; }
+            if (/^file:/i.test(src)) {
+                sendResponse({ ok: false, src, error: "file-source" });
+                return;
+            }
             const fetched = await fetchMarkdownText(src);
             if (!fetched.ok || !fetched.text) {
                 sendResponse({ ok: false, status: fetched.status, src: fetched.src, error: "fetch-failed" });
