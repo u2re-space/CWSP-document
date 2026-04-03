@@ -3,7 +3,7 @@ import { generateNewPlan } from "@rs-core/workers/AskToPlan";
 import { triggerDebugTaskGeneration } from "@rs-core/utils/DebugTaskGenerator";
 import { makeEntityEdit } from "@rs-frontend/shells/faint/editors/EntityEdit";
 import { downloadByPath, openPickerAndAnalyze, openPickerAndWrite, pasteAndAnalyze, pasteIntoClipboardWithRecognize } from "../storage/FileOps";
-import { showSuccess, showError } from "@rs-frontend/items/Toast";
+import { showSuccess, showError } from "@rs-frontend/shared/Toast";
 import { writeFileSmart } from "@rs-core/storage/WriteFileSmart-v2";
 import type { EntityInterface } from "@rs-com/template/EntityInterface";
 import { currentWebDav, loadSettings, saveSettings } from "@rs-com/config/Settings";

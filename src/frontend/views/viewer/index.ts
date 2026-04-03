@@ -27,8 +27,11 @@ import "fest/icon";
 // @ts-ignore - SCSS import
 import style from "./index.scss?inline";
 import type { MarkedExtension } from "marked";
+import { createViewerToolbar } from "./toolbar";
 
 let markedParserPromise: Promise<(markdown: string) => Promise<string>> | null = null;
+
+const VIEWER_OUTLINE_SESSION_KEY = "rs-viewer-outline";
 
 
 const MATH_DELIMITER_PATTERN = /\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|(?<!\$)\$[^$\n]+\$|\\\([\s\S]*?\\\)/;
@@ -77,6 +80,7 @@ type ViewerMarkdownSettings = {
     };
     modules: {
         typography: boolean;
+        lists: boolean;
         tables: boolean;
         codeBlocks: boolean;
         blockquotes: boolean;
@@ -186,64 +190,7 @@ interface ViewerState {
 }
 
 const STORAGE_KEY = "rs-viewer-state";
-const DEFAULT_CONTENT = `# 🤖 U2RE.space 🤖
-
-🌳 Here is our project land... 🌳
-
-## ⛑️ CrossWord i1 ⛑️
-
-> 💡 *Open a markdown file or paste content here.*
-
-**Welcome to CrossWord i1.**
-
-### Features
-
-- Advanced markdown viewer
-- AI processing (work-center)
-- File explorer (experimental)
-- AirPad (experimental)
-- Print (experimental)
-- DOCX-export (experimental)
-- PWA share target
-- Drop and paste events
-
-### Github
-
-- [CrossWord](https://github.com/u2re-space/crossword) (source code)
-- [Fest Live](https://github.com/fest-live) (libraries, frameworks)
-
-### Components
-
-- [Endpoint](https://github.com/u2re-space/crossword/src/endpoint) (nodejs, source code)
-- [PWA-APP](https://u2re.space/) (public)
-
-### Coming soon
-
-- CRX extension in public release
-- Endpoint for AirPad
-
-### Developers
-
-- [Fest Live](https://github.com/fest-live) (libraries, frameworks)
-- [L2NE](https://github.com/L2NE-dev) (developer profile)
-
----
-
-## 📱 Mobile Agent 📱
-
-😔 **Coming soon...** 😔
-
-### Features
-
-- AI assistance
-- Remote control
-- User defined API
-- Synchronizations
-- Clipboard sharing
-- Data storage
-- Tunneling
-- WebView
-`;
+const DEFAULT_CONTENT = `# Welcome to the Viewer\n\nThis is a markdown viewer component.`;
 
 // ============================================================================
 // VIEWER OPTIONS
@@ -314,6 +261,7 @@ export class ViewerView implements View {
         },
         modules: {
             typography: true,
+            lists: true,
             tables: true,
             codeBlocks: true,
             blockquotes: true,
@@ -330,6 +278,8 @@ export class ViewerView implements View {
         extensions: []
     };
     private markdownSettingsPromise: Promise<void> | null = null;
+    /** Table of contents for rendered markdown; persisted for the tab session. */
+    private outlineVisible = false;
 
     lifecycle: ViewLifecycle = {
         onMount: () => this.onMount(),
@@ -345,6 +295,11 @@ export class ViewerView implements View {
         this.sourceUrl = this.normalizeSourceUrl(options.source);
         this.applyRouteParams(options.params);
         this.markdownSettingsPromise = this.loadMarkdownSettings();
+        try {
+            this.outlineVisible = globalThis.sessionStorage?.getItem(VIEWER_OUTLINE_SESSION_KEY) === "1";
+        } catch {
+            this.outlineVisible = false;
+        }
 
         // Load initial content
         const savedState = this.stateManager.load();
@@ -373,54 +328,7 @@ export class ViewerView implements View {
         this.element = H`
             <div class="cw-view-viewer-shell">
                 <div class="view-viewer">
-                    <div class="view-viewer__toolbar" data-viewer-toolbar>
-                        <div class="view-viewer__toolbar-left">
-                            <button class="view-viewer__btn" data-action="open" type="button" title="Open file">
-                                <ui-icon class="view-viewer__toolbar-icon" icon="folder-open" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                                <span>Open</span>
-                            </button>
-                            <button class="view-viewer__btn" data-action="toggle-raw" type="button" title="Toggle raw/rendered view">
-                                <ui-icon class="view-viewer__toolbar-icon" icon="code" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                                <span>Raw</span>
-                            </button>
-                            <button class="view-viewer__btn" data-action="copy" type="button" title="Copy raw content">
-                                <ui-icon class="view-viewer__toolbar-icon" icon="copy" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                                <span>Copy</span>
-                            </button>
-                            <button class="view-viewer__btn" data-action="paste" type="button" title="Paste from clipboard (mobile-friendly)" aria-label="Paste from clipboard">
-                                <ui-icon class="view-viewer__toolbar-icon" icon="clipboard-text" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                                <span>Paste</span>
-                            </button>
-                            <button class="view-viewer__btn" data-action="download" type="button" title="Download as markdown">
-                                <ui-icon class="view-viewer__toolbar-icon" icon="download" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                                <span>Download</span>
-                            </button>
-                        </div>
-                        <div class="view-viewer__toolbar-center"></div>
-                        <div class="view-viewer__toolbar-right">
-                            
-                            <button class="view-viewer__btn" data-action="attach" type="button" title="Attach to Work Center">
-                                <ui-icon class="view-viewer__toolbar-icon" icon="lightning" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                                <span>Attach</span>
-                            </button>
-                            <button class="view-viewer__btn" data-action="open-style-settings" type="button" title="Markdown styling, modules, plugins">
-                                <ui-icon class="view-viewer__toolbar-icon" icon="paint-roller" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                                <span>Style</span>
-                            </button>
-                            <button class="view-viewer__btn" data-action="copy-rendered" type="button" title="Copy rendered text">
-                                <ui-icon class="view-viewer__toolbar-icon" icon="text-t" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                                <span>Copy text</span>
-                            </button>
-                            <button class="view-viewer__btn" data-action="export-docx" type="button" title="Export as DOCX">
-                                <ui-icon class="view-viewer__toolbar-icon" icon="file-doc" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                                <span>DOCX</span>
-                            </button>
-                            <button class="view-viewer__btn" data-action="print" type="button" title="Print content">
-                                <ui-icon class="view-viewer__toolbar-icon" icon="printer" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                                <span>Print</span>
-                            </button>
-                        </div>
-                    </div>
+                    ${createViewerToolbar()}
                     <div class="view-viewer__content" data-viewer-content>
                         <pre class="markdown-viewer-raw" data-raw-target aria-label="Raw content" hidden></pre>
                     </div>
@@ -439,6 +347,7 @@ export class ViewerView implements View {
 
         // Setup event handlers
         this.setupEventHandlers(rawTarget || undefined);
+        this.syncOutlineToolbarState();
 
         // Set initial content
         if (renderTarget && rawTarget) {
@@ -541,6 +450,7 @@ export class ViewerView implements View {
         const renderTarget = prose;
         const rawTarget = pre;
         this.setupEventHandlers(rawTarget);
+        this.syncOutlineToolbarState();
 
         if (renderTarget && rawTarget) {
             this.renderMarkdown(this.contentRef.value, renderTarget, rawTarget);
@@ -588,53 +498,7 @@ export class ViewerView implements View {
     private buildViewViewerChromeForShadow(): HTMLElement {
         return H`
             <div class="view-viewer">
-                <div class="view-viewer__toolbar" data-viewer-toolbar>
-                    <div class="view-viewer__toolbar-left">
-                        <button class="view-viewer__btn" data-action="open" type="button" title="Open file">
-                            <ui-icon class="view-viewer__toolbar-icon" icon="folder-open" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                            <span>Open</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="toggle-raw" type="button" title="Toggle raw/rendered view">
-                            <ui-icon class="view-viewer__toolbar-icon" icon="code" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                            <span>Raw</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="copy" type="button" title="Copy raw content">
-                            <ui-icon class="view-viewer__toolbar-icon" icon="copy" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                            <span>Copy</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="paste" type="button" title="Paste from clipboard (mobile-friendly)" aria-label="Paste from clipboard">
-                            <ui-icon class="view-viewer__toolbar-icon" icon="clipboard-text" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                            <span>Paste</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="download" type="button" title="Download as markdown">
-                            <ui-icon class="view-viewer__toolbar-icon" icon="download" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                            <span>Download</span>
-                        </button>
-                    </div>
-                    <div class="view-viewer__toolbar-center"></div>
-                    <div class="view-viewer__toolbar-right">
-                        <button class="view-viewer__btn" data-action="attach" type="button" title="Attach to Work Center">
-                            <ui-icon class="view-viewer__toolbar-icon" icon="lightning" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                            <span>Attach</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="open-style-settings" type="button" title="Markdown styling, modules, plugins">
-                            <ui-icon class="view-viewer__toolbar-icon" icon="paint-roller" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                            <span>Style</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="copy-rendered" type="button" title="Copy rendered text">
-                            <ui-icon class="view-viewer__toolbar-icon" icon="text-t" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                            <span>Copy text</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="export-docx" type="button" title="Export as DOCX">
-                            <ui-icon class="view-viewer__toolbar-icon" icon="file-doc" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                            <span>DOCX</span>
-                        </button>
-                        <button class="view-viewer__btn" data-action="print" type="button" title="Print content">
-                            <ui-icon class="view-viewer__toolbar-icon" icon="printer" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
-                            <span>Print</span>
-                        </button>
-                    </div>
-                </div>
+                ${createViewerToolbar()}
                 <div class="view-viewer__content" data-viewer-content>
                     <div class="cw-view-viewer__slot-raw">
                         <slot name="raw"></slot>
@@ -699,6 +563,90 @@ export class ViewerView implements View {
         } else {
             content?.removeAttribute("data-raw");
         }
+    }
+
+    private syncOutlineToolbarState(): void {
+        const toolbar = this.element?.querySelector("[data-viewer-toolbar]");
+        const btn = toolbar?.querySelector<HTMLButtonElement>('[data-action="toggle-outline"]');
+        if (btn) {
+            btn.setAttribute("aria-pressed", this.outlineVisible ? "true" : "false");
+        }
+    }
+
+    private slugifyHeadingId(text: string, used: Set<string>): string {
+        const base =
+            (text || "")
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, "-")
+                .replace(/[^a-z0-9\u00c0-\u024f-]+/gi, "-")
+                .replace(/^-+|-+$/g, "") || "section";
+        let id = base;
+        let n = 0;
+        while (used.has(id)) {
+            n += 1;
+            id = `${base}-${n}`;
+        }
+        used.add(id);
+        return id;
+    }
+
+    private refreshDocumentOutline(nav: HTMLElement, proseRoot: HTMLElement): void {
+        nav.hidden = !this.outlineVisible;
+        nav.innerHTML = "";
+        if (!this.outlineVisible) return;
+
+        const headings = Array.from(proseRoot.querySelectorAll("h1,h2,h3,h4,h5,h6")) as HTMLElement[];
+        if (headings.length === 0) {
+            nav.innerHTML = `<div class="view-viewer__outline-empty" role="status">No headings in document</div>`;
+            return;
+        }
+
+        const used = new Set<string>();
+        const list = document.createElement("ul");
+        list.className = "view-viewer__outline-list";
+
+        for (const h of headings) {
+            let id = (h.id || "").trim();
+            if (!id) {
+                id = this.slugifyHeadingId(h.textContent || "", used);
+                h.id = id;
+            } else {
+                used.add(id);
+            }
+            const li = document.createElement("li");
+            li.className = `view-viewer__outline-item view-viewer__outline--h${h.tagName.slice(1)}`;
+            const a = document.createElement("a");
+            a.href = `#${id}`;
+            a.textContent = (h.textContent || "").trim() || id;
+            li.appendChild(a);
+            list.appendChild(li);
+        }
+        nav.appendChild(list);
+    }
+
+    private setOutlineVisible(visible: boolean): void {
+        this.outlineVisible = visible;
+        try {
+            if (visible) {
+                globalThis.sessionStorage?.setItem(VIEWER_OUTLINE_SESSION_KEY, "1");
+            } else {
+                globalThis.sessionStorage?.removeItem(VIEWER_OUTLINE_SESSION_KEY);
+            }
+        } catch {
+            /* ignore */
+        }
+        const renderTarget = this.queryViewerSlotted("[data-render-target]");
+        if (renderTarget) {
+            const nav = renderTarget.querySelector(":scope > nav.view-viewer__outline") as HTMLElement | null;
+            const root = renderTarget.querySelector(":scope > .view-viewer__md-root") as HTMLElement | null;
+            if (nav && root) {
+                this.refreshDocumentOutline(nav, root);
+            } else if (nav) {
+                nav.hidden = !visible;
+            }
+        }
+        this.syncOutlineToolbarState();
     }
 
     private renderMarkdown(content: string, renderTarget: HTMLElement, rawTarget: HTMLPreElement): void {
@@ -779,9 +727,18 @@ export class ViewerView implements View {
                 const handleParsed = (html: string) => {
                     if (seq !== this.renderSeq) return;
                     const sanitized = DOMPurify?.sanitize?.((html || "")?.trim?.() || "", SANITIZE_OPTIONS) || "";
-                    renderTarget.innerHTML = sanitized;
-                    this.resolveRelativeResourceUrls(renderTarget);
-                    this.applyRenderedLinkBehavior(renderTarget);
+                    renderTarget.replaceChildren();
+                    const outlineNav = document.createElement("nav");
+                    outlineNav.className = "view-viewer__outline";
+                    outlineNav.setAttribute("aria-label", "Document outline");
+                    const mdRoot = document.createElement("div");
+                    mdRoot.className = "view-viewer__md-root";
+                    mdRoot.innerHTML = sanitized;
+                    renderTarget.append(outlineNav, mdRoot);
+                    this.resolveRelativeResourceUrls(mdRoot);
+                    this.applyRenderedLinkBehavior(mdRoot);
+                    this.refreshDocumentOutline(outlineNav, mdRoot);
+                    this.syncOutlineToolbarState();
                     endBusy();
                     console.log("[ViewerView] Markdown rendered successfully");
                 };
@@ -953,7 +910,10 @@ export class ViewerView implements View {
     }
 
     private resolveRelativeResourceUrls(root: HTMLElement): void {
-        const apply = (selector: string, attr: "src" | "href") => {
+        const extPage = globalThis.location?.protocol === "chrome-extension:";
+        const fileBacked = Boolean(this.sourceUrl?.startsWith("file:"));
+
+        const apply = (selector: string, attr: "src" | "href", mode: "link" | "media") => {
             const nodes = Array.from(root.querySelectorAll(selector)) as HTMLElement[];
             for (const node of nodes) {
                 const current = (node.getAttribute(attr) || "").trim();
@@ -963,13 +923,31 @@ export class ViewerView implements View {
                     node.removeAttribute(attr);
                     continue;
                 }
+                // Extension viewer + file-backed source: do not inject file:// into the DOM.
+                // Chromium blocks nested/opaque file loads; keep relative hrefs for link clicks.
+                if (extPage && fileBacked && /^file:/i.test(resolved)) {
+                    if (mode === "link") {
+                        const hadAbsoluteScheme =
+                            /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(current) || current.startsWith("//");
+                        if (!hadAbsoluteScheme) {
+                            continue;
+                        }
+                        node.removeAttribute(attr);
+                        continue;
+                    }
+                    node.removeAttribute(attr);
+                    continue;
+                }
                 if (resolved !== current) node.setAttribute(attr, resolved);
             }
         };
 
-        apply("img[src]", "src");
-        apply("source[src]", "src");
-        apply("a[href]", "href");
+        apply("img[src]", "src", "media");
+        apply("source[src]", "src", "media");
+        apply("video[src]", "src", "media");
+        apply("audio[src]", "src", "media");
+        apply("track[src]", "src", "media");
+        apply("a[href]", "href", "link");
     }
 
     private isLikelyMarkdownUrl(value: string): boolean {
@@ -1078,6 +1056,9 @@ export class ViewerView implements View {
                     break;
                 case "open-style-settings":
                     this.handleOpenStyleSettings();
+                    break;
+                case "toggle-outline":
+                    this.setOutlineVisible(!this.outlineVisible);
                     break;
                 case "attach":
                     void this.handleAttachToWorkCenter();
@@ -1197,7 +1178,8 @@ export class ViewerView implements View {
             else globalThis.setTimeout(() => r(), 0);
         });
         // textContent avoids full layout flush that innerText can trigger on large docs.
-        const text = (renderTarget?.textContent || "").trim();
+        const proseRoot = renderTarget.querySelector(":scope > .view-viewer__md-root") as HTMLElement | null;
+        const text = (proseRoot?.textContent || renderTarget?.textContent || "").trim();
         if (!text) {
             this.showMessage("No content to copy");
             return;
@@ -1792,14 +1774,37 @@ export class ViewerView implements View {
 
         const modulesCss = `
             ${this.markdownSettings.modules.typography ? "" : `
+            .cw-view-viewer-shell .markdown-viewer-content .view-viewer__md-root p,
+            .cw-view-viewer-shell .markdown-viewer-content .view-viewer__md-root li,
             .cw-view-viewer-shell .markdown-viewer-content p,
             .cw-view-viewer-shell .markdown-viewer-content li {
                 margin-block: 0.35em;
             }
+            .cw-view-viewer-shell .markdown-viewer-content .view-viewer__md-root h1,
+            .cw-view-viewer-shell .markdown-viewer-content .view-viewer__md-root h2,
+            .cw-view-viewer-shell .markdown-viewer-content .view-viewer__md-root h3,
             .cw-view-viewer-shell .markdown-viewer-content h1,
             .cw-view-viewer-shell .markdown-viewer-content h2,
             .cw-view-viewer-shell .markdown-viewer-content h3 {
                 margin-block: 0.45em;
+            }`}
+
+            ${this.markdownSettings.modules.lists ? `
+            .cw-view-viewer-shell .markdown-viewer-content .view-viewer__md-root ul,
+            .cw-view-viewer-shell .markdown-viewer-content .view-viewer__md-root ol {
+                margin-block: 0.65em;
+                padding-inline-start: 1.35em;
+            }
+            .cw-view-viewer-shell .markdown-viewer-content .view-viewer__md-root li {
+                margin-block: 0.28em;
+            }
+            .cw-view-viewer-shell .markdown-viewer-content .view-viewer__md-root li > ul,
+            .cw-view-viewer-shell .markdown-viewer-content .view-viewer__md-root li > ol {
+                margin-block: 0.4em;
+            }` : `
+            .cw-view-viewer-shell .markdown-viewer-content .view-viewer__md-root ul,
+            .cw-view-viewer-shell .markdown-viewer-content .view-viewer__md-root ol {
+                padding-inline-start: 1.15em;
             }`}
 
             ${this.markdownSettings.modules.codeBlocks ? `
@@ -1959,6 +1964,7 @@ export class ViewerView implements View {
                 },
                 modules: {
                     typography: (markdown?.modules?.typography ?? true) !== false,
+                    lists: (markdown?.modules?.lists ?? true) !== false,
                     tables: (markdown?.modules?.tables ?? true) !== false,
                     codeBlocks: (markdown?.modules?.codeBlocks ?? true) !== false,
                     blockquotes: (markdown?.modules?.blockquotes ?? true) !== false,

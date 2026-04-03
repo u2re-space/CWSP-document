@@ -87,6 +87,8 @@ export type MarkdownExtensionRule = {
 };
 export type MarkdownStyleModules = {
     typography?: boolean;
+    /** Lists (ul/ol): spacing, markers, nesting */
+    lists?: boolean;
     tables?: boolean;
     codeBlocks?: boolean;
     blockquotes?: boolean;
@@ -283,6 +285,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
             },
             modules: {
                 typography: true,
+                lists: true,
                 tables: true,
                 codeBlocks: true,
                 blockquotes: true,

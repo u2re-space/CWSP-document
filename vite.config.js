@@ -119,7 +119,9 @@ const createCrxConfig = (mode) => {
     const crxPlugin = crx({
         manifest,
         browser: "chrome",
-        contentScripts: { injectCss: true },
+        // Do not inject bundled CSS into arbitrary host pages — it was merging PWA/shell
+        // styles (cssCodeSplit: false) and breaking third-party layouts.
+        contentScripts: { injectCss: false },
     });
     // CRX build is not a PWA build. Disable PWA-related plugins (PWA + static-copy).
     const isPwaPlugin = (plugin) => {
@@ -163,6 +165,8 @@ const createCrxConfig = (mode) => {
         plugins: [...basePlugins, crxPlugin],
         build: {
             ...(baseConfig?.build ?? {}),
+            // Per-entry CSS so content scripts do not share one global stylesheet with popup/viewer.
+            cssCodeSplit: true,
             outDir: resolve(__dirname, "./dist-crx"),
             lib: undefined,
             // Disable modulePreload for CRX - causes broken imports with __vitePreload

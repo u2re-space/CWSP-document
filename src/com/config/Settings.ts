@@ -1,4 +1,3 @@
-import { getDirectoryHandle, readFile } from "fest/lure"
 import { JSOX } from "jsox";
 
 //
@@ -354,6 +353,18 @@ type SyncOptions = {
     pruneRemote?: boolean;
 };
 
+/** Lazy `fest/lure` — keeps content scripts / lightweight callers from pulling lure + UI CSS. */
+let lureFsPromise: Promise<{ getDirectoryHandle: typeof import("fest/lure").getDirectoryHandle; readFile: typeof import("fest/lure").readFile }> | null = null;
+const loadLureFs = () => {
+    if (!lureFsPromise) {
+        lureFsPromise = import("fest/lure").then((m) => ({
+            getDirectoryHandle: m.getDirectoryHandle,
+            readFile: m.readFile,
+        }));
+    }
+    return lureFsPromise;
+};
+
 // DOWNLOAD: не прибавляем path к filename — берём filename как есть
 const downloadContentsToOPFS = async (
     webDavClient,
@@ -361,6 +372,7 @@ const downloadContentsToOPFS = async (
     opts: SyncOptions = {},
     rootHandle: FileSystemDirectoryHandle | null = null
 ) => {
+    const { getDirectoryHandle, readFile } = await loadLureFs();
     const files = await webDavClient
         ?.getDirectoryContents?.(path || "/")
         ?.catch?.((e) => { console.warn(e); return []; }) as FileStat[];
@@ -423,6 +435,7 @@ const uploadOPFSToWebDav = async (
     path = "/",
     opts: SyncOptions = {}
 ) => {
+    const { getDirectoryHandle } = await loadLureFs();
     const effectiveDirHandle = dirHandle ?? (await getDirectoryHandle(null, path, { create: true })?.catch?.(console.warn.bind(console)));
     const entries = await Array.fromAsync(effectiveDirHandle?.entries?.() ?? []);
 

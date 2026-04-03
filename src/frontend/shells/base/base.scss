@@ -1,5 +1,5 @@
 /* ai-refactor: optimized/refactored at 2026-02-13T00:24:03Z */
-@use "../../views/scss/_views.scss" as v;
+@use "../../views/_views.scss" as v;
 
 @layer shell.tokens, shell.base, shell.components, shell.utilities, shell.overrides;
 
@@ -311,6 +311,16 @@
         scrollbar-width: thin;
         scrollbar-color: var(--shell-scrollbar, rgba(128, 128, 128, 0.3)) transparent;
         container-type: size;
+
+        /* Match minimal: viewer host fills the shell content track (avoid min-content width). */
+        & > [data-cw-view-host="true"] {
+            display: block;
+            flex: 1 1 auto;
+            align-self: stretch;
+            inline-size: 100%;
+            min-inline-size: 0;
+            min-block-size: 0;
+        }
 
         &::-webkit-scrollbar {
             inline-size: 6px;

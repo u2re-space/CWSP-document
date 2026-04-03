@@ -8,7 +8,7 @@
 import { H } from "fest/lure";
 import type { ShellId, ShellLayoutConfig, ViewId } from "../types";
 import { ShellBase } from "../shell";
-import { isEnabledView } from "../../config/views";
+import { isEnabledView } from "../../views/config/views";
 import type { WindowFrameElement } from "../UIElement";
 import { subscribeViewChannel } from "../../shared/view-api";
 

@@ -10,7 +10,7 @@ import { loadAsAdopted, removeAdopted } from "fest/dom";
 import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shells/types";
 import type { BaseViewOptions } from "../types";
 import { getString, setString } from "../../../core/storage";
-import { openUnifiedContextMenu } from "@rs-frontend/items/ContextMenu";
+import { openUnifiedContextMenu } from "@rs-frontend/shared/ContextMenu";
 import { requestOpenView } from "../../shared/view-api";
 import { sendMessage } from "@rs-com/core/UnifiedMessaging";
 import {

@@ -20,7 +20,7 @@ export * from "./misc/web-components";
 
 // Channel mixin for view connectivity
 export * from "../shared/channel-mixin";
-import { ENABLED_VIEW_IDS } from "../config/views";
+import { ENABLED_VIEW_IDS } from "./config/views";
 
 // ============================================================================
 // VIEW COMPONENTS

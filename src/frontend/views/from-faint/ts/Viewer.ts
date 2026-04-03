@@ -6,7 +6,7 @@ import type { EntityInterface } from "@rs-com/template/EntityInterface";
 import { renderTabName } from "../../../core/utils/Utils";
 import { scheduleFrame } from "@rs-core/utils/Runtime";
 import { sendToEntityPipeline } from "@rs-core/storage/FileSystem";
-import { CollectItemsForTabPage, MakeItemBy } from "../../items/Items";
+import { CollectItemsForTabPage, MakeItemBy } from "@rs-frontend/shared/Items";
 import { orientRef } from "fest/lure";
 
 //

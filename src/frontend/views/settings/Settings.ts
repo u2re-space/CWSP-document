@@ -6,8 +6,8 @@ import { loadSettings, saveSettings } from "@rs-com/config/Settings";
 import { BUILTIN_AI_MODELS, type AppSettings, type MCPConfig } from "@rs-com/config/SettingsTypes";
 import { applyTheme } from "@rs-core/utils/Theme";
 import { setString, StorageKeys } from "../../../core/storage";
-import { navigateToView } from "../../main/routing";
-import { createCustomInstructionsEditor } from "../../items/CustomInstructionsEditor";
+import { navigateToView } from "../../shells/main/routing";
+import { createCustomInstructionsEditor } from "../../shared/CustomInstructionsEditor";
 import { loadAsAdopted } from "fest/dom";
 
 export type SettingsViewOptions = {
@@ -178,30 +178,44 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         <input class="form-input" type="number" inputmode="numeric" min="5" max="40" step="1" data-field="appearance.markdown.page.marginMm" />
       </label>
       <h4>Style modules</h4>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="appearance.markdown.modules.typography" />
-        <span>Typography module</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="appearance.markdown.modules.tables" />
-        <span>Tables module</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="appearance.markdown.modules.codeBlocks" />
-        <span>Code blocks module</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="appearance.markdown.modules.blockquotes" />
-        <span>Blockquotes module</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="appearance.markdown.modules.media" />
-        <span>Media module</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="appearance.markdown.modules.printBreaks" />
-        <span>Print breaks module</span>
-      </label>
+      <p class="field-hint" style="margin: 0 0 0.5rem; opacity: 0.85; font-size: 0.9em;">Grouped by what they affect in the viewer. All are on by default.</p>
+      <fieldset class="field-group" style="border: 0; padding: 0; margin: 0 0 1rem;">
+        <legend class="field" style="font-weight: 600; margin-bottom: 0.35rem;">Type &amp; layout</legend>
+        <label class="field checkbox form-checkbox">
+          <input type="checkbox" data-field="appearance.markdown.modules.typography" />
+          <span>Typography (paragraphs, headings)</span>
+        </label>
+        <label class="field checkbox form-checkbox">
+          <input type="checkbox" data-field="appearance.markdown.modules.lists" />
+          <span>Lists (bullets &amp; numbering)</span>
+        </label>
+      </fieldset>
+      <fieldset class="field-group" style="border: 0; padding: 0; margin: 0 0 1rem;">
+        <legend class="field" style="font-weight: 600; margin-bottom: 0.35rem;">Blocks &amp; media</legend>
+        <label class="field checkbox form-checkbox">
+          <input type="checkbox" data-field="appearance.markdown.modules.tables" />
+          <span>Tables</span>
+        </label>
+        <label class="field checkbox form-checkbox">
+          <input type="checkbox" data-field="appearance.markdown.modules.codeBlocks" />
+          <span>Code blocks</span>
+        </label>
+        <label class="field checkbox form-checkbox">
+          <input type="checkbox" data-field="appearance.markdown.modules.blockquotes" />
+          <span>Blockquotes</span>
+        </label>
+        <label class="field checkbox form-checkbox">
+          <input type="checkbox" data-field="appearance.markdown.modules.media" />
+          <span>Images &amp; video</span>
+        </label>
+      </fieldset>
+      <fieldset class="field-group" style="border: 0; padding: 0; margin: 0 0 1rem;">
+        <legend class="field" style="font-weight: 600; margin-bottom: 0.35rem;">Print</legend>
+        <label class="field checkbox form-checkbox">
+          <input type="checkbox" data-field="appearance.markdown.modules.printBreaks" />
+          <span>Print breaks (avoid splits inside headings, tables, …)</span>
+        </label>
+      </fieldset>
       <h4>Rendering plugins</h4>
       <label class="field checkbox form-checkbox">
         <input type="checkbox" data-field="appearance.markdown.plugins.smartTypography" />
@@ -449,6 +463,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     const markdownPageOrientation = field('[data-field="appearance.markdown.page.orientation"]') as HTMLSelectElement | null;
     const markdownPageMarginMm = field('[data-field="appearance.markdown.page.marginMm"]') as HTMLInputElement | null;
     const markdownModuleTypography = field('[data-field="appearance.markdown.modules.typography"]') as HTMLInputElement | null;
+    const markdownModuleLists = field('[data-field="appearance.markdown.modules.lists"]') as HTMLInputElement | null;
     const markdownModuleTables = field('[data-field="appearance.markdown.modules.tables"]') as HTMLInputElement | null;
     const markdownModuleCodeBlocks = field('[data-field="appearance.markdown.modules.codeBlocks"]') as HTMLInputElement | null;
     const markdownModuleBlockquotes = field('[data-field="appearance.markdown.modules.blockquotes"]') as HTMLInputElement | null;
@@ -653,6 +668,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
             if (markdownPageOrientation) markdownPageOrientation.value = (s?.appearance?.markdown?.page?.orientation || "portrait") as any;
             if (markdownPageMarginMm) markdownPageMarginMm.value = String(s?.appearance?.markdown?.page?.marginMm ?? 12);
             if (markdownModuleTypography) markdownModuleTypography.checked = (s?.appearance?.markdown?.modules?.typography ?? true) !== false;
+            if (markdownModuleLists) markdownModuleLists.checked = (s?.appearance?.markdown?.modules?.lists ?? true) !== false;
             if (markdownModuleTables) markdownModuleTables.checked = (s?.appearance?.markdown?.modules?.tables ?? true) !== false;
             if (markdownModuleCodeBlocks) markdownModuleCodeBlocks.checked = (s?.appearance?.markdown?.modules?.codeBlocks ?? true) !== false;
             if (markdownModuleBlockquotes) markdownModuleBlockquotes.checked = (s?.appearance?.markdown?.modules?.blockquotes ?? true) !== false;
@@ -797,6 +813,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                         },
                         modules: {
                             typography: (markdownModuleTypography?.checked ?? true) !== false,
+                            lists: (markdownModuleLists?.checked ?? true) !== false,
                             tables: (markdownModuleTables?.checked ?? true) !== false,
                             codeBlocks: (markdownModuleCodeBlocks?.checked ?? true) !== false,
                             blockquotes: (markdownModuleBlockquotes?.checked ?? true) !== false,

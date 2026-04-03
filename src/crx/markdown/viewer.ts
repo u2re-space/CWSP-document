@@ -133,6 +133,10 @@ const resolveSource = async (params: URLSearchParams): Promise<string | null> =>
     if (params.get("mdk")) {
         return null;
     }
+    // Session-less file open (preload failed): never put file:// in ?src; ?origin=file only.
+    if (params.get("origin") === "file") {
+        return null;
+    }
 
     const sourceFromView = params.get("view-src") || params.get("view");
     if (sourceFromView && !isVirtualViewValue(sourceFromView)) {

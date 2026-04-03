@@ -12,7 +12,7 @@
  */
 
 import { showToast, initOverlay } from "@rs-frontend/main/overlay";
-import { initToastReceiver } from "@rs-frontend/items/Toast";
+import { initToastReceiver } from "@rs-frontend/shared/Toast";
 import { initClipboardReceiver } from "@rs-core/modules/Clipboard";
 import { copyAsHTML, copyAsMathML, copyAsMarkdown, copyAsTeX } from "@rs-core/document/Conversion";
 import { isUserScopePath, toUserRelativePath } from "fest/core";

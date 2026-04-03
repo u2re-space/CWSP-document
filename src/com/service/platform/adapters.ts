@@ -9,7 +9,7 @@ const showToastNotification = (
 		console.log(message);
 		return;
 	}
-	void import("@rs-frontend/items/Toast")
+	void import("@rs-frontend/shared/Toast")
 		.then(({ showToast }) => {
 			showToast({
 				message,

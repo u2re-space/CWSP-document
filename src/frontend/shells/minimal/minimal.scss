@@ -1,5 +1,5 @@
 /* ai-refactor: optimized/refactored at 2026-02-13T00:24:03Z */
-@use "../../views/scss/_views.scss" as v;
+@use "../../views/_views.scss" as v;
 
 @layer shell.tokens, shell.base, shell.components, shell.utilities, shell.overrides;
 
@@ -58,8 +58,10 @@
         display: grid;
         grid-template-rows: [toolbar-row] auto [content-row] minmax(0, 1fr);
         grid-template-columns: minmax(0, 1fr);
-        align-items: center;
-        justify-content: center;
+        /* stretch: center shrink-wraps grid items (viewer chrome looked like a small floating island in CRX). */
+        align-items: stretch;
+        justify-items: stretch;
+        justify-content: start;
         gap: 0;
         padding: 0;
         margin: 0;

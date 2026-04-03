@@ -6,7 +6,7 @@ import type { EntityInterface } from "@rs-com/template/EntityInterface";
 import { scheduleFrame } from "@rs-core/utils/Runtime";
 import { renderTabName } from "@rs-core/utils/Utils";
 import { sendToEntityPipeline } from "@rs-core/storage/FileSystem";
-import { CollectItemsForTabPage, MakeItemBy } from "@rs-frontend/items/Items";
+import { CollectItemsForTabPage, MakeItemBy } from "@rs-frontend/shared/Items";
 
 // =============================================================================
 // View Page Component

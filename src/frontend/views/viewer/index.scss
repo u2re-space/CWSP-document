@@ -1,38 +1,505 @@
-@use "../scss/_views.scss";
+@use "../_views.scss";
 @use "fest/veela/scss/runtime/basic/markdown/markdown.scss";
 
+
+@layer layer.view.viewer {
+    /*
+     * Markdown viewer toolbar: [left actions] · [flexible gap] · [right actions].
+     * Center column shrinks first (flex: 1 1 0); when intrinsic width exceeds the shell, the bar scrolls on the inline axis.
+     * Icon colors: --view-picon-fill* (inherited from this row).
+     */
+    .view-viewer__toolbar {
+        --view-toolbar-icon-size: 1.125rem;
+        --view-toolbar-ph-icon-size: var(--view-toolbar-icon-size);
+        --view-picon-fill: var(--color-on-surface, var(--view-fg));
+        --view-picon-fill-hover: var(--color-primary, var(--color-on-surface, var(--view-fg)));
+        --view-picon-fill-active: color-mix(
+            in oklab,
+            var(--color-on-surface, var(--view-fg)) 80%,
+            var(--color-primary, #007acc) 20%
+        );
+        --view-picon-fill-disabled: color-mix(in oklab, var(--color-on-surface, var(--view-fg)) 40%, transparent);
+
+        position: relative;
+        z-index: 2;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: flex-start;
+        gap: var(--view-toolbar-gap, 0.5rem);
+        align-self: stretch;
+        inline-size: 100%;
+        max-inline-size: 100%;
+        min-inline-size: 0;
+        min-block-size: 2.5rem;
+        padding-block: var(--view-toolbar-pad-block);
+        padding-inline: var(--view-toolbar-pad-inline);
+        flex-shrink: 0;
+        overflow-inline: auto;
+        overflow-block: hidden;
+        overscroll-behavior-inline: contain;
+        scrollbar-width: thin;
+        scrollbar-color: color-mix(in oklab, var(--view-fg) 18%, transparent) transparent;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
+        container-type: inline-size;
+        isolation: isolate;
+
+        background: var(--color-surface-container-high, var(--view-toolbar-surface));
+        border-block-end: 1px solid var(--view-toolbar-divider);
+        box-shadow: var(--view-toolbar-shadow);
+
+        button.view-viewer__btn > ui-icon.view-viewer__toolbar-icon,
+        .view-viewer__btn > ui-icon.view-viewer__toolbar-icon {
+            order: -1;
+            flex: 0 0 auto;
+            box-sizing: border-box;
+            --icon-size: var(--view-toolbar-ph-icon-size, 1.125rem);
+            --icon-padding: 0;
+            --icon-color: var(--view-picon-fill);
+            pointer-events: none;
+            transition: color var(--motion-fast, 0.12s ease);
+            inline-size: var(--view-toolbar-icon-size);
+            block-size: var(--view-toolbar-icon-size);
+            aspect-ratio: 1;
+        }
+
+        &::after {
+            content: "";
+            position: absolute;
+            inset-block-start: 0;
+            inset-inline: 0;
+            block-size: 1px;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                color-mix(in oklab, var(--color-primary, #007acc) 22%, transparent) 50%,
+                transparent
+            );
+            opacity: 45%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        & > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        &::-webkit-scrollbar {
+            block-size: 4px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            border-radius: 4px;
+            background: color-mix(in oklab, var(--view-fg) 22%, transparent);
+        }
+
+        @container (max-inline-size: 520px) {
+            --view-toolbar-pad-inline: 0.4rem;
+            min-block-size: 2.375rem;
+        }
+    }
+
+    /* Absorbs space between left and right; must shrink so the row can scroll when needed */
+    .view-viewer__toolbar-center {
+        flex: 1 1 0%;
+        min-inline-size: 0;
+        min-block-size: 0;
+        align-self: stretch;
+        pointer-events: none;
+    }
+
+    .view-viewer__toolbar-left,
+    .view-viewer__toolbar-right {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: var(--view-toolbar-gap, 0.5rem);
+        flex: 0 0 auto;
+        box-sizing: border-box;
+    }
+
+    .view-viewer__toolbar-group {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: var(--view-toolbar-group-gap, 0.125rem);
+        flex: 0 0 auto;
+    }
+
+    .view-viewer__toolbar-left .view-viewer__toolbar-group + .view-viewer__toolbar-group {
+        padding-inline-start: var(--view-toolbar-gap, 0.5rem);
+        margin-inline-start: 0;
+        border-inline-start: 1px solid var(--view-toolbar-divider);
+    }
+
+    .view-viewer__toolbar-right .view-viewer__toolbar-group + .view-viewer__toolbar-group {
+        padding-inline-start: var(--view-toolbar-gap, 0.5rem);
+        margin-inline-start: 0;
+        border-inline-start: 1px solid var(--view-toolbar-divider);
+    }
+
+    .view-viewer__toolbar-left {
+        justify-content: flex-start;
+    }
+
+    .view-viewer__toolbar-right {
+        justify-content: flex-end;
+        padding-inline-start: var(--view-toolbar-gap, 0.5rem);
+        margin-inline-start: 0;
+        border-inline-start: 1px solid var(--view-toolbar-divider);
+    }
+
+    button.view-viewer__btn {
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        min-block-size: 2rem;
+        padding: 0.35rem 0.5rem;
+        border: 1px solid transparent;
+        border-radius: var(--radius-md, 6px);
+        background: transparent;
+        color: var(--color-on-surface, var(--view-fg));
+        font-family: inherit;
+        font-size: var(--text-xs, 0.75rem);
+        font-weight: var(--font-weight-medium, 500);
+        line-height: 1.2;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+        cursor: pointer;
+        appearance: none;
+        -webkit-tap-highlight-color: transparent;
+        box-sizing: border-box;
+        flex: 0 0 auto;
+        contain: none;
+        container-type: normal;
+        transition:
+            background-color var(--motion-fast, 0.12s ease),
+            color var(--motion-fast, 0.12s ease),
+            border-color var(--motion-fast, 0.12s ease),
+            box-shadow var(--motion-fast, 0.12s ease);
+
+        span {
+            font-size: 0.6875rem;
+            font-weight: 500;
+            line-height: 1.2;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            opacity: 0.78;
+            flex-shrink: 0;
+        }
+
+        &:hover {
+            background: color-mix(in oklab, var(--color-on-surface, var(--view-fg)) 7%, transparent);
+            border-color: color-mix(in oklab, var(--view-border) 80%, transparent);
+
+            span {
+                opacity: 0.95;
+            }
+
+            & > ui-icon.view-viewer__toolbar-icon {
+                --icon-color: var(--view-picon-fill-hover);
+            }
+        }
+
+        &:active {
+            background: color-mix(in oklab, var(--color-on-surface, var(--view-fg)) 11%, transparent);
+
+            & > ui-icon.view-viewer__toolbar-icon {
+                --icon-color: var(--view-picon-fill-active);
+            }
+        }
+
+        &:disabled > ui-icon.view-viewer__toolbar-icon {
+            --icon-color: var(--view-picon-fill-disabled);
+            opacity: 0.55;
+        }
+
+        &:focus-visible {
+            outline: none;
+            border-color: var(--color-primary, #007acc);
+            box-shadow: var(--focus-ring, 0 0 0 2px color-mix(in oklab, var(--color-primary, #007acc) 45%, transparent));
+        }
+
+        &[aria-pressed="true"] {
+            background: color-mix(in oklab, var(--color-primary, #007acc) 12%, transparent);
+            border-color: color-mix(in oklab, var(--color-primary, #007acc) 35%, transparent);
+        }
+
+        @container (max-inline-size: 720px) {
+            gap: 0.2rem;
+            padding: 0.3rem 0.4rem;
+            min-block-size: 2.25rem;
+        }
+
+        @container (max-inline-size: 560px) {
+            position: relative;
+            gap: 0;
+            min-block-size: 2.5rem;
+            min-inline-size: 2.5rem;
+            padding: 0.35rem;
+            border-radius: var(--radius-lg, 8px);
+
+            span {
+                position: absolute;
+                inline-size: 1px;
+                block-size: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
+        }
+    }
+
+    .view-viewer__md-loading {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1.25rem 1rem;
+        color: var(--view-fg);
+        opacity: 0.9;
+        font-size: 0.9rem;
+
+        &::before {
+            content: "";
+            inline-size: 1.25rem;
+            block-size: 1.25rem;
+            border: 2px solid var(--view-border);
+            border-block-start-color: var(--view-link-color);
+            border-radius: 50%;
+            animation: view-spin 0.75s linear infinite;
+            flex-shrink: 0;
+        }
+    }
+
+    .view-viewer__content {
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        padding: 0px;
+
+        &.dragover {
+            background-color: rgba(0, 122, 204, 0.05);
+            outline: 2px dashed rgba(0, 122, 204, 0.3);
+            outline-offset: -8px;
+        }
+    }
+
+    /* Standalone / non–slot-mode: __content is the scrollport */
+    .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default)) .view-viewer__content {
+        overflow-block: auto;
+        overflow-inline: hidden;
+        overscroll-behavior: contain;
+    }
+
+    .cw-view-viewer-shell.dragover {
+        background-color: rgba(0, 122, 204, 0.05);
+        outline: 2px dashed rgba(0, 122, 204, 0.3);
+        outline-offset: -8px;
+    }
+
+    /* Shell / critical CSS may set user-select:none on broad ancestors — keep prose selectable and context menus usable. */
+    .cw-view-viewer-shell [data-render-target],
+    .cw-view-viewer-shell [data-render-target] * {
+        pointer-events: auto;
+        user-select: text;
+        -webkit-user-select: text;
+        -webkit-touch-callout: default;
+    }
+
+    /* Slotted prose lives in cw-view-viewer light DOM (not under .cw-view-viewer-shell in the tree). */
+    cw-view-viewer [data-render-target],
+    cw-view-viewer [data-render-target] * {
+        pointer-events: auto;
+        user-select: text;
+        -webkit-user-select: text;
+        -webkit-touch-callout: default;
+    }
+
+    /*
+     * Ensure the light-DOM prose node itself is a scroll container in custom-element mode.
+     * This avoids relying only on ::slotted() sizing/overflow propagation.
+     */
+    cw-view-viewer [data-render-target] {
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        block-size: 100%;
+        max-block-size: 100%;
+        min-block-size: 0;
+        min-inline-size: 0;
+        overflow-block: auto;
+        overflow-inline: hidden;
+        overscroll-behavior: contain;
+    }
+
+    /* Rendered body: outline (optional) + markdown root */
+    .cw-view-viewer-shell [data-render-target],
+    cw-view-viewer [data-render-target] {
+        .view-viewer__md-root {
+            flex: 1 1 auto;
+            min-block-size: 0;
+            min-inline-size: 0;
+        }
+    }
+
+    .view-viewer__outline {
+        flex: 0 0 auto;
+        position: sticky;
+        inset-block-start: 0;
+        z-index: 1;
+        max-block-size: min(33vh, 14rem);
+        overflow: auto;
+        overscroll-behavior: contain;
+        margin: 0;
+        padding: 0.5rem 0.75rem 0.65rem;
+        border-block-end: 1px solid var(--view-border);
+        background: color-mix(in oklab, var(--view-bg) 92%, var(--view-toolbar-surface) 8%);
+        font-size: var(--text-xs, 0.75rem);
+        line-height: 1.35;
+
+        &[hidden] {
+            display: none !important;
+        }
+    }
+
+    .view-viewer__outline-empty {
+        opacity: 0.75;
+        font-style: italic;
+        padding: 0.15rem 0;
+    }
+
+    .view-viewer__outline-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .view-viewer__outline-item {
+        margin: 0;
+        padding: 0;
+    }
+
+    .view-viewer__outline-item a {
+        display: block;
+        color: var(--view-link-color);
+        text-decoration: none;
+        border-radius: var(--radius-sm, 4px);
+        padding: 0.2rem 0.35rem;
+        margin-inline: -0.35rem;
+
+        &:hover {
+            color: var(--view-link-hover);
+            background: color-mix(in oklab, var(--view-btn-hover-bg) 80%, transparent);
+        }
+    }
+
+    .view-viewer__outline--h1 {
+        font-weight: 650;
+    }
+    .view-viewer__outline--h2 {
+        padding-inline-start: 0.35rem;
+    }
+    .view-viewer__outline--h3 {
+        padding-inline-start: 0.7rem;
+        opacity: 0.95;
+    }
+    .view-viewer__outline--h4 {
+        padding-inline-start: 1.05rem;
+        opacity: 0.9;
+    }
+    .view-viewer__outline--h5,
+    .view-viewer__outline--h6 {
+        padding-inline-start: 1.35rem;
+        opacity: 0.85;
+    }
+
+}
+
+
 //
+// Shared design tokens. Apply on `:root` / `cw-view-viewer` so `--view-*` inherits through the shadow
+// boundary into toolbar chrome. Never use `:host(.inner-class)` — `:host` only matches the host element;
+// wrong compounds can invalidate an entire comma-separated selector list.
+//
+@mixin viewer-view-tokens {
+    /* layout */
+    --view-layout: "flex";
+    --view-content-max-width: 800px;
+    --view-padding: var(--space-6);
+
+    /* typography */
+    --view-font-size-base: 1rem;
+    --view-line-height-base: 1.6;
+    --view-prose-font-size: var(--text-base);
+    --view-prose-line-height: 1.75;
+    --view-prose-heading-margin: var(--space-6);
+
+    /* colors */
+    --view-bg: var(--color-surface, #ffffff);
+    --view-fg: var(--color-on-surface, #1a1a1a);
+    --view-border: var(--color-border, rgba(0, 0, 0, 0.1));
+    --view-toolbar-bg: light-dark(rgba(0, 0, 0, 0.02), rgba(255, 255, 255, 0.04));
+    --view-btn-hover-bg: light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08));
+    --view-code-bg: light-dark(#f5f5f5, #2d2d2d);
+    --view-code-fg: light-dark(var(--color-text, #1a1a1a), #e0e0e0);
+    --view-code-border: var(--color-border);
+    --view-blockquote-border: var(--color-primary);
+    --view-blockquote-bg: light-dark(var(--color-surface-hover), #252525);
+    --view-link-color: var(--color-link, #007acc);
+    --view-link-hover: var(--color-link-hover, #005fa3);
+
+    /* toolbar (see .view-viewer__toolbar) */
+    --view-toolbar-pad-block: 0.375rem;
+    --view-toolbar-pad-inline: 0.625rem;
+    --view-toolbar-gap: 0.5rem;
+    --view-toolbar-group-gap: 0.125rem;
+    --view-toolbar-divider: color-mix(in oklab, var(--view-border) 65%, transparent);
+    --view-toolbar-surface: light-dark(
+        color-mix(in oklab, var(--color-surface-container-high, #ececec) 92%, var(--color-surface, #fff) 8%),
+        color-mix(in oklab, var(--color-surface-container-high, #2a2a2a) 88%, var(--color-surface, #121212) 12%)
+    );
+    --view-toolbar-shadow: light-dark(
+        0 1px 0 color-mix(in oklab, var(--color-on-surface, #000) 6%, transparent),
+        0 1px 0 color-mix(in oklab, #fff 8%, transparent)
+    );
+
+    /* units */
+    --view-code-font-size: 0.9em;
+}
+
 @layer layer.view.viewer {
     :root:has([data-view="viewer"]),
-    html:has([data-view="viewer"]) {
-        /* layout */
-        --view-layout: "flex";
-        --view-content-max-width: 800px;
-        --view-padding: var(--space-6);
+    html:has([data-view="viewer"]),
+    cw-view-viewer[data-view="viewer"],
+    cw-view-viewer[data-view-id="viewer"] {
+        @include viewer-view-tokens;
+    }
+}
 
-        /* typography */
-        --view-font-size-base: 1rem;
-        --view-line-height-base: 1.6;
-        --view-prose-font-size: var(--text-base);
-        --view-prose-line-height: 1.75;
-        --view-prose-heading-margin: var(--space-6);
-
-        /* colors */
-        --view-bg: var(--color-surface, #ffffff);
-        --view-fg: var(--color-on-surface, #1a1a1a);
-        --view-border: var(--color-border, rgba(0, 0, 0, 0.1));
-        --view-toolbar-bg: light-dark(rgba(0, 0, 0, 0.02), rgba(255, 255, 255, 0.04));
-        --view-btn-hover-bg: light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08));
-        --view-code-bg: light-dark(#f5f5f5, #2d2d2d);
-        --view-code-fg: light-dark(var(--color-text, #1a1a1a), #e0e0e0);
-        --view-code-border: var(--color-border);
-        --view-blockquote-border: var(--color-primary);
-        --view-blockquote-bg: light-dark(var(--color-surface-hover), #252525);
-        --view-link-color: var(--color-link, #007acc);
-        --view-link-hover: var(--color-link-hover, #005fa3);
-
-        /* units */
-        --view-code-font-size: 0.9em;
+@layer layer.view.viewer {
+    /*
+     * Base / minimal shells: viewer chrome spans the content track (not min-content / “floating” island).
+     */
+    :is(html:has([data-shell="base"]), html:has([data-shell="minimal"])) {
+        cw-view-viewer[data-cw-view-host="true"] {
+            display: block;
+            inline-size: 100%;
+            max-inline-size: 100%;
+        }
     }
 }
 
@@ -125,14 +592,15 @@
         overflow-inline: hidden;
         overscroll-behavior: contain;
 
-        > slot {
+        & > slot {
             display: block;
             block-size: 100%;
             min-block-size: 0;
         }
 
-        > slot::slotted([data-render-target]) {
-            display: block;
+        & > slot::slotted([data-render-target]) {
+            display: flex;
+            flex-direction: column;
             block-size: 100%;
             max-block-size: 100%;
             min-block-size: 0;
@@ -163,6 +631,8 @@
 
     .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default)):not([data-raw]) .cw-view-viewer__prose {
         flex: 1 1 auto;
+        flex-direction: column;
+        display: flex;
         min-block-size: 0;
         min-inline-size: 0;
         box-sizing: border-box;
@@ -175,333 +645,6 @@
         flex: 1 1 auto;
         min-block-size: 0;
     }
-}
-
-@layer layer.view.viewer {
-    /* Compact toolbar: tight rhythm, icon-led controls (theme tokens when present). */
-    .view-viewer__toolbar {
-        /*
-         * Toolbar icons: ui-icon (fest/icon) static duotone map and --icon-color.
-         * Override on `.view-viewer`, shell, or host:
-         *   --view-picon-fill, --view-picon-fill-hover, --view-picon-fill-active, --view-picon-fill-disabled
-         */
-        --view-toolbar-icon-size: 1.25rem;
-        --view-toolbar-ph-icon-size: var(--view-toolbar-icon-size);
-        --view-picon-fill: var(--color-on-surface, var(--view-fg));
-        --view-picon-fill-hover: var(--color-primary, var(--color-on-surface, var(--view-fg)));
-        --view-picon-fill-active: color-mix(
-            in oklab,
-            var(--color-on-surface, var(--view-fg)) 82%,
-            var(--color-primary, #007acc) 18%
-        );
-        --view-picon-fill-disabled: color-mix(in oklab, var(--color-on-surface, var(--view-fg)) 40%, transparent);
-        --view-toolbar-row-pad-block: 0.2rem;
-        --view-toolbar-row-pad-inline: 0.2rem;
-        --view-toolbar-gap: 0.125rem;
-
-        position: relative;
-        /* Full-width row: grid + place-self:center was shrink-wrapping the bar to ~min-content (CRX). */
-        display: flex;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--view-toolbar-gap);
-        align-self: stretch;
-        min-block-size: 2.25rem;
-        padding: var(--view-toolbar-row-pad-block) var(--view-toolbar-row-pad-inline);
-        background: var(--color-surface-container-high, var(--view-toolbar-bg));
-        border-block-end: 1px solid var(--view-border);
-        box-shadow: var(--elev-1, 0 1px 2px light-dark(rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.25)));
-        flex-shrink: 0;
-        overflow-inline: auto;
-        overflow-block: hidden;
-        scrollbar-width: none;
-        scrollbar-color: transparent transparent;
-        -webkit-overflow-scrolling: touch;
-        container-type: size;
-        /* Avoid `contain: strict` (size containment): it can distort toolbar sizing and @container queries vs Veela + CRX fix.scss. */
-        contain: layout paint;
-
-        inline-size: 100%;
-        width: 100%;
-        max-inline-size: 100%;
-        min-inline-size: 0;
-        box-sizing: border-box;
-
-        button.view-viewer__btn > ui-icon.view-viewer__toolbar-icon,
-        .view-viewer__btn > ui-icon.view-viewer__toolbar-icon {
-            order: -1;
-            box-sizing: border-box;
-            vertical-align: middle;
-            --icon-size: var(--view-toolbar-ph-icon-size, 1.25rem);
-            --icon-padding: 0;
-            --icon-color: var(--view-picon-fill);
-            pointer-events: none;
-            transition: color var(--motion-fast, 0.12s ease);
-            min-inline-size: max-content;
-            min-block-size: max-content;
-            inline-size: 1rem;
-            block-size: 1rem;
-            aspect-ratio: 1 / 1;
-        }
-
-        &::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(
-                90deg,
-                color-mix(in oklab, var(--color-primary, #007acc) 2%, transparent) 0%,
-                transparent 50%,
-                color-mix(in oklab, var(--color-primary, #007acc) 2%, transparent) 100%
-            );
-            pointer-events: none;
-        }
-
-        & > * {
-            position: relative;
-            z-index: 1;
-        }
-
-        &::-webkit-scrollbar {
-            display: none;
-        }
-
-        @container (max-inline-size: 1024px) {
-            min-block-size: 2.125rem;
-            padding: 0.15rem 0.15rem;
-        }
-
-        @container (max-inline-size: 768px) {
-            min-block-size: 2.25rem;
-            padding: 0.15rem 0.15rem;
-        }
-    }
-
-    .view-viewer__toolbar-center {
-        display: flex;
-        flex: 1 1 auto;
-        min-inline-size: 0;
-        gap: 0.25rem;
-        padding: 0.25rem;
-        justify-content: safe center;
-        align-items: center;
-
-        @container (max-inline-size: 480px) {
-            gap: 0.25rem;
-        }
-    }
-
-    .view-viewer__toolbar-left,
-    .view-viewer__toolbar-right {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        flex: 0 1 auto;
-        min-inline-size: 0;
-        gap: 0.25rem;
-        padding: 0.25rem;
-        justify-content: flex-start;
-        align-items: center;
-        overflow-x: auto;
-        overflow-y: hidden;
-        -webkit-overflow-scrolling: touch;
-
-        @container (max-inline-size: 480px) {
-            gap: 0.5rem;
-        }
-    }
-
-    .view-viewer__toolbar-right {
-        justify-content: flex-end;
-    }
-
-    /* `button` — Veela basic styles all native buttons; keep viewer chrome explicit. */
-    button.view-viewer__btn {
-        display: inline-flex;
-        align-items: safe center;
-        justify-content: safe center;
-        align-content: safe center;
-        justify-items: safe center;
-        gap: 0.28rem;
-        min-block-size: max-content;
-        padding: 0.25rem 0.25rem;
-        border: none;
-        border-radius: var(--radius-sm, 4px);
-        background: var(--color-surface, transparent);
-        color: var(--color-on-surface, var(--view-fg));
-        font-family: inherit;
-        font-size: var(--text-xs, 0.75rem);
-        font-weight: var(--font-weight-medium, 500);
-        line-height: 1.2;
-        letter-spacing: 0.01em;
-        white-space: nowrap;
-        cursor: pointer;
-        appearance: none;
-        -webkit-tap-highlight-color: transparent;
-        box-sizing: border-box;
-        flex-shrink: 0;
-        flex-basis: auto;
-        flex-grow: 0;
-        contain: none;
-        container-type: normal;
-        transition:
-            background-color var(--motion-fast, 0.12s ease),
-            color var(--motion-fast, 0.12s ease),
-            box-shadow var(--motion-fast, 0.12s ease);
-        overflow: visible;
-        inline-size: max-content;
-        min-inline-size: max-content;
-
-        /* Labels secondary to icons (typo fix: priority = icons > text). */
-        span {
-            max-inline-size: none;
-            flex-basis: max-content;
-            flex-grow: 1;
-            overflow: hidden;
-            inline-size: max-content;
-            min-inline-size: max-content;
-            text-overflow: ellipsis;
-            font-size: 0.625rem;
-            font-weight: 400;
-            line-height: 1.15;
-            letter-spacing: 0.03em;
-            text-transform: uppercase;
-            display: inline-block;
-            opacity: 0.72;
-            flex-shrink: 0;
-        }
-
-        &:hover {
-            background: var(--color-surface-container-high, var(--view-btn-hover-bg));
-
-            span {
-                opacity: 0.9;
-            }
-
-            & > ui-icon.view-viewer__toolbar-icon {
-                --icon-color: var(--view-picon-fill-hover);
-            }
-        }
-
-        &:active {
-            background: color-mix(in oklab, var(--color-surface-container-high, var(--view-btn-hover-bg)) 92%, var(--color-on-surface, currentColor) 8%);
-
-            & > ui-icon.view-viewer__toolbar-icon {
-                --icon-color: var(--view-picon-fill-active);
-            }
-        }
-
-        &:disabled > ui-icon.view-viewer__toolbar-icon {
-            --icon-color: var(--view-picon-fill-disabled);
-            opacity: 0.55;
-        }
-
-        &:focus-visible {
-            outline: none;
-            box-shadow: var(--focus-ring, 0 0 0 2px var(--color-primary, #007acc));
-        }
-
-        @container (max-inline-size: 1024px) {
-            gap: 0.15rem;
-            padding: 0.25rem 0.25rem;
-            min-block-size: 1.625rem;
-        }
-
-        @container (max-inline-size: 768px) {
-            gap: 0;
-            min-block-size: 1.75rem;
-            min-inline-size: 1.75rem;
-            padding: 0.25rem;
-
-            span {
-                display: none;
-            }
-        }
-    }
-
-    .view-viewer__md-loading {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 1.25rem 1rem;
-        color: var(--view-fg);
-        opacity: 0.9;
-        font-size: 0.9rem;
-
-        &::before {
-            content: "";
-            inline-size: 1.25rem;
-            block-size: 1.25rem;
-            border: 2px solid var(--view-border);
-            border-block-start-color: var(--view-link-color);
-            border-radius: 50%;
-            animation: view-spin 0.75s linear infinite;
-            flex-shrink: 0;
-        }
-    }
-
-    .view-viewer__content {
-        display: flex;
-        flex-direction: column;
-        box-sizing: border-box;
-        padding: 0px;
-
-        &.dragover {
-            background-color: rgba(0, 122, 204, 0.05);
-            outline: 2px dashed rgba(0, 122, 204, 0.3);
-            outline-offset: -8px;
-        }
-    }
-
-    /* Standalone / non–slot-mode: __content is the scrollport */
-    .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default)) .view-viewer__content {
-        overflow-block: auto;
-        overflow-inline: hidden;
-        overscroll-behavior: contain;
-    }
-
-    .cw-view-viewer-shell.dragover {
-        background-color: rgba(0, 122, 204, 0.05);
-        outline: 2px dashed rgba(0, 122, 204, 0.3);
-        outline-offset: -8px;
-    }
-
-    /* Shell / critical CSS may set user-select:none on broad ancestors — keep prose selectable and context menus usable. */
-    .cw-view-viewer-shell [data-render-target],
-    .cw-view-viewer-shell [data-render-target] * {
-        pointer-events: auto;
-        user-select: text;
-        -webkit-user-select: text;
-        -webkit-touch-callout: default;
-    }
-
-    /* Slotted prose lives in cw-view-viewer light DOM (not under .cw-view-viewer-shell in the tree). */
-    cw-view-viewer [data-render-target],
-    cw-view-viewer [data-render-target] * {
-        pointer-events: auto;
-        user-select: text;
-        -webkit-user-select: text;
-        -webkit-touch-callout: default;
-    }
-
-    /*
-     * Ensure the light-DOM prose node itself is a scroll container in custom-element mode.
-     * This avoids relying only on ::slotted() sizing/overflow propagation.
-     */
-    cw-view-viewer [data-render-target] {
-        display: block;
-        box-sizing: border-box;
-        block-size: 100%;
-        max-block-size: 100%;
-        min-block-size: 0;
-        min-inline-size: 0;
-        overflow-block: auto;
-        overflow-inline: hidden;
-        overscroll-behavior: contain;
-    }
-
 }
 
 @layer layer.view.viewer {
@@ -535,6 +678,10 @@
         }
 
         .view-viewer__toolbar {
+            display: none !important;
+        }
+
+        .view-viewer__outline {
             display: none !important;
         }
 

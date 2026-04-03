@@ -1,17 +1,20 @@
 /**
  * CrossWord Shared Frontend Module
  *
- * Shared registries, channel helpers, and layer/style utilities.
+ * Split layout:
+ * - `shell-bridge/` — registries, routing, channels, layers (shell ↔ view glue)
+ * - `ui/` — toasts, menus, items/cards, canvas helpers
+ * - `policies/` — DOM/event timing guards
+ *
+ * Root `*.ts` files re-export for stable `@rs-frontend/shared/<Name>` imports.
  *
  * @module frontend/shared
  */
 
-// Registries and channel helpers
-export * from "./registry";
-export * from "./channel-mixin";
-export * from "./view-message-routing";
+export * from "./shell-bridge/registry";
+export * from "./shell-bridge/channel-mixin";
+export * from "./shell-bridge/view-message-routing";
 
-// Layer management
 export {
     initializeLayers,
     resetLayers,
@@ -28,7 +31,6 @@ export {
     type LayerName,
     type ShellId,
     type ViewId,
-} from './layer-manager';
+} from "./shell-bridge/layer-manager";
 
-// Re-export default for convenient import
-export { default as LayerManager } from './layer-manager';
+export { default as LayerManager } from "./shell-bridge/layer-manager";

@@ -553,9 +553,9 @@ const toViewerUrl = (source?: string | null, markdownKey?: string | null) => {
     if (!source) return VIEWER_URL;
     const p = new URLSearchParams();
     const isFileUrl = source.startsWith("file:");
-    // Prefer preloaded markdown key for file:// pages. If preload failed, pass src so
-    // viewer can fallback to service-worker fetch bridge instead of opening empty state.
-    if (!isFileUrl || !markdownKey) {
+    // Never put file:// in the viewer query string: extension pages cannot fetch it, and
+    // passing it may contribute to Chromium's "unique security origins" / nested file loads.
+    if (!isFileUrl) {
         p.set("src", source);
     }
     if (markdownKey) p.set("mdk", markdownKey);
@@ -1077,6 +1077,9 @@ chrome.webNavigation?.onCompleted?.addListener?.((details) => {
 chrome.webRequest?.onHeadersReceived?.addListener?.((details) => {
     if (details.tabId < 0) return;
     if (!details.url || details.url.startsWith(VIEWER_ORIGIN)) return;
+    // file:// is handled by onCompleted + session preload; headers here can race and
+    // duplicate redirects with empty body reads.
+    if (details.url.startsWith("file:")) return;
     if (details.type !== "main_frame") return;
 
     const markdownHint = parseMarkdownHeaders(details);
