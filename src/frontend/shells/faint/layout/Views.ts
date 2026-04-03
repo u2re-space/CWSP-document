@@ -10,15 +10,15 @@ import { Sidebar } from "./Sidebar";
 import { MakeCardElement } from "../../../shared/ui/Cards";
 import { initBackNavigation, registerCloseable, historyViewRef, historyState } from "fest/lure";
 import { $byKind, $insideOfDay } from "../../../../core/utils/Utils";
-import { createCtxMenu, SpeedDial } from "../../../views/from-faint/SpeedDial";
-import { ViewPage } from "../../../views/from-faint/Viewer";
+import { createCtxMenu, SpeedDial } from "../../../shared/ui/viewer/SpeedDial";
+import { ViewPage } from "../../../shared/ui/viewer/Viewer";
 
 // @ts-ignore
 import style from "../scss/index.scss?inline";
 import { makeToolbar } from "../../../shared/Actions";
-import { Settings } from "../../../views/from-faint/Settings";
-import { DataExplorer } from "../../../views/from-faint/DataExplorer";
-import { MakeMarkdownView } from "../../../views/from-faint/Markdown";
+import { Settings } from "../../../shared/ui/viewer/Settings";
+import { DataExplorer } from "../../../shared/ui/viewer/DataExplorer";
+import { MakeMarkdownView } from "../../../shared/ui/viewer/Markdown";
 import { initGlobalClipboard } from "fest/lure";
 import initVeela from "fest/veela";
 
@@ -446,8 +446,8 @@ export async function frontend(mountElement) {
 }
 
 //
-export * from "../../../views/from-faint/DataExplorer";
-export * from "../../../views/from-faint/Settings";
+export * from "../../../shared/ui/viewer/DataExplorer";
+export * from "../../../shared/ui/viewer/Settings";
 
 //
 export default frontend;

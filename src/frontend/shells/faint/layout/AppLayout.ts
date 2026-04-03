@@ -3,7 +3,7 @@ import { H, C } from "fest/lure";
 import { navigate, historyState } from "fest/lure";
 import { isPrimitive } from "fest/core";
 import { scheduleFrame } from "@rs-core/utils/Runtime";
-import { makeWallpaper, SpeedDial } from "../../../views/from-faint/SpeedDial";
+import { makeWallpaper, SpeedDial } from "../../../shared/ui/viewer/SpeedDial";
 
 //
 let skipCreateNewView = false;
