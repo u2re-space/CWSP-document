@@ -12,9 +12,9 @@
 
 import { bootLoader } from "./BootLoader";
 import type { ViewId, Shell } from "../types";
-import { ViewRegistry } from "../../shared/registry";
-import { initializeLayers } from "../../shared/layer-manager";
-import { ensureAppLayers } from "../../shared/app-layers";
+import { ViewRegistry } from "../../shared/ui/registry";
+import { initializeLayers } from "../../shared/ui/layer-manager";
+import { ensureAppLayers } from "../../shared/ui/app-layers";
 import { pickEnabledView } from "../../views/config/views";
 
 // ============================================================================

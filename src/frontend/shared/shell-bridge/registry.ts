@@ -319,7 +319,7 @@ export function registerDefaultShells(): void {
         id: "faint",
         name: "Faint",
         description: "Experimental tabbed interface with sidebar",
-        loader: () => import("../../shells/faint/index")
+        loader: () => import("../../shells/index-alt")
     });
 }
 

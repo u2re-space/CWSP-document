@@ -1,6 +1,25 @@
 
 @layer views {
 
+    ui-window-frame,
+    ui-modal,
+    .ui-grid-item {
+        --opacity: 1;
+        --scale: 1;
+        --rotate: 0deg;
+        --translate-x: 0%;
+        --translate-y: 0%;
+        isolation: isolate;
+        content-visibility: auto;
+        transform-origin: 50% 50%;
+        transform-style: flat;
+        transform-box: fill-box;
+        translate: 0% 0% 0%;
+        opacity: var(--opacity, 1);
+        rotate: 0deg;
+        scale: 1;
+    }
+
     // Speed Dial (Home) Styles
     .speed-dial-root {
         display: grid;

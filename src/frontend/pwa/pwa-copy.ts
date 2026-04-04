@@ -6,7 +6,7 @@
 
 import { initClipboardReceiver, listenForClipboardRequests, requestCopy } from "../../core";
 import { copy } from "../../core/modules/Clipboard";
-import { initToastReceiver, showToast } from "../shared/Toast";
+import { initToastReceiver, showToast } from "../shared/ui/Toast";
 import { unifiedMessaging } from "@rs-com/core/UnifiedMessaging";
 import { summarizeForLog } from "@rs-com/core/LogSanitizer";
 

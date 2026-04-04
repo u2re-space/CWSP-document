@@ -7,7 +7,7 @@ import "fest/fl-ui";
 
 //
 import { Sidebar } from "./Sidebar";
-import { MakeCardElement } from "../../../shared/ui/Cards";
+import { MakeCardElement } from "../../../shared/ui/ts/Cards";
 import { initBackNavigation, registerCloseable, historyViewRef, historyState } from "fest/lure";
 import { $byKind, $insideOfDay } from "../../../../core/utils/Utils";
 import { createCtxMenu, SpeedDial } from "../../../shared/ui/viewer/SpeedDial";
@@ -15,7 +15,7 @@ import { ViewPage } from "../../../shared/ui/viewer/Viewer";
 
 // @ts-ignore
 import style from "../scss/index.scss?inline";
-import { makeToolbar } from "../../../shared/Actions";
+import { makeToolbar } from "../../../shared/ui/Actions";
 import { Settings } from "../../../shared/ui/viewer/Settings";
 import { DataExplorer } from "../../../shared/ui/viewer/DataExplorer";
 import { MakeMarkdownView } from "../../../shared/ui/viewer/Markdown";

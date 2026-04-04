@@ -1,8 +1,8 @@
 import { bindInteraction } from "fest/lure";
-import { requestOpenView } from "../../shared/view-api";
+import { requestOpenView } from "../../shared/ui/view-api";
 import type { ViewId } from "../../shells/types";
-import { openUnifiedContextMenu, closeUnifiedContextMenu, type ContextMenuEntry } from "../../shared/ContextMenu";
-import { setAppWallpaper } from "../../shared/Canvas";
+import { openUnifiedContextMenu, closeUnifiedContextMenu, type ContextMenuEntry } from "../../shared/ui/ContextMenu";
+import { setAppWallpaper } from "../../shared/ui/Canvas";
 import { ENABLED_VIEW_IDS, pickEnabledView } from "../config/views";
 import { openShortcutEditor } from "./ShortcutEditor";
 

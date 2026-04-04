@@ -8,12 +8,12 @@
  */
 
 import { initPWA, checkForUpdates, forceRefreshAssets } from "./frontend/pwa/pwa-handling";
-import { loadSubAppWithShell, VALID_VIEWS } from "./frontend/shells/main/routing";
-import { initializeLayers } from "./frontend/shared/layer-manager";
+import { loadSubAppWithShell, VALID_VIEWS } from "./frontend/shells/boot/routing";
+import { initializeLayers } from "./frontend/shared/ui/layer-manager";
 import type { ViewId } from "./frontend/shells/types";
 import { pickEnabledView } from "./frontend/views/config/views";
 import { loadAsAdopted } from "fest/dom";
-import { ensureAppLayers } from "./frontend/shared/app-layers";
+import { ensureAppLayers } from "./frontend/shared/ui/app-layers";
 
 // @ts-ignore
 import viewStyles from "./frontend/views/_views.scss?inline";

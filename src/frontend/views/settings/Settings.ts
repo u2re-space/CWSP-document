@@ -6,8 +6,8 @@ import { loadSettings, saveSettings } from "@rs-com/config/Settings";
 import { BUILTIN_AI_MODELS, type AppSettings, type MCPConfig } from "@rs-com/config/SettingsTypes";
 import { applyTheme } from "@rs-core/utils/Theme";
 import { setString, StorageKeys } from "../../../core/storage";
-import { navigateToView } from "../../shells/main/routing";
-import { createCustomInstructionsEditor } from "../../shared/CustomInstructionsEditor";
+import { navigateToView } from "../../shells/boot/routing";
+import { createCustomInstructionsEditor } from "../../shared/ui/CustomInstructionsEditor";
 import { loadAsAdopted } from "fest/dom";
 
 export type SettingsViewOptions = {

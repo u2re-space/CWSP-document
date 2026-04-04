@@ -5,7 +5,7 @@
  */
 
 import { fixOrientToScreen } from "fest/dom";
-import { initializeAppCanvasLayer } from "../ui/Canvas";
+import { initializeAppCanvasLayer } from "../ui/ts/Canvas";
 import { initializeOrientedDesktop } from "../../views/home/OrientedDesktop";
 
 export type AppLayers = {

@@ -1281,7 +1281,7 @@ export class ViewerView implements View {
         };
 
         try {
-            const { ViewRegistry } = await import("../../shared/registry");
+            const { ViewRegistry } = await import("../../shared/ui/registry");
             const workcenter =
                 ViewRegistry.getLoaded("workcenter") ||
                 await ViewRegistry.load("workcenter", { shellContext: this.shellContext });

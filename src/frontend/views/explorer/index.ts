@@ -11,7 +11,7 @@ import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shell
 import type { BaseViewOptions } from "../types";
 import { getString, setString } from "../../../core/storage";
 import { openUnifiedContextMenu } from "@rs-frontend/shared/ContextMenu";
-import { requestOpenView } from "../../shared/view-api";
+import { requestOpenView } from "../../shared/ui/view-api";
 import { sendMessage } from "@rs-com/core/UnifiedMessaging";
 import {
     addSpeedDialItem,

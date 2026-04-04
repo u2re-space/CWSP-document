@@ -23,7 +23,7 @@ import {
     defaultTheme,
     darkTheme,
     lightTheme
-} from "../../shared/registry";
+} from "../../shared/ui/registry";
 import type { ShellId, ViewId, Shell, ShellTheme } from "../types";
 import { serviceChannels, type ServiceChannelId } from "@rs-com/core/ServiceChannels";
 import { loadSettings } from "@rs-com/config/Settings";
@@ -32,7 +32,7 @@ import type { AppSettings } from "@rs-com/config/SettingsTypes";
 import { isEnabledView, pickEnabledView } from "../../views/config/views";
 
 import { loadVeelaVariant, type VeelaVariant } from "fest/veela";
-import { initializeLayers } from "../../shared/layer-manager";
+import { initializeLayers } from "../../shared/ui/layer-manager";
 
 // ============================================================================
 // BOOT TYPES

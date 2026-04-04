@@ -13,7 +13,7 @@
 
 
 import { loadSettings } from "@rs-com/config/Settings";
-import { mountShellApp, type ShellOptions } from "../../shared/channel-unknown";
+import { mountShellApp, type ShellOptions } from "../../shared/ui/channel-unknown";
 
 /**
  * @deprecated Legacy compatibility options for old shell-based entry.

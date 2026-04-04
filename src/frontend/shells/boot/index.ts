@@ -111,7 +111,7 @@ export {
     type ToastPosition,
     type ToastOptions,
     type ToastLayerConfig
-} from "../../shared/Toast";
+} from "../../shared/ui/Toast";
 
 // ============================================================================
 // OVERLAY SYSTEM
