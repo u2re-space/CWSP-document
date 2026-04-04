@@ -1,5 +1,5 @@
 import type { ShellId, ShellLayoutConfig } from "@shells/types";
-import { WindowShell } from "../index";
+import { WindowShell } from "../../index";
 
 /**
  * Tabbed shell: window-style host with tab-oriented identity.
