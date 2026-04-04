@@ -305,7 +305,7 @@ export function registerDefaultShells(): void {
         id: "minimal",
         name: "Minimal",
         description: "Minimal toolbar-based navigation",
-        loader: () => import("../../shells/minimal/index")
+        loader: () => import("../../shells/minimal/preview")
     });
 
     ShellRegistry.register({

@@ -11,16 +11,16 @@
 
 import { H } from "fest/lure";
 import { affected } from "fest/object";
-import type { ShellId, ShellLayoutConfig, ViewId } from "../types";
+import type { ShellId, ShellLayoutConfig, ViewId } from "@shells/types";
 
 // @ts-ignore - SCSS import
 import style from "./minimal.scss?inline";
 
 // Side effect: register icon component
 import "fest/icon";
-import { ShellBase } from "../shell";
-import { isEnabledView } from "../../config/views";
-import type { ShellTheme } from "../types";
+import { ShellBase } from "@shells/base/shell";
+import { isEnabledView } from "@shared/routing/views";
+import type { ShellTheme } from "@shells/types";
 
 // ============================================================================
 // NAVIGATION ITEMS
