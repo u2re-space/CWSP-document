@@ -11,10 +11,10 @@ import { generateEntityId, fixEntityId, type EntityLike } from "@rs-com/template
 import { JSOX } from "jsox";
 
 // field editors
-import { DateEntryEdit } from "./fields/DateEdit";
-import { DescriptionEdit } from "./fields/DescriptionEdit";
-import { InputListEdit } from "./fields/InputListEdit";
-import { SelectEdit } from "./fields/SelectEdit";
+import { DateEntryEdit } from "./DateEdit";
+import { DescriptionEdit } from "./DescriptionEdit";
+import { InputListEdit } from "./InputListEdit";
+import { SelectEdit } from "./SelectEdit";
 
 //
 export const objectExcludeNotExists = (object: any) => {

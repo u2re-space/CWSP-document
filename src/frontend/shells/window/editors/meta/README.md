@@ -1,3 +1,0 @@
-# Special Level - Meta
-
-For accordance between entity schemes, fields for editors...
