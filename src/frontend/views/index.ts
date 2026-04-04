@@ -12,7 +12,7 @@
 
 export * from "./types";
 export * from "./base/UIElement";
-export * from "./misc/web-components";
+export * from "../shared/policies/web-components";
 
 // ============================================================================
 // VIEW UTILITIES
@@ -20,7 +20,7 @@ export * from "./misc/web-components";
 
 // Channel mixin for view connectivity
 export * from "../shared/ui/channel-mixin";
-import { ENABLED_VIEW_IDS } from "./config/views";
+import { ENABLED_VIEW_IDS } from "../shared/routing/views";
 
 // ============================================================================
 // VIEW COMPONENTS
@@ -49,8 +49,8 @@ export { ExplorerView, createExplorerView } from "./explorer";
 export { HistoryView, createHistoryView } from "./history";
 
 // Home - Landing/dashboard view  
-export { HomeView, createHomeView } from "./home";
-export type { HomeViewOptions } from "./home";
+export { HomeView, createHomeView } from "./home/ts/outdated";
+export type { HomeViewOptions } from "./home/ts/outdated";
 
 // Print - Print-optimized view
 export { PrintView, createPrintView } from "./print";

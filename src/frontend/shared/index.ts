@@ -11,9 +11,9 @@
  * @module frontend/shared
  */
 
-export * from "../shell-bridge/registry";
-export * from "../shell-bridge/channel-mixin";
-export * from "../shell-bridge/view-message-routing";
+export * from "./routing/registry";
+export * from "./routing/channel-mixin";
+export * from "./routing/view-message-routing";
 
 export {
     initializeLayers,
@@ -31,6 +31,6 @@ export {
     type LayerName,
     type ShellId,
     type ViewId,
-} from "../shell-bridge/layer-manager";
+} from "./routing/layer-manager";
 
-export { default as LayerManager } from "../shell-bridge/layer-manager";
+export { default as LayerManager } from "./routing/layer-manager";

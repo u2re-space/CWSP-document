@@ -29,7 +29,7 @@ import { serviceChannels, type ServiceChannelId } from "@rs-com/core/ServiceChan
 import { loadSettings } from "@rs-com/config/Settings";
 import { applyTheme as applyAppTheme } from "@rs-core/utils/Theme";
 import type { AppSettings } from "@rs-com/config/SettingsTypes";
-import { isEnabledView, pickEnabledView } from "../../views/config/views";
+import { isEnabledView, pickEnabledView } from "../../shared/routing/views";
 
 import { loadVeelaVariant, type VeelaVariant } from "fest/veela";
 import { initializeLayers } from "../../shared/ui/layer-manager";

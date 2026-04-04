@@ -15,7 +15,7 @@ import type { ViewId, Shell } from "../types";
 import { ViewRegistry } from "../../shared/ui/registry";
 import { initializeLayers } from "../../shared/ui/layer-manager";
 import { ensureAppLayers } from "../../shared/ui/app-layers";
-import { pickEnabledView } from "../../views/config/views";
+import { pickEnabledView } from "../../shared/routing/views";
 
 // ============================================================================
 // TYPES

@@ -6,12 +6,12 @@ import { showToast } from "@rs-frontend/shared/Toast";
 import { withViewTransition, getTransitionDirection } from "../shared/ui/view-transitions";
 import { loadSettings, saveSettings } from "@rs-com/config/Settings";
 import { applyTheme as applyAppTheme, syncBrowserChromeTheme } from "@rs-core/utils/Theme";
-import { isEnabledView } from "../views/config/views";
+import { isEnabledView } from "../shared/routing/views";
 import { scheduleViewModulePrefetch } from "../shared/ui/view-prefetch";
 import { ensureStyleSheet } from "fest/icon";
 import "fest/icon";
 import { dynamicTheme } from "fest/lure";
-import { ensureShellElementDefined, type ShellElement, MinimalShellHostElement } from "../shared/UIElement";
+import { ensureShellElementDefined, type ShellElement, MinimalShellHostElement } from "../shared/ui/BaseElement";
 
 //
 import "fest/fl-ui";

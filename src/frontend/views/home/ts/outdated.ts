@@ -7,9 +7,9 @@
 
 import { H } from "fest/lure";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
-import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shells/types";
-import type { BaseViewOptions } from "../types";
-import { isEnabledView } from "../config/views";
+import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../../shells/types";
+import type { BaseViewOptions } from "../../types";
+import { isEnabledView } from "../../../shared/routing/views";
 import { SpeedDial, createCtxMenu } from "./SpeedDial";
 
 // @ts-ignore

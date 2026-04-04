@@ -1,4 +1,4 @@
-import type { ShellId } from "../shells/types";
+import type { ShellId } from "../../shells/types";
 
 const SHELL_ELEMENT_TAG_PREFIX = "cw-shell";
 const shellElementCtorByTag = new Map<string, CustomElementConstructor>();

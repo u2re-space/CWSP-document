@@ -155,7 +155,7 @@ export type { CrxAppOptions } from "./crx-entry";
 import { bootLoader, type BootConfig } from "./BootLoader";
 import { createBootConfigFromUrl, loadSubAppWithShell } from "./routing";
 import type { Shell } from "../types";
-import { isEnabledView, pickEnabledView } from "../../views/config/views";
+import { isEnabledView, pickEnabledView } from "../../shared/routing/views";
 
 /**
  * Execution context types

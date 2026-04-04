@@ -11,7 +11,7 @@ import { loadAsAdopted } from "fest/dom";
 //@ts-ignore
 import style from "./boot-menu.scss?inline";
 import type { ShellId } from "../types";
-import { pickEnabledView } from "../../views/config/views";
+import { pickEnabledView } from "../../shared/routing/views";
 
 // ============================================================================
 // Type Definitions

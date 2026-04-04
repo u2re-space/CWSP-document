@@ -8,7 +8,7 @@ import "fest/fl-ui";
 export * from "./types";
 export * from "../shared/ui/registry";
 export * from "./shell";
-export * from "../shared/UIElement";
+export * from "../shared/ui/BaseElement";
 export { ShellRegistry, ViewRegistry, getDefaultBootConfig } from "../shared/ui/registry";
 
 /**

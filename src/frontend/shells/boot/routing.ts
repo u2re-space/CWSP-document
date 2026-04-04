@@ -23,7 +23,7 @@
 import type { ShellId, ViewId, Shell } from "../types";
 import type { FrontendChoice } from "./boot-menu";
 import { bootMinimal, bootBase, bootWindow, type BootConfig, type StyleSystem } from "./BootLoader";
-import { ENABLED_VIEW_IDS, DEFAULT_VIEW_ID, isEnabledView, pickEnabledView } from "../../views/config/views";
+import { ENABLED_VIEW_IDS, DEFAULT_VIEW_ID, isEnabledView, pickEnabledView } from "../../shared/routing/views";
 
 // ============================================================================
 // ROUTE TYPES

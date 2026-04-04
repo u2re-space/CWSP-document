@@ -3,7 +3,7 @@
  */
 
 import { ViewRegistry } from "./registry";
-import { ENABLED_VIEW_IDS } from "../routing/views";
+import { ENABLED_VIEW_IDS } from "./views";
 import type { ViewId } from "../../shells/types";
 
 function scheduleIdle(fn: () => void, timeoutMs: number): void {
