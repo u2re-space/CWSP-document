@@ -32,7 +32,7 @@
                 "./assets/*"
             ],
             "/frontend/*": [
-                "./frontend/*"
+                "./src/frontend/*"
             ],
             "@phosphor-icons/core/assets/*": [
                 "./node_modules/@phosphor-icons/core/assets/*"
@@ -111,6 +111,21 @@
             ],
             "@rs-test/*": [
                 "./test/*"
+            ],
+            "@frontend/*": [
+                "./src/frontend/*"
+            ],
+            "@shared/*": [
+                "./src/frontend/shared/*"
+            ],
+            "@pwa/*": [
+                "./src/frontend/pwa/*"
+            ],
+            "@views/*": [
+                "./src/frontend/views/*"
+            ],
+            "@shells/*": [
+                "./src/frontend/shells/*"
             ],
             "veela": [
                 "./shared/fest/veela/index.ts"

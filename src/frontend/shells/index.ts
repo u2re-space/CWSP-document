@@ -1,4 +1,3 @@
-import "fest/fl-ui";
 
 /**
  * Shell System - Main Entry Point
@@ -6,10 +5,10 @@ import "fest/fl-ui";
  * Provides shell management, view registry, and initialization utilities.
  */
 export * from "./types";
-export * from "../shared/ui/registry";
-export * from "./shell";
-export * from "../shared/ui/BaseElement";
-export { ShellRegistry, ViewRegistry, getDefaultBootConfig } from "../shared/ui/registry";
+export * from "@rs-frontend/shared/routing/registry";
+export * from "./base/shell";
+export * from "@fl-ui/items/BaseElement";
+export { ShellRegistry, ViewRegistry, getDefaultBootConfig } from "@rs-frontend/shared/routing/registry";
 
 /**
  * Window Shell
@@ -19,11 +18,11 @@ export { ShellRegistry, ViewRegistry, getDefaultBootConfig } from "../shared/ui/
  */
 
 import { H } from "fest/lure";
-import type { ShellId, ShellLayoutConfig, ViewId } from "../types";
-import { ShellBase } from "../shell";
-import { isEnabledView } from "../../views/config/views";
-import type { WindowFrameElement } from "../UIElement";
-import { subscribeViewChannel } from "../../shared/ts/view-api";
+import type { ShellId, ShellLayoutConfig, ViewId } from "@shells/types";
+import { ShellBase } from "@frontend/shell";
+import { isEnabledView } from "@views/config/views";
+import type { WindowFrameElement } from "@frontend/UIElement";
+import { subscribeViewChannel } from "@shared/routing/view-api";
 
 // @ts-ignore - SCSS import
 import style from "./frame.scss?inline";
@@ -103,13 +102,42 @@ export class WindowShell extends ShellBase {
     private dockQuickElement: HTMLElement | null = null;
     private pinnedViews: ViewId[] = [];
 
+    protected shouldRenderDesktopChrome(): boolean {
+        return false;
+    }
+
+    private clearDesktopChrome(): void {
+        document.querySelector('[data-app-layer="shell"]')?.querySelector("cw-app-dock[data-window-dock]")?.remove();
+        document.querySelector('[data-app-layer="shell"]')?.querySelector("cw-status-bar[data-window-status]")?.remove();
+        this.statusContainer = null;
+    }
+
+    private ensureProcessHost(): void {
+        if (this.shouldRenderDesktopChrome()) {
+            this.bindOverlayChrome();
+            return;
+        }
+
+        if (this.dockElement && this.dockAppsElement) {
+            return;
+        }
+
+        const virtualDock = document.createElement("div");
+        const virtualApps = document.createElement("div");
+        virtualDock.appendChild(virtualApps);
+        this.dockElement = virtualDock;
+        this.dockAppsElement = virtualApps;
+        this.dockStartElement = null;
+        this.dockQuickElement = null;
+    }
+
     private async loadWindowView(
         viewId: ViewId,
         params?: Record<string, string>
     ): Promise<{ element: HTMLElement; disposeView?: (() => void) | null }> {
         // Explorer needs true per-window instances in window shell.
         if (viewId === "explorer") {
-            const mod = await import("../../views/explorer");
+            const mod = await import("@views/explorer");
             const factory = (mod as any).createExplorerView || (mod as any).createView || (mod as any).default;
             if (typeof factory === "function") {
                 const view = factory({
@@ -164,9 +192,13 @@ export class WindowShell extends ShellBase {
             this.rootElement.style.position = "relative";
             this.rootElement.style.zIndex = "1";
         }
-        this.bindOverlayChrome();
-
-        this.initStatusBar();
+        if (this.shouldRenderDesktopChrome()) {
+            this.bindOverlayChrome();
+            this.initStatusBar();
+        } else {
+            this.clearDesktopChrome();
+            this.ensureProcessHost();
+        }
         this.bindBrowserNavigation();
         await this.syncInitialRoute();
     }
@@ -197,6 +229,10 @@ export class WindowShell extends ShellBase {
         this.processTasks.clear();
         this.processes.clear();
         this.activePid = null;
+        this.dockElement = null;
+        this.dockAppsElement = null;
+        this.dockStartElement = null;
+        this.dockQuickElement = null;
         super.unmount();
     }
 
@@ -307,7 +343,8 @@ export class WindowShell extends ShellBase {
     }
 
     private async openWindowProcess(viewId: ViewId, params?: Record<string, string>): Promise<string> {
-        if (!this.rootElement || !this.dockElement || !this.dockAppsElement) {
+        this.ensureProcessHost();
+        if (!this.rootElement || !this.dockAppsElement) {
             throw new Error("[window] Shell host/dock is not mounted");
         }
 

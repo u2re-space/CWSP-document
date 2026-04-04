@@ -2,7 +2,7 @@
 // Keyboard Event Handlers
 // =========================
 
-import { stopBubbling } from '@rs-frontend/shared/event-handling-policy';
+import { stopBubbling } from "@rs-frontend/shared/policies/event-handling-policy";
 import { eventTargetElement } from '@rs-core/document/DocTools';
 import { getAirpadOwnerDocument, log, getVkStatusEl } from '../../utils/utils';
 import { sendKeyboardChar } from './message';

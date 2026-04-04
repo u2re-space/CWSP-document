@@ -20,7 +20,7 @@ import { showConfigUI, teardownAirpadConfigOverlay } from "./ui/config-ui";
 import { resetClipboardToolbarState } from "./ui/clipboard-toolbar";
 import { loadAsAdopted } from "fest/dom";
 import { H } from "fest/lure";
-import { waitForDomPaint } from "@rs-frontend/shared/event-handling-policy";
+import { waitForDomPaint } from "@rs-frontend/shared/policies/event-handling-policy";
 import { resetMotionAccum } from "./config/motion-state";
 import { resetMotionBaseline } from "./ui/air-button";
 import { resetRelativeOrientationRuntimeState } from "./input/sensor/relative-orientation";

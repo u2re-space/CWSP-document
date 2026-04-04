@@ -7,11 +7,9 @@
 
 import { H } from "fest/lure";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
-import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shells/types";
-import type { BaseViewOptions } from "../types";
-import { getString, setString } from "../../../core/storage";
-import { openUnifiedContextMenu } from "@rs-frontend/shared/ContextMenu";
-import { requestOpenView } from "../../shared/ui/view-api";
+import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@shells/types";
+import type { BaseViewOptions } from "@views/types";
+import { getString, setString } from "@rs-core/storage";
 import { sendMessage } from "@rs-com/core/UnifiedMessaging";
 import {
     addSpeedDialItem,
@@ -22,16 +20,72 @@ import {
     speedDialItems
 } from "@rs-core/storage/StateStorage";
 
-// Import the view-explorer web component from fl.ui
-import { FileManager, type FileItem } from "fest/fl-ui";
-
-// Re-export FileManager for backwards compatibility
-export { FileManager, FileManagerContent } from "fest/fl-ui";
-
 // @ts-ignore
-import style from "./index.scss?inline";
+import style from "./scss/index.scss?inline";
 export type ExplorerOptions = BaseViewOptions;
 type WorkCenterAttachMode = "active" | "queued" | "headless";
+
+type FileItem = {
+    name?: string;
+    kind?: "file" | "directory";
+    file?: File;
+};
+
+type LocalFileManager = HTMLElement & {
+    path: string;
+    navigate(path: string): void;
+};
+
+type ContextMenuItem = {
+    id: string;
+    label: string;
+    icon?: string;
+    action: () => void;
+};
+
+const openExplorerContextMenu = (x: number, y: number, items: ContextMenuItem[]): void => {
+    const menu = document.createElement("div");
+    menu.className = "rs-explorer-context-menu";
+    menu.style.position = "fixed";
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.style.zIndex = "10000";
+
+    for (const item of items) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "rs-explorer-context-menu__item";
+        button.textContent = item.label;
+        button.addEventListener("click", () => {
+            item.action();
+            closeMenu();
+        });
+        menu.append(button);
+    }
+
+    const closeMenu = () => {
+        document.removeEventListener("click", closeMenu);
+        menu.remove();
+    };
+    document.addEventListener("click", closeMenu, { once: true });
+    document.body.append(menu);
+};
+
+const requestOpenView = (request: {
+    viewId: string;
+    target?: "window" | "frame" | "shell" | "base" | "headless";
+    params?: Record<string, string>;
+}): void => {
+    const viewId = String(request?.viewId || "").trim().toLowerCase();
+    if (!viewId) return;
+    globalThis?.dispatchEvent?.(new CustomEvent("cw:view-open-request", {
+        detail: {
+            viewId,
+            target: request?.target || "window",
+            params: request?.params || {}
+        }
+    }));
+};
 
 const TEXT_FILE_EXTENSIONS = new Set([
     "md", "markdown", "txt", "text", "json", "xml", "yml", "yaml",
@@ -95,7 +149,7 @@ export class ExplorerView implements View {
     private options: BaseViewOptions;
     private shellContext?: ShellContext;
     private element: HTMLElement | null = null;
-    private explorer: FileManager | null = null;
+    private explorer: LocalFileManager | null = null;
     private initialPath: string | null = null;
 
     private _sheet: CSSStyleSheet | null = null;
@@ -134,7 +188,7 @@ export class ExplorerView implements View {
         ` as HTMLElement;
 
         // Get reference to view-explorer component
-        this.explorer = this.element.querySelector("ui-file-manager") as unknown as FileManager;
+        this.explorer = this.element.querySelector("ui-file-manager") as LocalFileManager | null;
 
         // Setup event listeners
         this.setupExplorerEvents();
@@ -152,7 +206,7 @@ export class ExplorerView implements View {
 
     private setupExplorerEvents(): void {
         if (!this.explorer) return;
-        const explorer = this.explorer as unknown as FileManager & HTMLElement;
+        const explorer = this.explorer as LocalFileManager & HTMLElement;
         const readFileDetail = (event: Event): { item?: FileItem; path?: string } => {
             const detail = (event as CustomEvent<{ item?: FileItem; path?: string }>).detail || {};
             return { item: detail?.item, path: detail?.path };
@@ -307,34 +361,23 @@ export class ExplorerView implements View {
         explorer.addEventListener("rs-navigate", () => {
             this.saveCurrentPath();
         });
+        const getItemPath = (item?: FileItem): string => `${this.explorer?.path || "/"}${item?.name || ""}`;
+        const contextActionHandlers: Record<string, (item?: FileItem) => Promise<void> | void> = {
+            view: async (item) => { await openFileInViewer(item, getItemPath(item), "window"); },
+            "view-base": async (item) => { await openFileInViewer(item, getItemPath(item), "base"); },
+            "attach-workcenter": (item) => attachToWorkCenter(item, "active"),
+            "attach-workcenter-queued": (item) => attachToWorkCenter(item, "queued"),
+            "attach-workcenter-headless": (item) => attachToWorkCenter(item, "headless"),
+            "pin-home": (item) => pinToHome(item)
+        };
         explorer.addEventListener("context-action", async (event: Event) => {
             const detail = (event as CustomEvent<{ action?: string; item?: FileItem }>).detail || {};
             const action = String(detail.action || "");
             const item = detail.item;
             if (!action) return;
-            if (action === "view") {
-                await openFileInViewer(item, `${this.explorer?.path || "/"}${item?.name || ""}`, "window");
-                return;
-            }
-            if (action === "view-base") {
-                await openFileInViewer(item, `${this.explorer?.path || "/"}${item?.name || ""}`, "base");
-                return;
-            }
-            if (action === "attach-workcenter") {
-                await attachToWorkCenter(item, "active");
-                return;
-            }
-            if (action === "attach-workcenter-queued") {
-                await attachToWorkCenter(item, "queued");
-                return;
-            }
-            if (action === "attach-workcenter-headless") {
-                await attachToWorkCenter(item, "headless");
-                return;
-            }
-            if (action === "pin-home") {
-                pinToHome(item);
-            }
+            const handler = contextActionHandlers[action];
+            if (!handler) return;
+            await handler(item);
         });
 
         explorer.addEventListener("contextmenu", (event: MouseEvent) => {
@@ -352,10 +395,7 @@ export class ExplorerView implements View {
             }
             event.preventDefault();
             const path = this.explorer?.path || "/";
-            openUnifiedContextMenu({
-                x: event.clientX,
-                y: event.clientY,
-                items: [
+            openExplorerContextMenu(event.clientX, event.clientY, [
                     {
                         id: "refresh",
                         label: "Refresh",
@@ -384,8 +424,7 @@ export class ExplorerView implements View {
                         icon: "house",
                         action: () => this.shellContext?.navigate("home")
                     }
-                ]
-            });
+                ]);
         });
     }
 

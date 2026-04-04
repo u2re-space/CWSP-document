@@ -5,10 +5,10 @@
  */
 
 import { loadAsAdopted, removeAdopted } from "fest/dom";
-import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shells/types";
-import type { BaseViewOptions } from "../types";
-import { WorkCenterManager } from "./modules/WorkCenter";
-import type { WorkCenterDependencies } from "./modules/WorkCenterState";
+import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@shells/types";
+import type { BaseViewOptions } from "@views/types";
+import { WorkCenterManager } from "./ts/WorkCenter";
+import type { WorkCenterDependencies } from "./ts/WorkCenterState";
 
 // @ts-ignore - SCSS import
 import workcenterStyles from "./scss/_index.scss?inline";

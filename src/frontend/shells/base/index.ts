@@ -12,11 +12,11 @@
  */
 
 import { H } from "fest/lure";
-import type { ShellId, ShellLayoutConfig } from "../types";
+import type { ShellId, ShellLayoutConfig } from "@shells/types";
 
 // @ts-ignore - SCSS import
 import style from "./base.scss?inline";
-import { ShellBase } from "../shell";
+import { ShellBase } from "./shell";
 
 // ============================================================================
 // BASE SHELL IMPLEMENTATION

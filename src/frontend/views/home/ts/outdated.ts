@@ -7,13 +7,13 @@
 
 import { H } from "fest/lure";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
-import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../../shells/types";
+import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@rs-frontend/shells/types";
 import type { BaseViewOptions } from "../../types";
-import { isEnabledView } from "../../../shared/routing/views";
+import { isEnabledView } from "@rs-frontend/shared/routing/views";
 import { SpeedDial, createCtxMenu } from "./SpeedDial";
 
 // @ts-ignore
-import style from "./home.scss?inline";
+import style from "../scss/home.scss?inline";
 
 // ============================================================================
 // HOME VIEW

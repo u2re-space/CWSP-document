@@ -1,7 +1,7 @@
 import { getRuntimeSettings } from "@rs-com/config/RuntimeSettings";
 import { loadSettings } from "@rs-com/config/Settings";
 import type { ResponseLanguage } from "@rs-com/config/SettingsTypes";
-import { detectPlatform } from "../platform/adapters";
+import { detectPlatform } from "./adapters";
 import { SVG_GRAPHICS_ADDON, LANGUAGE_INSTRUCTIONS, TRANSLATE_INSTRUCTION } from "../instructions/utils";
 
 export const loadAISettings = async () => {
@@ -21,7 +21,7 @@ export const loadAISettings = async () => {
 
 export const getActiveCustomInstruction = async (): Promise<string> => {
 	try {
-		const { getActiveInstructionText } = await import("../misc/CustomInstructions");
+		const { getActiveInstructionText } = await import("../instructions/CustomInstructions");
 		return await getActiveInstructionText();
 	} catch {
 		return "";

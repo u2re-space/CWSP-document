@@ -17,7 +17,7 @@ import { COPY_HACK, enableCapture } from "./service/api";
 import type { GPTResponses } from "@rs-com/service/model/GPT-Responses";
 import { recognizeImageData } from "../com/service/service/RecognizeData";
 import { getGPTInstance, processDataWithInstruction } from "@rs-com/service/service/RecognizeData";
-import { getCustomInstructions, type CustomInstruction } from "@rs-com/service/misc/CustomInstructions";
+import { getCustomInstructions, type CustomInstruction } from "@rs-com/service/instructions/CustomInstructions";
 import { loadSettings } from "@rs-com/config/Settings";
 import { executionCore } from "@rs-com/service/misc/ExecutionCore";
 import type { ActionContext, ActionInput } from "@rs-com/service/misc/ActionHistory";

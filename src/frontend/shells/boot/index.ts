@@ -25,15 +25,18 @@ export {
     bootLoader as default,
     quickBoot,
     bootFaint,
+    bootTabbed,
     bootMinimal,
     bootWindow,
+    bootEnvironment,
     bootBase,
+    bootContent,
     getRecommendedStyle,
     type StyleSystem,
     type BootConfig,
     type BootState,
     type BootPhaseHandler
-} from "./BootLoader";
+} from "@fl-ui/items/BootLoader";
 
 // ============================================================================
 // ROUTING (Path-based)
@@ -111,7 +114,7 @@ export {
     type ToastPosition,
     type ToastOptions,
     type ToastLayerConfig
-} from "../../shared/ui/Toast";
+} from "@fl-ui/items/Toast";
 
 // ============================================================================
 // OVERLAY SYSTEM
@@ -144,7 +147,7 @@ export {
 export { default as frontend, frontend as mountFrontend } from "./frontend-entry";
 export type { MinimalAppOptions } from "./frontend-entry";
 
-// CRX-specific entry (raw shell, no toolbar/tabs)
+// CRX-specific entry (content shell, no toolbar/tabs)
 export { default as crxFrontend, crxFrontend as mountCrxFrontend } from "./crx-entry";
 export type { CrxAppOptions } from "./crx-entry";
 
@@ -152,10 +155,10 @@ export type { CrxAppOptions } from "./crx-entry";
 // APP INITIALIZATION
 // ============================================================================
 
-import { bootLoader, type BootConfig } from "./BootLoader";
+import { bootLoader, type BootConfig } from "@fl-ui/items/BootLoader";
 import { createBootConfigFromUrl, loadSubAppWithShell } from "./routing";
-import type { Shell } from "../types";
-import { isEnabledView, pickEnabledView } from "../../shared/routing/views";
+import type { Shell } from "@shells/types";
+import { isEnabledView, pickEnabledView } from "@shared/routing/views";
 
 /**
  * Execution context types
@@ -235,7 +238,7 @@ export async function initializeLegacy(
  */
 export async function quickInit(
     container: HTMLElement,
-    shell: "minimal" | "faint" | "base" | "window" = "window",
+    shell: "base" | "window" | "tabbed" | "minimal" | "environment" | "content" | "faint" = "window",
     view: string = "home"
 ): Promise<Shell> {
     return initializeApp(container, {

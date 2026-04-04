@@ -1,9 +1,37 @@
 @use "veela-lib" as *;
-@use "../views/home/home";
-@layer tokens, base, layout, utilities, shells, shell, views, view, viewer, components, ux-layer, markdown, essentials, print, print-breaks, view-transitions, overrides;
+@use "../../views/home/scss/home";
+@use "./library/mixins" as ui;
 
-@use "veela-lib" as *;
-@use "../../library/mixins" as ui;
+@mixin grid-auto-fill($min) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax($min, 1fr));
+}
+
+@mixin scrollable($axis: "y") {
+    @if $axis == "x" {
+        overflow-x: auto;
+    } @else if $axis == "both" {
+        overflow: auto;
+    } @else {
+        overflow-y: auto;
+    }
+}
+
+@mixin container($breakpoint) {
+    @if $breakpoint == "lg" {
+        @container (max-inline-size: 1024px) {
+            @content;
+        }
+    } @else if $breakpoint == "md" {
+        @container (max-inline-size: 768px) {
+            @content;
+        }
+    } @else {
+        @content;
+    }
+}
+
+@layer tokens, base, layout, utilities, shells, shell, views, view, viewer, components, ux-layer, markdown, essentials, print, print-breaks, view-transitions, overrides;
 
 //
 @layer view.viewer {

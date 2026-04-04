@@ -12,22 +12,22 @@ import { ref, affected } from "fest/object";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
 import DOMPurify from 'dompurify';
 import renderMathInElement from "katex/dist/contrib/auto-render.mjs";
-import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shells/types";
-import type { CwViewViewerHostElement } from "../base/UIElement";
-import type { BaseViewOptions } from "../types";
-import { createViewState } from "../types";
+import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@shells/types";
+import type { CwViewViewerHostElement } from "@views/base/UIElement";
+import type { BaseViewOptions } from "@views/types";
+import { createViewState } from "@views/types";
 import { writeText as writeClipboardText } from "@rs-core/modules/Clipboard";
 import { loadSettings } from "@rs-com/config/Settings";
 import type { MarkdownExtensionRule } from "@rs-com/config/SettingsTypes";
 
 // Import fest/fl-ui (e.g. shared markdown utilities elsewhere)
-import "fest/fl-ui";
 import "fest/icon";
 
 // @ts-ignore - SCSS import
 import style from "./index.scss?inline";
 import type { MarkedExtension } from "marked";
-import { createViewerToolbar } from "./ts/toolbar";
+import { createViewerToolbar, ensureMarkdownToolbarFrame } from "./ts/toolbar";
+import { ensureMarkdownViewFrame } from "./ts/frame";
 
 let markedParserPromise: Promise<(markdown: string) => Promise<string>> | null = null;
 
@@ -324,20 +324,15 @@ export class ViewerView implements View {
 
         // Load styles (idempotent — returns cached sheet)
         this._sheet = loadAsAdopted(style) as CSSStyleSheet;
+        ensureMarkdownToolbarFrame();
+        ensureMarkdownViewFrame();
 
         this.element = H`
             <div class="cw-view-viewer-shell">
                 <div class="view-viewer">
-                    ${createViewerToolbar()}
-                    <div class="view-viewer__content" data-viewer-content>
-                        <pre class="markdown-viewer-raw" data-raw-target aria-label="Raw content" hidden></pre>
-                    </div>
+                    <cw-markdown-toolbar-frame></cw-markdown-toolbar-frame>
+                    <cw-markdown-view-frame></cw-markdown-view-frame>
                 </div>
-                <div
-                    class="cw-view-viewer__prose markdown-body markdown-viewer-content result-content"
-                    data-render-target
-                    data-cw-viewer-prose
-                ></div>
             </div>
         ` as HTMLElement;
 
@@ -1227,7 +1222,7 @@ export class ViewerView implements View {
             return;
         }
         try {
-            const { downloadMarkdownAsDocx } = await import("../../../core/document/DocxExport");
+            const { downloadMarkdownAsDocx } = await import("@rs-core/document/DocxExport");
             await downloadMarkdownAsDocx(content, {
                 title: this.options.filename || "Markdown Content",
                 filename: `document-${Date.now()}.docx`,
@@ -1281,7 +1276,7 @@ export class ViewerView implements View {
         };
 
         try {
-            const { ViewRegistry } = await import("../../shared/ui/registry");
+            const { ViewRegistry } = await import("@rs-frontend/shared/routing/registry");
             const workcenter =
                 ViewRegistry.getLoaded("workcenter") ||
                 await ViewRegistry.load("workcenter", { shellContext: this.shellContext });
@@ -2127,71 +2122,3 @@ export function createView(options?: ViewerOptions): ViewerView {
 export const createMarkdownView = createView;
 
 export default createView;
-
-
-import { H, provide } from "fest/lure";
-import { createMarkdownViewer } from "fest/fl-ui";
-
-// View
-export const MakeMarkdownView = async (path: string, id: string) => {
-    // Load content from path
-    let content = "";
-    try {
-        if (path.startsWith("/user/") || path.startsWith("./") || path.startsWith("../")) {
-            const file = await provide(path);
-            if (file) {
-                content = await file.text();
-            }
-        } else if (URL.canParse(path)) {
-            const response = await fetch(path);
-            content = await response.text();
-        } else {
-            content = path; // Direct content
-        }
-    } catch (error) {
-        console.warn('[FaintMarkdown] Failed to load content:', error);
-        content = `# Error loading content\n\nFailed to load: ${path}`;
-    }
-
-    // Create markdown viewer
-    const viewer = createMarkdownViewer({
-        content,
-        showTitle: false,
-        showActions: false
-    });
-
-    const viewElement = viewer.render();
-    viewElement.style.cssText = "block-size: 100%; overflow: auto; display: block;";
-    viewElement.classList.add("viewer-section");
-
-    const section = H`<section id=${id} class="data-view c2-surface" style="grid-column: 2 / -1; grid-row: 2 / -1;">${viewElement}</section>`;
-    return section;
-}
-
-
-/**
- * <md-view> Web Component and MarkdownViewer API
- *
- * Unified markdown rendering service that provides both:
- * - Web Component API: <md-view src="..." content="..."></md-view>
- *   Parsed HTML is rendered into a light-DOM `.markdown-body` child (default slot); shadow DOM holds layout/chrome only.
- * - Class-based API: createMarkdownViewer({ content: "...", ... })
- *
- * Usage:
- *   // Web Component
- *   <md-view content="# Hello World"></md-view>
- *   <md-view src="/path/to/file.md"></md-view>
- *
- *   // Class-based API
- *   import { createMarkdownViewer } from "fest/fl-ui/services/markdown-view";
- *   const viewer = createMarkdownViewer({ content: "# Hello", showActions: true });
- *   document.body.append(viewer.render());
- *
- * See fest/fl-ui/services/markdown-view/Markdown for implementation.
- */
-
-// Re-export MarkdownView component (Web Component)
-export { MarkdownView as MdViewElement, MarkdownView as default } from "./ts/Markdown";
-
-// Re-export MarkdownViewer class and factory function (Class-based API)
-export { MarkdownViewer, createMarkdownViewer, type MarkdownViewerOptions } from "./ts/Markdown";

@@ -1,7 +1,7 @@
 import { disconnectAirPadSession } from "../network/session";
 import { setRemoteKeyboardEnabled } from "../input/virtual-keyboard";
 import { unmountAirpadRuntime } from "../main";
-import { waitForDomPaint } from "@rs-frontend/shared/event-handling-policy";
+import { waitForDomPaint } from "@rs-frontend/shared/policies/event-handling-policy";
 
 export class AirpadController {
     private initialized = false;

@@ -18,7 +18,7 @@ export type {
 } from "../shared/types";
 
 export { getGPTInstance } from "../shared/gpt-utils";
-export { detectPlatform, getPlatformAdapter } from "../platform/adapters";
+export { detectPlatform, getPlatformAdapter } from "../processing/adapters";
 export { loadAISettings, getActiveCustomInstruction, getLanguageInstruction, getSvgGraphicsAddon } from "../processing/settings";
 export { recognizeImageData, convertTextualData, analyzeRecognizeUnified, recognizeWithContext, batchRecognize } from "../recognition/core";
 export { smartRecognize, recognizeAndNormalize, recognizeFromClipboard } from "../recognition/smart";

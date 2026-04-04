@@ -1239,7 +1239,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
                     // Lazy load work center if needed
                     getCachedComponent(
                         'workcenter',
-                        () => import('../../views/workcenter/modules/WorkCenter').then(m => m.WorkCenterManager),
+                        () => import('../../views/workcenter/ts/WorkCenter').then(m => m.WorkCenterManager),
                         { componentName: 'WorkCenter' }
                     ).then(() => {
                         if (state.managers.workCenter.instance) {
@@ -1889,7 +1889,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
 
                 getCachedComponent(
                     'workcenter',
-                    () => import('../../views/workcenter/modules/WorkCenter').then(m => m.WorkCenterManager),
+                    () => import('../../views/workcenter/ts/WorkCenter').then(m => m.WorkCenterManager),
                     { componentName: 'WorkCenter' }
                 ).then(workCenterModule => {
                     // Create work center manager if not already created

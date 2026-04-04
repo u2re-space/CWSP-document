@@ -1,5 +1,6 @@
 // Shared mixins to unify common property blocks
 @use "sass:map";
+@use "sass:meta";
 @use "veela-lib" as *;
 @use "./tokens" as t;
 
@@ -18,7 +19,9 @@
 
 // Typography helpers based on MD3 tokens
 @mixin text-heading($token: "title-large", $align: null) {
-    @include md3-typography($token);
+    @if meta.mixin-exists("md3-typography") {
+        @include md3-typography($token);
+    }
     font-family: t.$font-family-base;
     @if $align != null { text-align: $align; }
 
@@ -28,7 +31,9 @@
 }
 
 @mixin text-body($token: "body-medium") {
-    @include md3-typography($token);
+    @if meta.mixin-exists("md3-typography") {
+        @include md3-typography($token);
+    }
     font-family: t.$font-family-base;
 
     &:where(:-webkit-autofill, :autofill, :-webkit-autofill:hover, :-webkit-autofill:focus, :-webkit-autofill:active) {
@@ -37,7 +42,9 @@
 }
 
 @mixin text-label($token: "label-large", $uppercase: false) {
-    @include md3-typography($token);
+    @if meta.mixin-exists("md3-typography") {
+        @include md3-typography($token);
+    }
     font-family: t.$font-family-base;
     @if $uppercase { text-transform: uppercase; }
 
@@ -57,7 +64,9 @@
     $elevation: null,
     $border: false
 ) {
-    @include solid-colorize("&", ("shade": $tone, "role": $role, "scope": "selector"));
+    @if meta.mixin-exists("solid-colorize") {
+        @include solid-colorize("&", ("shade": $tone, "role": $role, "scope": "selector"));
+    }
 
     @if $radius != null { border-radius: $radius; }
     @if $padding != null { padding: $padding; }
@@ -76,7 +85,9 @@
     $selector: "&::after"
 ) {
     @include tonal-surface($role, $tone);
-    @include md3-state-layer($role, $state, $selector);
+    @if meta.mixin-exists("md3-state-layer") {
+        @include md3-state-layer($role, $state, $selector);
+    }
 }
 
 @mixin card-surface(

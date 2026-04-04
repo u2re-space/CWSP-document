@@ -8,12 +8,12 @@
 import { H } from "fest/lure";
 import { ref } from "fest/object";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
-import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shells/types";
-import type { BaseViewOptions } from "../types";
+import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@shells/types";
+import type { BaseViewOptions } from "@views/types";
 
 // @ts-ignore
-import settingsStyles from "./Settings.scss?inline";
-import { createSettingsView } from "./Settings";
+import settingsStyles from "./scss/Settings.scss?inline";
+import { createSettingsView } from "./ts/Settings";
 
 // ============================================================================
 // SETTINGS TYPES

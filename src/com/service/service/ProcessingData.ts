@@ -27,7 +27,7 @@ export {
 	DATA_MODIFICATION_INSTRUCTION,
 } from "../instructions/core";
 
-export { detectPlatform, getPlatformAdapter } from "../platform/adapters";
+export { detectPlatform, getPlatformAdapter } from "../processing/adapters";
 
 export { loadAISettings, getActiveCustomInstruction, getLanguageInstruction, getSvgGraphicsAddon } from "../processing/settings";
 

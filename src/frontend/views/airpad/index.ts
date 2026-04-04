@@ -7,8 +7,8 @@
 
 import { H } from "fest/lure";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
-import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shells/types";
-import type { BaseViewOptions } from "../types";
+import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@shells/types";
+import type { BaseViewOptions } from "@views/types";
 import { setRemoteKeyboardEnabled } from "./input/virtual-keyboard";
 import { ensureCwAirpadAppDefined, type CwAirpadApp } from "./component/CwAirpadApp";
 

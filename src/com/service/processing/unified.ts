@@ -3,7 +3,7 @@ import { buildInstructionPrompt, getOutputFormatInstruction, getIntermediateReco
 import { DEFAULT_API_URL, DEFAULT_MODEL, getGPTInstance, isImageData, unwrapUnwantedCodeBlocks, getResponseFormat } from "@rs-com/service/shared/gpt-utils";
 import { loadAISettings, getActiveCustomInstruction, getLanguageInstruction, getSvgGraphicsAddon } from "@rs-com/service/processing/settings";
 import { RecognitionCache } from "@rs-com/service/recognition/cache";
-import { detectPlatform, getPlatformAdapter } from "@rs-com/service/platform/adapters";
+import { detectPlatform, getPlatformAdapter } from "@rs-com/service/processing/adapters";
 import { solveAndAnswer, writeCode, extractCSS } from "@rs-com/service/processing/core";
 import { extractEntities } from "@rs-com/service/processing/entities";
 import { smartRecognize } from "@rs-com/service/recognition/smart";

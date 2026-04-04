@@ -12,15 +12,15 @@
 
 export * from "./types";
 export * from "./base/UIElement";
-export * from "../shared/policies/web-components";
+export * from "@shared/policies/web-components";
 
 // ============================================================================
 // VIEW UTILITIES
 // ============================================================================
 
 // Channel mixin for view connectivity
-export * from "../shared/ui/channel-mixin";
-import { ENABLED_VIEW_IDS } from "../shared/routing/views";
+export * from "@rs-frontend/shared/routing/channel-mixin";
+import { ENABLED_VIEW_IDS } from "@shared/routing/views";
 
 // ============================================================================
 // VIEW COMPONENTS

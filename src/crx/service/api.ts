@@ -19,7 +19,7 @@ import {
 } from "../../com/service/service/RecognizeData";
 import type { RecognizeResult } from "../../com/service/service/RecognizeData";
 import { toText } from "@rs-core/modules/Clipboard";
-import { getCustomInstructions } from "@rs-com/service/misc/CustomInstructions";
+import { getCustomInstructions } from "@rs-com/service/instructions/CustomInstructions";
 
 // ---------------------------------------------------------------------------
 // Constants
