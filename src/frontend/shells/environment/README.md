@@ -3,7 +3,7 @@ More complex shell than just simple window frame...
 Contains:
 - Wallpaper
 - Taskbar
-- SpeedDial
+- SpeedDial (Home)
 - Windowed (Tasks, Apps)
 - Statusbar
 - Modals

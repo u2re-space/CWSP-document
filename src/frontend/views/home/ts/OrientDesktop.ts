@@ -1,10 +1,10 @@
 import { bindInteraction } from "fest/lure";
-import { requestOpenView } from "../../shared/routing/view-api";
-import type { ViewId } from "../types";
+import { requestOpenView } from "../../../../shared/routing/view-api";
+import type { ViewId } from "../../../types";
 import { openUnifiedContextMenu, closeUnifiedContextMenu, type ContextMenuEntry } from "@fl-ui/items/ContextMenu";
 import { setAppWallpaper } from "@fl-ui/items/Canvas";
-import { ENABLED_VIEW_IDS, pickEnabledView } from "../../shared/routing/views";
-import { openShortcutEditor } from "../../views/home/ts/ShortcutEditor";
+import { ENABLED_VIEW_IDS, pickEnabledView } from "../../../../shared/routing/views";
+import { openShortcutEditor } from "../../../../views/home/ts/ShortcutEditor";
 
 type DesktopAction = "open-view" | "open-link";
 

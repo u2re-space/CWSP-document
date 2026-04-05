@@ -6,7 +6,7 @@
 
 import { fixOrientToScreen } from "fest/dom";
 import { initializeAppCanvasLayer } from "@fl-ui/items/Canvas";
-import { initializeOrientedDesktop } from "../../shells/environment/OrientedDesktop";
+import { initializeOrientedDesktop } from "./home/ts/OrientDesktop";
 
 export type AppLayers = {
     canvasLayer: HTMLElement;

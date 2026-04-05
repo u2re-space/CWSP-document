@@ -14,7 +14,7 @@ import { bootLoader } from "@fl-ui/items/BootLoader";
 import type { ViewId, Shell } from "../../types";
 import { ViewRegistry } from "../../../shared/routing/registry";
 import { initializeLayers } from "../../../shared/routing/layer-manager";
-import { ensureAppLayers } from "../../../shared/routing/app-layers";
+import { ensureAppLayers } from "../../environment/app-layers";
 import { pickEnabledView } from "../../../shared/routing/views";
 
 // ============================================================================
