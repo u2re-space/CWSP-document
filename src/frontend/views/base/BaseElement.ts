@@ -1,1 +1,1 @@
-../items/BaseElement.ts
+../../../../../../modules/projects/lur.e/src/extension/items/base/BaseElement.ts

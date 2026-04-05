@@ -234,11 +234,11 @@ export {
     type ClipboardWriteOptions,
     type ClipboardResult,
     type CRXCopyOptions
-} from "./modules/Clipboard";
+} from "../../../../modules/projects/lur.e/src/extension/modules/Clipboard";
 
 // Legacy aliases
-export { copy as copyToClipboard } from "./modules/Clipboard";
-export { readText as readFromClipboard } from "./modules/Clipboard";
+export { copy as copyToClipboard } from "../../../../modules/projects/lur.e/src/extension/modules/Clipboard";
+export { readText as readFromClipboard } from "../../../../modules/projects/lur.e/src/extension/modules/Clipboard";
 
 // ============================================================================
 // FILE UTILITIES
@@ -280,11 +280,11 @@ export {
 // MODULES (Feature modules)
 // ============================================================================
 
-export { getCachedComponent, clearComponentCache, disposeCachedComponents } from "./modules/LazyLoader";
+export { getCachedComponent, clearComponentCache, disposeCachedComponents } from "../../../../modules/projects/lur.e/src/extension/modules/LazyLoader";
 export { createFileHandler } from "./storage/FileHandling";
-export { getSpeechPrompt } from "./modules/VoiceInput";
-export { createTemplateManager } from "./modules/TemplateManager";
-export { HistoryManager, createHistoryManager } from "./modules/HistoryManager";
+export { getSpeechPrompt } from "../../../../modules/projects/lur.e/src/extension/modules/VoiceInput";
+export { createTemplateManager } from "../../../../modules/projects/lur.e/src/extension/modules/TemplateManager";
+export { HistoryManager, createHistoryManager } from "../../../../modules/projects/lur.e/src/extension/modules/HistoryManager";
 
 // ============================================================================
 // GENERAL UTILITIES

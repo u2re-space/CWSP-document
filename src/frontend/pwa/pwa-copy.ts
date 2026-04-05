@@ -5,7 +5,7 @@
  */
 
 import { initClipboardReceiver, listenForClipboardRequests, requestCopy } from "../../core";
-import { copy } from "../../core/modules/Clipboard";
+import { copy } from "../../../../../modules/projects/lur.e/src/extension/modules/Clipboard";
 import { initToastReceiver, showToast } from "@fl-ui/items/Toast";
 import { unifiedMessaging } from "@rs-com/core/UnifiedMessaging";
 import { summarizeForLog } from "@rs-com/core/LogSanitizer";

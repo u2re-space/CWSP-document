@@ -319,7 +319,7 @@ export function registerDefaultShells(): void {
         id: "tabbed",
         name: "Tabbed",
         description: "Tabbed window variant for focused multi-tasking",
-        loader: () => import("../../shells/window/tabbed/index")
+        loader: () => import("../../shells/tabbed/index")
     });
 
     ShellRegistry.register({
@@ -341,7 +341,7 @@ export function registerDefaultShells(): void {
         id: "faint",
         name: "Faint (legacy)",
         description: "Legacy alias redirected to tabbed shell",
-        loader: () => import("../../shells/window/tabbed/index")
+        loader: () => import("../../shells/tabbed/index")
     });
 }
 
