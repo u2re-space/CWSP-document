@@ -1,0 +1,89 @@
+{
+    "name": "crossword",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=24"
+    },
+    "scripts": {
+        "build": "npm run build:pwa",
+        "build:pwa": "rm -rf ./dist && vite build && node ./scripts/normalize-worker-names.mjs",
+        "build:crx": "rm -rf ./dist-crx && vite build --config vite.config.js --mode crx && node ./scripts/normalize-worker-names.mjs",
+        "build:crx:lite": "VITE_ENABLED_VIEWS=viewer,editor,settings,history,home,print vite build --config vite.config.js --mode crx",
+        "build:all": "node ./scripts/build.mjs pwa crx",
+        "build:modules": "node ./scripts/build.mjs modules",
+        "preview": "vite preview",
+        "start": "vite",
+        "dev": "vite dev",
+        "test": "vite dev",
+        "test:dev": "vite dev",
+        "test:test": "echo 'No tests configured for crossword' && exit 0"
+    },
+    "browserslist": [
+        "last 1 chrome version",
+        "last 1 edge version"
+    ],
+    "overrides": {
+        "@rollup/rollup-win32-x64-msvc": "npm:@rollup/wasm-node@latest",
+        "@rollup/rollup-linux-x64-gnu": "npm:@rollup/wasm-node@latest",
+        "rollup": "npm:@rollup/wasm-node@latest",
+        "@vitejs/devtools": ">=0.0.0-alpha.32",
+        "vite-plugin-pwa": ">=1.2.0"
+    },
+    "optionalDependencies": {
+        "@rollup/rollup-linux-x64-gnu": "npm:@rollup/wasm-node@latest",
+        "@rollup/rollup-win32-x64-msvc": "npm:@rollup/wasm-node@latest",
+        "@rollup/wasm-node": ">=4.57.1",
+        "rollup": "npm:@rollup/wasm-node@latest"
+    },
+    "resolutions": {
+        "@rollup/rollup-win32-x64-msvc": "npm:@rollup/wasm-node@latest",
+        "@rollup/rollup-linux-x64-gnu": "npm:@rollup/wasm-node@latest",
+        "rollup": "npm:@rollup/wasm-node@latest"
+    },
+    "devDependencies": {
+        "@crxjs/vite-plugin": ">=2.2.0",
+        "@jsquash/jpeg": ">=1.6.0",
+        "@jsquash/png": ">=3.1.1",
+        "@phosphor-icons/core": ">=2.1.1",
+        "@rollup/wasm-node": ">=4.57.1",
+        "@toon-format/toon": ">=2.1.0",
+        "@types/sanitize-html": ">=2.14.0",
+        "autoprefixer": ">=10.4.20",
+        "baseline-browser-mapping": ">=2.9.19",
+        "country-flag-emoji-polyfill": ">=0.1.8",
+        "cssnano": ">=7.0.7",
+        "culori": ">=4.0.2",
+        "docx": ">=9.5.3",
+        "dompurify": ">=3.2.5",
+        "isomorphic-dompurify": ">=2.35.0",
+        "jsdom": ">=26.0.1",
+        "jsox": ">=1.2.125",
+        "marked": ">=15.0.12",
+        "marked-katex-extension": ">=5.1.5",
+        "mathml-to-latex": ">=1.5.0",
+        "postcss-discard-duplicates": ">=7.0.1",
+        "postcss-import": ">=16.1.0",
+        "postcss-preset-env": ">=10.2.1",
+        "postcss-remove-duplicate-values": ">=2.0.0",
+        "prettier": ">=3.8.1",
+        "quill": "^2.0.0-beta.2",
+        "rollup": "npm:@rollup/wasm-node@latest",
+        "sass": ">=1.97.3",
+        "socket.io-client": ">=4.8.3",
+        "temml": ">=0.11.12",
+        "turndown": ">=7.2.1",
+        "typescript": ">=6.0.0-beta",
+        "vite": ">=7.3.1",
+        "vite-bundle-analyzer": ">=0.10.6",
+        "vite-plugin-bundle-prefetch": ">=0.0.4",
+        "vite-plugin-external": ">=6.2.2",
+        "vite-plugin-jspm": ">=0.6.2",
+        "vite-plugin-mcp": "^0.3.2",
+        "vite-plugin-optimizer": ">=1.4.3",
+        "vite-plugin-pwa": ">=1.2.0",
+        "vite-plugin-singlefile": ">=2.1.0",
+        "vite-plugin-static-copy": ">=3.1.1",
+        "vite-tsconfig-paths": ">=5.1.4"
+    }
+}

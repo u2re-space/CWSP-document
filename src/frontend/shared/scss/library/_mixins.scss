@@ -1,0 +1,179 @@
+// Shared mixins to unify common property blocks
+@use "sass:map";
+@use "sass:meta";
+@use "veela-lib" as *;
+@use "./tokens" as t;
+
+// Layout stacks
+@mixin stack($gap, $display: grid) {
+    display: $display;
+    gap: $gap;
+}
+
+@mixin hstack($gap) { @include stack($gap, inline-flex); }
+@mixin vstack($gap) { @include stack($gap, grid); }
+
+// Container helpers
+@mixin container-inline { container-type: inline-size; }
+@mixin container-size { container-type: size; contain: content; }
+
+// Typography helpers based on MD3 tokens
+@mixin text-heading($token: "title-large", $align: null) {
+    @if meta.mixin-exists("md3-typography") {
+        @include md3-typography($token);
+    }
+    font-family: t.$font-family-base;
+    @if $align != null { text-align: $align; }
+
+    &:where(:-webkit-autofill, :autofill, :-webkit-autofill:hover, :-webkit-autofill:focus, :-webkit-autofill:active) {
+        font-family: t.$font-family-base;
+    }
+}
+
+@mixin text-body($token: "body-medium") {
+    @if meta.mixin-exists("md3-typography") {
+        @include md3-typography($token);
+    }
+    font-family: t.$font-family-base;
+
+    &:where(:-webkit-autofill, :autofill, :-webkit-autofill:hover, :-webkit-autofill:focus, :-webkit-autofill:active) {
+        font-family: t.$font-family-base;
+    }
+}
+
+@mixin text-label($token: "label-large", $uppercase: false) {
+    @if meta.mixin-exists("md3-typography") {
+        @include md3-typography($token);
+    }
+    font-family: t.$font-family-base;
+    @if $uppercase { text-transform: uppercase; }
+
+    &:where(:-webkit-autofill, :autofill, :-webkit-autofill:hover, :-webkit-autofill:focus, :-webkit-autofill:active) {
+        font-family: t.$font-family-base;
+    }
+}
+
+@mixin font-nums-tabular { font-variant-numeric: tabular-nums; }
+
+// Tonal surfaces & elevation helpers
+@mixin tonal-surface(
+    $role: surface,
+    $tone: var(--surface-opacity-default),
+    $radius: null,
+    $padding: null,
+    $elevation: null,
+    $border: false
+) {
+    @if meta.mixin-exists("solid-colorize") {
+        @include solid-colorize("&", ("shade": $tone, "role": $role, "scope": "selector"));
+    }
+
+    @if $radius != null { border-radius: $radius; }
+    @if $padding != null { padding: $padding; }
+    @if $elevation != null {
+        --md3-elevation-level: #{$elevation};
+    }
+    @if $border {
+        border: 0.5px solid color-mix(in oklch, var(--md3-outline) 42%, transparent);
+    }
+}
+
+@mixin interactive-surface(
+    $role: surface,
+    $tone: var(--surface-opacity-default),
+    $state: hover,
+    $selector: "&::after"
+) {
+    @include tonal-surface($role, $tone);
+    @if meta.mixin-exists("md3-state-layer") {
+        @include md3-state-layer($role, $state, $selector);
+    }
+}
+
+@mixin card-surface(
+    $role: surface-container,
+    $tone: var(--surface-opacity-subtle),
+    $radius: var(--radius-lg),
+    $padding: var(--padding-lg),
+    $elevation: 2
+) {
+    @include tonal-surface($role, $tone, $radius, $padding, $elevation, true);
+    backdrop-filter: blur(10px) saturate(115%);
+}
+
+// Structured blocks
+@mixin section-stack($gap: var(--gap-sm)) {
+    display: grid;
+    gap: $gap;
+    inline-size: stretch;
+    min-inline-size: 0;
+}
+
+@mixin inline-toolbar($gap: var(--gap-sm)) {
+    display: inline-flex;
+    align-items: center;
+    gap: $gap;
+    flex-wrap: wrap;
+}
+
+// Input helpers
+@mixin input-padding-trailing($logical-size) {
+    padding-inline-end: calc(#{$logical-size} * 2);
+}
+
+@mixin field-stack($gap: var(--gap-xs)) {
+    display: grid;
+    gap: $gap;
+    inline-size: stretch;
+    min-inline-size: 0;
+}
+
+// List helpers
+@mixin tonal-list(
+    $role: surface,
+    $tone: var(--surface-opacity-subtle),
+    $radius: var(--radius-sm),
+    $padding: var(--padding-xs)
+) {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    list-style: none;
+    margin: 0;
+    padding: $padding;
+    @include tonal-surface($role, $tone, $radius);
+}
+
+// State blocks (flex row with gaps and radius)
+@mixin state-inline($gap, $padding-y, $padding-x, $radius) {
+    display: flex;
+    align-items: center;
+    gap: $gap;
+    padding-block: $padding-y;
+    padding-inline: $padding-x;
+    border-radius: $radius;
+}
+
+// Scrollbar styling (modern and webkit)
+@mixin scrollbars($size: 6px, $tone: var(--surface-opacity-emphasis)) {
+    scrollbar-width: thin;
+    & { scrollbar-color: color-mix(in oklch, var(--on-surface, currentColor) var(--scrollbar-tint, 86%), transparent) transparent; }
+
+    &::-webkit-scrollbar { inline-size: $size; block-size: $size; }
+    &::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        @include solid-colorize("&", ("shade": $tone, "scope": "selector"));
+    }
+    &::-webkit-scrollbar-track { background: transparent; }
+}
+
+// Overlay + elevation utilities
+@mixin glass-backdrop($blur: 18px, $opacity: 0.22) {
+    background: color-mix(in oklch, var(--color-inverse-surface) #{$opacity * 100%}, transparent);
+    backdrop-filter: blur($blur) saturate(120%);
+}
+
+// Accessibility helpers
+@mixin reduced-motion-zero { transition-duration: 0ms; }
+@mixin high-contrast-border($color: var(--border-color)) { border: 2px solid $color; }
+

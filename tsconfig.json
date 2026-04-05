@@ -1,0 +1,182 @@
+{
+    "include": [
+        "**/*.ts",
+        "**/*.mjs",
+        "**/*.js",
+        "**/*.d.ts",
+        "**/*.tsx",
+        "src/**/*.ts",
+        "src/**/*.mjs",
+        "src/**/*.js",
+        "src/**/*.d.ts",
+        "src/**/*.tsx"
+    ],
+    "exclude": [
+        "node_modules/**",
+        "dist/**",
+        "build/**",
+        "coverage/**",
+        "logs/**",
+        "cache/**",
+        "temp/**",
+        "tmp/**",
+        "temp/**",
+        "./src/**/*.js",
+        "./src/**/*.jsx"
+    ],
+    "compilerOptions": {
+        "skipLibCheck": true,
+        "jsx": "preserve",
+        "paths": {
+            "/assets/*": [
+                "./assets/*"
+            ],
+            "/frontend/*": [
+                "./src/frontend/*"
+            ],
+            "@phosphor-icons/core/assets/*": [
+                "./node_modules/@phosphor-icons/core/assets/*"
+            ],
+            "icons/*": [
+                "./node_modules/@phosphor-icons/core/assets/*"
+            ],
+            "assets/fonts/*": [
+                "./assets/fonts/*"
+            ],
+            "assets/*": [
+                "./assets/*"
+            ],
+            "fest-src/*": [
+                "./shared/*"
+            ],
+            "fest/*": [
+                "./shared/fest/*"
+            ],
+            "fest/fl-ui/*": [
+                "./shared/fest/fl-ui/*"
+            ],
+            "fest/dom": [
+                "./shared/fest/dom/index.ts"
+            ],
+            "fest/lure": [
+                "./shared/fest/lure/index.ts"
+            ],
+            "fest/object": [
+                "./shared/fest/object/index.ts"
+            ],
+            "fest/uniform": [
+                "./shared/fest/uniform/index.ts"
+            ],
+            "fest/theme": [
+                "./shared/fest/theme/index.ts"
+            ],
+            "fest/icon": [
+                "./shared/fest/icon/index.ts"
+            ],
+            "fest/polyfill/*": [
+                "./shared/fest/polyfill/*"
+            ],
+            "polyfill/*": [
+                "./shared/fest/polyfill/*"
+            ],
+            "shared/*": [
+                "./shared/*"
+            ],
+            "@fl-ui/*": [
+                "./shared/fest/fl-ui/ui/*"
+            ],
+            "@fl-src/*": [
+                "./shared/fest/fl-ui/*"
+            ],
+            "@fl-design/*": [
+                "./shared/fest/fl-ui/design/*"
+            ],
+            "@rs-pwa/*": [
+                "./src/pwa/*"
+            ],
+            "@rs-crx/*": [
+                "./src/crx/*"
+            ],
+            "@rs-core/*": [
+                "./src/core/*"
+            ],
+            "@rs-com/*": [
+                "./src/com/*"
+            ],
+            "@rs-frontend/*": [
+                "./src/frontend/*"
+            ],
+            "@rs-shared/*": [
+                "./shared/*"
+            ],
+            "@rs-test/*": [
+                "./test/*"
+            ],
+            "@frontend/*": [
+                "./src/frontend/*"
+            ],
+            "@shared/*": [
+                "./src/frontend/shared/*"
+            ],
+            "@pwa/*": [
+                "./src/frontend/pwa/*"
+            ],
+            "@views/*": [
+                "./src/frontend/views/*"
+            ],
+            "@shells/*": [
+                "./src/frontend/shells/*"
+            ],
+            "veela": [
+                "./shared/fest/veela/index.ts"
+            ],
+            "veela-runtime": [
+                "./shared/fest/veela/scss/runtime/index.ts"
+            ],
+            "veela-runtime/*": [
+                "./shared/fest/veela/scss/runtime/*"
+            ],
+            "veela-lib": [
+                "./shared/fest/veela/scss/lib/index.scss"
+            ],
+            "veela-lib/*": [
+                "./shared/fest/veela/scss/lib/*"
+            ]
+        },
+        "types": [
+            "chrome"
+        ],
+        "composite": true,
+        "lib": [
+            "ESNext",
+            "DOM",
+            "WebWorker"
+        ],
+        "module": "ESNext",
+        "target": "ESNext",
+        "moduleDetection": "auto",
+        "pretty": true,
+        "emitDeclarationOnly": true,
+        "resolveJsonModule": true,
+        "allowSyntheticDefaultImports": true,
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "rewriteRelativeImportExtensions": true,
+        "esModuleInterop": true,
+        "verbatimModuleSyntax": true,
+        "allowJs": true,
+        "noEmit": true,
+        "strict": false,
+        "allowUnusedLabels": true,
+        "noImplicitAny": false,
+        "declaration": true,
+        "noImplicitThis": false,
+        "inlineSources": true,
+        "inlineSourceMap": true,
+        "sourceMap": false,
+        "experimentalDecorators": true,
+        "noEmitOnError": true,
+        "noEmitHelpers": true
+    },
+    "compileOnSave": false
+}

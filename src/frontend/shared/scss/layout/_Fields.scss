@@ -1,0 +1,122 @@
+@use "veela-lib" as *;
+
+//
+@layer layer.shell.faint.forms {
+
+    // Enhanced input/select/textarea styling
+    input,
+    select,
+    textarea {
+        & {
+            background-repeat: no-repeat;
+            min-block-size: 2.5rem;
+            font-size: inherit;
+            max-inline-size: stretch;
+            max-inline-size: 100cqi;
+
+            text-overflow: ellipsis;
+            overflow: auto;
+            scrollbar-width: none;
+        }
+    }
+
+    //
+    textarea[data-multiline="true"] {
+        min-block-size: 5rem;
+        resize: vertical;
+    }
+
+    .field {
+        inline-size: stretch;
+        max-inline-size: stretch;
+        min-inline-size: 0px;
+
+        block-size: fit-content;
+
+        place-content: center;
+        place-items: center;
+        text-align: center;
+
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+
+        & > * {
+            inline-size: stretch;
+            block-size: fit-content;
+        }
+    }
+
+    .field-control {
+        inline-size: stretch;
+        max-inline-size: stretch;
+        min-inline-size: 0px;
+        block-size: fit-content;
+    }
+
+    .field-label {
+        margin-block: var(--space-sm);
+        inline-size: fit-content;
+        max-inline-size: stretch;
+    }
+
+    // Date/Time Editor Styles
+    .field-editor {
+        display: grid;
+        gap: 0.5rem;
+        min-inline-size: 0; // Prevent grid blowout
+    }
+
+    //
+    .field-inputs {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr)); // Better responsiveness
+        gap: 0.5rem;
+        align-items: center;
+        min-inline-size: 0;
+    }
+
+    //
+    .field-error {
+        --current: var(--color-error);
+    }
+
+    //
+    .label {
+        @include font-style("&", ("size": "sm", "weight": 600));
+    }
+
+    // Enhanced date field layout
+    .date-field-layout {
+        display: grid;
+        gap: var(--space-md);
+        container-type: inline-size;
+        min-inline-size: 0;
+
+        // Enhanced format section
+        .date-field-layout-format {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            align-items: center;
+            place-content: center;
+            place-items: center;
+            text-align: start;
+
+            label {
+                inline-size: stretch;
+                display: flex;
+                align-items: center;
+                place-content: center;
+                place-items: center;
+                text-align: start;
+                justify-content: start;
+
+                @include font-style("&", ("size": "sm", "weight": 500));
+            }
+
+            ui-icon {
+                padding: var(--padding-md);
+            }
+        }
+    }
+}

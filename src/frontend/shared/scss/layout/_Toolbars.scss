@@ -1,0 +1,165 @@
+// Toolbar Components - Refactored and Optimized
+// Unified with design system variables and mixins
+
+@use "veela-lib" as *;
+@use "../../library/mixins" as ui;
+
+//
+@layer layer.shell.faint.toolbar {
+
+    .toolbar {
+        background-color: transparent;
+        display: flex;
+        flex-direction: column;
+        block-size: stretch;
+        inline-size: stretch;
+        max-inline-size: stretch;
+        grid-row: toolbar;
+        box-shadow: none;
+        padding: 0px;
+        max-block-size: min(3rem, 100%);;
+        min-block-size: stretch;
+    }
+
+    .view-toolbar {
+        background: transparent;
+        position: sticky;
+        inset-block-start: 0;
+        z-index: 10;
+        padding: 0px;
+
+        justify-content: flex-start;
+        place-content: center;
+        place-items: center;
+        place-self: center;
+        pointer-events: none;
+        inline-size: stretch;
+        max-inline-size: stretch;
+        max-block-size: min(3rem, 100%);
+        min-block-size: stretch;
+
+        box-sizing: border-box;
+        box-shadow: none;
+
+        //
+        @include ui.inline-toolbar(var(--gap-xs));
+        @include ui.tonal-surface(surface, var(--surface-opacity-subtle), var(--radius-lg), null, 1);
+        @include backdrop-blur("subtle");
+        @include container-clamped(stretch, max-content);
+
+        //
+        & { min-block-size: 0px; block-size: stretch; max-block-size: min(3rem, 100%); }
+        & { min-inline-size: 0px; inline-size: stretch; max-inline-size: stretch; }
+        & {
+            margin: 0px;
+            margin-inline: 0px;
+            box-shadow: none;
+            background-color: transparent;
+            padding: 0px;
+            padding-inline: 0px;
+            padding-block: 0px;
+        }
+
+        //
+        &:empty {
+            display: none;
+        }
+
+        .button-set {
+            @include ui.inline-toolbar(var(--gap-md));
+            @include ui.tonal-surface(surface-container, var(--surface-opacity-subtle, 0.00), var(--radius-lg), 0px);
+            @include container-clamped(stretch, stretch);
+
+            //
+            flex-wrap: nowrap;
+            padding: 0px;
+            padding-inline: 0.25rem;
+            padding-block: 0.25rem;
+            inline-size: stretch;
+            block-size: stretch;
+
+            //
+            &:empty { display: none; }
+            & { min-block-size: 3rem; block-size: stretch; max-block-size: 3rem; }
+            & { min-inline-size: 0px; inline-size: stretch; max-inline-size: stretch; }
+
+            //
+            button {
+                max-block-size: stretch;
+                border-radius: var(--radius-full);
+                padding: 0px;
+                pointer-events: auto;
+                touch-action: none;
+
+                //
+                @include ui.tonal-surface(surface-container, calc(var(--surface-opacity-subtle, 0.00) + 0.02), var(--radius-lg), 0px);
+                @include ui.inline-toolbar(var(--gap-sm));
+                @include toolbar-button;
+                @include flex-center;
+
+                //
+                & {
+                    min-inline-size: 2.5rem;
+                    min-block-size: 2.75rem;
+                    inline-size: max-content;
+                    block-size: stretch;
+                    touch-action: manipulation;
+                    flex-direction: row;
+                    flex-wrap: nowrap;
+                    max-inline-size: stretch;
+                    padding: 0.5rem;
+                    padding-block: 0px;
+                    padding-inline: 0.5rem;
+                    max-block-size: stretch;
+                    flex-shrink: 0;
+                }
+
+                //
+                ui-icon {
+                    padding: 0rem;
+                    --icon-size: clamp(1.25rem, 5.5vmin, 1.75rem);
+                    font-size: var(--icon-size);
+                    block-size: auto;
+                    inline-size: auto;
+                    min-inline-size: 1.25rem;
+                    min-block-size: 1.25rem;
+                    max-block-size: none;
+                }
+
+                //
+                span {
+                    display: block;
+                    color: color-mix(in oklch, var(--on-surface, currentColor) var(--text-tint-primary, 92%), transparent);
+                    padding-inline-end: 0.25rem;
+                    max-inline-size: stretch;
+                    inline-size: fit-content;
+                    min-inline-size: fit-content;
+                    padding-block: 0px;
+
+                    @include ui.text-body("body-small");
+                }
+            }
+        }
+
+        // Mobile optimizations
+        @include breakpoint("md") {
+            justify-content: center;
+
+            .button-set {
+                justify-content: center;
+                inline-size: stretch;
+            }
+        }
+
+        //
+        @include container("lg") {
+            button span { display: none !important; }
+        }
+
+        //
+        @container (inline-size <= 600px) {
+            button span { display: none !important; };
+        }
+    }
+
+}

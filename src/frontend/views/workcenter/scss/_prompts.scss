@@ -1,0 +1,952 @@
+@layer view.workcenter.components {
+
+    .prompt-panel {
+        block-size: stretch;
+        max-block-size: stretch;
+        min-block-size: fit-content;
+        flex-basis: fit-content;
+        flex-shrink: 1;
+        flex-grow: 1;
+    }
+
+    .prompt-panel,
+    .prompt-section {
+        position: relative;
+        border-radius: var(--radius-md);
+        padding: 0;
+        border: none;
+
+        & > :where(.wc-file-drop-overlay) {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--motion-normal);
+        }
+
+        .prompt-controls {
+            display: flex;
+            gap: var(--space-md);
+            align-items: center;
+            place-content: center;
+            place-items: center;
+            flex-wrap: wrap;
+
+            .btn-icon {
+                @container (max-inline-size: 480px) {
+                    span {
+                        display: none;
+                    }
+                }
+            }
+
+            .icon-btn {
+                inline-size: 40px;
+                block-size: 40px;
+                border-radius: var(--radius-sm);
+                border: none;
+                background: var(--color-surface-container);
+                color: var(--color-on-surface);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all var(--motion-fast);
+
+                ui-icon {
+                    transition: color var(--motion-fast);
+                }
+
+                &:hover {
+                    background: var(--color-surface-container-high);
+                    box-shadow: var(--elev-1);
+
+                    ui-icon {
+                        color: var(--color-primary);
+                    }
+                }
+
+                &:focus-visible {
+                    outline: none;
+                    box-shadow: var(--focus-ring);
+                }
+
+                @container (max-inline-size: 768px) {
+                    inline-size: 36px;
+                    block-size: 36px;
+                }
+
+                @container (max-inline-size: 480px) {
+                    inline-size: 32px;
+                    block-size: 32px;
+                }
+            }
+
+            @container (max-inline-size: 768px) {
+                gap: var(--space-sm);
+            }
+
+            @container (max-inline-size: 480px) {
+                align-items: stretch;
+                gap: var(--space-sm);
+            }
+        }
+    }
+
+    .template-select {
+        flex: 1;
+        padding: var(--space-sm) var(--space-md);
+        border-radius: var(--radius-sm);
+        background: var(--color-surface);
+        color: var(--color-on-surface);
+        font-size: var(--text-sm);
+        font-weight: var(--font-weight-medium);
+        font-family: var(--font-family);
+        cursor: pointer;
+        min-block-size: 36px;
+
+        &:hover {
+            background: var(--color-surface-container-high);
+            border-color: var(--color-primary);
+        }
+
+        &:focus {
+            outline: none;
+            border-color: var(--color-primary);
+        }
+
+        @container (max-inline-size: 768px) {
+            min-block-size: 40px;
+        }
+    }
+
+    .instruction-selector-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-sm) 0;
+
+        .instruction-label {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            font-size: var(--text-xs);
+            font-weight: var(--font-weight-medium);
+            color: var(--color-on-surface-variant);
+            white-space: nowrap;
+            flex-shrink: 0;
+
+            ui-icon {
+                color: var(--color-primary);
+                opacity: 0.8;
+            }
+        }
+
+        .instruction-select {
+            flex: 1;
+            padding: var(--space-xs) var(--space-sm);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--color-outline-variant);
+            background: var(--color-surface);
+            color: var(--color-on-surface);
+            font-size: var(--text-xs);
+            font-family: var(--font-family);
+            cursor: pointer;
+            min-block-size: 30px;
+            transition: border-color var(--motion-fast);
+
+            &:hover {
+                border-color: var(--color-primary);
+                background: var(--color-surface-container-high);
+            }
+
+            &:focus {
+                outline: none;
+                border-color: var(--color-primary);
+                box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary) 15%, transparent);
+            }
+        }
+
+        .btn-sm {
+            padding: var(--space-xs);
+            min-inline-size: 28px;
+            min-block-size: 28px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--color-outline-variant);
+            background: transparent;
+            color: var(--color-on-surface-variant);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--motion-fast);
+            flex-shrink: 0;
+
+            &:hover {
+                background: var(--color-surface-container-high);
+                color: var(--color-primary);
+                border-color: var(--color-primary);
+            }
+        }
+
+        @container (max-inline-size: 480px) {
+            flex-wrap: wrap;
+
+            .instruction-label {
+                flex-basis: 100%;
+            }
+        }
+    }
+
+    .prompt-input {
+        inline-size: stretch;
+        block-size: stretch;
+        max-block-size: stretch;
+        min-block-size: calc-size(min-content, min(size, 100%));
+        flex-basis: min-content;
+        flex-grow: 1;
+        flex-shrink: 1;
+        padding: var(--space-sm) var(--space-md);
+        border: 1px solid var(--color-outline-variant);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
+        color: var(--color-on-surface);
+        font-family: var(--font-family-system);
+        font-size: var(--text-sm);
+        line-height: var(--leading-relaxed);
+        resize: vertical;
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-outline-variant) transparent;
+
+        &::placeholder {
+            color: var(--color-on-surface-variant);
+            opacity: 0.8;
+        }
+
+        &::-webkit-scrollbar {
+            inline-size: 4px;
+            block-size: 4px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: var(--color-outline-variant);
+        }
+
+        &:hover {
+            background: var(--color-surface-container-low);
+            box-shadow: var(--elev-1);
+        }
+
+        &:focus {
+            outline: none;
+            background: var(--color-surface-container-high);
+            box-shadow: var(--focus-ring);
+        }
+
+        @container (max-inline-size: 1024px) {
+            padding: var(--space-sm);
+        }
+
+        @container (max-inline-size: 768px) {
+            padding: var(--space-xs) var(--space-sm);
+        }
+    }
+
+    .wc-file-drop-overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        visibility: hidden;
+        border: none;
+        border-radius: var(--radius-md);
+        padding-inline: var(--space-lg);
+        padding-block: var(--space-lg);
+        background: var(--color-surface-container-low);
+        box-shadow: var(--elev-1);
+        z-index: 10;
+        transition: all var(--motion-normal);
+
+        &.drag-over {
+            opacity: 1;
+            visibility: visible;
+            background: color-mix(in oklab, var(--color-primary) 10%, var(--color-surface-container-low));
+            box-shadow: var(--focus-ring), var(--elev-2);
+
+            .drop-zone-content {
+                opacity: 1;
+                visibility: visible;
+            }
+        }
+
+        @container (max-inline-size: 1024px) {
+            padding-inline: var(--space-md);
+            padding-block: var(--space-md);
+        }
+
+        @container (max-inline-size: 768px) {
+            padding-inline: var(--space-sm);
+            padding-block: var(--space-sm);
+        }
+    }
+
+    .prompt-input-group {
+        position: relative;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xl);
+        block-size: stretch;
+        max-block-size: stretch;
+        min-block-size: calc-size(min-content, min(size, 100%));
+        flex-basis: fit-content;
+        flex-grow: 1;
+        /*flex-shrink: 0;*/
+        place-content: center;
+        place-items: center;
+
+        &[data-dropzone] {
+            position: relative;
+            transition: all var(--motion-normal);
+        }
+
+        .file-drop-zone {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-lg);
+            text-align: center;
+            pointer-events: none;
+
+            .drop-zone-content {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: var(--space-lg);
+                opacity: 0;
+                visibility: hidden;
+                transition: all var(--motion-normal);
+
+                .drop-icon {
+                    color: var(--color-primary);
+                    opacity: 0.8;
+                    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.15));
+                    transition: all var(--motion-normal);
+
+                    @container (max-inline-size: 1024px) {
+                        &[size="4rem"] {
+                            --icon-size: 3.5rem;
+                            inline-size: 4rem;
+                            block-size: 4rem;
+                        }
+                    }
+
+                    @container (max-inline-size: 768px) {
+                        &[size="4rem"] {
+                            --icon-size: 3rem;
+                            inline-size: 4rem;
+                            block-size: 4rem;
+                        }
+                    }
+
+                    @container (max-inline-size: 480px) {
+                        &[size="4rem"] {
+                            --icon-size: 2.5rem;
+                            inline-size: 4rem;
+                            block-size: 4rem;
+                        }
+                    }
+                }
+
+                .drop-text {
+                    font-size: var(--text-xl);
+                    font-weight: var(--font-weight-bold);
+                    color: var(--color-on-surface);
+                    letter-spacing: -0.01em;
+                    text-align: center;
+                    line-height: var(--leading-tight);
+                    font-variant-emoji: text;
+
+                    @container (max-inline-size: 1024px) {
+                        font-size: var(--text-lg);
+                    }
+
+                    @container (max-inline-size: 768px) {
+                        font-size: var(--text-base);
+                    }
+                }
+
+                .drop-hint {
+                    font-size: var(--text-sm);
+                    color: var(--color-on-surface-variant);
+                    font-weight: var(--font-weight-medium);
+                    opacity: 0.9;
+                    text-align: center;
+                    max-inline-size: 280px;
+                    line-height: var(--leading-normal);
+
+                    @container (max-inline-size: 768px) {
+                        font-size: var(--text-xs);
+                        max-inline-size: 240px;
+                    }
+                }
+
+                @container (max-inline-size: 1024px) {
+                    gap: var(--space-md);
+                }
+
+                @container (max-inline-size: 768px) {
+                    gap: var(--space-sm);
+                }
+            }
+        }
+
+        .wc-recognized-status {
+            margin-block-start: var(--space-md);
+            padding: var(--space-sm) var(--space-md);
+            background: color-mix(in oklab, var(--color-success) 5%, transparent);
+            border: none;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--elev-1);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            font-size: var(--text-sm);
+            color: var(--color-on-surface);
+
+            .status-icon {
+                color: var(--color-success);
+                flex-shrink: 0;
+            }
+
+            .clear-recognized {
+                margin-inline-start: auto;
+                padding: var(--space-xs) var(--space-sm);
+                border: none;
+                border-radius: var(--radius-full);
+                background: transparent;
+                color: var(--color-on-surface-variant);
+                font-size: var(--text-xs);
+                min-block-size: 28px;
+                box-shadow: none;
+
+                &:hover {
+                    color: var(--color-error);
+                    background: color-mix(in oklab, var(--color-error) 5%, transparent);
+                }
+            }
+        }
+
+        .file-list {
+            margin-block-start: var(--space-md);
+            box-sizing: border-box;
+            inline-size: stretch;
+            max-inline-size: stretch;
+            min-inline-size: 0;
+        }
+
+        .file-item {
+            padding: var(--space-sm) var(--space-md);
+            background: var(--color-surface-container);
+            border: none;
+            box-shadow: var(--elev-0);
+
+            &:hover {
+                background: var(--color-surface-container-high);
+                box-shadow: var(--elev-1);
+            }
+        }
+
+        .file-info {
+            gap: var(--space-md);
+        }
+
+        .file-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            inline-size: 32px;
+            block-size: 32px;
+            border-radius: var(--radius-sm);
+            background: var(--color-surface-container-high);
+
+            ui-icon {
+                color: var(--color-primary);
+            }
+
+            @container (max-inline-size: 768px) {
+                inline-size: 28px;
+                block-size: 28px;
+            }
+        }
+
+        .remove-btn {
+            inline-size: 24px;
+            block-size: 24px;
+            background: transparent;
+            color: var(--color-error);
+            border: none;
+            padding: 0;
+
+            &:hover {
+                background: color-mix(in oklab, var(--color-error) 20%, transparent);
+                color: var(--color-error);
+            }
+        }
+
+        @container (max-inline-size: 1024px) {
+            gap: var(--space-lg);
+        }
+
+        @container (max-inline-size: 768px) {
+            gap: var(--space-md);
+        }
+    }
+
+    .action-section,
+    .prompt-section,
+    .prompts-section,
+    /*.prompts-column,*/
+    .prompt-panel {
+        background: var(--color-surface-container-low);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
+        border: 1px solid var(--color-outline-variant);
+        place-content: center;
+        place-items: center;
+        align-items: stretch;
+
+        .prompt-actions {
+            display: grid;
+            grid-template-columns: minmax(0px, 1fr) minmax(0px, max-content);
+            grid-template-rows: minmax(max-content, 1fr) minmax(max-content, 1fr);
+            gap: var(--space-md);
+            place-self: center;
+            min-inline-size: max-content;
+            max-inline-size: stretch;
+            inline-size: max(60cqi, min(24rem, 100%));
+            place-items: center;
+            place-content: stretch;
+
+            .voice-btn {
+                grid-column: 1;
+                grid-row: 1;
+                padding: var(--space-lg);
+                border: none;
+                border-radius: var(--radius-xl);
+                background: var(--color-surface-container-high);
+                color: var(--color-on-surface);
+                font-size: var(--text-sm);
+                font-weight: var(--font-weight-medium);
+                cursor: pointer;
+                transition: all var(--motion-normal);
+                box-shadow: var(--elev-0);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-block-size: 44px;
+                inline-size: stretch;
+
+                &:hover {
+                    background: var(--color-surface-container-highest);
+                    box-shadow: var(--elev-1);
+                }
+
+                &:focus {
+                    outline: none;
+                    box-shadow: var(--focus-ring);
+                }
+
+                &.recording {
+                    background: var(--color-error);
+                    color: var(--color-on-error);
+                    animation: workcenter-pulse 1.5s infinite;
+
+                    &::before {
+                        content: "●";
+                        margin-inline-end: var(--space-sm);
+                        color: var(--color-on-error);
+                        animation: workcenter-blink 1s infinite;
+                    }
+                }
+
+                @container (max-inline-size: 768px) {
+                    min-block-size: 40px;
+                    font-size: var(--text-xs);
+                }
+
+                @container (max-inline-size: 480px) {
+                    min-block-size: 36px;
+                    padding: var(--space-sm);
+                }
+            }
+
+            .auto-action-label {
+                grid-column: 2;
+                grid-row: 1;
+                display: flex;
+                place-content: center;
+                place-items: center;
+                justify-content: center;
+                inline-size: 44px;
+                block-size: 44px;
+                border-radius: var(--radius-lg);
+                background: var(--color-surface-container);
+                cursor: pointer;
+                transition: all var(--motion-fast);
+                box-shadow: var(--elev-0);
+                border: none;
+                padding: 0.5rem;
+
+                & > :not(ui-icon) {
+                    display: none;
+                }
+
+                ui-icon {
+                    color: var(--color-on-surface-variant);
+                    transition: all var(--motion-fast);
+                }
+
+                input[type="checkbox"] {
+                    position: absolute;
+                    opacity: 0;
+                    inline-size: 1px;
+                    block-size: 1px;
+                    margin: -1px;
+                    padding: 0;
+                    overflow: hidden;
+                    clip: rect(0, 0, 0, 0);
+                    white-space: nowrap;
+                    border: 0;
+                }
+
+                &:has(input[type="checkbox"]:checked),
+                input[type="checkbox"]:checked ~ & {
+                    background: var(--color-primary);
+                    box-shadow: var(--elev-1);
+
+                    ui-icon {
+                        color: var(--color-on-primary);
+                    }
+                }
+
+                &:hover {
+                    background: var(--color-surface-container-high);
+                    box-shadow: var(--elev-1);
+
+                    &:has(input[type="checkbox"]:checked),
+                    input[type="checkbox"]:checked ~ & {
+                        background: color-mix(in oklab, var(--color-primary) 90%, black);
+                    }
+                }
+
+                &:focus-within {
+                    outline: none;
+                    box-shadow: var(--focus-ring);
+                }
+
+                @container (max-inline-size: 768px) {
+                    inline-size: 40px;
+                    block-size: 40px;
+
+                    ui-icon {
+                        &[size="20"] {
+                            --size: 18px;
+                        }
+                    }
+                }
+
+                @container (max-inline-size: 480px) {
+                    inline-size: 36px;
+                    block-size: 36px;
+
+                    ui-icon {
+                        &[size="20"] {
+                            --size: 16px;
+                        }
+                    }
+                }
+            }
+
+            .action-btn {
+                grid-column: 1;
+                grid-row: 2;
+                padding: var(--space-md) var(--space-lg);
+                border: none;
+                border-radius: var(--radius-md);
+                background: var(--color-primary);
+                color: var(--color-on-primary);
+                cursor: pointer;
+                font-size: var(--text-sm);
+                font-weight: var(--font-weight-medium);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: var(--space-xs);
+                min-block-size: 44px;
+                transition: all var(--motion-normal);
+                inline-size: stretch;
+                max-inline-size: stretch;
+
+                &:hover {
+                    background: color-mix(in oklab, var(--color-primary) 85%, black);
+                    box-shadow: var(--elev-1);
+                    transform: translateY(-1px);
+                }
+
+                &:focus {
+                    outline: none;
+                    box-shadow: var(--focus-ring);
+                }
+
+                &:disabled {
+                    background: var(--color-surface-container-high);
+                    color: var(--color-on-surface-variant);
+                    cursor: not-allowed;
+                    box-shadow: var(--elev-0);
+                    transform: none;
+                }
+
+                ui-icon {
+                    @container (max-inline-size: 768px) {
+                        &[size="20"] {
+                            --icon-size: 16px;
+                        }
+                    }
+                }
+
+                .btn-text {
+                    @container (max-inline-size: 640px) {
+                        display: none;
+                    }
+                }
+
+                @container (max-inline-size: 768px) {
+                    min-block-size: 40px;
+                    padding: var(--space-sm) var(--space-md);
+                }
+
+                @container (max-inline-size: 480px) {
+                    min-block-size: 36px;
+                    padding: var(--space-xs) var(--space-sm);
+                    font-size: var(--text-xs);
+                }
+            }
+
+            .clear-btn {
+                grid-column: 2;
+                grid-row: 2;
+                min-inline-size: 44px;
+                min-block-size: 44px;
+                border-radius: var(--radius-md);
+                border: none;
+                background: var(--color-surface-container);
+                color: var(--color-on-surface);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all var(--motion-fast);
+                block-size: max-content;
+                max-block-size: fit-content;
+                min-block-size: 2.5rem;
+                aspect-ratio: auto;
+                inline-size: stretch;
+                max-inline-size: stretch;
+
+                &:hover {
+                    background: var(--color-error-container);
+                    color: var(--color-on-error-container);
+                }
+
+                &:focus {
+                    outline: none;
+                    box-shadow: var(--focus-ring);
+                }
+
+                @container (max-inline-size: 768px) {
+                    min-inline-size: 40px;
+                    min-block-size: 40px;
+                }
+
+                @container (max-inline-size: 480px) {
+                    min-inline-size: 36px;
+                    min-block-size: 36px;
+                }
+            }
+        }
+
+        @container (max-inline-size: 1024px) {
+            padding: var(--space-md);
+        }
+
+        @container (max-inline-size: 768px) {
+            padding: var(--space-sm);
+        }
+    }
+
+    .wc-block-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-md);
+        flex-wrap: nowrap;
+        inline-size: stretch;
+        max-inline-size: stretch;
+        flex-direction: row;
+
+        h3 {
+            margin: 0;
+            font-size: var(--text-lg);
+            font-weight: var(--font-weight-medium);
+            color: var(--color-on-surface);
+            flex-grow: 1;
+            flex-shrink: 1;
+            flex-basis: fit-content;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .prompt-actions {
+            align-items: center;
+            gap: var(--space-xs);
+            flex-wrap: wrap;
+        }
+    }
+
+    .instruction-panel,
+    .prompt-panel {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+    }
+
+    .instruction-panel {
+        .instruction-help {
+            font-size: var(--text-xs);
+            color: var(--color-on-surface-variant);
+            background: var(--color-surface-container-high);
+            border-radius: var(--radius-sm);
+            padding: var(--space-sm);
+        }
+    }
+
+    .prompt-panel {
+        .prompt-actions {
+            flex-wrap: wrap;
+            gap: var(--space-sm);
+            align-items: center;
+        }
+
+        .prompt-attach-btn,
+        .auto-action-label,
+        .clear-btn {
+            flex: 0 0 auto;
+        }
+
+        .voice-btn {
+            flex: 1 1 14rem;
+            min-inline-size: 12rem;
+            max-inline-size: 100%;
+            inline-size: auto;
+            justify-content: center;
+        }
+
+        .action-btn {
+            flex: 0 0 auto;
+            min-inline-size: 10.5rem;
+        }
+
+        @container (max-inline-size: 760px) {
+            .voice-btn {
+                flex-basis: 100%;
+                min-inline-size: 0;
+            }
+
+            .action-btn {
+                flex: 1 1 auto;
+                min-inline-size: 0;
+            }
+        }
+    }
+
+    .prompt-attach-btn {
+        min-inline-size: 44px;
+        min-block-size: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-xs);
+        border: 1px solid var(--color-outline-variant);
+        background: var(--color-surface-container);
+
+        .attach-count {
+            font-size: var(--text-xs);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-primary);
+            background: var(--color-primary-container);
+            border-radius: var(--radius-full);
+            padding: 0 0.35rem;
+            min-inline-size: 1.35rem;
+            text-align: center;
+        }
+    }
+
+    .prompt-input-group[data-prompt-dropzone] {
+        position: relative;
+        border-radius: var(--radius-md);
+        border: 2px dashed transparent;
+        transition: border-color var(--motion-fast), background-color var(--motion-fast);
+
+        &.drag-over {
+            border-color: var(--color-primary);
+            background: color-mix(in oklab, var(--color-primary) 7%, transparent);
+        }
+    }
+
+    .prompt-input-overlay {
+        position: absolute !important;
+        inset: var(--space-xs);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-xs);
+        border-radius: var(--radius-sm);
+        background: color-mix(in oklab, var(--color-primary) 12%, var(--color-surface-container-high));
+        color: var(--color-on-surface);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity var(--motion-fast), visibility var(--motion-fast);
+        z-index: 3;
+        block-size: stretch;
+        inline-size: stretch;
+        inset: 0px;
+
+        &.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+    }
+
+    .prompt-actions, .prompt-panel {
+        .btn, .icon-btn, .clear-btn {
+            block-size: 2.5rem;
+            min-block-size: fit-content;
+            block-size: max-content;
+            padding: var(--space-sm) var(--space-md);
+            min-inline-size: 0px;
+            max-inline-size: fit-content;
+        }
+
+        .clear-btn, .voice-btn {
+            inline-size: auto;
+            aspect-ratio: auto;
+            max-inline-size: stretch;
+        }
+    }
+}

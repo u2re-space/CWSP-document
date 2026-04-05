@@ -1,0 +1,283 @@
+// Layout Components - Refactored and Optimized
+// Unified with design system variables and mixins
+@use "veela-lib" as *;
+@use "../../library/mixins" as ui;
+@use "../../library/tokens" as t;
+
+//
+@layer layer.shell.faint.sidebar {
+
+    .app-layout {
+        /***********/
+        /* SIDEBAR */
+        /***********/
+
+        //
+        .sidebar {
+            align-items: stretch;
+            box-sizing: border-box;
+            user-select: none;
+            text-align: start;
+            padding: 0px;
+            touch-action: pan-y;
+            pointer-events: auto;
+            justify-content: start;
+            block-size: stretch;
+            margin: 0px;
+
+            //
+            @include flex-center;
+            @include container-clamped(clamp(0px, var(--sidebar-width, 20rem), 100cqi), stretch);
+            @include scrollable("y");
+            @include hide-scrollbar;
+
+            //
+            @include ui.vstack(0px);
+            @include ui.tonal-surface(surface-container-low, var(--surface-opacity-default), var(--radius-sm), 0px, 1, true);
+
+            //
+            & {
+                box-sizing: border-box;
+                border: none 0 transparent;
+                outline: none 0 transparent;
+                max-block-size: stretch;
+                min-block-size: 0px;
+                box-shadow: none;
+
+                contain: strict;
+                content-visibility: auto;
+                block-size: stretch;
+                padding: 0.25rem;
+                padding-inline: 0.25rem;
+                padding-block: 0.25rem;
+
+                border-radius: 0px;
+                border-start-start-radius: 0px;
+                border-end-start-radius: 0px;
+                //background-color: oklch(from --c2-surface(0.15, var(--current, currentColor)) l c h / 0.9);
+                //filter: drop-shadow(0 1.5rem 1rem color-mix(in oklch, #000 22%, transparent));
+                //backdrop-filter: blur(1rem);
+                background-color: transparent;
+                filter: drop-shadow(0 1.5rem 1rem color-mix(in oklch, #000 22%, transparent));
+            }
+
+            //
+            &[slot="sidebar"] {
+                grid-column: 1 / 2;
+                grid-row: 1 / -1;
+                position: sticky;
+                inset-block-start: var(--padding-sm);
+                align-self: start;
+                display: flex;
+                flex-direction: column;
+                touch-action: pan-y;
+                justify-content: start;
+
+                //
+                @include container-clamped(stretch, stretch);
+                @include scrollable;
+                @include hide-scrollbar;
+                @include container("lg") {
+                    position: static;
+                    max-block-size: none;
+                    order: 2;
+                    inline-size: calc(100cqi - clamp(0px, var(--padding-sm), 100cqi));
+                }
+
+                //
+                & { min-block-size: 0px; box-shadow: none; block-size: stretch; max-block-size: stretch; }
+            }
+
+            ul {
+                user-select: none;
+                overflow: visible;
+                box-sizing: border-box;
+                margin: 0px;
+                touch-action: pan-y;
+                justify-content: start;
+                max-block-size: none;
+                block-size: max-content;
+                margin-block: 0.25rem;
+
+                //
+                @include container-clamped(stretch, fit-content);
+                @include ui.tonal-list(surface, var(--surface-opacity-subtle), var(--radius-sm), 0);
+
+                //
+                /*filter: drop-shadow(0 1.5rem 1rem color-mix(in oklch, #000 22%, transparent));*/
+                background-color: oklch(from var(--surface-color) l c h / 1);
+                /*backdrop-filter: blur(1rem);*/
+
+                //
+                &, &:focus {
+                    border: none 0 transparent;
+                    outline: none 0 transparent;
+                }
+
+                //
+                & { block-size: max-content; min-block-size: max-content; max-block-size: none; }
+
+                //
+                li {
+                    overflow: visible;
+                    font-size: t.$font-sm;
+                    transition: var(--transition-colors);
+                    touch-action: pan-y;
+
+                    //
+                    @include container-clamped(stretch, fit-content);
+
+                    //
+                    &, * { pointer-events: none; }
+
+                    //
+                    a {
+                        display: flex;
+                        flex-direction: row;
+                        flex-wrap: nowrap;
+                        pointer-events: auto;
+                        background: transparent;
+                        touch-action: pan-y;
+
+                        //
+                        @include container-clamped(stretch, fit-content);
+                        @include nav-item;
+
+                        //
+                        &, &:focus {
+                            border: none;
+                            outline: none;
+                        }
+
+                        //
+                        & { padding: var(--padding-lg); column-gap: var(--gap-xs); gap: var(--gap-md); }
+                        @media (max-height: 600px) { padding: var(--padding-xl); gap: var(--gap-sm); }
+                        @media (max-height: 480px) { padding: var(--padding-lg); gap: var(--gap-md); }
+
+                        //
+                        & {
+                            position: relative;
+                            isolation: isolate;
+                            border-radius: var(--radius-sm);
+                            transition: color var(--transition-colors), background-color var(--transition-colors);
+                            color: color-mix(in oklch, var(--on-surface, currentColor) 72%, transparent);
+                            min-block-size: 3rem; // 56px
+                        }
+
+                        &::before {
+                            content: "";
+                            position: absolute;
+                            inset: 0;
+                            border-radius: inherit;
+                            background: color-mix(in oklch, var(--primary, var(--color-primary, currentColor)) 18%, transparent);
+                            opacity: 0;
+                            transform: scale3d(0.4, 1, 1);
+                            transition: opacity var(--transition-colors), transform var(--transition-medium, var(--transition-colors));
+                            pointer-events: none;
+                        }
+
+                        &::after {
+                            display: none; // Remove the small indicator
+                        }
+
+                        &:where(:hover, :focus-visible, :focus, :active) {
+                            color: color-mix(in oklch, var(--on-surface, currentColor) 94%, transparent);
+
+                            &::before {
+                                opacity: 0.55;
+                                transform: scale3d(1, 1, 1);
+                            }
+
+                            ui-icon {
+                                color: color-mix(in oklch, var(--on-surface, currentColor) 94%, transparent);
+                            }
+                        }
+
+                        &[data-active="true"] {
+                            color: color-mix(in oklch, var(--on-secondary-container, var(--on-surface, currentColor)) 100%, transparent);
+                            font-weight: var(--font-weight-semibold);
+                            letter-spacing: 0.01em;
+
+                            &::before {
+                                opacity: 1;
+                                transform: scale3d(1, 1, 1);
+                                background: var(--secondary-container, color-mix(in oklch, var(--primary, var(--color-primary, currentColor)) 25%, transparent));
+                                box-shadow: none;
+                            }
+
+                            ui-icon {
+                                color: currentColor;
+                            }
+                        }
+
+                        @media (prefers-reduced-motion: reduce) {
+                            &, &::before, &::after {
+                                transition-duration: 0ms;
+                                transform: none;
+                            }
+                        }
+
+                        ui-icon {
+                            justify-self: start;
+                            inline-size: var(--icon-size);
+                            block-size: var(--icon-size);
+                            --icon-size: var(--icon-size-sm);
+                            color: color-mix(in oklch, var(--on-surface, currentColor) 58%, transparent);
+                            transition: color var(--transition-colors), transform var(--transition-medium, var(--transition-colors));
+
+                            @media (max-width: 720px) { --icon-size: var(--icon-size-md); }
+                            @media (max-width: 480px) { --icon-size: var(--icon-size-lg); }
+                        }
+
+                        //
+                        span {
+                            display: block;
+                            justify-self: start;
+                            text-align: start;
+                            @include container-clamped(stretch, max-content);
+                        }
+                    }
+                }
+            }
+
+            &,
+            ul,
+            ul li,
+            ul li a,
+            ul li a span {
+                text-align: start;
+                direction: ltr;
+                justify-items: start;
+                justify-self: start;
+            }
+
+            //
+            @include container("lg") {
+                nav {
+                    inline-size: 100cqi;
+
+                    //
+                    padding: var(--padding-sm) var(--padding-xs);
+                    @media (max-width: 720px) { padding: var(--padding-md) var(--padding-sm); }
+                    @media (max-width: 480px) { padding: var(--padding-lg) var(--padding-md); }
+
+                    //
+                    ul {
+                        gap: 0;
+                        padding-inline: 0;
+                        inline-size: stretch;
+
+                        li {
+                            flex: 0 0 auto;
+                            white-space: nowrap;
+                            border-radius: var(--radius-sm);
+
+                            //
+                            @media (max-width: 480px) { border-radius: var(--radius-md); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

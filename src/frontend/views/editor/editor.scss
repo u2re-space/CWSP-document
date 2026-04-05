@@ -1,0 +1,103 @@
+/**
+ * Editor View Styles
+ */
+
+@layer view.editor {
+    :is(html, body):has([data-view="editor"]) {
+        --view-layout: "flex";
+        --view-content-max-width: none;
+    }
+
+    .view-editor {
+        display: flex;
+        flex-direction: column;
+        block-size: 100%;
+        background-color: var(--view-bg, var(--color-surface, #ffffff));
+        color: var(--view-fg, var(--color-on-surface, #1a1a1a));
+    }
+
+    .view-editor__toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background-color: var(--view-toolbar-bg, rgba(0, 0, 0, 0.02));
+        border-block-end: 1px solid var(--view-border, rgba(0, 0, 0, 0.08));
+        flex-shrink: 0;
+    }
+
+    .view-editor__toolbar-left,
+    .view-editor__toolbar-right {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .view-editor__btn {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--view-fg);
+        font-size: 0.8125rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+
+        ui-icon {
+            font-size: 1rem;
+            opacity: 0.7;
+        }
+
+        span {
+            @media (max-width: 640px) {
+                display: none;
+            }
+        }
+
+        &:hover {
+            background-color: rgba(0, 0, 0, 0.06);
+        }
+    }
+
+    .view-editor__content {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+    }
+
+    .view-editor__textarea {
+        flex: 1;
+        padding: 1.5rem 2rem;
+        border: none;
+        background-color: var(--view-editor-bg, #fafafa);
+        color: var(--view-fg);
+        font-family: "SF Mono", "Fira Code", "JetBrains Mono", Consolas, monospace;
+        font-size: 0.9375rem;
+        line-height: 1.6;
+        resize: none;
+
+        &:focus {
+            outline: none;
+        }
+
+        &::placeholder {
+            color: var(--view-fg);
+            opacity: 0.4;
+        }
+    }
+
+    @media print {
+        .view-editor__toolbar {
+            display: none;
+        }
+
+        .view-editor__textarea {
+            padding: 0;
+        }
+    }
+}

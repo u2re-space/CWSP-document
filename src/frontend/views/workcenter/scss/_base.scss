@@ -1,0 +1,89 @@
+@layer view.workcenter.tokens {
+    :is(html, body):has([data-view="workcenter"]) {
+        --view-layout: "grid";
+        --view-sidebar-visible: true;
+        --view-toolbar-expanded: true;
+        --view-content-max-width: none;
+    }
+}
+
+@layer view.workcenter.base {
+    .workcenter-view {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+        padding: var(--space-md);
+        overflow-y: auto;
+        overflow-x: hidden;
+        background: var(--color-background);
+        color: var(--color-on-background);
+        max-block-size: stretch;
+        block-size: stretch;
+        inline-size: stretch;
+        min-inline-size: 0;
+        min-block-size: 0;
+        max-inline-size: stretch;
+        container-type: size;
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-outline-variant) transparent;
+        animation: workcenter-fade-in-up 0.3s ease-out;
+        contain: strict;
+
+        textarea,
+        input,
+        select,
+        button {
+            box-sizing: border-box;
+            max-inline-size: 100%;
+        }
+
+        button {
+            flex-wrap: nowrap;
+            text-wrap: nowrap;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+            text-align: center;
+            text-transform: none;
+            text-decoration: none;
+            text-shadow: none;
+            text-rendering: auto;
+        }
+
+        h3 {
+            padding: var(--space-sm);
+        }
+
+        @container (max-inline-size: 1024px) {
+            padding: var(--space-sm);
+            gap: var(--space-sm);
+        }
+
+        @container (max-inline-size: 768px) {
+            padding: var(--space-xs);
+            gap: var(--space-xs);
+        }
+
+        &::-webkit-scrollbar {
+            inline-size: 4px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: var(--color-outline-variant);
+            border-radius: 2px;
+        }
+
+        &::-webkit-scrollbar-thumb:hover {
+            background: var(--color-outline);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--color-primary);
+            outline-offset: -2px;
+        }
+    }
+}

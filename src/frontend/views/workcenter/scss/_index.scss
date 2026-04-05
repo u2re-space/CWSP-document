@@ -1,0 +1,45 @@
+/**
+ * Workcenter SCSS Index
+ *
+ * Entry point for all workcenter view styles.
+ * Uses @use/@forward for modern module imports.
+ *
+ * Layer: view.workcenter
+ *
+ * @module views/workcenter
+ */
+
+
+// ============================================================================
+// PARTIALS (Order matters for cascade)
+// ============================================================================
+
+// 1. Utilities - shared keyframes and mixins
+@use "keyframes";
+@use "mixins";
+
+// 2. Base - foundational styles
+@use "base";
+
+// 3. Layout - structural layout
+@use "layout";
+
+// 4. Header - header component
+@use "header";
+
+// 5. Prompts - prompt/input area
+@use "prompts";
+
+// 6. Attachments - file attachment handling
+@use "attachments";
+
+// 7. Results - output/results display
+@use "results";
+
+// 8. Animations - animation classes and modal styles
+@use "animations";
+
+@layer view.workcenter.tokens, view.workcenter.base, view.workcenter.layout, view.workcenter.components, view.workcenter.utilities, view.workcenter.overrides;
+
+// Note: The main workcenter.scss file contains the core view styles
+// and is imported separately at the view level.
