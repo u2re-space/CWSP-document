@@ -1,7 +1,8 @@
-# Tabbed Window
+# Tabbed Window (virtual)
 
 Multi-tabbed version of `${view}` process of windowed shell.
 
+|------------------------------------------------|
 | = | Tab A | Tab B | ------------ | mn | mx | x |
 |------------------------------------------------|
 |   |                                            |

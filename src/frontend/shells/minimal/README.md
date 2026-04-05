@@ -24,3 +24,5 @@ Full-screen only process...
 - `base` shell (contained)
 - `${view}` process (contained)
 
+Minimal shell (`minimal`) can't be inside virtual `environment` window, but can be inside dedicated real window or view.
+For that (similar functional), use `tabbed` window version.

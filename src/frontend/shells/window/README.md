@@ -1,12 +1,13 @@
-# Tabbed Window
+# Virtual Window
 
 Multi-tabbed version of `${view}` process of windowed shell.
 
+|------------------------------------------------|
 | = | Title Name ----------------- | mn | mx | x |
 |------------------------------------------------|
-|                                                |
-| Tab A Content (For Example) by `base`          |
-|                                                |
+|   |                                            |
+|Sid| Tab A Content (For Example) by `base`      |
+|   |                                            |
 |------------------------------------------------|
 
 **Under:**

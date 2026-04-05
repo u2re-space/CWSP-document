@@ -5,14 +5,15 @@ Core/System:
 
 UI-wrappers (for content):
 - `base` is shell practially without toolbars or anything (can/may contain padding/margin only).
-- `window` is virtual window wrapped content shell.
 
-Minor (with content):
-- `tabbed` (unmentioned) variant of `window` with multiple task tabs.
-- `minimal` is tabbed/toolbar based UI environment, with single focused task. 
+Minor (virtual, with content, containement):
+- `minimal`: Minimal UI/UX, focused by single process.
+- `tabbed` : variant of `window` with multiple task tabs.
+- `window` : is tabbed/toolbar based UI environment, with single focused task. 
   - has at least only two or three elements: toolbar panel, content, and (sometimes) probably sidebar
 
-Major (multiple-tasked):
+Major (multiple-tasked, managed):
+- `minimal`: Minimal UI/UX, focused by single process.
 - `environment`:
   - in underlying generally used wallpapers or canvas.
   - contains/uses multiple layers (underlying, items, content, overlays).
@@ -33,7 +34,7 @@ Needs to make much better system of shells (compatibility, nesting)...
   - <overlays>
     - <modals>
     - <toasts>
-- `content`
+- `content` (CRX/chrome only)
   - <overlays>
     - <sniping>
     - <tools>
