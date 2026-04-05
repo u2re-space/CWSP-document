@@ -5,11 +5,11 @@
  */
 
 import { fixOrientToScreen } from "fest/dom";
-import { initializeAppCanvasLayer } from "@fl-ui/items/Canvas";
-import { initializeOrientedDesktop } from "./home/ts/OrientDesktop";
+import { initializeAppCanvasLayer } from "@fl-ui/items/image/Canvas";
+import { initializeOrientedDesktop } from "../../views/home/ts/OrientDesktop";
 
 export type AppLayers = {
-    canvasLayer: HTMLElement;
+    canvasLayer: HTMLElement | null;
     orientLayer: HTMLElement | null;
     shellLayer: HTMLElement;
     overlayLayer: HTMLElement;
@@ -17,15 +17,38 @@ export type AppLayers = {
 
 export const ensureAppLayers = (
     mountElement: HTMLElement,
-    options: { enableOrientLayer?: boolean } = {},
+    options: { enableOrientLayer?: boolean; enableCanvasLayer?: boolean } = {},
 ): AppLayers => {
     const enableOrientLayer = options.enableOrientLayer !== false;
+    const enableCanvasLayer = options.enableCanvasLayer !== false;
     const existingCanvas = mountElement.querySelector<HTMLElement>('[data-app-layer="canvas"]');
     const existingOrient = mountElement.querySelector<HTMLElement>('[data-app-layer="orient"]');
     const existingShell = mountElement.querySelector<HTMLElement>('[data-app-layer="shell"]');
     const existingOverlay = mountElement.querySelector<HTMLElement>('[data-app-layer="overlay"]');
 
-    if (existingCanvas && existingShell && existingOverlay) {
+    const createCanvasLayer = (): HTMLElement => {
+        const canvasLayer = document.createElement("div");
+        canvasLayer.dataset.appLayer = "canvas";
+        canvasLayer.className = "app-layer app-layer--canvas";
+        canvasLayer.style.position = "absolute";
+        canvasLayer.style.inset = "0";
+        canvasLayer.style.zIndex = "0";
+        canvasLayer.style.pointerEvents = "none";
+        initializeAppCanvasLayer(canvasLayer);
+        return canvasLayer;
+    };
+
+    if (existingShell && existingOverlay) {
+        let canvasLayer: HTMLElement | null = existingCanvas;
+        if (enableCanvasLayer && !canvasLayer) {
+            canvasLayer = createCanvasLayer();
+            mountElement.insertBefore(canvasLayer, existingOrient ?? existingShell);
+        }
+        if (!enableCanvasLayer && canvasLayer) {
+            canvasLayer.remove();
+            canvasLayer = null;
+        }
+
         if (enableOrientLayer && !existingOrient) {
             const orientLayer = document.createElement("div");
             orientLayer.dataset.appLayer = "orient";
@@ -46,14 +69,14 @@ export const ensureAppLayers = (
             fixOrientToScreen(orientBox as any);
             initializeOrientedDesktop(orientBox as HTMLElement);
             mountElement.insertBefore(orientLayer, existingShell);
-            return { canvasLayer: existingCanvas, orientLayer, shellLayer: existingShell, overlayLayer: existingOverlay };
+            return { canvasLayer, orientLayer, shellLayer: existingShell, overlayLayer: existingOverlay };
         }
         if (!enableOrientLayer && existingOrient) {
             existingOrient.remove();
-            return { canvasLayer: existingCanvas, orientLayer: null, shellLayer: existingShell, overlayLayer: existingOverlay };
+            return { canvasLayer, orientLayer: null, shellLayer: existingShell, overlayLayer: existingOverlay };
         }
         return {
-            canvasLayer: existingCanvas,
+            canvasLayer,
             orientLayer: enableOrientLayer ? (existingOrient || null) : null,
             shellLayer: existingShell,
             overlayLayer: existingOverlay,
@@ -65,13 +88,7 @@ export const ensureAppLayers = (
     mountElement.style.overflow = "hidden";
     mountElement.dataset.appLayerRoot = "true";
 
-    const canvasLayer = document.createElement("div");
-    canvasLayer.dataset.appLayer = "canvas";
-    canvasLayer.className = "app-layer app-layer--canvas";
-    canvasLayer.style.position = "absolute";
-    canvasLayer.style.inset = "0";
-    canvasLayer.style.zIndex = "0";
-    canvasLayer.style.pointerEvents = "none";
+    const canvasLayer = enableCanvasLayer ? createCanvasLayer() : null;
 
     const orientLayer = enableOrientLayer ? document.createElement("div") : null;
     if (orientLayer) {
@@ -120,11 +137,13 @@ export const ensureAppLayers = (
     overlayLayer.style.background = "transparent";
     overlayLayer.style.backgroundColor = "transparent";
 
-    if (orientLayer) {
-        mountElement.append(canvasLayer, orientLayer, shellLayer, overlayLayer);
-    } else {
-        mountElement.append(canvasLayer, shellLayer, overlayLayer);
+    if (canvasLayer) {
+        mountElement.append(canvasLayer);
     }
-    initializeAppCanvasLayer(canvasLayer);
+    if (orientLayer) {
+        mountElement.append(orientLayer);
+    }
+    mountElement.append(shellLayer, overlayLayer);
+
     return { canvasLayer, orientLayer, shellLayer, overlayLayer };
 };

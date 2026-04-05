@@ -1,9 +1,9 @@
 import type { EntityDescriptor } from "@rs-core/utils/Types";
 import { generateNewPlan } from "@rs-core/workers/AskToPlan";
 import { triggerDebugTaskGeneration } from "@rs-core/utils/DebugTaskGenerator";
-import { makeEntityEdit } from "@fl-ui/items/EntityEdit";
+import { makeEntityEdit } from "@fl-ui/items/editor/EntityEdit";
 import { downloadByPath, openPickerAndAnalyze, openPickerAndWrite, pasteAndAnalyze, pasteIntoClipboardWithRecognize } from "../storage/FileOps";
-import { showSuccess, showError } from "@fl-ui/items/Toast";
+import { showSuccess, showError } from "@fl-ui/items/overlay/Toast";
 import { writeFileSmart } from "@rs-core/storage/WriteFileSmart-v2";
 import type { EntityInterface } from "@rs-com/template/EntityInterface";
 import { currentWebDav, loadSettings, saveSettings } from "@rs-com/config/Settings";

@@ -220,7 +220,7 @@
         border-radius: var(--radius-sm);
         background: var(--color-surface);
         color: var(--color-on-surface);
-        font-size: var(--text-sm);
+        font-size: max(var(--text-sm), 0.875rem);
         font-weight: var(--font-weight-medium);
         font-family: var(--font-family);
         place-content: center;
@@ -237,6 +237,8 @@
             place-content: center;
             place-items: center;
             text-align: start;
+            font-size: 0.875rem;
+            line-height: 1.2;
         }
 
         label {
@@ -273,5 +275,10 @@
         @container (max-inline-size: 640px) {
             gap: var(--space-xs);
         }
+    }
+
+    .workcenter-view :where(button, input, select, textarea) {
+        font-size: 0.875rem;
+        line-height: 1.25;
     }
 }

@@ -1,6 +1,6 @@
 // PWA clipboard and service worker communication
 import { initPWAClipboard } from "./pwa-copy";
-import { showToast } from "@fl-ui/items/Toast";
+import { showToast } from "@fl-ui/items/overlay/Toast";
 import { ensureServiceWorkerRegistered } from "./sw-url";
 import { dispatchViewTransfer, type ViewTransferHint } from "@rs-com/core/ViewTransferRouting";
 import { BROADCAST_CHANNELS } from "@rs-com/config/Names";

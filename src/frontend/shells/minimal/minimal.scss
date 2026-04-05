@@ -1,28 +1,134 @@
-.app-shell[data-shell="minimal"] {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
-    inline-size: 100%;
-    block-size: 100%;
-    min-inline-size: 0;
-    min-block-size: 0;
+@layer layer.shell.minimal, layer.shell.minimal.layout, layer.shell.minimal.components;
+
+@layer layer.shell.minimal {
+    .app-shell[data-shell="minimal"] {
+        --minimal-nav-bg: color-mix(in oklab, var(--color-surface-container, #1f2937) 82%, #111827);
+        --minimal-nav-border: color-mix(in oklab, var(--color-outline-variant, #334155) 70%, transparent);
+        --minimal-nav-btn-bg: color-mix(in oklab, var(--color-surface-container, #1f2937) 60%, transparent);
+        --minimal-nav-btn-hover: color-mix(in oklab, var(--color-surface-container-high, #334155) 68%, transparent);
+        --minimal-nav-btn-active: color-mix(in oklab, var(--color-primary, #60a5fa) 28%, var(--minimal-nav-bg));
+        --minimal-nav-fg: var(--color-on-surface, #e5e7eb);
+        --minimal-nav-fg-muted: color-mix(in oklab, var(--minimal-nav-fg) 74%, transparent);
+        --minimal-nav-h: clamp(42px, 4.2svh, 54px);
+    }
 }
 
-.app-shell[data-shell="minimal"] .app-shell__nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.5rem;
+@layer layer.shell.minimal.layout {
+    .app-shell[data-shell="minimal"] {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-rows: [toolbar-row] minmax(var(--minimal-nav-h), max-content) [content-row] minmax(0, 1fr) [status-row] minmax(0, max-content);
+        grid-template-columns: [content-column] minmax(0, 1fr);
+        inline-size: 100%;
+        block-size: 100%;
+        min-inline-size: 0;
+        min-block-size: 0;
+        overflow: hidden;
+    }
+
+    .app-shell[data-shell="minimal"] .app-shell__content {
+        grid-row: content-row;
+        grid-column: content-column;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        inline-size: 100%;
+        block-size: 100%;
+        min-inline-size: 0;
+        min-block-size: 0;
+        overflow: hidden;
+    }
+
+    .app-shell[data-shell="minimal"] .app-shell__content > [data-cw-view-host="true"] {
+        display: block;
+        flex: 1 1 auto;
+        inline-size: 100%;
+        min-inline-size: 0;
+        min-block-size: 0;
+    }
 }
 
-.app-shell[data-shell="minimal"] .app-shell__content {
-    min-inline-size: 0;
-    min-block-size: 0;
-    overflow: auto;
-}
+@layer layer.shell.minimal.components {
+    .app-shell[data-shell="minimal"] .app-shell__nav {
+        grid-row: toolbar-row;
+        grid-column: content-column;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.25rem 0.5rem;
+        background: var(--minimal-nav-bg);
+        color: var(--minimal-nav-fg);
+        border-block-end: 1px solid var(--minimal-nav-border);
+        z-index: 2;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+    }
 
-.app-shell[data-shell="minimal"] .app-shell__status {
-    padding: 0.4rem 0.6rem;
-    opacity: 0.8;
-    font-size: 0.85rem;
+    .app-shell[data-shell="minimal"] .app-shell__nav-left,
+    .app-shell[data-shell="minimal"] .app-shell__nav-right {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        min-inline-size: 0;
+    }
+
+    .app-shell[data-shell="minimal"] .app-shell__nav-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.28rem 0.44rem;
+        border: 1px solid var(--minimal-nav-border);
+        border-radius: 0.5rem;
+        background: var(--minimal-nav-btn-bg);
+        color: var(--minimal-nav-fg-muted);
+        font: inherit;
+        font-size: 0.8rem;
+        line-height: 1;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .app-shell[data-shell="minimal"] .app-shell__nav-btn:hover {
+        background: var(--minimal-nav-btn-hover);
+        color: var(--minimal-nav-fg);
+    }
+
+    .app-shell[data-shell="minimal"] .app-shell__nav-btn.active {
+        background: var(--minimal-nav-btn-active);
+        color: var(--minimal-nav-fg);
+        border-color: color-mix(in oklab, var(--minimal-nav-border) 40%, var(--color-primary, #60a5fa));
+    }
+
+    .app-shell[data-shell="minimal"] .app-shell__nav-btn ui-icon {
+        font-size: 1rem;
+        inline-size: 1rem;
+        block-size: 1rem;
+    }
+
+    .app-shell[data-shell="minimal"] .app-shell__status {
+        grid-row: status-row;
+        grid-column: content-column;
+        justify-self: center;
+        margin: 0.35rem;
+        padding: 0.28rem 0.55rem;
+        opacity: 0.92;
+        font-size: 0.8rem;
+        border-radius: 0.4rem;
+        background: color-mix(in oklab, var(--minimal-nav-bg) 92%, transparent);
+        color: var(--minimal-nav-fg);
+        border: 1px solid var(--minimal-nav-border);
+    }
+
+    .app-shell[data-shell="minimal"] .app-shell__loading {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-size: 0.95rem;
+        color: var(--minimal-nav-fg-muted);
+        background: color-mix(in oklab, var(--color-surface, #111827) 88%, transparent);
+    }
 }

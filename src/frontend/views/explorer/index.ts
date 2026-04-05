@@ -178,20 +178,37 @@ export class ExplorerView implements View {
 
         this._sheet = loadAsAdopted(style) as CSSStyleSheet;
 
-        // Create element with view-explorer web component
-        this.element = H`
-            <div class="view-explorer">
-                <div class="view-explorer__content" data-explorer-content>
-                    <ui-file-manager view-mode="list"></ui-file-manager>
+        const hasFileManager = Boolean(customElements.get("ui-file-manager"));
+        this.element = hasFileManager
+            ? H`
+                <div class="view-explorer">
+                    <div class="view-explorer__content" data-explorer-content>
+                        <ui-file-manager view-mode="list"></ui-file-manager>
+                    </div>
                 </div>
-            </div>
-        ` as HTMLElement;
+            ` as HTMLElement
+            : H`
+                <div class="view-explorer">
+                    <div class="view-explorer__content" data-explorer-content>
+                        <div class="view-explorer__fallback">
+                            <h3>Explorer fallback mode</h3>
+                            <p>File manager component is unavailable; use local files below.</p>
+                            <div class="view-explorer__fallback-actions">
+                                <button type="button" data-action="pick-files">Open files</button>
+                                <button type="button" data-action="open-workcenter">Open Work Center</button>
+                            </div>
+                            <ul class="view-explorer__fallback-files" data-fallback-files></ul>
+                        </div>
+                    </div>
+                </div>
+            ` as HTMLElement;
 
-        // Get reference to view-explorer component
         this.explorer = this.element.querySelector("ui-file-manager") as LocalFileManager | null;
-
-        // Setup event listeners
-        this.setupExplorerEvents();
+        if (this.explorer) {
+            this.setupExplorerEvents();
+        } else {
+            this.setupFallbackExplorerEvents();
+        }
 
         return this.element;
     }
@@ -425,6 +442,55 @@ export class ExplorerView implements View {
                         action: () => this.shellContext?.navigate("home")
                     }
                 ]);
+        });
+    }
+
+    private setupFallbackExplorerEvents(): void {
+        if (!this.element) return;
+        const filesList = this.element.querySelector('[data-fallback-files]') as HTMLUListElement | null;
+        const pickBtn = this.element.querySelector('[data-action="pick-files"]') as HTMLButtonElement | null;
+        const workBtn = this.element.querySelector('[data-action="open-workcenter"]') as HTMLButtonElement | null;
+        if (!pickBtn || !filesList) return;
+
+        const input = document.createElement("input");
+        input.type = "file";
+        input.multiple = true;
+        input.accept = ".md,.markdown,.txt,.json,.xml,.yaml,.yml,.csv,.log,text/*";
+        input.style.display = "none";
+        this.element.append(input);
+
+        pickBtn.addEventListener("click", () => input.click());
+        workBtn?.addEventListener("click", () => requestOpenView({ viewId: "workcenter", target: "window" }));
+
+        input.addEventListener("change", async () => {
+            const files = Array.from(input.files || []);
+            filesList.replaceChildren();
+            if (files.length === 0) return;
+
+            for (const file of files) {
+                const li = document.createElement("li");
+                li.textContent = file.name;
+                filesList.append(li);
+            }
+
+            const firstTextLike = files.find((file) => isTextLikeFile(file));
+            if (firstTextLike) {
+                requestOpenView({ viewId: "viewer", target: "window" });
+                const sent = await sendMessage({
+                    type: "content-view",
+                    source: "explorer-fallback",
+                    destination: "viewer",
+                    contentType: firstTextLike.type || "text/plain",
+                    data: {
+                        file: firstTextLike,
+                        filename: firstTextLike.name,
+                        source: "explorer-fallback"
+                    }
+                });
+                if (!sent) {
+                    this.showMessage("Viewer is not ready yet");
+                }
+            }
         });
     }
 

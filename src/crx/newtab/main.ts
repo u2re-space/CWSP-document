@@ -1,4 +1,4 @@
-import crxFrontend from "../../frontend/main/crx-entry";
+import { crxFrontend } from "@shells/boot";
 import { loadSettings } from "@rs-com/config/Settings";
 
 const mount = document.getElementById("app") as HTMLElement | null;

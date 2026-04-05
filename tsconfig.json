@@ -58,11 +58,23 @@
             "fest/dom": [
                 "./shared/fest/dom/index.ts"
             ],
+            "fest/dom/*": [
+                "./shared/fest/dom/*"
+            ],
             "fest/lure": [
                 "./shared/fest/lure/index.ts"
             ],
+            "fest/lure/core/*": [
+                "./shared/fest/lure/lure/core/*"
+            ],
+            "fest/lure/*": [
+                "./shared/fest/lure/*"
+            ],
             "fest/object": [
                 "./shared/fest/object/index.ts"
+            ],
+            "fest/object/*": [
+                "./shared/fest/object/*"
             ],
             "fest/uniform": [
                 "./shared/fest/uniform/index.ts"
@@ -72,6 +84,9 @@
             ],
             "fest/icon": [
                 "./shared/fest/icon/index.ts"
+            ],
+            "fest/icon/*": [
+                "./shared/fest/icon/*"
             ],
             "fest/polyfill/*": [
                 "./shared/fest/polyfill/*"

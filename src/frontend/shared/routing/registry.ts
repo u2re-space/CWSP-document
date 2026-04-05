@@ -46,7 +46,7 @@ import {
     VIEW_ENABLED_HOME,
     VIEW_ENABLED_PRINT
 } from "./views";
-import { ensureViewElementDefined, getViewElementTagName } from "@fl-ui/items/BaseElement";
+import { ensureViewElementDefined, getViewElementTagName } from "@fl-ui/items/BaseElement.ts";
 
 
 // ============================================================================

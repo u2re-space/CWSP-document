@@ -1,4 +1,4 @@
-import frontend from "@rs-frontend/main/frontend-entry";
+import frontend from "../../../frontend/shells/boot/ts/frontend-entry";
 
 // Import CRX runtime channel module for inline coding style
 import { createRuntimeChannelModule } from '@rs-crx/shared/runtime';

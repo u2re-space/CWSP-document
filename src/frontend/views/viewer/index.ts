@@ -26,8 +26,8 @@ import "fest/icon";
 // @ts-ignore - SCSS import
 import style from "./index.scss?inline";
 import type { MarkedExtension } from "marked";
-import { createViewerToolbar, ensureMarkdownToolbarFrame } from "./ts/toolbar";
-import { ensureMarkdownViewFrame } from "./ts/frame";
+import { createViewerToolbar, ensureMarkdownToolbarFrame } from "./ts/Toolbar";
+import { ensureMarkdownViewFrame } from "./ts/Markdown";
 
 let markedParserPromise: Promise<(markdown: string) => Promise<string>> | null = null;
 
@@ -2145,7 +2145,7 @@ export default createView;
  */
 
 // Re-export MarkdownView component (Web Component)
-export { MarkdownView as MdViewElement, MarkdownView as default } from "./ts/Markdown";
+export { MarkdownView as MdViewElement, MarkdownView } from "./ts/Markdown";
 
 // Re-export MarkdownViewer class and factory function (Class-based API)
 export { MarkdownViewer, createMarkdownViewer, type MarkdownViewerOptions } from "./ts/Markdown";

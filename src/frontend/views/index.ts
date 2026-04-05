@@ -12,7 +12,6 @@
 
 export * from "./types";
 export * from "./base/UIElement";
-export * from "@shared/policies/web-components";
 
 // ============================================================================
 // VIEW UTILITIES
@@ -35,7 +34,7 @@ export { SettingsView, createView as createSettingsView } from "./settings";
 export type { SettingsOptions } from "./settings";
 
 // Viewer - Document viewer
-export { ViewerView, createView as createViewerView } from "./viewer";
+export { ViewerView, createMarkdownView as createViewerView } from "./viewer";
 export type { ViewerOptions, ViewerDocument } from "./viewer";
 
 // Editor - Document editor

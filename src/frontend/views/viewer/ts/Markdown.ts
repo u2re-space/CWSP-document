@@ -607,8 +607,6 @@ export function createMarkdownViewer(options?: MarkdownViewerOptions): MarkdownV
     return new MarkdownViewer(options);
 }
 
-import { H } from "fest/lure";
-
 const FRAME_TAG = "cw-markdown-view-frame";
 
 export function createMarkdownViewFrame(): HTMLElement {

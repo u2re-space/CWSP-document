@@ -1,18 +1,3 @@
-export { WindowShell, createShell } from "../index";
-export { createShell as default } from "../index";
-
-
-/**
- * Shell System - Main Entry Point
- *
- * Provides shell management, view registry, and initialization utilities.
- */
-export * from "./types";
-export * from "@rs-frontend/shared/routing/registry";
-export * from "./base/shell";
-export * from "@fl-ui/items/BaseElement";
-export { ShellRegistry, ViewRegistry, getDefaultBootConfig } from "@rs-frontend/shared/routing/registry";
-
 /**
  * Window Shell
  *
@@ -22,9 +7,9 @@ export { ShellRegistry, ViewRegistry, getDefaultBootConfig } from "@rs-frontend/
 
 import { H } from "fest/lure";
 import type { ShellId, ShellLayoutConfig, ViewId } from "@shells/types";
-import { ShellBase } from "@frontend/shell";
-import { isEnabledView } from "@views/config/views";
-import type { WindowFrameElement } from "@frontend/UIElement";
+import { ShellBase } from "@shells/base/shell";
+import { isEnabledView } from "@shared/routing/views";
+import type { WindowFrameElement } from "@fl-ui/items/BaseElement.ts";
 import { subscribeViewChannel } from "@shared/routing/view-api";
 
 // @ts-ignore - SCSS import

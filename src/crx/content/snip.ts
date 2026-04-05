@@ -9,7 +9,7 @@
  *  - Keyboard shortcuts (Ctrl+Shift+X/Y forwarded by SW)
  */
 
-import { getBox, getHint, getOverlay, getSizeBadge, hideSelection, showSelection, showToast } from "@rs-frontend/main/overlay";
+import { getBox, getHint, getOverlay, getSizeBadge, hideSelection, showSelection, showToast } from "../../frontend/shells/boot/ts/overlay";
 import { createRuntimeChannelModule } from "../shared/runtime";
 import { registerCrxHandler } from "../../com/core/CrxMessaging";
 

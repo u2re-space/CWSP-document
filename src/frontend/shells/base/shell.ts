@@ -2,7 +2,7 @@ import { ref } from "fest/object";
 import type { Shell, ShellContext, ShellId, ShellLayoutConfig, ShellNavigationState, ShellTheme, View, ViewId } from "../types";
 import { loadInlineStyle, preloadStyle } from "fest/dom";
 import { ViewRegistry } from "../../shared/routing/registry";
-import { showToast } from "@fl-ui/items/Toast";
+import { showToast } from "@fl-ui/items/overlay/Toast";
 import { withViewTransition, getTransitionDirection } from "../../shared/routing/view-transitions";
 import { loadSettings, saveSettings } from "@rs-com/config/Settings";
 import { applyTheme as applyAppTheme, syncBrowserChromeTheme } from "@rs-core/utils/Theme";
@@ -11,7 +11,7 @@ import { scheduleViewModulePrefetch } from "../../shared/routing/view-prefetch";
 import { ensureStyleSheet } from "fest/icon";
 import "fest/icon";
 import { dynamicTheme } from "fest/lure";
-import { ensureShellElementDefined, type ShellElement, MinimalShellHostElement } from "@fl-ui/items/BaseElement";
+import { ensureShellElementDefined, type ShellElement, MinimalShellHostElement } from "@fl-ui/items/BaseElement.ts";
 
 //@ts-ignore
 import style from "../../views/_views.scss?inline";

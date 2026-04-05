@@ -11,8 +11,8 @@
  *  - Coordinate / element tracking for context-menu operations
  */
 
-import { showToast, initOverlay } from "@rs-frontend/main/overlay";
-import { initToastReceiver } from "@fl-ui/items/Toast";
+import { showToast, initOverlay } from "../../frontend/shells/boot/ts/overlay";
+import { initToastReceiver } from "@fl-ui/items/overlay/Toast";
 import { initClipboardReceiver } from "@rs-core/modules/Clipboard";
 import { copyAsHTML, copyAsMathML, copyAsMarkdown, copyAsTeX } from "@rs-core/document/Conversion";
 import { isUserScopePath, toUserRelativePath } from "fest/core";

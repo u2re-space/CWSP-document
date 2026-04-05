@@ -13,7 +13,7 @@ import { isEnabledView } from "@rs-frontend/shared/routing/views";
 import { SpeedDial, createCtxMenu } from "./SpeedDial";
 
 // @ts-ignore
-import style from "../scss/home.scss?inline";
+import style from "../scss/SpeedDial.scss?inline";
 
 // ============================================================================
 // HOME VIEW

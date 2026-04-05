@@ -1891,7 +1891,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
                     'workcenter',
                     () => import('../../views/workcenter/ts/WorkCenter').then(m => m.WorkCenterManager),
                     { componentName: 'WorkCenter' }
-                ).then(workCenterModule => {
+                ).then(async (workCenterModule) => {
                     // Create work center manager if not already created
                     if (!state.managers.workCenter.instance) {
                         state.managers.workCenter.instance = new workCenterModule.component({

@@ -10,7 +10,7 @@
  *   crxFrontend(document.getElementById("app")!, { initialView: "settings" });
  */
 
-import { bootLoader } from "@fl-ui/items/BootLoader";
+import { bootLoader } from "./BootLoader";
 import type { ViewId, Shell } from "../../types";
 import { ViewRegistry } from "../../../shared/routing/registry";
 import { initializeLayers } from "../../../shared/routing/layer-manager";
@@ -52,8 +52,8 @@ const resolveViewId = (input?: string): ViewId =>
 /**
  * Mount the frontend for a Chrome extension page.
  *
- * - Uses the **content** shell (chrome-less CRX wrapper).
- * - Loads "vl-basic" style system (shell + view own styles handle the rest).
+ * - Uses the **base** shell (chrome-less CRX wrapper).
+ * - Loads "vl-core" style system.
  * - No channels or preference persistence (CRX pages are single-purpose).
  *
  * @param mountElement - DOM element to mount into
@@ -69,15 +69,18 @@ export default async function crxFrontend(
 
     // Same grid shell layer as PWA (`content-row` / `content-column`); ShellBase.mount
     // positions cw-shell-* on those named lines — mounting directly on #app had no lines.
-    const layers = ensureAppLayers(mountElement, { enableOrientLayer: false });
+    const layers = ensureAppLayers(mountElement, {
+        enableOrientLayer: false,
+        enableCanvasLayer: false,
+    });
 
     const view = resolveViewId(options.initialView);
     const hasViewParams = Boolean(options.viewParams && Object.keys(options.viewParams).length > 0);
     const hasPayload = options.viewPayload !== undefined && options.viewPayload !== null;
 
     const shell = await bootLoader.boot(layers.shellLayer, {
-        styleSystem: "vl-basic",
-        shell:       "content",
+        styleSystem: "vl-core",
+        shell:       "base",
         defaultView: view,
         channels:    [],
         rememberChoice: false,

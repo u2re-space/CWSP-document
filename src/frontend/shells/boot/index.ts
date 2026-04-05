@@ -15,6 +15,12 @@
  *   import { navigate, parseCurrentRoute, onRouteChange } from "@rs-frontend/main";
  */
 
+/**
+ * Shell System - Main Entry Point
+ *
+ * Provides shell management, view registry, and initialization utilities.
+ */
+
 // ============================================================================
 // BOOT LOADER
 // ============================================================================
@@ -36,7 +42,7 @@ export {
     type BootConfig,
     type BootState,
     type BootPhaseHandler
-} from "@fl-ui/items/BootLoader";
+} from "./ts/BootLoader";
 
 // ============================================================================
 // ROUTING (Path-based)
@@ -84,7 +90,7 @@ export {
     type RouteHandler,
     type AppLoaderResult,
     type RoutingMode
-} from "./routing";
+} from "./ts/routing";
 
 // ============================================================================
 // BOOT MENU
@@ -95,7 +101,7 @@ export {
     type FrontendChoice,
     type ChoiceScreenOptions,
     type ChoiceScreenResult
-} from "./boot-menu";
+} from "./ts/boot-menu";
 
 // ============================================================================
 // TOAST SYSTEM
@@ -114,7 +120,7 @@ export {
     type ToastPosition,
     type ToastOptions,
     type ToastLayerConfig
-} from "@fl-ui/items/Toast";
+} from "@fl-ui/items/overlay/Toast";
 
 // ============================================================================
 // OVERLAY SYSTEM
@@ -138,26 +144,27 @@ export {
     sizeBadge,
     type OverlayConfig,
     type OverlayElements
-} from "./overlay";
+} from "./ts/overlay";
 
 // ============================================================================
 // FRONTEND ENTRY POINTS
 // ============================================================================
 
-export { default as frontend, frontend as mountFrontend } from "./frontend-entry";
-export type { MinimalAppOptions } from "./frontend-entry";
+export { default as frontend, frontend as mountFrontend } from "./ts/frontend-entry";
+export type { MinimalAppOptions } from "./ts/frontend-entry";
 
 // CRX-specific entry (content shell, no toolbar/tabs)
-export { default as crxFrontend, crxFrontend as mountCrxFrontend } from "./crx-entry";
-export type { CrxAppOptions } from "./crx-entry";
+export { default as crxFrontend, crxFrontend as mountCrxFrontend } from "./ts/crx-entry";
+export type { CrxAppOptions } from "./ts/crx-entry";
 
 // ============================================================================
 // APP INITIALIZATION
 // ============================================================================
 
-import { bootLoader, type BootConfig } from "@fl-ui/items/BootLoader";
-import { createBootConfigFromUrl, loadSubAppWithShell } from "./routing";
+import { bootLoader, type BootConfig } from "./ts/BootLoader";
+import { createBootConfigFromUrl, loadSubAppWithShell } from "./ts/routing";
 import type { Shell } from "@shells/types";
+import type { ServiceChannelId } from "@rs-com/core/ServiceChannels";
 import { isEnabledView, pickEnabledView } from "@shared/routing/views";
 
 /**
@@ -213,7 +220,8 @@ export async function initializeApp(
         styleSystem: config?.styleSystem ?? urlConfig.styleSystem ?? savedConfig?.styleSystem ?? "vl-basic",
         shell: config?.shell ?? urlConfig.shell ?? savedConfig?.shell ?? "minimal",
         defaultView: pickEnabledView(config?.defaultView ?? urlConfig.defaultView ?? savedConfig?.defaultView ?? "viewer"),
-        channels: config?.channels ?? ["workcenter", "settings", "viewer"].filter((channelId) => isEnabledView(channelId)),
+        channels: config?.channels ?? (["workcenter", "settings", "viewer"] as ServiceChannelId[])
+            .filter((channelId) => isEnabledView(channelId)),
         rememberChoice: config?.rememberChoice ?? true,
         theme: config?.theme
     };
@@ -246,3 +254,4 @@ export async function quickInit(
         defaultView: view as any
     });
 }
+

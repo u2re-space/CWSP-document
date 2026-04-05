@@ -69,7 +69,7 @@ export type { StorageKey } from "../core";
 // MAIN - Boot, routing, and UI utilities
 // ============================================================================
 
-export * from "./main";
+export * from "./shells/boot";
 export type {
     BootConfig,
     BootState,
@@ -79,15 +79,15 @@ export type {
     FrontendChoice,
     ExecutionContext,
     MinimalAppOptions
-} from "./main";
+} from "./shells/boot";
 
 // Default boot loader
-export { default as bootLoader } from "./main";
+export { default as bootLoader } from "./shells/boot";
 
 // Frontend entry points
-export { frontend, mountFrontend } from "./main";
+export { frontend, mountFrontend } from "./shells/boot";
 // CRX-specific entry (raw shell, no toolbar/tabs)
-export { crxFrontend, mountCrxFrontend } from "./main";
+export { crxFrontend, mountCrxFrontend } from "./shells/boot";
 
 // ============================================================================
 // PWA - Progressive Web App features

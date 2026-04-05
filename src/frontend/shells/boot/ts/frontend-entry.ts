@@ -13,6 +13,7 @@
 
 
 import { loadSettings } from "@rs-com/config/Settings";
+// @ts-ignore - legacy shell bridge is intentionally imported as compatibility layer.
 import { mountShellApp, type ShellOptions } from "../../../shared/routing/channel-unknown";
 
 /**
@@ -42,7 +43,7 @@ export default async function frontend(
     // (SW stores only counts in the metadata; files are stored as cache entries + a manifest.)
     if (sharedFlag === "1" || sharedFlag === "true") {
         try {
-            const { consumeCachedShareTargetPayload } = await import("../pwa/sw-handling");
+            const { consumeCachedShareTargetPayload } = await import("../../../pwa/sw-handling");
             const payload = await consumeCachedShareTargetPayload({ clear: true });
             const files = payload?.files ?? [];
 
@@ -93,7 +94,7 @@ export default async function frontend(
                 if (!auto || !hasKey) return;
 
                 try {
-                    const { processShareTargetData } = await import("../pwa/sw-handling");
+                    const { processShareTargetData } = await import("../../../pwa/sw-handling");
                     await processShareTargetData({
                         files: sharedFilesForAutoAI,
                         fileCount: sharedFilesForAutoAI.length,

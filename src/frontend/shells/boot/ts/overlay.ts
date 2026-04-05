@@ -5,7 +5,7 @@
  */
 
 import { initClipboardReceiver } from "@rs-core/modules/Clipboard";
-import { showToast as toastShow, initToastReceiver, type ToastOptions } from "@fl-ui/items/Toast";
+import { showToast as toastShow, initToastReceiver, type ToastOptions } from "@fl-ui/items/overlay/Toast";
 
 export interface OverlayConfig {
     prefix?: string;

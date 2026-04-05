@@ -8,7 +8,7 @@
  */
 
 import { initPWA, checkForUpdates, forceRefreshAssets } from "./frontend/pwa/pwa-handling";
-import { loadSubAppWithShell, VALID_VIEWS } from "./frontend/shells/boot/base/routing";
+import { loadSubAppWithShell, VALID_VIEWS } from "./frontend/shells/boot";
 import { initializeLayers } from "@rs-frontend/shared/routing/layer-manager";
 import type { ViewId } from "./frontend/shells/types";
 import { pickEnabledView } from "./frontend/shared/routing/views";
@@ -350,7 +350,10 @@ export default async function index(mountElement: HTMLElement) {
                 : pickEnabledView("home", "home")
         );
         const allowPathRoutedShell = preferredShell === "base" || preferredShell === "minimal";
-        const layers = ensureAppLayers(mountElement, { enableOrientLayer: preferredShell === "window" });
+        const layers = ensureAppLayers(mountElement, {
+            enableOrientLayer: preferredShell === "window",
+            enableCanvasLayer: preferredShell === "window",
+        });
         clearLoadingState(mountElement);
 
         if (!allowPathRoutedShell && (isLegacyViewRoute || pathname === "share-target" || pathname === "share_target")) {

@@ -1,5 +1,4 @@
 /* ai-refactor: optimized/refactored at 2026-02-13T00:25:20Z */
-@use "veela-lib" as *;
 @use "sass:meta";
 
 @mixin rs-panel-base() {
@@ -1348,5 +1347,27 @@
         .settings-panel {
             padding: var(--padding-lg);
         }
+    }
+
+    /* Canonical fallback: keep settings layout readable when token/mixin stacks vary. */
+    .view-settings,
+    .settings-panel,
+    .settings-form {
+        place-content: start !important;
+        place-items: stretch !important;
+        justify-content: flex-start !important;
+        align-content: flex-start !important;
+        align-items: stretch !important;
+        text-align: start !important;
+    }
+
+    .view-settings :where(input, select, textarea, button) {
+        min-block-size: 2rem;
+        font-size: 0.875rem;
+        line-height: 1.25;
+    }
+
+    .view-settings .settings-tab-actions {
+        flex-wrap: wrap;
     }
 }

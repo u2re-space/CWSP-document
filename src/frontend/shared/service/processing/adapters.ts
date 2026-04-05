@@ -9,7 +9,7 @@ const showToastNotification = (
 		console.log(message);
 		return;
 	}
-	void import("@fl-ui/items/Toast")
+	void import("@fl-ui/items/overlay/Toast")
 		.then(({ showToast }) => {
 			showToast({
 				message,

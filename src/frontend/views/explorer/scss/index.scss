@@ -117,6 +117,47 @@
             overflow: hidden;
         }
 
+        .view-explorer__fallback {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            padding: 1rem;
+            block-size: 100%;
+            overflow: auto;
+
+            h3 {
+                margin: 0;
+                font-size: 1rem;
+            }
+
+            p {
+                margin: 0;
+                color: var(--view-fg-muted);
+            }
+        }
+
+        .view-explorer__fallback-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .view-explorer__fallback-actions button {
+            padding: 0.45rem 0.7rem;
+            border: 1px solid var(--view-border, rgba(255,255,255,0.22));
+            border-radius: 0.4rem;
+            background: var(--view-bg-secondary, rgba(255,255,255,0.08));
+            color: inherit;
+            cursor: pointer;
+        }
+
+        .view-explorer__fallback-files {
+            margin: 0;
+            padding-inline-start: 1rem;
+            display: grid;
+            gap: 0.25rem;
+        }
+
         .view-explorer__toolbar,
         .view-explorer__status {
             display: flex;
