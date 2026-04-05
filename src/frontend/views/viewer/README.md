@@ -10,7 +10,7 @@ Contents may be free or framed (scrollable)
 
 |-------------|
 |  Contents   |
-|             |
+|  Markdown   |
 |-------------|
 
 ### Toolbar view

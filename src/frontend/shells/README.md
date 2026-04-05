@@ -34,10 +34,6 @@ Needs to make much better system of shells (compatibility, nesting)...
     - <modals>
     - <toasts>
 - `content`
-  - `window`
-    - `base`
-    - `minimal`
-      - `base`
   - <overlays>
     - <sniping>
     - <tools>
@@ -47,14 +43,17 @@ Needs to make much better system of shells (compatibility, nesting)...
     - <background>
     - <wallpaper>
     - <canvas>
-  - `minimal`
+  - <content>
+  - `tabbed`
+    - `base`
     - <overlays>
     - <modals>
     - <toasts>
   - `window`
     - `base`
-    - `minimal`
-      - `base`
+    - <overlays>
+    - <modals>
+    - <toasts>
   - <overlays>
     - <taskbar>
     - <statusbar>

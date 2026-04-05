@@ -1,6 +1,8 @@
+# Environment shell
+
 More complex shell than just simple window frame...
 
-Contains:
+**Contains:**
 - Wallpaper
 - Taskbar
 - SpeedDial (Home)
@@ -9,3 +11,9 @@ Contains:
 - Modals
 - ContextMenu
 - etc.
+
+**Layers:**
+- <Underlying>
+- <SpeedDial>
+- <Contents>
+- <Overlays>
