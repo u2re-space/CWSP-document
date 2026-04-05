@@ -1,20 +1,20 @@
 import { ref } from "fest/object";
 import type { Shell, ShellContext, ShellId, ShellLayoutConfig, ShellNavigationState, ShellTheme, View, ViewId } from "../types";
 import { loadInlineStyle, preloadStyle } from "fest/dom";
-import { ViewRegistry } from "../../shared/routing/registry";
+import { ViewRegistry } from "@shared/routing/registry";
 import { showToast } from "@fl-ui/items/overlay/Toast";
-import { withViewTransition, getTransitionDirection } from "../../shared/routing/view-transitions";
+import { withViewTransition, getTransitionDirection } from "@shared/routing/view-transitions";
 import { loadSettings, saveSettings } from "@rs-com/config/Settings";
 import { applyTheme as applyAppTheme, syncBrowserChromeTheme } from "@rs-core/utils/Theme";
-import { isEnabledView } from "../../shared/routing/views";
-import { scheduleViewModulePrefetch } from "../../shared/routing/view-prefetch";
+import { isEnabledView } from "@shared/routing/views";
+import { scheduleViewModulePrefetch } from "@shared/routing/view-prefetch";
 import { ensureStyleSheet } from "fest/icon";
 import "fest/icon";
 import { dynamicTheme } from "fest/lure";
-import { ensureShellElementDefined, type ShellElement, MinimalShellHostElement } from "@fl-ui/items/BaseElement.ts";
+import { ensureShellElementDefined, type ShellElement, MinimalShellHostElement } from "@fl-ui/items/BaseElement";
 
 //@ts-ignore
-import style from "../../views/_views.scss?inline";
+import style from "@shared/scss/views.scss?inline";
 
 
 /**

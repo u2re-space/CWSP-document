@@ -1,2 +1,573 @@
-@use "../../shared/scss/views";
+@use "@shared/scss/views.scss";
+@use "fest/veela/scss/runtime/basic/markdown/markdown.scss";
 
+//
+@layer viewer.tokens {
+    :root:has([data-view="viewer"]),
+    html:has([data-view="viewer"]) {
+        /* layout */
+        --view-layout: "flex";
+        --view-content-max-width: 800px;
+        --view-padding: var(--space-6);
+
+        /* typography */
+        --view-font-size-base: 1rem;
+        --view-line-height-base: 1.6;
+        --view-prose-font-size: var(--text-base);
+        --view-prose-line-height: 1.75;
+        --view-prose-heading-margin: var(--space-6);
+
+        /* colors */
+        --view-bg: var(--color-surface, #ffffff);
+        --view-fg: var(--color-on-surface, #1a1a1a);
+        --view-border: var(--color-border, rgba(0, 0, 0, 0.1));
+        --view-toolbar-bg: light-dark(rgba(0, 0, 0, 0.02), rgba(255, 255, 255, 0.04));
+        --view-btn-hover-bg: light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08));
+        --view-code-bg: light-dark(#f5f5f5, #2d2d2d);
+        --view-code-fg: light-dark(var(--color-text, #1a1a1a), #e0e0e0);
+        --view-code-border: var(--color-border);
+        --view-blockquote-border: var(--color-primary);
+        --view-blockquote-bg: light-dark(var(--color-surface-hover), #252525);
+        --view-link-color: var(--color-link, #007acc);
+        --view-link-hover: var(--color-link-hover, #005fa3);
+
+        /* units */
+        --view-code-font-size: 0.9em;
+    }
+}
+
+@layer viewer.base {
+    /*
+     * Shell = column flex. Two shapes:
+     * - Standalone preview: prose is a direct child of .cw-view-viewer-shell.
+     * - cw-view-viewer host: slots live inside .view-viewer__content; prose/pre are light-DOM (assigned to slots).
+     */
+    .cw-view-viewer-shell {
+        --viewer-shell-container-type: inline-size;
+        --viewer-shell-contain: layout style paint;
+        --viewer-shell-inline-size: 100%;
+        --viewer-shell-block-size: 100%;
+
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        inline-size: var(--viewer-shell-inline-size, 100%);
+        block-size: var(--viewer-shell-block-size, 100%);
+        max-inline-size: 100%;
+        max-block-size: 100%;
+        min-block-size: 0;
+        min-inline-size: 0;
+        container-type: var(--viewer-shell-container-type, inline-size);
+        contain: var(--viewer-shell-contain, layout style paint);
+        contain-intrinsic-size: auto 1000px;
+        isolation: isolate;
+    }
+
+    .view-viewer {
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        background-color: var(--view-bg);
+        color: var(--view-fg);
+        min-block-size: 0;
+        min-inline-size: 0;
+        block-size: 100%;
+        inline-size: 100%;
+        overflow: hidden;
+    }
+
+    .cw-view-viewer-shell:not([data-raw]) .view-viewer {
+        flex: 0 0 auto;
+    }
+
+    /* Standalone: raw lives in .view-viewer__content; grow view-viewer when showing raw */
+    .cw-view-viewer-shell[data-raw]:not(:has(.cw-view-viewer__slot-default)) .view-viewer {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+    }
+
+    /* Web component: shell’s only block child is .view-viewer; it fills height */
+    .cw-view-viewer-shell:has(.cw-view-viewer__slot-default) .view-viewer {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+    }
+
+    /* Slot wrappers stack inside __content; __content is the flex grow + clip region */
+    .cw-view-viewer-shell:has(.cw-view-viewer__slot-default) .view-viewer__content {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+        block-size: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .cw-view-viewer-shell:has(.cw-view-viewer__slot-default):not([data-raw]) .cw-view-viewer__slot-raw {
+        display: none !important;
+    }
+
+    .cw-view-viewer-shell:has(.cw-view-viewer__slot-default)[data-raw] .cw-view-viewer__slot-default {
+        display: none !important;
+    }
+
+    .cw-view-viewer-shell:has(.cw-view-viewer__slot-default):not([data-raw]) .cw-view-viewer__slot-default {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+        block-size: 100%;
+        box-sizing: border-box;
+        overflow-block: auto;
+        overflow-inline: hidden;
+        overscroll-behavior: contain;
+
+        > slot {
+            display: block;
+            block-size: 100%;
+            min-block-size: 0;
+        }
+
+        > slot::slotted([data-render-target]) {
+            display: block;
+            block-size: 100%;
+            max-block-size: 100%;
+            min-block-size: 0;
+            overflow-block: auto;
+            overflow-inline: hidden;
+            overscroll-behavior: contain;
+        }
+    }
+
+    .cw-view-viewer-shell:has(.cw-view-viewer__slot-default)[data-raw] .cw-view-viewer__slot-raw {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+        box-sizing: border-box;
+        overflow-block: auto;
+        overflow-inline: hidden;
+        overscroll-behavior: contain;
+    }
+
+    /* Standalone: hide prose in raw mode; hide __content when rendered */
+    .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default))[data-raw] .cw-view-viewer__prose {
+        display: none !important;
+    }
+
+    .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default)):not([data-raw]) .view-viewer__content {
+        display: none;
+    }
+
+    .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default)):not([data-raw]) .cw-view-viewer__prose {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+        box-sizing: border-box;
+        overflow-block: auto;
+        overflow-inline: hidden;
+        overscroll-behavior: contain;
+    }
+
+    .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default))[data-raw] .view-viewer__content {
+        flex: 1 1 auto;
+        min-block-size: 0;
+    }
+}
+
+@layer viewer.components {
+    /* Compact toolbar: tight rhythm, icon-led controls (theme tokens when present). */
+    .view-viewer__toolbar {
+        /*
+         * Toolbar icons: ui-icon (fest/icon) static duotone map and --icon-color.
+         * Override on `.view-viewer`, shell, or host:
+         *   --view-picon-fill, --view-picon-fill-hover, --view-picon-fill-active, --view-picon-fill-disabled
+         */
+        --view-toolbar-icon-size: 1.25rem;
+        --view-toolbar-ph-icon-size: var(--view-toolbar-icon-size);
+        --view-picon-fill: var(--color-on-surface, var(--view-fg));
+        --view-picon-fill-hover: var(--color-primary, var(--color-on-surface, var(--view-fg)));
+        --view-picon-fill-active: color-mix(
+            in oklab,
+            var(--color-on-surface, var(--view-fg)) 82%,
+            var(--color-primary, #007acc) 18%
+        );
+        --view-picon-fill-disabled: color-mix(in oklab, var(--color-on-surface, var(--view-fg)) 40%, transparent);
+        --view-toolbar-row-pad-block: 0.2rem;
+        --view-toolbar-row-pad-inline: 0.2rem;
+        --view-toolbar-gap: 0.125rem;
+
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0px, max-content) minmax(0px, 1fr) minmax(0px, max-content);
+        grid-template-rows: minmax(0px, 1fr);
+        grid-auto-flow: column;
+        
+        place-items: center;
+        place-content: center;
+        place-self: center;
+        gap: var(--view-toolbar-gap);
+        min-block-size: 2.25rem;
+        padding: var(--view-toolbar-row-pad-block) var(--view-toolbar-row-pad-inline);
+        background: var(--color-surface-container-high, var(--view-toolbar-bg));
+        border-block-end: 1px solid var(--view-border);
+        box-shadow: var(--elev-1, 0 1px 2px light-dark(rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.25)));
+        flex-shrink: 0;
+        overflow-inline: auto;
+        overflow-block: hidden;
+        scrollbar-width: none;
+        scrollbar-color: transparent transparent;
+        -webkit-overflow-scrolling: touch;
+        container-type: size;
+        contain: strict;
+
+        inline-size: stretch;
+        max-inline-size: stretch;
+
+        & > * {
+            grid-row: 1 / 1;
+        }
+
+        button.view-viewer__btn > ui-icon.view-viewer__toolbar-icon {
+            order: -1;
+            box-sizing: border-box;
+            vertical-align: middle;
+            --icon-size: var(--view-toolbar-ph-icon-size, 1.25rem);
+            --icon-padding: 0;
+            --icon-color: var(--view-picon-fill);
+            pointer-events: none;
+            transition: color var(--motion-fast, 0.12s ease);
+            min-inline-size: max-content;
+            min-block-size: max-content;
+            inline-size: 1rem;
+            block-size: 1rem;
+            aspect-ratio: 1 / 1;
+        }
+
+        &::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                90deg,
+                color-mix(in oklab, var(--color-primary, #007acc) 2%, transparent) 0%,
+                transparent 50%,
+                color-mix(in oklab, var(--color-primary, #007acc) 2%, transparent) 100%
+            );
+            pointer-events: none;
+        }
+
+        & > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+
+        @container (max-inline-size: 1024px) {
+            min-block-size: 2.125rem;
+            padding: 0.15rem 0.15rem;
+        }
+
+        @container (max-inline-size: 768px) {
+            min-block-size: 2.25rem;
+            padding: 0.15rem 0.15rem;
+        }
+    }
+
+    .view-viewer__toolbar-center {
+        display: flex;
+        flex-shrink: 0;
+        flex-grow: 0;
+        flex-basis: auto;
+        gap: 0.25rem;
+        padding: 0.25rem;
+        justify-content: safe center;
+        align-content: safe center;
+        justify-items: safe center;
+        align-items: safe center;
+        min-inline-size: max-content;
+        inline-size: stretch;
+        max-inline-size: stretch;
+
+        @container (max-inline-size: 480px) {
+            gap: 0.25rem;
+        }
+    }
+
+    .view-viewer__toolbar-left,
+    .view-viewer__toolbar-right {
+        display: flex;
+        flex-shrink: 0;
+        flex-grow: 1;
+        flex-basis: max-content;
+        gap: 0.25rem;
+        padding: 0.25rem;
+        justify-content: safe center;
+        align-content: safe center;
+        justify-items: safe center;
+        align-items: safe center;
+        min-inline-size: max-content;
+        inline-size: max-content;
+        max-inline-size: stretch;
+
+        @container (max-inline-size: 480px) {
+            gap: 0.5rem;
+        }
+    }
+
+    .view-viewer__btn {
+        display: inline-flex;
+        align-items: safe center;
+        justify-content: safe center;
+        align-content: safe center;
+        justify-items: safe center;
+        gap: 0.28rem;
+        min-block-size: max-content;
+        padding: 0.25rem 0.25rem;
+        border: none;
+        border-radius: var(--radius-sm, 4px);
+        background: var(--color-surface, transparent);
+        color: var(--color-on-surface, var(--view-fg));
+        font-family: inherit;
+        font-size: var(--text-xs, 0.75rem);
+        font-weight: var(--font-weight-medium, 500);
+        line-height: 1.2;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+        cursor: pointer;
+        appearance: none;
+        -webkit-tap-highlight-color: transparent;
+        box-sizing: border-box;
+        flex-shrink: 0;
+        flex-basis: max-content;
+        flex-grow: 1;
+        contain: none;
+        container-type: normal;
+        transition:
+            background-color var(--motion-fast, 0.12s ease),
+            color var(--motion-fast, 0.12s ease),
+            box-shadow var(--motion-fast, 0.12s ease);
+        overflow: visible;
+        inline-size: max-content;
+        min-inline-size: max-content;
+
+        /* Labels secondary to icons (typo fix: priority = icons > text). */
+        span {
+            max-inline-size: none;
+            flex-basis: max-content;
+            flex-grow: 1;
+            overflow: hidden;
+            inline-size: max-content;
+            min-inline-size: max-content;
+            text-overflow: ellipsis;
+            font-size: 0.625rem;
+            font-weight: 400;
+            line-height: 1.15;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            display: inline-block;
+            opacity: 0.72;
+            flex-shrink: 0;
+        }
+
+        &:hover {
+            background: var(--color-surface-container-high, var(--view-btn-hover-bg));
+
+            span {
+                opacity: 0.9;
+            }
+
+            & > ui-icon.view-viewer__toolbar-icon {
+                --icon-color: var(--view-picon-fill-hover);
+            }
+        }
+
+        &:active {
+            background: color-mix(in oklab, var(--color-surface-container-high, var(--view-btn-hover-bg)) 92%, var(--color-on-surface, currentColor) 8%);
+
+            & > ui-icon.view-viewer__toolbar-icon {
+                --icon-color: var(--view-picon-fill-active);
+            }
+        }
+
+        &:disabled > ui-icon.view-viewer__toolbar-icon {
+            --icon-color: var(--view-picon-fill-disabled);
+            opacity: 0.55;
+        }
+
+        &:focus-visible {
+            outline: none;
+            box-shadow: var(--focus-ring, 0 0 0 2px var(--color-primary, #007acc));
+        }
+
+        @container (max-inline-size: 1024px) {
+            gap: 0.15rem;
+            padding: 0.25rem 0.25rem;
+            min-block-size: 1.625rem;
+        }
+
+        @container (max-inline-size: 768px) {
+            gap: 0;
+            min-block-size: 1.75rem;
+            min-inline-size: 1.75rem;
+            padding: 0.25rem;
+
+            span {
+                display: none;
+            }
+        }
+    }
+
+    .view-viewer__md-loading {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1.25rem 1rem;
+        color: var(--view-fg);
+        opacity: 0.9;
+        font-size: 0.9rem;
+
+        &::before {
+            content: "";
+            inline-size: 1.25rem;
+            block-size: 1.25rem;
+            border: 2px solid var(--view-border);
+            border-block-start-color: var(--view-link-color);
+            border-radius: 50%;
+            animation: view-spin 0.75s linear infinite;
+            flex-shrink: 0;
+        }
+    }
+
+    .view-viewer__content {
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        padding: 0px;
+
+        &.dragover {
+            background-color: rgba(0, 122, 204, 0.05);
+            outline: 2px dashed rgba(0, 122, 204, 0.3);
+            outline-offset: -8px;
+        }
+    }
+
+    /* Standalone / non–slot-mode: __content is the scrollport */
+    .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default)) .view-viewer__content {
+        overflow-block: auto;
+        overflow-inline: hidden;
+        overscroll-behavior: contain;
+    }
+
+    .cw-view-viewer-shell.dragover {
+        background-color: rgba(0, 122, 204, 0.05);
+        outline: 2px dashed rgba(0, 122, 204, 0.3);
+        outline-offset: -8px;
+    }
+
+    /* Shell / critical CSS may set user-select:none on broad ancestors — keep prose selectable and context menus usable. */
+    .cw-view-viewer-shell [data-render-target],
+    .cw-view-viewer-shell [data-render-target] * {
+        pointer-events: auto;
+        user-select: text;
+        -webkit-user-select: text;
+        -webkit-touch-callout: default;
+    }
+
+    /* Slotted prose lives in cw-view-viewer light DOM (not under .cw-view-viewer-shell in the tree). */
+    cw-view-viewer [data-render-target],
+    cw-view-viewer [data-render-target] * {
+        pointer-events: auto;
+        user-select: text;
+        -webkit-user-select: text;
+        -webkit-touch-callout: default;
+    }
+
+    /*
+     * Ensure the light-DOM prose node itself is a scroll container in custom-element mode.
+     * This avoids relying only on ::slotted() sizing/overflow propagation.
+     */
+    cw-view-viewer [data-render-target] {
+        display: block;
+        box-sizing: border-box;
+        block-size: 100%;
+        max-block-size: 100%;
+        min-block-size: 0;
+        min-inline-size: 0;
+        overflow-block: auto;
+        overflow-inline: hidden;
+        overscroll-behavior: contain;
+    }
+
+}
+
+@layer viewer.utilities {
+    @keyframes view-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @media print {
+        .cw-view-viewer-shell {
+            display: block !important;
+            block-size: auto !important;
+            inline-size: 100% !important;
+            overflow: visible !important;
+        }
+
+        .view-viewer {
+            display: block !important;
+            block-size: auto !important;
+            inline-size: 100% !important;
+            overflow: visible !important;
+            background: transparent !important;
+            color: #000 !important;
+        }
+
+        .view-viewer__toolbar {
+            display: none !important;
+        }
+
+        .view-viewer__content {
+            display: block !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            block-size: auto !important;
+            inline-size: 100% !important;
+        }
+
+        .cw-view-viewer__prose {
+            display: block !important;
+            block-size: auto !important;
+            inline-size: 100% !important;
+            overflow: visible !important;
+            contain: none !important;
+        }
+
+        .cw-view-viewer__slot-raw,
+        .cw-view-viewer__slot-default {
+            display: block !important;
+            block-size: auto !important;
+            inline-size: 100% !important;
+            overflow: visible !important;
+        }
+
+        [data-render-target],
+        .markdown-body,
+        .markdown-viewer-content,
+        .result-content {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            overflow: visible !important;
+            block-size: auto !important;
+            inline-size: 100% !important;
+            color: #000 !important;
+            background: transparent !important;
+        }
+    }
+}

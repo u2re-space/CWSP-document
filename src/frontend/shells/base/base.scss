@@ -1,5 +1,5 @@
 /* ai-refactor: optimized/refactored at 2026-02-13T00:24:03Z */
-@use "../../views/_views.scss" as v;
+@use "../../shared/scss/views.scss" as v;
 
 @layer shell.tokens, shell.base, shell.components, shell.utilities, shell.overrides;
 
@@ -25,10 +25,6 @@
         --shell-sidebar-width: 0;
         --shell-status-height: 24px;
         --shell-padding: 0;
-        --wco-titlebar-x: env(titlebar-area-x, 0px);
-        --wco-titlebar-y: env(titlebar-area-y, 0px);
-        --wco-titlebar-width: env(titlebar-area-width, 100vi);
-        --wco-titlebar-height: env(titlebar-area-height, 0px);
     }
 
     :is(:root, html):has([data-shell="base"][data-theme="dark"]) {
@@ -43,13 +39,12 @@
 @layer shell.base {
     :where(.app-shell, .app-shell[data-style="raw"]) {
         position: absolute;
-        inset: 0;
+        inset: -1;
         display: grid;
         grid-template-rows: [toolbar-row] auto [content-row] minmax(0, 1fr);
         grid-template-columns: minmax(0, 1fr);
-        /* stretch: `center` shrink-wraps grid items (observed: viewer toolbar ~min-content width in CRX). */
-        align-items: stretch;
-        justify-items: stretch;
+        align-items: center;
+        justify-content: center;
         gap: 0;
         padding: 0;
         margin: 0;
@@ -60,7 +55,7 @@
         min-inline-size: 0;
         min-block-size: 0;
         overflow: hidden;
-        background: var(--shell-bg);
+        background: var(--color-background);
         background-color: var(--shell-bg);
         color: var(--shell-fg);
         font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -160,7 +155,7 @@
 
     .app-shell__loading {
         position: absolute;
-        inset: 0;
+        inset: -1;
         display: none;
         flex-direction: column;
         align-items: center;
@@ -312,16 +307,6 @@
         scrollbar-color: var(--shell-scrollbar, rgba(128, 128, 128, 0.3)) transparent;
         container-type: size;
 
-        /* Match minimal: viewer host fills the shell content track (avoid min-content width). */
-        & > [data-cw-view-host="true"] {
-            display: block;
-            flex: 1 1 auto;
-            align-self: stretch;
-            inline-size: 100%;
-            min-inline-size: 0;
-            min-block-size: 0;
-        }
-
         &::-webkit-scrollbar {
             inline-size: 6px;
         }
@@ -338,42 +323,6 @@
         & > * {
             flex: 1;
         }
-    }
-
-    /*
-     * Window Controls Overlay support for installed desktop PWA windows.
-     * Keep content clear of titlebar controls using both env() and runtime geometry vars.
-     */
-    :where(.app-shell, .app-shell[data-style="raw"]) .app-shell__content {
-        --wco-safe-top: max(
-            env(safe-area-inset-top, 0px),
-            calc(var(--wco-titlebar-y, env(titlebar-area-y, 0px)) + var(--wco-titlebar-height, env(titlebar-area-height, 0px)))
-        );
-        padding-block-start: max(
-            0px,
-            var(--wco-safe-top)
-        ) !important;
-        padding-inline-start: 0;
-        padding-inline-end: 0;
-        position: relative;
-        isolation: isolate;
-    }
-
-    :where(.app-shell, .app-shell[data-style="raw"]) .app-shell__content::before {
-        content: "";
-        position: absolute;
-        inset-block-start: 0;
-        inset-inline: 0;
-        block-size: var(--wco-safe-top, 0px);
-        background: var(--shell-bg);
-        border-block-end: 1px solid color-mix(in oklab, var(--shell-nav-border, var(--color-outline-variant, #334155)) 70%, transparent);
-        pointer-events: none;
-        z-index: 0;
-    }
-
-    :where(.app-shell[data-wco-visible="true"], .app-shell[data-style="raw"][data-wco-visible="true"]) .app-shell__content > * {
-        position: relative;
-        z-index: 1;
     }
 
     .app-shell__status {
