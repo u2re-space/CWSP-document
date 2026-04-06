@@ -5,6 +5,83 @@ import { loadEnv } from "vite";
 
 import { assetFileNames as distAssetFileNames, chunkFileNames as distChunkFileNames, manualChunks as distManualChunks } from "./shared/vite-chunk-placement.mjs";
 
+/**
+ * CRX MV3 only: keep service-worker-adjacent deps out of `com/app.js`.
+ * Otherwise Rolldown merges jsox / `fest/core` / config into the UI chunk and `com/service.js`
+ * gains a static `import … from "./app.js"` (customElements in the SW).
+ *
+ * Use a **non-`com-*`** chunk id so Rolldown does not fold this slice into `com-app`.
+ * Many config/service files are hardlinked under `src/frontend/shared/**`; match both trees.
+ */
+const CRX_SW_SHARED_CHUNK = "crx-sw-shared";
+const CRX_SW_LIB_MARKERS = [
+    "/src/com/config/",
+    "/src/frontend/shared/config/",
+    "/src/core/document/AIResponseParser",
+    "/src/core/utils/Runtime",
+    "/src/core/constants/data-paths",
+    "/src/core/storage/FileSystem",
+    "/src/com/template/EntityId",
+    "/src/com/template/EntityUtils",
+    "/src/frontend/shared/template/EntityId",
+    "/src/frontend/shared/template/EntityUtils",
+    "/src/com/store/IDBQueue",
+    "/src/frontend/shared/store/IDBQueue",
+    "/src/com/service/instructions/core",
+    "/src/frontend/shared/service/instructions/core",
+    "/src/com/service/instructions/templates",
+    "/src/frontend/shared/service/instructions/templates",
+    "/src/com/service/instructions/utils",
+    "/src/frontend/shared/service/instructions/utils",
+    "/src/com/service/instructions/AIInstructions",
+    "/src/frontend/shared/service/instructions/AIInstructions",
+    "/src/com/service/model/GPT-Config",
+    "/src/frontend/shared/service/model/GPT-Config",
+];
+
+function crxSwSharedManualChunks(id) {
+    const p = String(id).split("\\").join("/");
+    for (const m of CRX_SW_LIB_MARKERS) {
+        if (p.includes(m)) return CRX_SW_SHARED_CHUNK;
+    }
+    if (p.includes("node_modules")) {
+        if (p.includes("jsox") || /[/\\]jsox[/\\]/.test(p)) return CRX_SW_SHARED_CHUNK;
+        if (p.includes("@toon-format") || p.includes("/toon-format/")) return CRX_SW_SHARED_CHUNK;
+    }
+    if (p.includes("/modules/projects/core.ts/")) return CRX_SW_SHARED_CHUNK;
+    return undefined;
+}
+
+const createCrxManualChunks = (id) => crxSwSharedManualChunks(id) ?? distManualChunks(id);
+
+/** Rolldown (Vite 8) uses `output.codeSplitting.groups`; `manualChunks` alone may not isolate chunks. */
+const CRX_SW_SHARED_CHUNK_TEST =
+    /\/modules\/projects\/core\.ts\/|\/node_modules\/jsox\/|\/node_modules\/@toon-format\/|\/src\/com\/config\/|\/src\/frontend\/shared\/config\/|\/src\/core\/document\/AIResponseParser|\/src\/core\/utils\/Runtime|\/src\/core\/constants\/data-paths|\/src\/core\/storage\/FileSystem|\/src\/(?:com\/template|frontend\/shared\/template)\/Entity(?:Id|Utils)|\/src\/(?:com\/store|frontend\/shared\/store)\/IDBQueue|\/src\/(?:com\/service|frontend\/shared\/service)\/instructions\/(?:core|templates|utils|AIInstructions)|\/src\/(?:com\/service|frontend\/shared\/service)\/model\/GPT-Config/;
+
+const crxSharedOutputChunks = {
+    manualChunks: createCrxManualChunks,
+    minifyInternalExports: false,
+};
+
+/** Rolldown-only: `manualChunks` alone does not isolate these modules in Vite 8. */
+const crxRolldownCodeSplitting = {
+    codeSplitting: {
+        groups: [
+            {
+                name: CRX_SW_SHARED_CHUNK,
+                test: CRX_SW_SHARED_CHUNK_TEST,
+                priority: 100,
+            },
+        ],
+    },
+};
+
+const crxChunkFileNames = (chunkInfo) => {
+    const n = chunkInfo.name || "";
+    if (n === CRX_SW_SHARED_CHUNK || n.startsWith(`${CRX_SW_SHARED_CHUNK}-`)) return "com/sw-lib.js";
+    return distChunkFileNames(chunkInfo);
+};
+
 //
 const importConfig = (url, ...args)=>{ return import(url)?.then?.((m)=>m?.default?.(...args)); }
 const objectAssign = (target, ...sources) => {
@@ -99,7 +176,10 @@ const createViewDefine = (mode) => {
     };
 };
 
+// `background` first so Rollup prefers the service-worker graph when placing shared `src/com/*` modules
+// (otherwise `view-workcenter` can become the chunk that re-exports com APIs and the SW pulls DOM chunks).
 const crxInputs = {
+    background: resolve(crxRoot, "./sw.ts"),
     popup: resolve(crxRoot, "./popup/index.html"),
     newtab: resolve(crxRoot, "./newtab/index.html"),
     settings: resolve(crxRoot, "./settings/index.html"),
@@ -107,8 +187,46 @@ const crxInputs = {
     "offscreen-copy": resolve(crxRoot, "./offscreen/copy.html"),
     "offscreen-capture": resolve(crxRoot, "./offscreen/capture.html"),
     content: resolve(crxRoot, "./content/main.ts"),
-    background: resolve(crxRoot, "./sw.ts")
 };
+
+/**
+ * Rolldown/Vite alias `{ find: absolutePath }` does not always match `./cache-reactivity` resolutions
+ * when `root` is `src/crx`. Force the SW-safe shim so `fest/object` is not merged into `com-app`.
+ */
+const crxCacheReactivityShimPlugin = (shimPath) => ({
+    name: "crx-cache-reactivity-shim",
+    enforce: "pre",
+    resolveId(id, importer) {
+        const clean = String(id).split("?")[0].split("\\").join("/");
+        const from = String(importer || "").split("\\").join("/");
+        // Relative imports are `./cache-reactivity`, not `.../misc/cache-reactivity.ts`.
+        const isBridge =
+            clean.endsWith("/misc/cache-reactivity.ts") ||
+            clean.endsWith("/misc/cache-reactivity") ||
+            clean === "./cache-reactivity" ||
+            clean.endsWith("/cache-reactivity.ts") ||
+            (clean.includes("cache-reactivity") && from.includes("/service/misc/"));
+        if (isBridge) {
+            return shimPath;
+        }
+        return null;
+    },
+});
+
+/** Forces a single physical module graph for mirrored `src/com/service` ↔ `src/frontend/shared/service`. */
+const crxDedupeComServicePlugin = () => ({
+    name: "crx-dedupe-com-service",
+    enforce: "pre",
+    resolveId(id) {
+        const s = String(id).split("\\").join("/");
+        const needle = "/src/frontend/shared/service/";
+        const i = s.indexOf(needle);
+        if (i >= 0) {
+            return s.slice(0, i) + "/src/com/service/" + s.slice(i + needle.length);
+        }
+        return null;
+    },
+});
 
 const createCrxConfig = (mode) => {
     // Diagnostic CRX mode can be enabled explicitly.
@@ -148,10 +266,16 @@ const createCrxConfig = (mode) => {
     const crxOutput = objectAssign({}, baseOutput, {
         dir: resolve(__dirname, "./dist-crx"),
         entryFileNames: "app/[name].js",
-        chunkFileNames: distChunkFileNames,
+        chunkFileNames: crxChunkFileNames,
         assetFileNames: distAssetFileNames(NAME),
-        inlineDynamicImports: false,
     });
+
+    const comServiceRoot = resolve(__dirname, "src/com/service");
+    const cacheReactivityBridge = resolve(__dirname, "src/com/service/misc/cache-reactivity.ts");
+    const festObjectCacheShim = resolve(__dirname, "src/crx/shims/fest-object-cache.ts");
+    const baseResolve = baseConfig?.resolve ?? {};
+    const prevAlias = baseResolve.alias;
+    const prevAliasList = Array.isArray(prevAlias) ? prevAlias : prevAlias != null ? [prevAlias] : [];
 
     // CRX build configuration - avoid conflicts with base config
     return {
@@ -162,11 +286,27 @@ const createCrxConfig = (mode) => {
             ...(baseConfig?.define ?? {}),
             ...createViewDefine(mode)
         },
-        plugins: [...basePlugins, crxPlugin],
+        resolve: {
+            ...baseResolve,
+            alias: [
+                // `misc/Cache` uses `./cache-reactivity` → real `fest/object` in PWA; stub in CRX so SW
+                // does not hoist `observe`/`iterated` next to lure/DOM in `com/app.js`.
+                { find: cacheReactivityBridge, replacement: festObjectCacheShim },
+                // `src/com/service` mirrors `src/frontend/shared/service`. Treat as one module graph so the
+                // service worker does not import duplicated modules via shell/workcenter chunks (DOM in SW).
+                { find: "@rs-frontend/shared/service", replacement: comServiceRoot },
+                { find: "@shared/service", replacement: comServiceRoot },
+                // Relative imports bypass package-style aliases; pin the physical directory too.
+                { find: resolve(__dirname, "src/frontend/shared/service"), replacement: comServiceRoot },
+                ...prevAliasList,
+            ],
+        },
+        plugins: [crxCacheReactivityShimPlugin(festObjectCacheShim), crxDedupeComServicePlugin(), ...basePlugins, crxPlugin],
         build: {
             ...(baseConfig?.build ?? {}),
             // Per-entry CSS so content scripts do not share one global stylesheet with popup/viewer.
             cssCodeSplit: true,
+            cssMinify: "esbuild",
             outDir: resolve(__dirname, "./dist-crx"),
             lib: undefined,
             // Disable modulePreload for CRX - causes broken imports with __vitePreload
@@ -187,11 +327,21 @@ const createCrxConfig = (mode) => {
                 input: crxInputs,
                 output: {
                     ...crxOutput,
-                    manualChunks: distManualChunks,
-                    compact: false,
-                    minifyInternalExports: false,
+                    ...crxSharedOutputChunks,
                 }
-            }
+            },
+            // Vite 8 + Rolldown: chunk placement from `rollupOptions.output` may be ignored; mirror here so
+            // `com/service.js` is not forced to static-import `com/app.js` (MV3 SW / customElements).
+            rolldownOptions: {
+                ...(baseConfig?.build?.rolldownOptions ?? {}),
+                ...(debugCrxBundle ? { treeshake: false } : {}),
+                input: crxInputs,
+                output: {
+                    ...crxOutput,
+                    ...crxSharedOutputChunks,
+                    ...crxRolldownCodeSplitting,
+                },
+            },
         },
         esbuild: debugCrxBundle ? {
             target: 'esnext',

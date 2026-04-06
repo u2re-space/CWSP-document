@@ -12,8 +12,6 @@
  */
 
 import { showToast, initOverlay } from "../../frontend/shells/boot/ts/overlay";
-import { initToastReceiver } from "@fl-ui/items/overlay/Toast";
-import { initClipboardReceiver } from "@rs-core/modules/Clipboard";
 import { copyAsHTML, copyAsMathML, copyAsMarkdown, copyAsTeX } from "@rs-core/document/Conversion";
 import { isUserScopePath, toUserRelativePath } from "fest/core";
 
@@ -26,13 +24,8 @@ import "./snip";           // START_SNIP / SOLVE_AND_ANSWER / WRITE_CODE / EXTRA
 // Init overlay & broadcast receivers
 // ---------------------------------------------------------------------------
 
+// Overlay: injects shared styles + toast/clipboard receivers only; DOM nodes are created on demand.
 initOverlay();
-const cleanupToast = initToastReceiver();
-const cleanupClipboard = initClipboardReceiver();
-
-if (typeof window !== "undefined") {
-    globalThis?.addEventListener?.("pagehide", () => { cleanupToast?.(); cleanupClipboard?.(); }, { once: true });
-}
 
 // ---------------------------------------------------------------------------
 // Coordinate / element tracking (for context-menu hit-testing)
@@ -42,14 +35,6 @@ const coordinate: [number, number] = [0, 0];
 let lastElement: HTMLElement | null = null;
 let selectionNotifyTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSelectionKey = "0";
-const runOnNextFrame = (callback: () => void) => {
-    if (typeof globalThis.requestAnimationFrame === "function") {
-        globalThis.requestAnimationFrame(callback);
-        return;
-    }
-    globalThis.setTimeout(callback, 0);
-};
-
 const notifySelectionState = () => {
     const selectedText = (typeof window != "undefined" ? window : globalThis)?.getSelection?.()?.toString?.() || "";
     const trimmed = selectedText.trim();
@@ -286,31 +271,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
 const showPageNotification = (message: string, type: "success" | "error" | "info" = "info") => {
     try {
-        document.querySelectorAll(".crossword-crx-notification").forEach((el) => el.remove());
-
-        const colors = { success: "#10b981", error: "#ef4444", info: "#3b82f6" };
-        const icons = { success: "✅", error: "❌", info: "ℹ️" };
-
-        const el = document.createElement("div");
-        el.className = "crossword-crx-notification";
-        Object.assign(el.style, {
-            position: "fixed", top: "20px", right: "20px",
-            backgroundColor: colors[type], color: "white",
-            padding: "16px 20px", borderRadius: "8px",
-            fontSize: "14px", fontFamily: "system-ui, sans-serif", fontWeight: "500",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.2)", zIndex: "2147483647",
-            maxWidth: "450px", wordWrap: "break-word",
-            opacity: "0", transform: "translateY(-20px) scale(0.95)",
-            transition: "all 0.4s cubic-bezier(0.34,1.56,0.64,1)",
-            border: "1px solid rgba(255,255,255,0.2)", backdropFilter: "blur(10px)",
-            cursor: "pointer",
-        });
-        el.innerHTML = `<div style="display:flex;align-items:center;gap:12px"><span style="font-size:18px">${icons[type]}</span><div style="flex:1;line-height:1.4">${message}</div></div>`;
-        el.addEventListener("click", () => { el.style.opacity = "0"; el.style.transform = "translateY(-20px) scale(0.95)"; setTimeout(() => el.remove(), 400); });
-
-        (document.body || document.documentElement).appendChild(el);
-        runOnNextFrame(() => { el.style.opacity = "1"; el.style.transform = "translateY(0) scale(1)"; });
-        setTimeout(() => { el.style.opacity = "0"; el.style.transform = "translateY(-20px) scale(0.95)"; setTimeout(() => el.remove(), 400); }, 5000);
+        const prefix = type === "error" ? "❌ " : type === "success" ? "✅ " : "";
+        showToast({ message: `${prefix}${message}`, kind: type === "error" ? "error" : type === "success" ? "success" : "info", duration: 4200 });
     } catch {
         if ("Notification" in (typeof window != "undefined" ? window : globalThis) && Notification.permission === "granted") {
             new Notification("CrossWord", { body: message, icon: chrome.runtime.getURL("icons/icon.png") });

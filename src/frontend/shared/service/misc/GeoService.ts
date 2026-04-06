@@ -1,4 +1,4 @@
-import { observe } from "fest/object";
+import { observe } from "./cache-reactivity";
 
 //
 export const GeoState: any = observe<{ latitude: number | null, longitude: number | null, accuracy: number | null, error: string | null, isAvailable: boolean }>({

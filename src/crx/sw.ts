@@ -12,17 +12,21 @@
  * Heavy capture/AI/clipboard logic is in `./service/api.ts`.
  */
 
-import { createTimelineGenerator, requestNewTimeline } from "@rs-com/service/service/MakeTimeline";
+import { createTimelineGenerator, requestNewTimeline } from "../com/service/service/MakeTimeline";
 import { COPY_HACK, enableCapture } from "./service/api";
-import type { GPTResponses } from "@rs-com/service/model/GPT-Responses";
-import { recognizeImageData } from "../com/service/service/RecognizeData";
-import { getGPTInstance, processDataWithInstruction } from "@rs-com/service/service/RecognizeData";
-import { getCustomInstructions, type CustomInstruction } from "@rs-com/service/instructions/CustomInstructions";
-import { loadSettings } from "@rs-com/config/Settings";
-import { executionCore } from "@rs-com/service/misc/ExecutionCore";
-import type { ActionContext, ActionInput } from "@rs-com/service/misc/ActionHistory";
+import type { GPTResponses } from "../com/service/model/GPT-Responses";
+import type { CustomInstruction } from "../com/service/instructions/CustomInstructions";
+import { loadSettings } from "../com/config/Settings";
+
+import * as swAi from "./sw-ai-modules";
+import type { ActionContext, ActionInput } from "../com/service/misc/ActionHistory";
 import { crxMessaging, registerCrxHandler, broadcastToCrxTabs } from "../com/core/CrxMessaging";
-import { CRX_SOLVE_AND_ANSWER_INSTRUCTION, CRX_WRITE_CODE_INSTRUCTION, CRX_EXTRACT_CSS_INSTRUCTION } from "@rs-com/core/BuiltInAI";
+import {
+    CRX_SOLVE_AND_ANSWER_INSTRUCTION,
+    CRX_WRITE_CODE_INSTRUCTION,
+    CRX_EXTRACT_CSS_INSTRUCTION,
+} from "../com/core/BuiltInAI";
+import { unifiedMessaging } from "../com/core/UnifiedMessagingSw";
 import { isUserScopePath } from "fest/core";
 
 // ---------------------------------------------------------------------------
@@ -165,7 +169,7 @@ const requestClipboardCopy = async (data: unknown, showFeedback = true, tabId?: 
 // ---------------------------------------------------------------------------
 
 const loadCustomInstructions = async (): Promise<CustomInstruction[]> => {
-    try { return await getCustomInstructions(); }
+    try { return await swAi.getCustomInstructions(); }
     catch { return []; }
 };
 
@@ -182,9 +186,9 @@ const processChromeExtensionAction = async (
             source: "chrome-extension",
             sessionId: sessionId || `crx_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
         };
-        const result = await executionCore.execute(input, context);
+        const result = await swAi.executionCore.execute(input, context);
         if (result.type === "error") {
-            return { success: false, error: result.content || result.error || "Processing failed", result };
+            return { success: false, error: result?.content || result?.error || "Processing failed", result };
         }
         return { success: true, result };
     } catch (error) {
@@ -214,7 +218,7 @@ if (isInCrxEnvironment && chrome.runtime?.onMessage) {
                         });
                     });
                     const blob = await (await fetch(dataUrl)).blob();
-                    const result = await recognizeImageData(blob);
+                    const result = await swAi.recognizeImageData(blob);
                     sendResponse({ success: true, result });
                 } catch (error) {
                     sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) });
@@ -239,7 +243,7 @@ if (isInCrxEnvironment && chrome.runtime?.onMessage) {
 
 if (isInCrxEnvironment) {
     registerCrxHandler("processImage", async (data: { imageData: string; mode: string; customInstructionId?: string }) => {
-        const result = await processChromeExtensionAction({ type: "recognize", data: data.imageData, mode: data.mode, customInstructionId: data.customInstructionId });
+        const result = await processChromeExtensionAction({ type: "recognize", data: data.imageData, mode: data.mode as any, customInstructionId: data.customInstructionId });
         crxMessaging.sendRuntimeMessage({ type: "processingComplete", data: { result }, metadata: { progress: 100 } }).catch(() => {});
         return result;
     });
@@ -371,7 +375,6 @@ class CrxResultPipeline {
 
             case "workcenter":
                 try {
-                    const { unifiedMessaging } = await import("@rs-com/core/UnifiedMessaging");
                     await unifiedMessaging.sendMessage({
                         id: result.id, type: "content-share", source: "crx-snip", destination: "workcenter",
                         contentType: result.type, data: { text: textContent, processed: true, source: result.source, metadata: result.metadata },
@@ -407,8 +410,8 @@ const processCrxSnipWithPipeline = async (
 
         if ((contentType === "image" || content instanceof ArrayBuffer) && content instanceof ArrayBuffer) {
             const blob = new Blob([content], { type: "image/png" });
-            const rec = await recognizeImageData(blob);
-            processedContent = rec.text || "";
+            const rec = await swAi.recognizeImageData(blob);
+            processedContent = rec?.text || rec?.data || "";
             finalType = "text";
         }
 
@@ -836,7 +839,7 @@ const captureScreenArea = async (options?: { rect?: { x: number; y: number; widt
         // Fallback: desktop capture via offscreen document
         try {
             const streamId = await new Promise<string>((resolve: (id: string) => void, reject: (error: Error) => void) => {
-                chrome.desktopCapture.chooseDesktopMedia(["screen", "window"], { frameRate: 1 }, (id) => id ? resolve(id) : reject(new Error("Cancelled")));
+                chrome.desktopCapture.chooseDesktopMedia(["screen", "window"], (id) => id ? resolve(id) : reject(new Error("Cancelled")));
             });
 
             const offscreenUrl = chrome.runtime.getURL("offscreen/capture.html");
@@ -866,7 +869,7 @@ const processWithBuiltInInstruction = async (
     broadcast(AI_RECOGNITION_CHANNEL, { type: mode, requestId, status: "processing" });
 
     try {
-        const gpt = await getGPTInstance();
+        const gpt = await swAi.getGPTInstance();
         if (!gpt) { const err = { ok: false, error: "AI service not available" }; broadcast(AI_RECOGNITION_CHANNEL, { type: "result", requestId, mode, ...err }); sendResponse(err); return; }
 
         gpt.getPending?.()?.push?.({ type: "message", role: "user", content: [{ type: "input_text", text: instruction }, { type: "input_text", text: input || "" }] });
@@ -903,9 +906,69 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (!text.trim() && tabId > 0) {
                 text = await tryReadMarkdownFromTab(tabId, source);
             }
+            if (!text.trim()) {
+                const fetched = await fetchMarkdownText(source).catch(() => null);
+                if (fetched?.ok && fetched.text?.trim()) {
+                    text = fetched.text;
+                }
+            }
             const key = text.trim() ? await putMarkdownToSession(text) : null;
             openViewer(source, tabId > 0 ? tabId : undefined, key);
             sendResponse({ ok: true, redirected: true, key: key || null });
+        })().catch((error) => {
+            sendResponse({ ok: false, error: String(error) });
+        });
+        return true;
+    }
+
+    /** Open local markdown in the extension viewer without relying on a loaded file:// tab (e.g. popup paste). */
+    if (message.type === "crx:open-markdown-file") {
+        (async () => {
+            const raw = String(message?.url || "").trim();
+            if (!raw) {
+                sendResponse({ ok: false, error: "missing-url" });
+                return;
+            }
+            let fileUrl = raw;
+            try {
+                if (!/^file:/i.test(fileUrl)) {
+                    sendResponse({ ok: false, error: "not-file-url" });
+                    return;
+                }
+                fileUrl = new URL(fileUrl).href;
+            } catch {
+                sendResponse({ ok: false, error: "bad-url" });
+                return;
+            }
+            if (!isMarkdownUrl(fileUrl)) {
+                sendResponse({ ok: false, error: "not-markdown-path" });
+                return;
+            }
+            const fetched = await fetchMarkdownText(fileUrl).catch(() => null);
+            if (!fetched?.ok || !fetched.text?.trim()) {
+                sendResponse({ ok: false, error: "fetch-failed", status: fetched?.status });
+                return;
+            }
+            if (!isDefinitelyMarkdownResponse(fetched.src, fetched.text, fetched.contentType) && !MARKDOWN_EXT_RE.test(new URL(fileUrl).pathname)) {
+                sendResponse({ ok: false, error: "not-markdown" });
+                return;
+            }
+            const key = await putMarkdownToSession(fetched.text);
+            if (!key) {
+                sendResponse({ ok: false, error: "session-store-failed" });
+                return;
+            }
+            let filename = "";
+            try {
+                filename = decodeURIComponent(new URL(fileUrl).pathname.split("/").pop() || "");
+            } catch { /* ignore */ }
+            const viewer = `${VIEWER_URL}?${new URLSearchParams({
+                mdk: key,
+                origin: "file",
+                ...(filename ? { filename } : {}),
+            }).toString()}`;
+            chrome.tabs.create({ url: viewer })?.catch?.(console.warn);
+            sendResponse({ ok: true, key });
         })().catch((error) => {
             sendResponse({ ok: false, error: String(error) });
         });
@@ -940,20 +1003,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "gpt:recognize") {
         const requestId = message.requestId || `rec_${Date.now()}`;
         broadcast(AI_RECOGNITION_CHANNEL, { type: "recognize", requestId, status: "processing" });
-        recognizeImageData(message.input, async (result) => {
-            const response = { ok: result?.ok, data: result?.raw, error: result?.error };
-            broadcast(AI_RECOGNITION_CHANNEL, { type: "result", requestId, ...response });
-            if (result?.ok && result?.raw && message.autoCopy !== false) {
-                const text = typeof result.raw === "string" ? result.raw : result.raw?.latex || result.raw?.text || JSON.stringify(result.raw);
-                await requestClipboardCopy(text, true);
+        void (async () => {
+            try {
+                const { recognizeImageData } = swAi;
+                await recognizeImageData(message.input, async (result: any) => {
+                    const response = { ok: result?.ok, data: result?.raw, error: result?.error };
+                    broadcast(AI_RECOGNITION_CHANNEL, { type: "result", requestId, ...response });
+                    if (result?.ok && result?.raw && message.autoCopy !== false) {
+                        const text = typeof result.raw === "string" ? result.raw : result.raw?.latex || result.raw?.text || JSON.stringify(result.raw);
+                        await requestClipboardCopy(text, true);
+                    }
+                    sendResponse(response);
+                });
+            } catch (e) {
+                const err = { ok: false, error: String(e) };
+                broadcast(AI_RECOGNITION_CHANNEL, { type: "result", requestId, ...err });
+                showExtensionToast(`Recognition failed: ${e}`, "error");
+                sendResponse(err);
             }
-            sendResponse(response);
-        })?.catch?.((e) => {
-            const err = { ok: false, error: String(e) };
-            broadcast(AI_RECOGNITION_CHANNEL, { type: "result", requestId, ...err });
-            showExtensionToast(`Recognition failed: ${e}`, "error");
-            sendResponse(err);
-        });
+        })();
         return true;
     }
 
@@ -989,7 +1057,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             const requestId = message.requestId || `custom_${Date.now()}`;
             broadcast(AI_RECOGNITION_CHANNEL, { type: "custom", requestId, label: instructionLabel, status: "processing" });
 
-            processDataWithInstruction(message.input, { instruction: instructionText, outputFormat: "auto", intermediateRecognition: { enabled: false } })
+            swAi.processDataWithInstruction(message.input, { instruction: instructionText, outputFormat: "auto", intermediateRecognition: { enabled: false } })
                 .then(async (result) => {
                     const response = { ok: result?.ok, data: result?.data, error: result?.error };
                     broadcast(AI_RECOGNITION_CHANNEL, { type: "result", requestId, mode: "custom", label: instructionLabel, ...response });
@@ -1074,18 +1142,18 @@ chrome.webNavigation?.onCompleted?.addListener?.((details) => {
     })().catch(console.warn);
 });
 
-chrome.webRequest?.onHeadersReceived?.addListener?.((details) => {
-    if (details.tabId < 0) return;
-    if (!details.url || details.url.startsWith(VIEWER_ORIGIN)) return;
+chrome.webRequest?.onHeadersReceived?.addListener?.((details: chrome.webRequest.WebResponseHeadersDetails) => {
+    if (details?.tabId < 0) return;
+    if (!details?.url || details?.url?.startsWith(VIEWER_ORIGIN)) return;
     // file:// is handled by onCompleted + session preload; headers here can race and
     // duplicate redirects with empty body reads.
-    if (details.url.startsWith("file:")) return;
-    if (details.type !== "main_frame") return;
+    if (details?.url?.startsWith("file:")) return;
+    if (details?.type !== "main_frame") return;
 
     const markdownHint = parseMarkdownHeaders(details);
     if (!markdownHint.typeLooksMarkdown && !markdownHint.plainTextWithMarkdownHint) return;
 
-    void openMarkdownInViewer(details.url, details.tabId);
+    void openMarkdownInViewer(details?.url, details?.tabId);
 }, {
     urls: ["<all_urls>"],
     types: ["main_frame"]

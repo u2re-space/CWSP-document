@@ -1,5 +1,5 @@
-import { observe } from "fest/object";
 import type { EntityInterface } from "@rs-com/template/EntityInterface";
+import { observe } from "./cache-reactivity";
 
 //
 export const EntityRegistry = observe(new Map<string, EntityInterface<any, any>>());

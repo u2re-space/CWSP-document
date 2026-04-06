@@ -331,13 +331,11 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
         treeshake: {
             annotations: false,
             moduleSideEffects: true,
-            unknownGlobalSideEffects: true,
-            correctVarValueBeforeDeclaration: true,
-            propertyReadSideEffects: true
+            // Rolldown accepts false | "always" (Rollup also allowed true).
+            propertyReadSideEffects: "always",
         },
         input: resolve(__dirname, './src/index.ts'),
         output: {
-            compact: true,
             globals: {},
             format: 'es',
             name: NAME,
@@ -372,10 +370,9 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
 
     //
     const optimizeDeps = {
-        // List CJS packages by their npm name so Vite pre-bundles them with
-        // esbuild during startup — before rollup's WASM parser is involved.
-        // This avoids the "parse is not a function" race in vite:import-analysis
-        // when @rollup/wasm-node is used as the rollup implementation.
+        // List CJS packages by their npm name so Vite pre-bundles them during startup
+        // (Vite 8: Rolldown-based dep optimizer; options still live under optimizeDeps).
+        // Kept for packages that used to need explicit pre-bundle before Rollup WASM.
         include: [
             // CJS libraries imported in Conversion.ts
             'turndown',
@@ -490,6 +487,8 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
         emptyOutDir: true,
         target: 'esnext',
         outDir: resolve(__dirname, './dist'),
+        // Vite 8 defaults to Lightning CSS; Veela / fl-ui use syntax Lightning cannot minify yet.
+        cssMinify: "esbuild",
         cssCodeSplit: false,
         // Ensure CSS file is named after the library
         cssFileName: `assets/${NAME}`,

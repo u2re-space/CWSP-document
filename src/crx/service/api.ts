@@ -10,16 +10,9 @@
  */
 
 import { ableToShowImage, encodeWithJSquash, removeAnyPrefix } from "@rs-core/workers/ImageProcess";
-import {
-    recognizeImageData,
-    solveAndAnswer,
-    writeCode,
-    extractCSS,
-    recognizeByInstructions,
-} from "../../com/service/service/RecognizeData";
 import type { RecognizeResult } from "../../com/service/service/RecognizeData";
-import { toText } from "@rs-core/modules/Clipboard";
-import { getCustomInstructions } from "@rs-com/service/instructions/CustomInstructions";
+import { toText } from "./sw-text";
+import * as swAiMod from "../sw-ai-modules";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -155,12 +148,11 @@ const captureVisibleTab = async (options?: CaptureOptions): Promise<string> => {
 // Unified AI processing
 // ---------------------------------------------------------------------------
 
-/** Map mode → AI function */
-const AI_DISPATCH: Record<string, (input: File | Blob) => Promise<CaptureResult>> = {
-    recognize: recognizeImageData,
-    solve: solveAndAnswer,
-    code: writeCode,
-    css: extractCSS,
+const dispatchAi = async (mode: SnipMode, file: File | Blob): Promise<CaptureResult> => {
+    if (mode === "solve") return swAiMod.solveAndAnswer(file) as Promise<CaptureResult>;
+    if (mode === "code") return swAiMod.writeCode(file) as Promise<CaptureResult>;
+    if (mode === "css") return swAiMod.extractCSS(file) as Promise<CaptureResult>;
+    return swAiMod.recognizeImageData(file) as Promise<CaptureResult>;
 };
 
 /**
@@ -183,7 +175,7 @@ const captureAndProcess = async (
     let result: CaptureResult;
 
     if (mode === "custom" && extra?.instructionId) {
-        const instructions = await getCustomInstructions().catch(() => []);
+        const instructions = await swAiMod.getCustomInstructions().catch(() => []);
         const instruction = instructions.find((i) => i.id === extra.instructionId);
         if (!instruction) return { ok: false, error: "Custom instruction not found" };
 
@@ -192,7 +184,7 @@ const captureAndProcess = async (
             role: "user",
             content: [{ type: "input_image", image_url: imageUrl }],
         }];
-        const raw = await recognizeByInstructions(input, instruction.instruction);
+        const raw = await swAiMod.recognizeByInstructions(input, instruction.instruction);
         const text = extractRecognizedText(raw);
         result = {
             ok: raw?.ok ?? !!text,
@@ -200,8 +192,7 @@ const captureAndProcess = async (
             error: raw?.error || (!text ? `${instruction.label} failed` : undefined),
         };
     } else {
-        const fn = AI_DISPATCH[mode] ?? AI_DISPATCH.recognize;
-        result = await fn(file);
+        result = await dispatchAi(mode, file);
     }
 
     // 4. Copy to clipboard
@@ -229,8 +220,7 @@ const handleProcessImage = async (ext: typeof chrome, data: any, sender: any) =>
     const mode: SnipMode = data.mode || "recognize";
     const file = typeof imageData === "string" ? await dataUrlToFile(imageData) : imageData;
 
-    const fn = AI_DISPATCH[mode] ?? AI_DISPATCH.recognize;
-    const result = await fn(file);
+    const result = await dispatchAi(mode, file);
 
     if (result.ok && result.data) {
         await COPY_HACK(ext, result, sender?.tab?.id).catch(console.warn);
@@ -239,7 +229,7 @@ const handleProcessImage = async (ext: typeof chrome, data: any, sender: any) =>
 };
 
 const handleProcessText = async (_ext: typeof chrome, data: any) =>
-    recognizeImageData(new Blob([data.content], { type: "text/plain" }));
+    swAiMod.recognizeImageData(new Blob([data.content], { type: "text/plain" }));
 
 const handleDoCopy = async (ext: typeof chrome, data: any) => {
     const result = await COPY_HACK(ext, data.data, data.tabId);

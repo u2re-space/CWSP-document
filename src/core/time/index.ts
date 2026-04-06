@@ -4,7 +4,6 @@
  * Consolidated time/date handling utilities.
  */
 
-import { observe } from "fest/object";
 import type { ChapterDescriptor, DayDescriptor } from "@rs-core/utils/Types";
 import type { EntityInterface, TimeType } from "@rs-com/template/EntityInterface";
 
@@ -253,6 +252,7 @@ export const notInPast = <
  * Split timelines by days
  */
 export const SplitTimelinesByDays = async (timelineMap: any, daysDesc: any[] | null = null) => {
+    const { observe } = await import("fest/object");
     daysDesc ??= observe([] as any[]) as any[];
     if (!timelineMap) return daysDesc;
 

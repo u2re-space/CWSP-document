@@ -1,6 +1,15 @@
 import type { ClipboardResult, ImageProcessingOptions, PlatformAdapter } from "../shared/types";
-import { readText, requestCopyViaCRX, writeText } from "@rs-core/modules/Clipboard";
 
+/** Dynamic-only: static `@rs-core/modules/Clipboard` is merged into `com-app` and ties the MV3 SW graph to DOM chunks. */
+let clipboardMod: typeof import("@rs-core/modules/Clipboard") | null = null;
+const getClipboard = async () => {
+	if (!clipboardMod) {
+		clipboardMod = await import("@rs-core/modules/Clipboard");
+	}
+	return clipboardMod;
+};
+
+/** SW-safe: do not import `@fl-ui` here — it merges into `com-app` with DOM/customElements and breaks CRX MV3 service workers. */
 const showToastNotification = (
 	message: string,
 	options?: { type?: "info" | "success" | "warning" | "error"; duration?: number },
@@ -9,22 +18,22 @@ const showToastNotification = (
 		console.log(message);
 		return;
 	}
-	void import("@fl-ui/items/overlay/Toast")
-		.then(({ showToast }) => {
-			showToast({
-				message,
-				kind: options?.type || "info",
-				duration: options?.duration || 3000,
-			});
-		})
-		.catch(() => {
-			console.log(message);
-		});
+	try {
+		const NT = globalThis.Notification;
+		if (typeof NT === "function" && NT.permission === "granted") {
+			new NT(message);
+			return;
+		}
+	} catch {
+		/* ignore */
+	}
+	console.log(`[${options?.type || "info"}] ${message}`);
 };
 
 const createPwaAdapter = (): PlatformAdapter => ({
 	async copyToClipboard(data: string): Promise<ClipboardResult> {
 		try {
+			const { writeText } = await getClipboard();
 			return (await writeText(data)) as ClipboardResult;
 		} catch (e) {
 			return { ok: false, error: String(e) };
@@ -33,6 +42,7 @@ const createPwaAdapter = (): PlatformAdapter => ({
 
 	async readFromClipboard(): Promise<ClipboardResult> {
 		try {
+			const { readText } = await getClipboard();
 			return (await readText()) as ClipboardResult;
 		} catch (e) {
 			return { ok: false, error: String(e) };
@@ -54,6 +64,7 @@ const createPwaAdapter = (): PlatformAdapter => ({
 const createCrxAdapter = (): PlatformAdapter => ({
 	async copyToClipboard(data: string): Promise<ClipboardResult> {
 		try {
+			const { requestCopyViaCRX } = await getClipboard();
 			const result = await requestCopyViaCRX(data);
 			return { ok: result.ok, data: result.data as string | undefined };
 		} catch (e) {
@@ -63,6 +74,7 @@ const createCrxAdapter = (): PlatformAdapter => ({
 
 	async readFromClipboard(): Promise<ClipboardResult> {
 		try {
+			const { readText } = await getClipboard();
 			return (await readText()) as ClipboardResult;
 		} catch (e) {
 			return { ok: false, error: String(e) };
@@ -146,6 +158,7 @@ const createCrxAdapter = (): PlatformAdapter => ({
 const createCoreAdapter = (): PlatformAdapter => ({
 	async copyToClipboard(data: string): Promise<ClipboardResult> {
 		try {
+			const { writeText } = await getClipboard();
 			return (await writeText(data)) as ClipboardResult;
 		} catch (e) {
 			return { ok: false, error: String(e) };
@@ -154,6 +167,7 @@ const createCoreAdapter = (): PlatformAdapter => ({
 
 	async readFromClipboard(): Promise<ClipboardResult> {
 		try {
+			const { readText } = await getClipboard();
 			return (await readText()) as ClipboardResult;
 		} catch (e) {
 			return { ok: false, error: String(e) };

@@ -1,21 +1,19 @@
 /**
  * Chrome Extension Messaging Adapter
- * Integrates fest/uniform with Chrome extension messaging APIs
- * Provides unified messaging across content scripts, popup, background, and service worker
+ * Chrome extension messaging without pulling the full `fest/uniform` bundle (MV3 SW–safe).
  */
 
 import {
-    createWorkerChannel,
-    createQueuedOptimizedWorkerChannel,
-    OptimizedWorkerChannel,
-    detectExecutionContext,
-    supportsDedicatedWorkers,
-    QueuedWorkerChannel,
+    createChromeExtensionBroadcast,
     createChromeExtensionRuntimeChannel,
-    createChromeExtensionBroadcast
-} from 'fest/uniform';
+    type ChromeExtensionRuntimeChannel,
+} from "./crx-extension-channels";
 
-import { createDeferred } from 'fest/core';
+/** Subset of fest/uniform OptimizedWorkerChannel used by CrxRuntimeChannel */
+interface CrxOptimizedWorkerChannelLike {
+    request(method: string, args?: any[], options?: { timeout?: number }): Promise<any>;
+    close(): void;
+}
 
 // ============================================================================
 // CHROME EXTENSION MESSAGING INTERFACES
@@ -65,15 +63,15 @@ export const getCrxContext = (): CrxMessage['source'] => {
 };
 
 export const isCrxEnvironment = (): boolean => {
-    return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
+    return Boolean(typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id);
 };
 
 // ============================================================================
 // CHROME RUNTIME MESSAGING ADAPTER
 // ============================================================================
 
-export class CrxRuntimeChannel implements OptimizedWorkerChannel {
-    public festUniformChannel?: ReturnType<typeof createChromeExtensionRuntimeChannel>;
+export class CrxRuntimeChannel implements CrxOptimizedWorkerChannelLike {
+    public festUniformChannel?: ChromeExtensionRuntimeChannel;
     public broadcastChannel?: BroadcastChannel;
     public listeners = new Map<string, (message: any) => void>();
     public pendingRequests = new Map<string, { resolve: (value: any) => void; reject: (error: any) => void; timeout: NodeJS.Timeout }>();
@@ -92,7 +90,7 @@ export class CrxRuntimeChannel implements OptimizedWorkerChannel {
         // Always try to create the channel - it will return a no-op channel if not in CRX
         this.festUniformChannel = createChromeExtensionRuntimeChannel(target || 'background');
 
-        // Set up message forwarding from fest/uniform to our listeners
+        // Set up message forwarding for chrome.runtime messaging
         this.setupMessageForwarding();
     }
 
@@ -150,12 +148,11 @@ export class CrxRuntimeChannel implements OptimizedWorkerChannel {
                     // Handle request-response pattern
                     if (unifiedMessage.type.startsWith('request:')) {
                         const actualType = unifiedMessage.type.replace('request:', '');
-                        const listener = this.listeners.get(actualType);
+                        const listener = this.listeners.get(actualType) as (data: any) => Promise<any> | void;
 
                         if (listener) {
                             // Handle async listener with guaranteed sendResponse
-                            listener(unifiedMessage.data)
-                                ?.then(result => {
+                            (listener(unifiedMessage.data) as Promise<any>)?.then?.((result: any) => {
                                     sendResponse({
                                         id: unifiedMessage.id,
                                         type: `response:${actualType}`,
@@ -164,7 +161,7 @@ export class CrxRuntimeChannel implements OptimizedWorkerChannel {
                                         source: this.context
                                     });
                                 })
-                                ?.catch(error => {
+                                ?.catch?.(error => {
                                     sendResponse({
                                         id: unifiedMessage.id,
                                         type: `response:${actualType}`,
@@ -299,7 +296,6 @@ export class CrxRuntimeChannel implements OptimizedWorkerChannel {
 export class CrxUnifiedMessaging {
     private static instance: CrxUnifiedMessaging;
     private runtimeChannel?: CrxRuntimeChannel;
-    private workerChannels = new Map<string, QueuedWorkerChannel>();
     private context: CrxMessage['source'];
     private isCrxEnv: boolean;
 
@@ -336,36 +332,6 @@ export class CrxUnifiedMessaging {
      */
     registerRuntimeHandler(type: string, handler: (data: any) => Promise<any> | any): void {
         this.runtimeChannel?.registerHandler(type, handler);
-    }
-
-    /**
-     * Create worker channel for background processing
-     */
-    createWorkerChannel(name: string, workerScript: string): QueuedWorkerChannel {
-        if (this.workerChannels.has(name)) {
-            return this.workerChannels.get(name)! as QueuedWorkerChannel;
-        }
-
-        const channel: QueuedWorkerChannel = createQueuedOptimizedWorkerChannel({
-            name,
-            script: workerScript,
-            context: 'chrome-extension'
-        }, {
-            timeout: 30000,
-            retries: 2,
-            batching: true,
-            compression: false
-        });
-
-        this.workerChannels.set(name, channel as QueuedWorkerChannel);
-        return channel as QueuedWorkerChannel;
-    }
-
-    /**
-     * Get worker channel
-     */
-    getWorkerChannel(name: string): QueuedWorkerChannel | null {
-        return this.workerChannels.get(name) || null;
     }
 
     /**
@@ -445,10 +411,6 @@ export function sendCrxMessage(message: Omit<CrxMessage, 'id' | 'source'>): Prom
 
 export function registerCrxHandler(type: string, handler: (data: any) => Promise<any> | any): void {
     crxMessaging.registerRuntimeHandler(type, handler);
-}
-
-export function createCrxWorkerChannel(name: string, workerScript: string): QueuedWorkerChannel {
-    return crxMessaging.createWorkerChannel(name, workerScript);
 }
 
 export function sendToCrxTab(tabId: number, message: Omit<CrxMessage, 'id' | 'source'>): Promise<any> {

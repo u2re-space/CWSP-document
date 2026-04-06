@@ -3,19 +3,34 @@
  * Manages user-defined instructions for AI recognition operations
  */
 
-import { loadSettings, saveSettings } from "@rs-com/config/Settings";
-import type { AppSettings } from "@rs-com/config/SettingsTypes";
-import {
-    generateInstructionId,
-    buildInstructionPrompt,
-    DEFAULT_INSTRUCTION_TEMPLATES,
-    type CustomInstruction
-} from "./InstructionUtils";
+import { loadSettings, saveSettings } from "../../config/Settings";
+import { type AppSettings } from "../../config/SettingsTypes";
+import { generateInstructionId, type CustomInstruction } from "./utils";
 
 export type { CustomInstruction };
-export { buildInstructionPrompt, DEFAULT_INSTRUCTION_TEMPLATES };
 
-const generateId = generateInstructionId;
+/**
+ * Same behavior as `./utils` `buildInstructionPrompt`, inlined here so the workcenter chunk does not
+ * import that symbol from `com/app` (circular init → TDZ). Other modules keep using `utils.ts`.
+ */
+export function buildInstructionPrompt(baseInstruction: string, customInstruction: string): string {
+    if (!customInstruction?.trim()) return baseInstruction;
+
+    return `${baseInstruction}
+
+---
+
+USER CUSTOM INSTRUCTIONS:
+${customInstruction.trim()}
+
+---
+
+Apply the user's custom instructions above when processing the data. Prioritize user instructions when they conflict with default behavior.
+`;
+}
+
+/** Defer read of `generateInstructionId` until call — avoids TDZ when workcenter ↔ com-app chunks cycle. */
+const generateId = (): string => generateInstructionId();
 
 export type InstructionRegistrySnapshot = {
     instructions: CustomInstruction[];
@@ -144,7 +159,7 @@ export const addInstructions = async (
 export const updateInstruction = async (id: string, updates: Partial<Omit<CustomInstruction, "id">>): Promise<boolean> => {
     const settings = await loadSettings();
     const instructions = settings?.ai?.customInstructions || [];
-    const index = instructions.findIndex(i => i.id === id);
+    const index = instructions.findIndex((i: { id: string; }) => i.id === id);
 
     if (index === -1) return false;
 
@@ -165,7 +180,7 @@ export const updateInstruction = async (id: string, updates: Partial<Omit<Custom
 export const deleteInstruction = async (id: string): Promise<boolean> => {
     const settings = await loadSettings();
     const instructions = settings?.ai?.customInstructions || [];
-    const filtered = instructions.filter(i => i.id !== id);
+    const filtered = instructions.filter((i: { id: string; }) => i.id !== id);
 
     if (filtered.length === instructions.length) return false;
 
@@ -191,10 +206,10 @@ export const reorderInstructions = async (orderedIds: string[]): Promise<void> =
 
     const reordered = orderedIds
         .map((id, index) => {
-            const instr = instructions.find(i => i.id === id);
+            const instr = instructions.find((i: { id: string; }) => i.id === id);
             return instr ? { ...instr, order: index } : null;
         })
-        .filter((i): i is CustomInstruction => i !== null && i !== undefined);
+        .filter((i): i is CustomInstruction & { order: number; } => i !== null && i !== undefined);
 
     const updated: AppSettings = {
         ...settings,
@@ -213,6 +228,7 @@ export const addDefaultTemplates = async (): Promise<CustomInstruction[]> => {
 
     if (existing.length > 0) return existing;
 
+    const { DEFAULT_INSTRUCTION_TEMPLATES } = await import("./templates");
     const newInstructions: CustomInstruction[] = DEFAULT_INSTRUCTION_TEMPLATES.map((template, index) => ({
         ...template,
         id: generateId(),

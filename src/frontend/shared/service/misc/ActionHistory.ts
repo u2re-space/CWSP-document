@@ -24,10 +24,16 @@ export interface ProcessedData {
 }
 
 export interface ActionInput {
-    type: 'files' | 'text' | 'url' | 'markdown' | 'image' | 'mixed';
-    files?: File[];
+    type: 'files' | 'text' | 'url' | 'markdown' | 'image' | 'mixed' | 'arrayBuffer' | 'process' | 'capture' | 'recognize';
+    mode?: 'recognize' | 'solve' | 'answer' | 'code' | 'css' | 'custom' | 'image';
+    files?: (File[] | Blob[]) | (File|Blob)[];
     text?: string;
+    data?: any;
     url?: string;
+    error?: string;
+    content?: string | ArrayBuffer;
+    contentType?: string;
+    customInstructionId?: string;
     recognizedData?: RecognizedData; // New: structured recognized data
     processedData?: ProcessedData[]; // New: chain of processed data
     recognizedContent?: string; // Legacy: keep for backward compatibility
@@ -35,9 +41,12 @@ export interface ActionInput {
 }
 
 export interface ActionResult {
-    type: 'markdown' | 'json' | 'text' | 'html' | 'error';
+    type: 'markdown' | 'json' | 'text' | 'html' | 'error' | 'arrayBuffer' | 'process';
     content: string;
-    rawData?: any;
+    text?: string;
+    arrayBuffer?: ArrayBuffer;
+    process?: string;
+    error?: string;
     processingTime?: number;
     tokenUsage?: number;
     model?: string;

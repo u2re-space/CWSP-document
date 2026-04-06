@@ -1,5 +1,5 @@
-import { observe } from "fest/object";
-import { checkInTimeRange, getComparableTimeValue, parseDateCorrectly } from "../../core/document/TimeUtils";
+import { observe } from "./cache-reactivity";
+import { checkInTimeRange, getComparableTimeValue, parseDateCorrectly } from "@rs-core/time";
 
 //
 export const TimeState: any = observe<{ currentTime: Date, timestamp: number }>({

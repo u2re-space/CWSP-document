@@ -133,7 +133,7 @@ export function startSnip(mode: SnipMode = "recognize", instructionId?: string, 
 
         try {
             const result = await captureTab({ x, y, width: w, height: h }, currentMode).catch(() => null);
-            if (!result?.success) { /* captureTab already shows toast */ }
+            if (!result?.ok) { /* captureTab already shows toast */ }
         } catch { showToast(`${meta.name} failed`); }
     };
 
@@ -201,7 +201,8 @@ const initSnip = () => {
 
 if (isInCrx) {
     registerCrxHandler("processingStarted", () => showToast(`Starting ${MODE_META[currentMode].name}...`));
-    registerCrxHandler("processingError", (data: any) => showToast(`Processing failed: ${data.error}`, "error"));
+    registerCrxHandler("processingError", (data: any) =>
+        showToast({ message: `Processing failed: ${data?.error || "unknown"}`, kind: "error", duration: 4200 }));
     registerCrxHandler("processingProgress", (data: any) => {
         if (data.progress > 0 && data.progress < 100) showToast(`${MODE_META[currentMode].name}: ${data.progress}%`);
     });

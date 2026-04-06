@@ -16,7 +16,7 @@ export const recognizeImageData = async (
 	sendResponse?: (result: any) => void,
 	config?: AIConfig,
 	options?: RecognizeByInstructionsOptions,
-): Promise<{ ok: boolean; data?: string; error?: string }> => {
+): Promise<{ ok: boolean; data?: string; text?: string; arrayBuffer?: ArrayBuffer; error?: string }> => {
 	const { recognizeByInstructions } = await import("@rs-com/service/processing/unified");
 	return recognizeByInstructions(input, CORE_IMAGE_INSTRUCTION, sendResponse, config, options);
 };

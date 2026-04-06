@@ -1,5 +1,14 @@
-import { readFile, writeFile } from "fest/lure";
 import { JSOX } from "jsox";
+
+/** Dynamic-only: static `fest/lure` pulls `com-app` (lure/fl-ui merge) into the MV3 service worker graph. */
+type LureFs = Pick<typeof import("fest/lure"), "readFile" | "writeFile">;
+let lureFsPromise: Promise<LureFs> | null = null;
+const getLureFs = (): Promise<LureFs> => {
+	if (!lureFsPromise) {
+		lureFsPromise = import("fest/lure").then((m) => ({ readFile: m.readFile, writeFile: m.writeFile }));
+	}
+	return lureFsPromise;
+};
 
 //
 export const sanitizeFileName = (name: string, fallbackExt = "") => {
@@ -165,6 +174,7 @@ async function blobToText(blob: Blob): Promise<string> {
 
 async function readFileAsJson(root: any | null, fullPath: string): Promise<any | null> {
     try {
+        const { readFile } = await getLureFs();
         // Предположим, что readFile есть и возвращает Blob/File
         const existing: any = await readFile(root, fullPath)?.catch?.(console.warn.bind(console));
         if (!existing) return null;
@@ -183,6 +193,7 @@ export const writeFileSmart = async (
     file: File | Blob,
     options: WriteSmartOptions = {}
 ) => {
+    const { writeFile } = await getLureFs();
     const {
         forceExt,
         ensureJson,

@@ -1,4 +1,4 @@
-import { observe, iterated, safe } from "fest/object";
+import { observe, iterated, safe } from "./cache-reactivity";
 import { Promised } from "fest/core";
 import { JSOX } from "jsox";
 

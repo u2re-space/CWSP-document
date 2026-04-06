@@ -24,7 +24,6 @@ import { loadSettings } from "@rs-com/config/Settings";
 import { fetchSwCachedEntries } from "@rs-com/core/ShareTargetGateway";
 // @ts-ignore - bundled as inline stylesheet
 import style from "../../views/views.scss?inline";
-import { recognizeByInstructions } from "@rs-com/service/processing/unified";
 import type { FileManager } from "../../views/explorer";
 
 
@@ -1555,7 +1554,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
         try {
             const res = customAIFunction
                 ? await customAIFunction(input, { useActiveInstruction: true })
-                : await recognizeByInstructions(input, instructions);
+                : await (await import("@rs-com/service/processing/unified")).recognizeByInstructions(input, instructions);
             const after = res?.ok && res?.data ? String(res.data) : "";
 
             state.history.push({

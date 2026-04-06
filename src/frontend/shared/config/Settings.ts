@@ -3,7 +3,6 @@ import { JSOX } from "jsox";
 //
 import type { AppSettings } from "@rs-com/config/SettingsTypes";
 import { DEFAULT_SETTINGS } from "@rs-com/config/SettingsTypes";
-import { writeFileSmart } from "@rs-core/storage/WriteFileSmart-v2";
 
 //
 export const SETTINGS_KEY = "rs-settings";
@@ -421,6 +420,7 @@ const downloadContentsToOPFS = async (
 
                     // mime может отсутствовать — ставим разумный дефолт
                     const mime = (file as any)?.mime || "application/octet-stream";
+                    const { writeFileSmart } = await import("@rs-core/storage/WriteFileSmart-v2");
                     return writeFileSmart(rootHandle, fullPath, new File([contents], file.basename, { type: mime }));
                 }
             }

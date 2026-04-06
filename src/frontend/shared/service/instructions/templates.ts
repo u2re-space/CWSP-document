@@ -1,6 +1,6 @@
-import type { PromptTemplate } from "@rs-core/modules/TemplateManager";
 import type { CustomInstruction } from "@rs-com/config/SettingsTypes";
 import { AI_INSTRUCTIONS } from "./core";
+import type { PromptTemplate } from "fest/lure";
 
 export const DEFAULT_TEMPLATES: PromptTemplate[] = [
 	{

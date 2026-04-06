@@ -54,10 +54,13 @@ export class RectSelector {
             pointerEvents: 'none'
         });
         instruction.textContent = 'Click and drag to select area. Press Escape to cancel.';
+        Object.assign(instruction.style, { zIndex: '2147483646' });
+        Object.assign(this.overlay.style, { zIndex: '2147483645' });
 
         this.overlay.appendChild(this.selectionBox);
         this.overlay.appendChild(instruction);
-        document.body.appendChild(this.overlay);
+        const root = document.body || document.documentElement;
+        root.appendChild(this.overlay);
 
         this.attachEventListeners();
     }
@@ -171,12 +174,19 @@ declare global {
     }
 }
 
-// Make available globally for injection
-globalThis.crxSnipSelectRect = async () => {
-    const selector = new RectSelector();
-    try {
-        return await selector.selectArea();
-    } finally {
-        selector.destroy();
-    }
+const installGlobalRectSelector = () => {
+    globalThis.crxSnipSelectRect = async () => {
+        const selector = new RectSelector();
+        try {
+            return await selector.selectArea();
+        } finally {
+            selector.destroy();
+        }
+    };
 };
+
+if (typeof document !== "undefined" && (document.body || document.readyState === "complete")) {
+    installGlobalRectSelector();
+} else if (typeof document !== "undefined") {
+    document.addEventListener("DOMContentLoaded", installGlobalRectSelector, { once: true });
+}

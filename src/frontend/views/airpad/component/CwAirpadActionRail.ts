@@ -58,7 +58,7 @@ export class CwAirpadActionRailElement extends HTMLElement {
 }
 
 export function ensureCwAirpadActionRailDefined(): void {
-    const ce = (globalThis as unknown as { customElements?: CustomElementRegistry | null }).customElements;
+    const ce = (globalThis as unknown as { customElements?: CustomElementRegistry | null })?.customElements;
     if (!ce || typeof ce.get !== "function" || typeof ce.define !== "function") return;
     if (ce.get(TAG)) return;
     ce.define(TAG, CwAirpadActionRailElement);

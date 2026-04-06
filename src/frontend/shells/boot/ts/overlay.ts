@@ -212,6 +212,7 @@ const createElements = (config: Required<OverlayConfig>, doc: Document = documen
         overlayInstances.delete(key);
     }
 
+    // Avoid injecting overlay nodes during document_start before <html> is fully wired.
     if (!doc?.documentElement) {
         return { overlay: null, box: null, hint: null, sizeBadge: null, toast: null };
     }
@@ -390,20 +391,15 @@ export const setHint = (text: string, config?: Partial<OverlayConfig>): void => 
     }
 };
 
+/** Prepare overlay CSS/receivers only; DOM nodes are created on first snip/toast use. */
 export const initOverlay = (config?: Partial<OverlayConfig>): OverlayElements => {
     if (typeof document === "undefined") {
         return { overlay: null, box: null, hint: null, sizeBadge: null, toast: null };
     }
-
-    if (document.readyState === "loading") {
-        let elements: OverlayElements = { overlay: null, box: null, hint: null, sizeBadge: null, toast: null };
-        document.addEventListener("DOMContentLoaded", () => {
-            elements = getOverlayElements(config);
-        }, { once: true });
-        return elements;
-    }
-
-    return getOverlayElements(config);
+    const fullConfig: Required<OverlayConfig> = { ...DEFAULT_CONFIG, ...config };
+    injectStyles(fullConfig, document);
+    initReceivers();
+    return { overlay: null, box: null, hint: null, sizeBadge: null, toast: null };
 };
 
 // Legacy proxy exports for backward compatibility
@@ -442,10 +438,4 @@ export default {
     getToast
 };
 
-if (typeof document !== "undefined") {
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", () => getOverlayElements(), { once: true });
-    } else {
-        getOverlayElements();
-    }
-}
+// Intentionally no eager DOM injection: content scripts should only add overlay/toast nodes when used.

@@ -1,8 +1,24 @@
 import { getDirectoryHandle, handleIncomingEntries } from "fest/lure";
 import { handleDataTransferFiles, postCommitAnalyze, postCommitRecognize, writeFilesToDir } from "@rs-core/storage/FileSystem";
-import { analyzeRecognizeUnified } from "@rs-com/service/service/RecognizeData";
 import { sanitizeFileName, writeFileSmart } from "@rs-core/storage/WriteFileSmart-v2";
-import { writeText, readText } from "@rs-core/modules/Clipboard";
+type AnalyzeRecognizeUnified = typeof import("@rs-com/service/service/RecognizeData").analyzeRecognizeUnified;
+let analyzeRecognizeUnifiedRef: AnalyzeRecognizeUnified | null = null;
+const getAnalyzeRecognizeUnified = async (): Promise<AnalyzeRecognizeUnified> => {
+    if (!analyzeRecognizeUnifiedRef) {
+        const m = await import("@rs-com/service/service/RecognizeData");
+        analyzeRecognizeUnifiedRef = m.analyzeRecognizeUnified;
+    }
+    return analyzeRecognizeUnifiedRef;
+};
+
+let clipboardRw: Pick<typeof import("@rs-core/modules/Clipboard"), "readText" | "writeText"> | null = null;
+const getClipboardRw = async () => {
+    if (!clipboardRw) {
+        const m = await import("@rs-core/modules/Clipboard");
+        clipboardRw = { readText: m.readText, writeText: m.writeText };
+    }
+    return clipboardRw;
+};
 
 //
 export const bindDropToDir = (host: HTMLElement, dir: string) => {
@@ -107,6 +123,7 @@ export const writeWithTryRecognize = async (dir: string, file: File) => {
     }
 
     //
+    const analyzeRecognizeUnified = await getAnalyzeRecognizeUnified();
     const recognized = (await analyzeRecognizeUnified(file)?.catch?.(console.warn.bind(console)))?.data;
     if (recognized) {
         return writeFileSmart(null, dir, new File([recognized], file.name));
@@ -116,6 +133,8 @@ export const writeWithTryRecognize = async (dir: string, file: File) => {
 //
 export const pasteIntoClipboardWithRecognize = async () => {
     try {
+        const analyzeRecognizeUnified = await getAnalyzeRecognizeUnified();
+        const { readText, writeText } = await getClipboardRw();
         // clipboard first (read raw items)
         if (typeof navigator !== "undefined" && (navigator.clipboard as any)?.read) {
             const items = await (navigator.clipboard as any).read();
@@ -149,6 +168,7 @@ export const pasteIntoClipboardWithRecognize = async () => {
 //
 export const pasteAndAnalyze = async () => {
     try {
+        const { readText } = await getClipboardRw();
         // clipboard first (read raw items)
         if (typeof navigator !== "undefined" && (navigator.clipboard as any)?.read) {
             const items = await (navigator.clipboard as any).read();
@@ -177,6 +197,7 @@ export const pasteAndAnalyze = async () => {
 //
 export const pasteIntoDir = async (dir: string) => {
     try {
+        const { readText } = await getClipboardRw();
         // Use unified handler for paste
         // We need to get data from clipboard first
         let success = false;

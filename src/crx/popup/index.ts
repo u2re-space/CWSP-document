@@ -8,7 +8,7 @@
  *  - Settings (API key, language, translate, SVG)
  */
 
-import "../fix.scss";
+//@ts-ignore
 import "./index.scss";
 import { createRuntimeChannelModule } from "../shared/runtime";
 
@@ -41,7 +41,14 @@ type CollectMcpRowsResult = {
     mcp: MCPConfig[];
     errors: string[];
 };
+type CrxUiSettings = {
+    theme?: "system" | "light" | "dark";
+    font?: "system" | "ui" | "mono";
+    accent?: "blue" | "violet" | "green" | "orange";
+};
+
 type PopupSettings = {
+    crxUi?: CrxUiSettings;
     ai?: {
         apiKey?: string;
         baseUrl?: string;
@@ -223,13 +230,60 @@ const loadSettings = async (): Promise<PopupSettings> => {
     catch { return {}; }
 };
 
-const saveSettings = async (updates: { ai?: Partial<NonNullable<PopupSettings["ai"]> & { mcp?: MCPConfig[] }> }) => {
+const saveSettings = async (updates: {
+    ai?: Partial<NonNullable<PopupSettings["ai"]> & { mcp?: MCPConfig[] }>;
+    crxUi?: Partial<CrxUiSettings>;
+}) => {
     try {
         const current = await loadSettings();
-        await chrome.storage.local.set({ [SETTINGS_KEY]: { ...current, ai: { ...(current.ai || {}), ...(updates.ai || {}) } } });
+        await chrome.storage.local.set({
+            [SETTINGS_KEY]: {
+                ...current,
+                ai: { ...(current.ai || {}), ...(updates.ai || {}) },
+                crxUi: { ...(current.crxUi || {}), ...(updates.crxUi || {}) },
+            },
+        });
         return true;
     } catch { return false; }
 };
+
+const defaultCrxUi = (): CrxUiSettings => ({
+    theme: "dark",
+    font: "system",
+    accent: "blue",
+});
+
+const applyCrxUi = (ui: Partial<CrxUiSettings>) => {
+    const t = { ...defaultCrxUi(), ...ui };
+    const root = document.documentElement;
+    root.dataset.crxTheme = t.theme || "dark";
+    root.dataset.crxFont = t.font || "system";
+    root.dataset.crxAccent = t.accent || "blue";
+};
+
+/** Windows / Unix absolute paths → file: URL for markdown open. */
+const pathInputToFileUrl = (raw: string): string | null => {
+    const t = (raw || "").trim();
+    if (!t) return null;
+    if (/^file:/i.test(t)) {
+        try { return new URL(t).href; } catch { return null; }
+    }
+    if (/^[a-z]:[\\/]/i.test(t)) {
+        const p = t.replace(/\\/g, "/");
+        try { return new URL(`file:///${p}`).href; } catch { return null; }
+    }
+    if (t.startsWith("\\\\")) {
+        const p = t.replace(/\\/g, "/");
+        try { return new URL(`file:${p}`).href; } catch { return null; }
+    }
+    if (t.startsWith("/")) {
+        try { return new URL(`file://${t}`).href; } catch { return null; }
+    }
+    return null;
+};
+
+const isMarkdownPath = (href: string) =>
+    /\.(?:md|markdown|mdown|mkd|mkdn|mdtxt|mdtext)(?:$|[?#])/i.test(href);
 
 // ---------------------------------------------------------------------------
 // Helper: send message to active tab content script, then close popup
@@ -438,18 +492,39 @@ const initMarkdownViewer = () => {
     const normalizeMarkdownCandidate = (value: string): string => {
         const raw = (value || "").trim();
         if (!raw) return "";
+        const fileFromPath = pathInputToFileUrl(raw);
+        if (fileFromPath && isMarkdownPath(fileFromPath)) return fileFromPath;
         if (/^(https?:|file:|ftp:)/i.test(raw)) return raw;
         if (raw.startsWith("//")) return `https:${raw}`;
         return `https://${raw}`;
     };
 
     const openUrl = () => {
-        const url = normalizeMarkdownCandidate(input?.value || "");
+        const raw = (input?.value || "").trim();
+        if (!raw) return;
+
+        const tryFile = pathInputToFileUrl(raw) || (/^file:/i.test(raw) ? normalizeMarkdownCandidate(raw) : "");
+        if (tryFile && /^file:/i.test(tryFile) && isMarkdownPath(tryFile)) {
+            chrome.runtime.sendMessage({ type: "crx:open-markdown-file", url: tryFile }, (r) => {
+                if (chrome.runtime.lastError || !r?.ok) {
+                    chrome.tabs.create({ url: tryFile });
+                    globalThis?.close?.();
+                    return;
+                }
+                globalThis?.close?.();
+            });
+            return;
+        }
+
+        const url = normalizeMarkdownCandidate(raw);
         if (!url) return;
         if (/^file:/i.test(url)) {
-            // Let webNavigation flow capture file:// text and redirect with session key.
-            chrome.tabs.create({ url });
-            globalThis?.close?.();
+            chrome.runtime.sendMessage({ type: "crx:open-markdown-file", url }, (r) => {
+                if (chrome.runtime.lastError || !r?.ok) {
+                    chrome.tabs.create({ url });
+                }
+                globalThis?.close?.();
+            });
             return;
         }
         const viewerUrl = chrome.runtime.getURL("markdown/viewer.html");
@@ -458,7 +533,37 @@ const initMarkdownViewer = () => {
     };
 
     btn?.addEventListener("click", openUrl);
-    //input?.addEventListener("keydown", (e) => { if (e.key === "Enter") openUrl(); });
+    input?.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") openUrl();
+    });
+};
+
+const initAppearance = () => {
+    const theme = document.getElementById("crx-theme") as HTMLSelectElement;
+    const font = document.getElementById("crx-font") as HTMLSelectElement;
+    const accent = document.getElementById("crx-accent") as HTMLSelectElement;
+
+    const persist = async () => {
+        await saveSettings({
+            crxUi: {
+                theme: (theme?.value as CrxUiSettings["theme"]) || "dark",
+                font: (font?.value as CrxUiSettings["font"]) || "system",
+                accent: (accent?.value as CrxUiSettings["accent"]) || "blue",
+            },
+        });
+    };
+
+    loadSettings().then((s) => {
+        const u = { ...defaultCrxUi(), ...(s.crxUi || {}) };
+        if (theme) theme.value = u.theme || "dark";
+        if (font) font.value = u.font || "system";
+        if (accent) accent.value = u.accent || "blue";
+        applyCrxUi(u);
+    }).catch(console.warn);
+
+    theme?.addEventListener("change", () => { applyCrxUi({ theme: theme.value as CrxUiSettings["theme"] }); void persist(); });
+    font?.addEventListener("change", () => { applyCrxUi({ font: font.value as CrxUiSettings["font"] }); void persist(); });
+    accent?.addEventListener("change", () => { applyCrxUi({ accent: accent.value as CrxUiSettings["accent"] }); void persist(); });
 };
 
 // ---------------------------------------------------------------------------
@@ -664,6 +769,7 @@ const initSettingsUI = () => {
 // Boot
 // ---------------------------------------------------------------------------
 
+initAppearance();
 initSnipActions();
 initCopyButtons();
 initMarkdownViewer();

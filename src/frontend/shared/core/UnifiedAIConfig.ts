@@ -5,34 +5,12 @@
  * for consistent behavior across different entry points and modules.
  */
 
-import type { RecognizeByInstructionsOptions } from '@rs-com/service/service/ProcessingData';
+import type { RecognizeByInstructionsOptions } from '../service/service/ProcessingData';
 
-// Import built-in AI instructions and templates
-import {
-    AI_INSTRUCTIONS,
-    BUILT_IN_AI_ACTIONS,
-} from './BuiltInAI';
+import { getProcessingRules, type AIProcessingType, type ProcessingRule } from "./processingRules";
 
-// AI Processing Types
-export type AIProcessingType =
-    | 'solve-and-answer'
-    | 'write-code'
-    | 'extract-css'
-    | 'recognize-content'
-    | 'convert-data'
-    | 'extract-entities'
-    | 'general-processing';
-
-// Content Processing Rules
-export interface ProcessingRule {
-    type: AIProcessingType;
-    instruction: string;
-    options?: RecognizeByInstructionsOptions;
-    supportedContentTypes: string[];
-    priority: number;
-}
-
-// AI_INSTRUCTIONS imported from BuiltInAI module
+export type { AIProcessingType, ProcessingRule };
+export { getProcessingRules };
 
 // Core content types
 export type ContentType =
@@ -190,35 +168,6 @@ export const processingRules = Object.fromEntries(
     ])
 );
 
-// AI Processing Rules Configuration (auto-generated from BUILT_IN_AI_ACTIONS)
-const AI_PROCESSING_TYPES: readonly AIProcessingType[] = [
-    'solve-and-answer',
-    'write-code',
-    'extract-css',
-    'recognize-content',
-    'convert-data',
-    'extract-entities',
-    'general-processing'
-] as const;
-
-const toAIProcessingType = (id: string): AIProcessingType | null => {
-    const normalized = String(id || '').toLowerCase().replace(/_/g, '-') as AIProcessingType;
-    return (AI_PROCESSING_TYPES as readonly string[]).includes(normalized) ? normalized : null;
-};
-
-export const PROCESSING_RULES: ProcessingRule[] = BUILT_IN_AI_ACTIONS
-    .map(action => {
-        const type = toAIProcessingType(action.id);
-        if (!type) return null;
-        return {
-            type,
-            instruction: AI_INSTRUCTIONS[action.instructionKey],
-            supportedContentTypes: action.supportedContentTypes,
-            priority: action.priority
-        } satisfies ProcessingRule;
-    })
-    .filter((v): v is ProcessingRule => Boolean(v));
-
 // Content Type Mappings
 export const CONTENT_TYPE_MAPPINGS = {
     // File extensions to MIME types
@@ -291,16 +240,17 @@ export function getProcessingRule(
     contentType: string,
     requestedType?: AIProcessingType
 ): ProcessingRule | null {
+    const rules = getProcessingRules();
     // If specific type requested, try to find it
     if (requestedType) {
-        const rule = PROCESSING_RULES.find(r => r.type === requestedType);
+        const rule = rules.find(r => r.type === requestedType);
         if (rule && (rule.supportedContentTypes.includes(contentType) || rule.supportedContentTypes.includes('*'))) {
             return rule;
         }
     }
 
     // Otherwise, find best match based on content type and priority
-    const matchingRules = PROCESSING_RULES
+    const matchingRules = rules
         .filter(rule => rule.supportedContentTypes.includes(contentType) || rule.supportedContentTypes.includes('*'))
         .sort((a, b) => b.priority - a.priority);
 
@@ -312,7 +262,7 @@ export function getProcessingRule(
  */
 export function getMimeTypeFromExtension(filename: string): string {
     const extension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
-    return CONTENT_TYPE_MAPPINGS.extensions[extension] || 'application/octet-stream';
+    return CONTENT_TYPE_MAPPINGS?.extensions?.[extension as keyof typeof CONTENT_TYPE_MAPPINGS.extensions] || 'application/octet-stream';
 }
 
 /**

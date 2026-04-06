@@ -1,7 +1,6 @@
 import { processDataWithInstruction } from '@rs-com/service/service/RecognizeData';
 import { toBase64 } from '@rs-com/service/model/GPT-Responses';
 import { actionHistory, type ActionEntry, type ActionContext, type ActionInput, type ActionResult } from './ActionHistory';
-import { writeText as writeClipboardText } from '@rs-core/modules/Clipboard';
 
 export interface ExecutionRule {
     id: string;
@@ -205,11 +204,8 @@ export class ExecutionCore {
                         // This will be handled by the extension's background script
                         return;
                     }
-                } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                    const writeResult = await writeClipboardText(textToCopy.trim());
-                    if (!writeResult.ok) {
-                        throw new Error(writeResult.error || 'Clipboard write failed');
-                    }
+                } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(textToCopy.trim());
                 } else if (typeof document !== 'undefined' && document.body) {
                     // Fallback method - only available in main thread context
                     const textArea = document.createElement('textarea');
@@ -270,19 +266,19 @@ export class ExecutionCore {
             action: 'source',
             condition: (input) => {
                 return input.files?.some(f =>
-                    f.type.startsWith('text/') ||
-                    f.type === 'application/markdown' ||
-                    f.name?.endsWith('.md') ||
-                    f.name?.endsWith('.txt')
+                    f?.type?.startsWith?.('text/') ||
+                    f?.type === 'application/markdown' ||
+                    (f as File)?.name?.endsWith?.('.md') ||
+                    (f as File)?.name?.endsWith?.('.txt')
                 ) ?? false;
             },
             processor: async (input) => {
                 // Read text/markdown files and return as source data
-                const textFiles = input.files!.filter(f =>
-                    f.type.startsWith('text/') ||
-                    f.type === 'application/markdown' ||
-                    f.name?.endsWith('.md') ||
-                    f.name?.endsWith('.txt')
+                const textFiles = input.files!.filter((f: File) =>
+                    f?.type?.startsWith?.('text/') ||
+                    f?.type === 'application/markdown' ||
+                    (f as File)?.name?.endsWith?.('.md') ||
+                    (f as File)?.name?.endsWith?.('.txt')
                 );
 
                 let combinedContent = '';
@@ -291,7 +287,7 @@ export class ExecutionCore {
                         const content = await file.text();
                         combinedContent += content + '\n\n';
                     } catch (error) {
-                        console.warn(`Failed to read text file ${file.name}:`, error);
+                        console.warn(`Failed to read text file ${(file as File)?.name ?? 'unknown file'}:`, error);
                     }
                 }
 
@@ -416,7 +412,7 @@ export class ExecutionCore {
                                 }
                             );
                         } catch (error) {
-                            console.warn(`Failed to process image ${file.name}:`, error);
+                            console.warn(`Failed to process image ${(file as File)?.name ?? 'unknown file'}:`, error);
                             result = await processDataWithInstruction(
                                 file,
                                 {
@@ -514,20 +510,20 @@ export class ExecutionCore {
             inputTypes: ['files'],
             action: 'source',
             condition: (input) => {
-                return input.files?.some(f =>
-                    f.type.startsWith('text/') ||
-                    f.type === 'application/markdown' ||
-                    f.name?.endsWith('.md') ||
-                    f.name?.endsWith('.txt')
+                return input.files?.some?.((f: File) =>
+                    f?.type?.startsWith?.('text/') ||
+                    f?.type === 'application/markdown' ||
+                    (f as File)?.name?.endsWith?.('.md') ||
+                    (f as File)?.name?.endsWith?.('.txt')
                 ) ?? false;
             },
             processor: async (input) => {
                 // Read text/markdown files and return as source data
-                const textFiles = input.files!.filter(f =>
-                    f.type.startsWith('text/') ||
-                    f.type === 'application/markdown' ||
-                    f.name?.endsWith('.md') ||
-                    f.name?.endsWith('.txt')
+                const textFiles = input.files!.filter?.((f: File) =>
+                    f?.type?.startsWith?.('text/') ||
+                    f?.type === 'application/markdown' ||
+                    (f as File)?.name?.endsWith?.('.md') ||
+                    (f as File)?.name?.endsWith?.('.txt')
                 );
 
                 let combinedContent = '';
@@ -536,7 +532,7 @@ export class ExecutionCore {
                         const content = await file.text();
                         combinedContent += content + '\n\n';
                     } catch (error) {
-                        console.warn(`Failed to read text file ${file.name}:`, error);
+                        console.warn(`Failed to read text file ${(file as File)?.name ?? 'unknown file'}:`, error);
                     }
                 }
 
@@ -578,7 +574,7 @@ export class ExecutionCore {
                                         const bytes = new Uint8Array(arrayBuffer);
                                         const base64 = btoa(String.fromCharCode(...bytes));
                                         return [
-                                            { type: "input_text", text: `\n--- Image ${index + 1}: ${file.name} ---\n` },
+                                            { type: "input_text", text: `\n--- Image ${index + 1}: ${(file as File)?.name ?? 'unknown file'} ---\n` },
                                             {
                                                 type: "input_image",
                                                 detail: "auto",
@@ -586,12 +582,12 @@ export class ExecutionCore {
                                             }
                                         ];
                                     } catch (error) {
-                                        console.warn(`Failed to process image ${file.name}:`, error);
+                                        console.warn(`Failed to process image ${(file as File)?.name ?? 'unknown file'}:`, error);
                                         return [
-                                            { type: "input_text", text: `\n--- Image ${index + 1}: ${file.name} ---\n` },
+                                            { type: "input_text", text: `\n--- Image ${index + 1}: ${(file as File)?.name ?? 'unknown file'} ---\n` },
                                             {
                                                 type: "input_text",
-                                                text: `[Failed to process image: ${file.name}]`
+                                                text: `[Failed to process image: ${(file as File)?.name ?? 'unknown file'}]`
                                             }
                                         ];
                                     }
@@ -699,19 +695,19 @@ export class ExecutionCore {
             action: 'source',
             condition: (input) => {
                 return input.files?.some(f =>
-                    f.type.startsWith('text/') ||
-                    f.type === 'application/markdown' ||
-                    f.name?.endsWith('.md') ||
-                    f.name?.endsWith('.txt')
+                    f?.type?.startsWith?.('text/') ||
+                    f?.type === 'application/markdown' ||
+                    (f as File)?.name?.endsWith?.('.md') ||
+                    (f as File)?.name?.endsWith?.('.txt')
                 ) ?? false;
             },
             processor: async (input) => {
                 // Read text/markdown files and return as source data
                 const textFiles = input.files!.filter(f =>
-                    f.type.startsWith('text/') ||
-                    f.type === 'application/markdown' ||
-                    f.name?.endsWith('.md') ||
-                    f.name?.endsWith('.txt')
+                    f?.type?.startsWith?.('text/') ||
+                    f?.type === 'application/markdown' ||
+                    (f as File)?.name?.endsWith?.('.md') ||
+                    (f as File)?.name?.endsWith?.('.txt')
                 );
 
                 let combinedContent = '';
@@ -720,7 +716,7 @@ export class ExecutionCore {
                         const content = await file.text();
                         combinedContent += content + '\n\n';
                     } catch (error) {
-                        console.warn(`Failed to read text file ${file.name}:`, error);
+                        console.warn(`Failed to read text file ${(file as File)?.name ?? 'unknown file'}:`, error);
                     }
                 }
 
@@ -813,7 +809,7 @@ export class ExecutionCore {
                                 }
                             );
                         } catch (error) {
-                            console.warn(`Failed to process screenshot ${file.name}:`, error);
+                            console.warn(`Failed to process screenshot ${(file as File)?.name ?? 'unknown file'}:`, error);
                             result = await processDataWithInstruction(
                                 file,
                                 {
@@ -861,8 +857,8 @@ export class ExecutionCore {
                 return input.files?.some(f =>
                     f.type.startsWith('text/') ||
                     f.type === 'application/markdown' ||
-                    f.name?.endsWith('.md') ||
-                    f.name?.endsWith('.txt')
+                    (f as File)?.name?.endsWith?.('.md') ||
+                    (f as File)?.name?.endsWith?.('.txt')
                 ) ?? false;
             },
             processor: async (input) => {
@@ -870,8 +866,8 @@ export class ExecutionCore {
                 const textFiles = input.files!.filter(f =>
                     f.type.startsWith('text/') ||
                     f.type === 'application/markdown' ||
-                    f.name?.endsWith('.md') ||
-                    f.name?.endsWith('.txt')
+                    (f as File)?.name?.endsWith?.('.md') ||
+                    (f as File)?.name?.endsWith?.('.txt')
                 );
 
                 let combinedContent = '';
@@ -880,7 +876,7 @@ export class ExecutionCore {
                         const content = await file.text();
                         combinedContent += content + '\n\n';
                     } catch (error) {
-                        console.warn(`Failed to read text file ${file.name}:`, error);
+                        console.warn(`Failed to read text file ${(file as File)?.name ?? 'unknown file'}:`, error);
                     }
                 }
 
@@ -1000,7 +996,7 @@ export class ExecutionCore {
                                 }
                             );
                         } catch (error) {
-                            console.warn(`Failed to process image ${file.name}:`, error);
+                            console.warn(`Failed to process image ${(file as File)?.name ?? 'unknown file'}:`, error);
                             result = await processDataWithInstruction(
                                 file,
                                 {

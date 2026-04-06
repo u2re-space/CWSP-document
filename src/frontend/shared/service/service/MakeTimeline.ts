@@ -20,7 +20,18 @@ import { encode } from "@toon-format/toon";
 //
 import { getGPTInstance } from "@rs-com/service/shared/gpt-utils";
 import { readJSONs, readOneMarkDown } from "@rs-core/storage/FileSystem";
-import { realtimeStates } from "../misc/Cache";
+
+// Dynamic-only: static `misc/Cache` ties `observed`/`fest/object` into `com-app` and recreates com-app ↔ com-service cycles for the MV3 SW graph.
+const loadRealtimeStates = async () => {
+    const { realtimeStates } = await import("../misc/Cache");
+    return realtimeStates as {
+        time: Date;
+        timestamp: number;
+        coords: unknown;
+        otherProps: unknown;
+        cards: unknown;
+    };
+};
 
 // @ts-ignore
 import AI_OUTPUT_SCHEMA from "@rs-com/template/Entities-v2.md?raw";
@@ -31,16 +42,22 @@ import { fixEntityId } from "@rs-com/template/EntityId";
 import { loadSettings } from "@rs-com/config/Settings";
 import { parseAIResponseSafe } from "@rs-core/document/AIResponseParser";
 
-//
-export const TIMELINE_DIR = "/timeline/";
+import {
+    EVENTS_DIR,
+    FACTORS_DIR,
+    PLANS_DIR,
+    PREFERENCES_DIR,
+    TIMELINE_DIR,
+} from "@rs-core/constants/data-paths";
+import type { GPTResponses } from "../model/GPT-Responses";
 
-//
-export const PREFERENCES_DIR = "/docs/preferences/";
-export const PLANS_DIR = "/docs/plans/";
-
-//
-export const FACTORS_DIR = "/data/factors/";
-export const EVENTS_DIR = "/data/events/";
+export {
+    EVENTS_DIR,
+    FACTORS_DIR,
+    PLANS_DIR,
+    PREFERENCES_DIR,
+    TIMELINE_DIR,
+};
 
 
 
@@ -65,6 +82,8 @@ export const filterEvents = (events: any[], currentTime: Date, maxDays: number =
 export const createTimelineGenerator = async (sourcePath: string | null = null, speechPrompt: string | null = null) => {
     const settings = await loadSettings();
     if (!settings || !settings?.ai || !settings.ai?.apiKey) return;
+
+    const realtimeStates = await loadRealtimeStates();
 
     //
     const gptResponses = await getGPTInstance({
@@ -118,6 +137,8 @@ export const createTimelineGenerator = async (sourcePath: string | null = null, 
 //
 export const requestNewTimeline = async (gptResponses: GPTResponses, existsTimeline: any | null = null) => {
     if (!gptResponses) return { timeline: [], keywords: [] };
+
+    const realtimeStates = await loadRealtimeStates();
 
     // attach exists timeline
     if (existsTimeline) {

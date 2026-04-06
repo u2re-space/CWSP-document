@@ -13,8 +13,10 @@
 
 
 import { loadSettings } from "@rs-com/config/Settings";
-// @ts-ignore - legacy shell bridge is intentionally imported as compatibility layer.
-import { mountShellApp, type ShellOptions } from "../../../shared/routing/channel-unknown";
+// Types only — runtime `mountShellApp` is dynamic-imported so this entry chunk does not
+// statically pull `channel-unknown` → unified/RecognizeData (would merge AI into `shell-boot-*`
+// and cause the extension service worker to import DOM-heavy chunks).
+import type { ShellOptions } from "../../../shared/routing/channel-unknown";
 
 /**
  * @deprecated Legacy compatibility options for old shell-based entry.
@@ -32,6 +34,8 @@ export default async function frontend(
     mountElement: HTMLElement,
     options: ShellOptions = {}
 ): Promise<void> {
+    const { mountShellApp } = await import("../../../shared/routing/channel-unknown");
+
     // Check for markdown content in URL parameters (from launch queue or direct links)
     const urlParams = new URLSearchParams(globalThis.location.search);
     const markdownContent = urlParams.get('markdown-content');

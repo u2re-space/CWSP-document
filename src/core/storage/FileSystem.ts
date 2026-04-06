@@ -1,15 +1,48 @@
 import { BASE64_PREFIX, convertImageToJPEG, DEFAULT_ENTITY_TYPE, MAX_BASE64_SIZE } from "@rs-core/workers/ImageProcess";
 import { dumpAndClear } from "@rs-com/store/IDBQueue";
-import { getDirectoryHandle, getFileHandle, decodeBase64ToBytes, stringToFile, parseDataUrl } from "fest/lure";
 import { detectEntityTypeByJSON } from "@rs-com/template/EntityUtils";
 import { fixEntityId } from "@rs-com/template/EntityId";
+import { TIMELINE_DIR } from "@rs-core/constants/data-paths";
 import { opfsModifyJson } from "./OPFSMod";
 import { writeFileSmart } from "./WriteFileSmart-v2";
-import { TIMELINE_DIR } from "@rs-com/service/service/MakeTimeline";
 import { JSOX } from "jsox";
-import { showSuccess } from "@fl-ui/items/overlay/Toast";
-import { showError } from "@fl-ui/items/overlay/Toast";
 import { canParseURL } from "@rs-core/utils/Runtime";
+
+/** Dynamic-only: static `fest/lure` pulls `com-app` into the MV3 service worker graph. */
+type LureFs = Pick<
+    typeof import("fest/lure"),
+    "getDirectoryHandle" | "getFileHandle" | "decodeBase64ToBytes" | "stringToFile" | "parseDataUrl"
+>;
+let lureFsPromise: Promise<LureFs> | null = null;
+const getLureFs = (): Promise<LureFs> => {
+    if (!lureFsPromise) {
+        lureFsPromise = import("fest/lure").then((m) => ({
+            getDirectoryHandle: m.getDirectoryHandle,
+            getFileHandle: m.getFileHandle,
+            decodeBase64ToBytes: m.decodeBase64ToBytes,
+            stringToFile: m.stringToFile,
+            parseDataUrl: m.parseDataUrl,
+        }));
+    }
+    return lureFsPromise;
+};
+
+const notifyFsToast = async (kind: "success" | "error", message: string) => {
+    try {
+        const mod = await import(new URL("../../frontend/shared/items/overlay/Toast.ts", import.meta.url).href);
+        (kind === "success" ? mod.showSuccess : mod.showError)(message);
+    } catch {
+        try {
+            if (typeof globalThis !== "undefined" && Notification?.permission === "granted") {
+                new Notification(message);
+            } else {
+                console[kind === "success" ? "log" : "warn"](message);
+            }
+        } catch {
+            console[kind === "success" ? "log" : "warn"](message);
+        }
+    }
+};
 
 //
 /*
@@ -103,6 +136,7 @@ export const hasCriteriaInText = async (text: string, criteria: string[]) => {
 
 //
 export const readJSONs = async (dir: any | null) => {
+    const { getDirectoryHandle } = await getLureFs();
     const dirHandle = typeof dir === "string" ? await getDirectoryHandle(null, dir) : dir;
     const factors = await Array.fromAsync(dirHandle?.entries?.() ?? []);
     return Promise.all(factors?.map?.((factor) => getJSONFromFile(factor)));
@@ -110,6 +144,7 @@ export const readJSONs = async (dir: any | null) => {
 
 //
 export const readJSONsFiltered = async (dir: any | null, filterFiles?: string[] | null) => {
+    const { getDirectoryHandle } = await getLureFs();
     const dirHandle = typeof dir === "string" ? await getDirectoryHandle(null, dir) : dir;
     const factors = await Array.fromAsync(dirHandle?.entries?.() ?? []);
     return Promise.all(factors?.map?.((factor) => getJSONFromFile(factor)));
@@ -117,6 +152,7 @@ export const readJSONsFiltered = async (dir: any | null, filterFiles?: string[] 
 
 //
 export const readMarkDownsFiltered = async (dir: any | null, filterFiles?: string[] | null) => {
+    const { getDirectoryHandle } = await getLureFs();
     const dirHandle = typeof dir === "string" ? await getDirectoryHandle(null, dir) : dir;
     const preferences = await Array.fromAsync(dirHandle?.entries?.() ?? []);
     return Promise.all(preferences?.map?.(async (preferences) => (await getMarkDownFromFile(preferences)))
@@ -125,6 +161,7 @@ export const readMarkDownsFiltered = async (dir: any | null, filterFiles?: strin
 
 //
 export const readMarkDowns = async (dir: any | null) => {
+    const { getDirectoryHandle } = await getLureFs();
     const dirHandle = typeof dir === "string" ? await getDirectoryHandle(null, dir) : dir;
     const preferences = await Array.fromAsync(dirHandle?.entries?.() ?? []);
     return Promise.all(preferences?.map?.((preference) => getMarkDownFromFile(preference?.[1])));
@@ -132,6 +169,7 @@ export const readMarkDowns = async (dir: any | null) => {
 
 //
 export const readOneMarkDown = async (path: string) => {
+    const { getFileHandle } = await getLureFs();
     const markdown = await getFileHandle(null, path);
     if (!markdown) return "";
     if (markdown?.type?.startsWith?.("image/")) return "";
@@ -197,6 +235,7 @@ export interface shareTargetFormData {
 export const handleDataByType = async (item: File | string | Blob, handler: (payload: shareTargetFormData) => Promise<void>) => {
     if (typeof item === 'string') {
         if (item?.startsWith?.("data:image/") && item?.includes?.(";base64,")) {
+            const { parseDataUrl, stringToFile } = await getLureFs();
             const parts = parseDataUrl(item);
             const mimeType = parts?.mimeType || "image/png";
             const file = await stringToFile(item, "clipboard-image", { mimeType, uriComponent: true });
@@ -221,7 +260,7 @@ export const handleDataTransferFiles = async (files: (File | Blob)[] | FileList,
 export const handleDataTransferItemList = async (items: DataTransferItemList, handler: (payload: shareTargetFormData) => Promise<void>) => {
     // @ts-ignore
     for (const item of items) {
-        handleDataByType(item, handler);
+        handleDataByType(item as any, handler);
     }
 }
 
@@ -316,8 +355,9 @@ export const normalizePayload = async (payload: shareTargetFormData): Promise<sh
             const { mime, data } = match.groups;
             const byteLen = Math.ceil((data.length * 3) / 4);
             if (byteLen > MAX_BASE64_SIZE) {
+                const { decodeBase64ToBytes } = await getLureFs();
                 const bytes = decodeBase64ToBytes(data, { alphabet: "base64", lastChunkHandling: "loose" });
-                const blob = new Blob([bytes], { type: mime });
+                const blob = new Blob([bytes as unknown as ArrayBuffer], { type: mime });
                 const converted = await convertImageToJPEG(blob);
                 return { file: converted };
             }
@@ -359,6 +399,7 @@ export const sendToEntityPipeline = async (payload: shareTargetFormData, options
 //
 export const loadTimelineSources = async (dir: string = "/docs/preferences") => {
     try {
+        const { getDirectoryHandle } = await getLureFs();
         const root = await getDirectoryHandle(null, dir)?.catch(() => null);
         if (!root) return [] as string[];
         const entries = await Array.fromAsync(root.entries?.() ?? []);
@@ -395,10 +436,10 @@ controlChannel.addEventListener('message', (event: MessageEvent) => {
     if (!payload || (payload?.type !== 'commit-result' && payload?.type !== 'commit-to-clipboard')) return;
     if (payload?.type === 'commit-result') {
         flushQueueIntoOPFS?.()?.then?.(() => {
-            showSuccess("Data has been saved to the filesystem.");
+            void notifyFsToast("success", "Data has been saved to the filesystem.");
         })?.catch?.((e) => {
             console.warn("Failed to save data to filesystem.", e, payload);
-            showError("Failed to save data to filesystem.");
+            void notifyFsToast("error", "Failed to save data to filesystem.");
         });
     } else
         if (payload?.type === 'commit-to-clipboard') {
@@ -407,13 +448,13 @@ controlChannel.addEventListener('message', (event: MessageEvent) => {
                 ?.filter?.((result: any) => (result && typeof result === "string"))?.join?.("\n") || "";
             if (data?.trim?.()) {
                 navigator?.clipboard?.writeText?.(data)?.then?.(() => {
-                    showSuccess("Data has been copied to clipboard.");
+                    void notifyFsToast("success", "Data has been copied to clipboard.");
                 })?.catch?.((e) => {
                     console.warn("Failed to copy data to clipboard.", e, data);
-                    showError("Failed to copy data to clipboard. Data is not copied.");
+                    void notifyFsToast("error", "Failed to copy data to clipboard. Data is not copied.");
                 });
             } else
-                { showError("Failed to copy data to clipboard. Data is empty."); }
+                { void notifyFsToast("error", "Failed to copy data to clipboard. Data is empty."); }
         }
 });
 
@@ -494,6 +535,7 @@ export const writeTimelineTasks = async (tasks: any[]) => {
 
 //
 export const loadAllTimelines = async (DIR: string = TIMELINE_DIR) => {
+    const { getDirectoryHandle } = await getLureFs();
     const dirHandle = await getDirectoryHandle(null, DIR)?.catch?.(console.warn.bind(console));
     const timelines = await Array.fromAsync(dirHandle?.entries?.() ?? []);
     return (await Promise.all(timelines?.map?.(async ([name, fileHandle]: any) => {

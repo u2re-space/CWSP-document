@@ -57,6 +57,13 @@ function appSliceChunk(ns, rel) {
 export function manualChunks(id) {
     const p = norm(id);
 
+    // `fest/object` — must stay out of `com-app` (lure/fl-ui/DOM). Realpath is
+    // `.../modules/projects/object.ts/src/...`; if this is assigned to `com-app`, `com-service`
+    // (MV3 SW) imports `observe`/`iterated` from `./app.js` and executes DOM/customElements.
+    if (p.includes("/modules/projects/object.ts/") || p.includes("/object.ts/src/")) {
+        return "fest-object";
+    }
+
     if (p.includes("node_modules")) {
         const tail = p.split("node_modules/").pop() || "";
         const parts = tail.split("/");
@@ -72,10 +79,77 @@ export function manualChunks(id) {
         if (rel) return `pwa-${stripExt(rel).split("/").join("-")}`;
     }
 
-    if (p.includes("/src/core/")) {
-        const rel = p.split("/src/core/")[1];
-        if (rel) return appSliceChunk("core", rel);
+    // Most of `src/core/*` defaults to `com-service` (see block below); lure-heavy files stay in `com-app`.
+    // Clipboard + image helpers are required by the CRX MV3 service worker — keep them out of `com/app.js`
+    // so the background script does not load DOM/customElements.
+    if (p.includes("/src/core/modules/Clipboard")) return "core-clipboard";
+    if (p.includes("/src/core/workers/ImageProcess")) return "core-imageprocess";
+
+    // `src/frontend/shared/config/*` is often hardlinked to `src/com/config/*` but bundlers can
+    // still emit a second graph path; keep both in `com-service` for the CRX SW.
+    if (p.includes("/src/frontend/shared/config/")) return "com-service";
+
+    // Shared settings + OPFS helpers used by the MV3 service worker — keep out of `com-app` (lure/fl-ui/DOM merge).
+    const comServiceCorePrefixes = [
+        "/src/core/constants/data-paths",
+        "/src/core/storage/WriteFileSmart-v2",
+        "/src/core/storage/FileSystem",
+        "/src/core/storage/OPFSMod",
+        "/src/core/document/AIResponseParser",
+        "/src/core/utils/Runtime",
+    ];
+    for (const prefix of comServiceCorePrefixes) {
+        if (p.includes(prefix)) return "com-service";
     }
+    if (p.includes("/src/core/time/")) return "com-service";
+
+    // `modules/projects/object.ts/src/core/*` also contains the substring `/src/core/` but is **fest/object**
+    // (reactivity). Never treat it as CrossWord `src/core/`.
+    //
+    // **CRX MV3**: Do not assign most of `src/core/*` to `com-app`. The service worker imports `com/service.js`;
+    // if that chunk static-imports `com/app.js` (lure/customElements), registration fails. Default CrossWord
+    // `src/core/` → `com-service`; only files that statically depend on `fest/lure` (same TDZ island as lur.e)
+    // stay in `com-app`.
+    const coreStaticLureMarkers = [
+        "/src/core/index.ts",
+        "/src/core/storage/FileOps.ts",
+        "/src/core/utils/Actions.ts",
+        "/src/core/storage/StateStorage.ts",
+        "/src/core/document/Parser.ts",
+        "/src/core/document/markdown.ts",
+        "/src/core/document/index.ts",
+    ];
+    if (p.includes("/src/core/") && !p.includes("/object.ts/src/core/")) {
+        for (const mark of coreStaticLureMarkers) {
+            if (p.includes(mark)) return CORE_CHUNK_NAME;
+        }
+        return "com-service";
+    }
+    // AI / shared service layer: isolate from `com-app` (which merges fest lure + fl-ui for UI TDZ).
+    // Otherwise the MV3 service worker loads `com/app.js` and executes DOM-only code (customElements, etc.).
+    if (p.includes("/src/frontend/shared/service/")) return "com-service";
+    if (p.includes("/src/com/service/")) return "com-service";
+    // UI-heavy `com/core` modules mirrored under `frontend/shared/core` must land in `com-app`, not `com-service`.
+    // This block MUST run before the blanket `frontend/shared/core` → `com-service` rule below.
+    // Use `/${base}.` so `UnifiedMessaging` does not match `UnifiedMessagingSw.ts` (prefix collision).
+    const comCoreUiMirrored = (base) => [`/src/com/core/${base}.`, `/src/frontend/shared/core/${base}.`];
+    const comCoreUiOnly = [
+        ...comCoreUiMirrored("UnifiedMessaging"),
+        ...comCoreUiMirrored("ViewTransferRouting"),
+        ...comCoreUiMirrored("AppCommunicator"),
+        ...comCoreUiMirrored("LogSanitizer"),
+        ...comCoreUiMirrored("ServiceChannels"),
+        ...comCoreUiMirrored("UniformChannelManager"),
+        ...comCoreUiMirrored("MessageQueue"),
+    ];
+    for (const mark of comCoreUiOnly) {
+        if (p.includes(mark)) return CORE_CHUNK_NAME;
+    }
+    if (p.includes("/src/frontend/shared/core/")) return "com-service";
+    if (p.includes("/src/com/core/")) return "com-service";
+    if (p.includes("/src/com/config/")) return "com-service";
+    if (p.includes("/src/com/store/IDBQueue")) return "com-service";
+    if (p.includes("/src/com/template/")) return "com-service";
     if (p.includes("/src/com/")) return "com-app";
 
     const shellSub = p.match(/\/frontend\/shells\/(minimal|base|faint)\//);
