@@ -1,4 +1,4 @@
-import { H } from "fest/lure";
+import { getCachedComponent, H } from "fest/lure";
 import { ensureStyleSheet } from "fest/icon";
 
 // Import unified messaging system
@@ -13,23 +13,18 @@ import {
 import { createMessageWithOverrides } from "@rs-com/core/UnifiedMessaging";
 import type { ContentContext, ContentType } from "@rs-com/core/UnifiedAIConfig";
 
-// Import lazy loading utility
-import { getCachedComponent } from "@rs-core/modules/LazyLoader";
-
 // Import file handling components that are always needed
 import { createFileHandler } from "@rs-core/storage/FileHandling";
-import { getSpeechPrompt } from "@rs-core/modules/VoiceInput";
 import { createTemplateManager } from "@rs-core/modules/TemplateManager";
 import { BROADCAST_CHANNELS } from "@rs-com/config/Names";
 import { loadAsAdopted } from "fest/dom";
 import { clearIconCaches, clearIconCache, testIconRacing, reinitializeRegistry, debugIconSystem } from "fest/icon";
-import type { FileManager } from "fest/fl-ui/services/file-manager/FileManager";
 import type { AppSettings } from "@rs-com/config/SettingsTypes";
-import { extractCSS, recognizeByInstructions, solveAndAnswer, writeCode } from "@rs-com/service/service/RecognizeData";
 import { loadSettings } from "@rs-com/config/Settings";
 import { fetchSwCachedEntries } from "@rs-com/core/ShareTargetGateway";
 // @ts-ignore - bundled as inline stylesheet
-import style from "../../views/_views.scss?inline";
+import style from "../../views/views.scss?inline";
+import { recognizeByInstructions } from "@rs-com/service/processing/unified";
 
 
 

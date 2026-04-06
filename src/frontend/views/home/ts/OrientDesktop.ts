@@ -1,4 +1,4 @@
-import { bindInteraction } from "fest/lure";
+import { bindInteraction } from "./Interact";
 import { requestOpenView } from "../../../shared/routing/view-api";
 import type { ViewId } from "../../../types";
 import { openUnifiedContextMenu, closeUnifiedContextMenu, type ContextMenuEntry } from "@fl-ui/items/context/ContextMenu";

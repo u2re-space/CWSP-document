@@ -34,6 +34,18 @@
             "/frontend/*": [
                 "./src/frontend/*"
             ],
+            "@frontend/*": [
+                "./src/frontend/*"
+            ],
+            "@frontend/shared/*": [
+                "./src/frontend/shared/*"
+            ],
+            "@frontend/pwa/*": [
+                "./src/frontend/pwa/*"
+            ],
+            "@frontend/shells/*": [
+                "./src/frontend/shells/*"
+            ],
             "@phosphor-icons/core/assets/*": [
                 "./node_modules/@phosphor-icons/core/assets/*"
             ],
@@ -126,9 +138,6 @@
             ],
             "@rs-test/*": [
                 "./test/*"
-            ],
-            "@frontend/*": [
-                "./src/frontend/*"
             ],
             "@shared/*": [
                 "./src/frontend/shared/*"

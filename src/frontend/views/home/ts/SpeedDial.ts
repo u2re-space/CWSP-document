@@ -1,5 +1,6 @@
 import { observe, numberRef, propRef, stringRef, affected } from "fest/object";
-import { E, H, orientRef, M, provide, handleIncomingEntries, pointerAnchorRef, bindInteraction } from "fest/lure";
+import { E, H, orientRef, M, provide, handleIncomingEntries, pointerAnchorRef } from "fest/lure";
+import { bindInteraction } from "./Interact";
 import { actionRegistry, iconsPerAction, labelsPerAction } from "@rs-core/utils/Actions";
 import { showSuccess, showError } from "@fl-ui/items/overlay/Toast";
 import { openUnifiedContextMenu, type ContextMenuEntry } from "@fl-ui/items/context/ContextMenu";

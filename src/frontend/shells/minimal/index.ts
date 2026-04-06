@@ -18,7 +18,7 @@ import style from "./minimal.scss?inline";
 
 // Side effect: register icon component
 import "fest/icon";
-import { ShellBase } from "../shell";
+import { ShellBase } from "../shells";
 import { isEnabledView } from "../../config/views";
 import type { ShellTheme } from "../types";
 

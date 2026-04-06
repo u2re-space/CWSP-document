@@ -14,11 +14,11 @@ import { affected } from "fest/object";
 import type { ShellId, ShellLayoutConfig, ViewId } from "@shells/types";
 
 // @ts-ignore - SCSS import
-import style from "./scss/minimal.scss?inline";
+import style from "./minimal.scss?inline";
 
 // Side effect: register icon component
 import "fest/icon";
-import { ShellBase } from "@shells/shell";
+import { ShellBase } from "/frontend/shells/shells";
 import { isEnabledView } from "@shared/routing/views";
 import type { ShellTheme } from "@shells/types";
 

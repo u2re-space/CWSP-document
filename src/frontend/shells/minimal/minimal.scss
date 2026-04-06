@@ -1,6 +1,4 @@
-/* ai-refactor: optimized/refactored at 2026-02-13T00:24:03Z */
-@use "../scss/views.scss" as v;
-@use "./scss/minimal.scss" as b;
+/* Minimal shell: layered tokens + nav/content grid, WCO-safe, shadow slot views. */
 
 @layer shell.tokens, shell.base, shell.components, shell.utilities, shell.overrides;
 
@@ -55,12 +53,14 @@
 
     :where(.app-shell, .app-shell[data-style="minimal"]) {
         position: absolute;
-        inset: -1;
+        inset: 0;
         display: grid;
         grid-template-rows: [toolbar-row] auto [content-row] minmax(0, 1fr);
         grid-template-columns: minmax(0, 1fr);
-        align-items: center;
-        justify-content: center;
+        /* stretch: center shrink-wraps grid items (viewer chrome looked like a small floating island in CRX). */
+        align-items: stretch;
+        justify-items: stretch;
+        justify-content: start;
         gap: 0;
         padding: 0;
         margin: 0;
@@ -297,10 +297,6 @@
         box-sizing: border-box;
         border-radius: 0px;
 
-        /*
-         * Views are assigned to <slot name="view"> (light DOM of cw-shell-*).
-         * Descendant selectors here do not cross shadow → assigned nodes; use ::slotted.
-         */
         [data-view] {
             position: absolute;
             inset: 0;
@@ -312,6 +308,10 @@
             min-block-size: fit-content;
         }
 
+        /*
+         * Views assigned to <slot name="view"> live in light DOM; descendant selectors
+         * do not cross shadow boundaries — use ::slotted for cw-shell-* wrappers.
+         */
         slot[name="view"]::slotted([data-view]) {
             position: absolute;
             inset: 0;
@@ -372,7 +372,7 @@
 
     .app-shell__loading {
         position: absolute;
-        inset: -1;
+        inset: 0;
         display: none;
         flex-direction: column;
         align-items: center;

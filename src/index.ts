@@ -16,7 +16,7 @@ import { loadAsAdopted } from "fest/dom";
 import { ensureAppLayers } from "@rs-frontend/shared/routing/app-layers";
 
 // @ts-ignore
-import viewStyles from "./frontend/views/_views.scss?inline";
+import viewStyles from "./frontend/views/views.scss?inline";
 
 // Import PWA handlers
 import {

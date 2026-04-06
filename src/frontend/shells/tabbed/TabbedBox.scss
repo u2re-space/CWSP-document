@@ -1,0 +1,509 @@
+@use "veela-lib" as *;
+
+//
+@layer tabbed-box {
+    $at-host-orient-0: ":host([orient=\"0\"])";
+    $at-host-orient-2: ":host([orient=\"2\"])";
+    $at-host-orient-1: ":host([orient=\"1\"])";
+    $at-host-orient-3: ":host([orient=\"3\"])";
+
+    :host {
+        --tabbed-gap: var(--gap-sm, 0.5rem);
+        --tabbed-radius: var(--radius-lg, 0.75rem);
+        --tabbed-padding-inline: clamp(0.25rem, 1cqi + 0.25rem, 1rem);
+        --tabbed-padding-block: clamp(0.25rem, 1cqb + 0.25rem, 0.75rem);
+        --tabbed-tab-gap: var(--gap-xs, 0.375rem);
+        --tabbed-indicator-height: 0.2rem;
+        --tabbed-indicator-ease: var(--ease-emphasized, cubic-bezier(0.2, 0, 0, 1));
+        --tabbed-indicator-duration: var(--duration-normal, 160ms);
+        --tabbed-bar-block-size: clamp(3.5rem, 1cqb + 2.5rem, 4.25rem);
+        --tabbed-grid-columns: minmax(0px, 1fr);
+        --tabbed-tabs-block-gap: var(--padding-sm, 0.75rem);
+        --tabbed-bar-column-size: clamp(4rem, 2cqb + 2.5rem, 4.5rem);
+        --tabbed-grid-rows: minmax(0px, 1fr) minmax(0px, var(--tabbed-bar-block-size));
+
+        //
+        &, :where(*), ::slotted(*) {
+            box-sizing: border-box;
+            background-color: transparent;
+            border: none;
+            outline: none;
+            margin: 0;
+            padding: 0;
+            gap: 0px;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+
+            //
+            isolation: auto;
+            min-inline-size: 0px;
+            min-block-size: 0px;
+            border-radius: 0px;
+
+            //
+            max-inline-size: stretch;
+            max-block-size: stretch;
+        }
+
+        //
+        & {
+            background-color: transparent !important;
+            display: grid !important;
+            gap: 0px !important;
+            grid-template-columns: var(--tabbed-grid-columns) !important;
+            grid-template-rows: var(--tabbed-grid-rows) !important;
+            grid-template-areas: "content tabs" !important;
+            inline-size: stretch;
+            block-size: stretch;
+            position: relative;
+            container-type: inline-size;
+            padding: 0px !important;
+            margin: 0px !important;
+            perspective: 1000;
+            border-radius: 0px !important;
+
+            //
+            overflow: hidden !important;
+            contain: strict !important;
+            writing-mode: horizontal-tb;
+        }
+
+        //
+        @at-root #{$at-host-orient-1} {
+            --tabbed-grid-columns: minmax(0px, var(--tabbed-bar-column-size)) minmax(0px, 1fr);
+            --tabbed-grid-rows: minmax(0px, 1fr);
+            grid-template-areas: "tabs content" !important;
+        }
+
+        //
+        @at-root #{$at-host-orient-3} {
+            --tabbed-grid-columns: minmax(0px, 1fr) minmax(0px, var(--tabbed-bar-column-size));
+            --tabbed-grid-rows: minmax(0px, 1fr);
+            grid-template-areas: "content tabs" !important;
+        }
+
+        //
+        @at-root #{$at-host-orient-0} {
+            --tabbed-grid-columns: minmax(0px, 1fr);
+            --tabbed-grid-rows: minmax(0px, 1fr) minmax(0px, var(--tabbed-bar-block-size));
+            grid-template-areas: "content" "tabs" !important;
+        }
+
+        //
+        @at-root #{$at-host-orient-2} {
+            --tabbed-grid-columns: minmax(0px, 1fr);
+            --tabbed-grid-rows: minmax(0px, var(--tabbed-bar-block-size)) minmax(0px, 1fr);
+            grid-template-areas: "tabs" "content" !important;
+        }
+
+        //
+        :where(.ui-tabbed-box-tabs, .ui-tabbed-box-content) {
+            margin: 0;
+        }
+
+        //
+        .ui-tabbed-box-tabs-container {
+            margin-block: 0;
+            display: flex;
+            grid-area: tabs;
+            inline-size: stretch;
+            block-size: stretch;
+            max-block-size: stretch;
+            min-block-size: 3rem;
+            flex-wrap: nowrap;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 0px;
+            padding: 0px;
+            border-radius: 0px;
+            overflow: visible;
+            background-color: transparent;
+            background-image: none;
+            isolation: auto;
+            scrollbar-width: none;
+
+            //
+            position: relative;
+            z-index: 90;
+
+            //
+            place-content: center;
+            place-items: center;
+            text-align: center;
+            /*backdrop-filter: blur(0);*/
+            pointer-events: none;
+            /*filter: drop-shadow(0 0 0.5rem oklch(from #000 l c h / 0.1));*/
+            transform: translateZ(0);
+
+            //
+            .ui-tabbed-box-tabs {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                gap: var(--tabbed-tab-gap);
+                padding-block: calc(var(--tabbed-padding-block) * 0.65);
+                padding-inline: calc(var(--tabbed-padding-inline) * 0.5);
+                pointer-events: auto;
+                touch-action: pan-x pan-y;
+                scrollbar-gutter: stable;
+                overscroll-behavior-inline: contain;
+                scroll-behavior: smooth;
+                border-radius: var(--tabbed-radius);
+                overflow: visible;
+                overflow-inline: auto;
+                overflow-block: visible;
+                margin-inline: 0.5rem;
+                margin-block: 0.25rem;
+                isolation: auto;
+                transform: translateZ(0);
+                scrollbar-width: none;
+                contain: strict;
+
+                //
+                position: relative;
+                z-index: 99;
+
+                //
+                place-content: center;
+                place-items: center;
+
+                //
+                min-inline-size: stretch;
+                min-block-size: var(--tabbed-bar-block-size);
+                inline-size: fit-content;
+                block-size: fit-content;
+                max-inline-size: stretch;
+                max-block-size: stretch;
+
+                //
+                justify-content: safe center;
+                justify-items: safe center;
+                background-color: oklch(from var(--surface-color) l c h / 0.8);
+                backdrop-filter: blur(16px);
+                filter: drop-shadow(0 0 0.5rem oklch(from #000 l c h / 0.2));
+                /*clip-path: inset(0px round var(--tabbed-radius));*/
+
+                //
+                &, & *, & button {
+                    touch-action: pan-x pan-y;
+                }
+            }
+
+            //
+            .ui-tabbed-box-tab {
+                display: flex;
+                flex-direction: row;
+                flex-wrap: nowrap;
+                text-wrap: nowrap;
+                flex-shrink: 0;
+                grid-area: tab;
+                touch-action: pan-x pan-y;
+                writing-mode: horizontal-tb;
+
+                //
+                position: relative;
+                border-radius: var(--radius-full);
+                padding-inline: calc(var(--tabbed-padding-inline) * 0.6);
+                padding-block: calc(var(--tabbed-padding-block) * 0.6);
+                letter-spacing: 0.01em;
+                cursor: pointer;
+                color: color-mix(in oklch, var(--md3-on-surface) 85%, transparent);
+                background-color: transparent;
+
+                //
+                place-content: center;
+                place-items: center;
+                text-align: center;
+
+                //
+                transition: color var(--duration-normal) var(--ease-out), transform var(--duration-fast) var(--ease-emphasized);
+                overflow: visible;
+
+                //
+                & { min-block-size: 3rem; min-inline-size: 4rem; inline-size: fit-content; max-inline-size: stretch; background-color: transparent; }
+
+                //
+                &::after {
+                    overflow: visible;
+                    content: "";
+                    position: absolute;
+                    inset-inline: clamp(0.75rem, 3cqi, 1.5rem);
+                    inset-block-end: calc(var(--tabbed-indicator-height) * -1);
+                    block-size: var(--tabbed-indicator-height);
+                    border-radius: var(--tabbed-indicator-height);
+                    background: currentColor;
+                    opacity: 0;
+                    transform: translate3d(0, 50%, 0) scaleX(0.6);
+                    transition: transform var(--tabbed-indicator-duration) var(--tabbed-indicator-ease),
+                                opacity var(--tabbed-indicator-duration) var(--tabbed-indicator-ease);
+
+                    place-content: center;
+                    place-items: center;
+                    text-align: center;
+                }
+
+                //
+                &:where([aria-selected="true"], [data-active], .is-active, .active) {
+                    color: var(--md3-on-primary);
+                    transform: translateY(-2px);
+
+                    place-content: center;
+                    place-items: center;
+                    text-align: center;
+
+                    &::after {
+                        opacity: 1;
+                        transform: translate3d(0, 0, 0) scaleX(1);
+                        background: var(--md3-on-primary);
+                    }
+                }
+
+                //
+                &:disabled {
+                    opacity: var(--state-opacity-disabled, 0.38);
+                }
+
+                //
+                @at-root #{$at-host-orient-0} &::after {
+                    inset-block-start: calc(var(--tabbed-indicator-height) * -1);
+                    inset-block-end: auto;
+                    transform: translate3d(0, -50%, 0) scaleX(0.6);
+                }
+            }
+
+            //
+            @at-root #{$at-host-orient-3} .ui-tabbed-box-tabs-container, #{$at-host-orient-1} .ui-tabbed-box-tabs-container {
+                writing-mode: vertical-rl;
+                flex-direction: row;
+                align-items: stretch;
+                justify-content: flex-start;
+                scrollbar-width: none;
+                gap: 0px;
+                padding: 0px;
+                min-inline-size: var(--tabbed-bar-block-size);
+                max-inline-size: stretch;
+                max-block-size: var(--tabbed-bar-column-size);
+                block-size: var(--tabbed-bar-column-size);
+                min-block-size: var(--tabbed-bar-column-size);
+                inline-size: stretch;
+                border-radius: 0px;
+                pointer-events: none;
+                background-color: transparent;
+                background-image: none;
+                z-index: 90;
+                position: relative;
+                isolation: auto;
+                transform: translateZ(0);
+                /*backdrop-filter: blur(0);*/
+
+                //
+                .ui-tabbed-box-tabs {
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                    justify-content: flex-start;
+                    gap: var(--tabbed-tab-gap);
+                    padding-block: calc(var(--tabbed-padding-inline) * 0.5);
+                    padding-inline: calc(var(--tabbed-padding-block) * 0.65);
+                    position: relative;
+                    z-index: 99;
+                    pointer-events: auto;
+                    touch-action: pan-x pan-y;
+                    scroll-behavior: smooth;
+                    scrollbar-width: none;
+                    overflow: hidden;
+                    overflow-inline: auto;
+                    overflow-block: hidden;
+                    border-radius: var(--tabbed-radius);
+                    clip-path: inset(0px round var(--tabbed-radius));
+                    min-inline-size: stretch;
+                    min-block-size: var(--tabbed-bar-column-size);
+                    inline-size: fit-content;
+                    block-size: fit-content;
+                    max-inline-size: stretch;
+                    max-block-size: stretch;
+                    margin-inline: 0.5rem;
+                    margin-block: 0.25rem;
+                    isolation: auto;
+                    transform: translateZ(0);
+                    contain: strict;
+
+                    //
+                    &, & *, & button {
+                        touch-action: pan-x pan-y;
+                    }
+                }
+
+                // Tab items for vertical orientation
+                .ui-tabbed-box-tab {
+                    writing-mode: horizontal-tb;
+                    min-inline-size: stretch;
+                    inline-size: stretch;
+                    max-inline-size: stretch;
+                    min-block-size: 3.5rem;
+                    block-size: fit-content;
+                    max-block-size: 3.5rem;
+                    padding-inline: 0px;/*calc(var(--tabbed-padding-block) * 0.75)*/;
+                    padding-block: calc(var(--tabbed-padding-inline) * 0.75);
+                    flex-direction: column;
+                    align-items: center;
+                    gap: clamp(0.25rem, 0.3cqb, 0.5rem);
+                    word-break: break-word;
+                    overflow: hidden;
+                    overflow-wrap: normal;
+                    display: flex;
+
+                    place-content: center;
+                    place-items: center;
+                    text-align: center;
+                    font-size: 0.5rem;
+                    text-overflow: ellipsis;
+
+                    justify-content: safe center;
+                    justify-items: safe center;
+                    border-radius: var(--radius-sm);
+
+                    background-color: transparent;
+
+                    // Tab label styling for vertical
+                    .ui-tabbed-box-tab-label {
+                        display: block;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        text-align: center;
+                        line-height: var(--leading-tight, 1.2);
+                        overflow-wrap: break-word;
+                        text-overflow: ellipsis;
+                        word-break: break-word;
+                        overflow: hidden;
+                        inline-size: stretch;
+                        max-inline-size: stretch;
+                        min-inline-size: 0px;
+                        block-size: fit-content;
+                    }
+
+                    span {
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        word-break: break-word;
+                    }
+
+                    // Icon styling for vertical tabs
+                    ui-icon {
+                        flex-shrink: 0;
+                        inline-size: clamp(1.25rem, 1.5cqb, 1.75rem);
+                        block-size: clamp(1.25rem, 1.5cqb, 1.75rem);
+                    }
+
+                    // Vertical indicator (on the side)
+                    &::after {
+                        inset-inline-start: calc(var(--tabbed-indicator-height) * -1);
+                        inset-inline-end: auto;
+                        inset-block: clamp(0.5rem, 2cqb, 1rem);
+                        inline-size: var(--tabbed-indicator-height);
+                        block-size: auto;
+                        transform: translate3d(-50%, 0, 0) scaleY(0.6);
+                        border-radius: calc(var(--tabbed-indicator-height) / 2);
+                    }
+
+                    &:where([aria-selected="true"], [data-active], .is-active, .active) {
+                        transform: translateX(-2px);
+
+                        &::after {
+                            transform: translate3d(0, 0, 0) scaleY(1);
+                        }
+                    }
+                }
+
+                // Orient 1 specific: indicator on left
+                @at-root #{$at-host-orient-1} .ui-tabbed-box-tabs .ui-tabbed-box-tab::after {
+                    inset-inline-start: calc(var(--tabbed-indicator-height) * -1);
+                    inset-inline-end: auto;
+                }
+
+                // Orient 3 specific: indicator on right
+                @at-root #{$at-host-orient-3} .ui-tabbed-box-tabs .ui-tabbed-box-tab::after {
+                    inset-inline-start: auto;
+                    inset-inline-end: calc(var(--tabbed-indicator-height) * -1);
+                    transform: translate3d(50%, 0, 0) scaleY(0.6);
+                }
+
+                @at-root #{$at-host-orient-3} .ui-tabbed-box-tabs .ui-tabbed-box-tab:where([aria-selected="true"], [data-active], .is-active, .active)::after {
+                    transform: translate3d(0, 0, 0) scaleY(1);
+                }
+            }
+
+            //
+            .ui-tabbed-box-handle {
+                inline-size: 0;
+                block-size: 0;
+                visibility: hidden;
+                pointer-events: none;
+
+                place-content: center;
+                place-items: center;
+                overflow: visible;
+                touch-action: pan-x;
+            }
+
+            //
+            ui-icon {
+                pointer-events: none;
+                touch-action: pan-x;
+            }
+        }
+
+        //
+        .ui-tabbed-box-content {
+            content-visibility: auto;
+            contain: strict;
+            perspective: 1000;
+            transform: translateZ(0px);
+
+            grid-area: content;
+            display: grid;
+            inline-size: stretch;
+            block-size: stretch;
+            border-radius: 0px;
+            align-content: start;
+            grid-template-columns: minmax(0px, 1fr);
+            grid-template-rows: minmax(0px, 1fr);
+            will-change: contents;
+            position: relative;
+            z-index: 0;
+
+            // immersive mode
+            grid-row: 1 / -1;
+            grid-column: 1 / -1;
+
+            //
+            max-inline-size: stretch;
+            max-block-size: stretch;
+            min-inline-size: 0px;
+            min-block-size: 0px;
+            writing-mode: horizontal-tb;
+
+            & { max-block-size: none; background-color: transparent; background-image: none; }
+
+            &::slotted(*) {
+                inline-size: stretch;
+                block-size: stretch;
+                grid-column: 1 / -1;
+                grid-row: 1 / -1;
+                //padding-inline: var(--tabbed-padding-inline);
+                //padding-block: var(--tabbed-padding-block);
+                line-height: var(--leading-normal, 1.5);
+                color: var(--md3-on-surface);
+                overflow: auto;
+                scrollbar-gutter: stable both-edges;
+                @include scrollbar();
+            }
+
+            &::slotted([aria-hidden="true"], [data-hidden], :not([data-active])) {
+                display: none !important;
+            }
+        }
+    }
+}

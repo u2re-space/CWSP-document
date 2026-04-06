@@ -16,7 +16,7 @@ import type { ShellId, ShellLayoutConfig } from "@shells/types";
 
 // @ts-ignore - SCSS import
 import style from "./base.scss?inline";
-import { ShellBase } from "@shells/shell";
+import { ShellBase } from "/frontend/shells/shells";
 
 // ============================================================================
 // BASE SHELL IMPLEMENTATION
