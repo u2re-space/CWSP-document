@@ -52,8 +52,8 @@ export { HomeView, createHomeView } from "./home/ts/outdated";
 export type { HomeViewOptions } from "./home/ts/outdated";
 
 // Print - Print-optimized view
-export { PrintView, createPrintView } from "./print";
-export type { PrintViewOptions } from "./print";
+export { PrintView, createPrintView } from "../shells/print";
+export type { PrintViewOptions } from "../shells/print";
 
 // Airpad - Quick note view
 export { AirpadView, createAirpadView } from "./airpad";

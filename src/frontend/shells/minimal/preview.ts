@@ -14,7 +14,7 @@ import { affected } from "fest/object";
 import type { ShellId, ShellLayoutConfig, ViewId } from "@shells/types";
 
 // @ts-ignore - SCSS import
-import style from "./minimal.scss?inline";
+import style from "./scss/minimal.scss?inline";
 
 // Side effect: register icon component
 import "fest/icon";

@@ -40,7 +40,10 @@ export class BaseShell extends ShellBase {
         const root = H`
             <div class="app-shell" data-shell="base">
                 <div class="app-shell__status" data-shell-status hidden aria-live="polite"></div>
-                <div class="app-shell__content" data-shell-content></div>
+                <div class="app-shell__viewport">
+                    <div class="app-shell__content" data-shell-content></div>
+                    <div class="app-shell__overlays" data-shell-overlays></div>
+                </div>
             </div>
         ` as HTMLElement;
 

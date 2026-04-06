@@ -426,7 +426,7 @@ export function registerDefaultViews(): void {
             id: "print",
             name: "Print",
             icon: "printer",
-            loader: () => import("../../views/print")
+            loader: () => import("../../shells/print")
         });
     }
 }

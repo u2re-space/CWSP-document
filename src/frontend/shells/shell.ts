@@ -42,6 +42,7 @@ export abstract class ShellBase implements Shell {
     protected toolbarViewSlot: HTMLElement | null = null;
     protected toolbarThemeSlot: HTMLElement | null = null;
     protected statusContainer: HTMLElement | null = null;
+    protected overlayContainer: HTMLElement | null = null;
 
     // View cache
     protected loadedViews = new Map<ViewId, { view: View; element: HTMLElement }>();
@@ -136,6 +137,7 @@ export abstract class ShellBase implements Shell {
         this.contentContainer = shellLayout.querySelector("[data-shell-content]") || shellLayout;
         this.toolbarContainer = shellLayout.querySelector("[data-shell-toolbar]");
         this.statusContainer = shellLayout.querySelector("[data-shell-status]");
+        this.overlayContainer = shellLayout.querySelector("[data-shell-overlays]");
         this.ensureToolbarChrome();
 
         // Apply initial theme
@@ -220,6 +222,7 @@ export abstract class ShellBase implements Shell {
         this.contentContainer = null;
         this.toolbarContainer = null;
         this.statusContainer = null;
+        this.overlayContainer = null;
         this.container = null;
         this.mounted = false;
         this.themeAttrObserver?.disconnect();
@@ -388,6 +391,7 @@ export abstract class ShellBase implements Shell {
             theme: this.getThemeRefValue(),
             layout: this.layout,
             getContentContainer: () => this.contentContainer!,
+            getOverlayContainer: () => this.overlayContainer,
             getToolbarContainer: () => this.toolbarContainer,
             setViewToolbar: (toolbar) => this.setViewToolbar(toolbar)
         };

@@ -20,6 +20,9 @@ import {
     speedDialItems
 } from "@rs-core/storage/StateStorage";
 import "@fl-ui/items/explorer/FileManager";
+import { ensureCwViewExplorerDefined } from "./CwViewExplorer";
+
+ensureCwViewExplorerDefined();
 
 // @ts-ignore
 import style from "./scss/index.scss?inline";
@@ -182,11 +185,7 @@ export class ExplorerView implements View {
         const hasFileManager = Boolean(customElements.get("ui-file-manager"));
         this.element = hasFileManager
             ? H`
-                <div class="view-explorer">
-                    <div class="view-explorer__content" data-explorer-content>
-                        <ui-file-manager view-mode="list"></ui-file-manager>
-                    </div>
-                </div>
+                <cw-view-explorer></cw-view-explorer>
             ` as HTMLElement
             : H`
                 <div class="view-explorer">

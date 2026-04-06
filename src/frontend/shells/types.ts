@@ -102,6 +102,11 @@ export interface ShellContext {
     layout: ShellLayoutConfig;
     /** Get the content container for views */
     getContentContainer: () => HTMLElement;
+    /**
+     * Optional stacking root above main content (modals, dialogs).
+     * Base shell exposes a dedicated layer; others return null (use document / app overlay).
+     */
+    getOverlayContainer: () => HTMLElement | null;
     /** Get the toolbar container (if shell supports it) */
     getToolbarContainer: () => HTMLElement | null;
     /** Register a view toolbar */

@@ -1,3 +1,5 @@
+@use "misc/index" as *;
+
 /* ai-refactor: optimized/refactored at 2026-02-13T00:23:02Z */
 @mixin spinner($size, $border, $accent, $duration: 0.8s) {
     inline-size: $size;
@@ -37,10 +39,25 @@
             background: var(--view-bg);
         }
 
+        cw-view-explorer {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-block-size: 0;
+            min-inline-size: 0;
+            block-size: 100%;
+            inline-size: 100%;
+            box-sizing: border-box;
+        }
+
         .view-explorer {
             display: flex;
             flex-direction: column;
+            flex: 1;
             block-size: 100%;
+            inline-size: 100%;
+            min-block-size: 0;
+            min-inline-size: 0;
             background-color: var(--view-bg, var(--color-surface, #ffffff));
             color: var(--view-fg, var(--color-on-surface, #1a1a1a));
         }

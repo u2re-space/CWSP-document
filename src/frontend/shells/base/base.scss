@@ -1,5 +1,5 @@
 /* ai-refactor: optimized/refactored at 2026-02-13T00:24:03Z */
-@use "../../shared/scss/views.scss" as v;
+@use "../scss/views.scss" as v;
 
 @layer shell.tokens, shell.base, shell.components, shell.utilities, shell.overrides;
 
@@ -34,17 +34,34 @@
         --shell-nav-fg: light-dark(var(--color-on-surface), var(--color-on-surface));
         --shell-nav-border: light-dark(var(--color-outline-variant), var(--color-outline-variant));
     }
+
+    /* cw-shell-base :host — fill grid cell; shadow layout is not document-level */
+    :host:has(> .app-shell) {
+        display: block;
+        min-inline-size: 0;
+        min-block-size: 0;
+        inline-size: 100%;
+        block-size: 100%;
+        align-self: stretch;
+        justify-self: stretch;
+        --shell-bg: light-dark(var(--color-surface), var(--color-surface));
+        --shell-fg: light-dark(var(--color-on-surface), var(--color-on-surface));
+    }
+
+    :host([data-theme="dark"]):has(> .app-shell) {
+        --shell-bg: var(--color-surface);
+        --shell-fg: var(--color-on-surface);
+    }
 }
 
 @layer shell.base {
     :where(.app-shell, .app-shell[data-style="raw"]) {
         position: absolute;
-        inset: -1;
-        display: grid;
-        grid-template-rows: [toolbar-row] auto [content-row] minmax(0, 1fr);
-        grid-template-columns: minmax(0, 1fr);
-        align-items: center;
-        justify-content: center;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
         gap: 0;
         padding: 0;
         margin: 0;
@@ -60,7 +77,8 @@
         color: var(--shell-fg);
         font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, BlinkMacSystemFont, "Segoe UI", sans-serif;
         color-scheme: light dark;
-        contain: strict;
+        /* layout + style only: strict containment clips fixed descendants and breaks some hosts */
+        contain: layout style;
         -webkit-tap-highlight-color: transparent;
         transition: background-color 0.2s ease, color 0.2s ease;
         border-radius: 0px;
@@ -95,9 +113,18 @@
         }
     }
 
-    .app-shell__content {
+    .app-shell__viewport {
         position: relative;
-        flex: 1;
+        flex: 1 1 0;
+        min-inline-size: 0;
+        min-block-size: 0;
+        overflow: hidden;
+        isolation: isolate;
+    }
+
+    .app-shell__content {
+        position: absolute;
+        inset: 0;
         display: flex;
         flex-direction: column;
         inline-size: stretch;
@@ -107,15 +134,16 @@
         min-inline-size: 0;
         min-block-size: 0;
         padding: 0;
-        overflow: hidden;
+        overflow: auto;
         scrollbar-width: thin;
         scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
         container-type: size;
         border-radius: 0px;
 
         & > * {
-            flex: 1;
-            overflow: auto;
+            flex: 1 1 auto;
+            min-block-size: 0;
+            min-inline-size: 0;
         }
 
         &::-webkit-scrollbar {
@@ -129,6 +157,18 @@
         &::-webkit-scrollbar-thumb {
             background-color: rgba(128, 128, 128, 0.4);
             border-radius: 4px;
+        }
+    }
+
+    .app-shell__overlays {
+        position: absolute;
+        inset: 0;
+        z-index: 10000;
+        pointer-events: none;
+        overflow: visible;
+
+        & > * {
+            pointer-events: auto;
         }
     }
 
@@ -233,7 +273,16 @@
             }
         }
 
+        .app-shell__viewport {
+            display: contents !important;
+        }
+
+        .app-shell__overlays {
+            display: none !important;
+        }
+
         .app-shell__content {
+            position: static !important;
             overflow: visible;
             contain: none;
 
@@ -297,31 +346,16 @@
     }
 
     .app-shell__content {
-        position: relative;
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow: auto hidden;
         scroll-behavior: smooth;
-        scrollbar-width: thin;
         scrollbar-color: var(--shell-scrollbar, rgba(128, 128, 128, 0.3)) transparent;
-        container-type: size;
 
         &::-webkit-scrollbar {
             inline-size: 6px;
         }
 
-        &::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
         &::-webkit-scrollbar-thumb {
             background-color: var(--shell-scrollbar, rgba(128, 128, 128, 0.3));
             border-radius: 3px;
-        }
-
-        & > * {
-            flex: 1;
         }
     }
 
