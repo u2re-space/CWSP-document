@@ -308,6 +308,12 @@
             min-block-size: fit-content;
         }
 
+        /* Settings: inner `.settings-screen__body` scrolls; keep tabs + footer fixed in the view box */
+        [data-view="settings"] {
+            overflow: hidden;
+            min-block-size: 0;
+        }
+
         /*
          * Views assigned to <slot name="view"> live in light DOM; descendant selectors
          * do not cross shadow boundaries — use ::slotted for cw-shell-* wrappers.
@@ -321,6 +327,11 @@
             block-size: stretch;
             min-inline-size: 0;
             min-block-size: fit-content;
+        }
+
+        slot[name="view"]::slotted([data-view="settings"]) {
+            overflow: hidden;
+            min-block-size: 0;
         }
 
         & > * {

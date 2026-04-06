@@ -23,30 +23,11 @@
         "last 1 chrome version",
         "last 1 edge version"
     ],
-    "overrides": {
-        "@rollup/rollup-win32-x64-msvc": "npm:@rollup/wasm-node@latest",
-        "@rollup/rollup-linux-x64-gnu": "npm:@rollup/wasm-node@latest",
-        "rollup": "npm:@rollup/wasm-node@latest",
-        "@vitejs/devtools": ">=0.0.0-alpha.32",
-        "vite-plugin-pwa": ">=1.2.0"
-    },
-    "optionalDependencies": {
-        "@rollup/rollup-linux-x64-gnu": "npm:@rollup/wasm-node@latest",
-        "@rollup/rollup-win32-x64-msvc": "npm:@rollup/wasm-node@latest",
-        "@rollup/wasm-node": ">=4.57.1",
-        "rollup": "npm:@rollup/wasm-node@latest"
-    },
-    "resolutions": {
-        "@rollup/rollup-win32-x64-msvc": "npm:@rollup/wasm-node@latest",
-        "@rollup/rollup-linux-x64-gnu": "npm:@rollup/wasm-node@latest",
-        "rollup": "npm:@rollup/wasm-node@latest"
-    },
     "devDependencies": {
         "@crxjs/vite-plugin": ">=2.2.0",
         "@jsquash/jpeg": ">=1.6.0",
         "@jsquash/png": ">=3.1.1",
         "@phosphor-icons/core": ">=2.1.1",
-        "@rollup/wasm-node": ">=4.57.1",
         "@toon-format/toon": ">=2.1.0",
         "@types/sanitize-html": ">=2.14.0",
         "autoprefixer": ">=10.4.20",
@@ -68,13 +49,12 @@
         "postcss-remove-duplicate-values": ">=2.0.0",
         "prettier": ">=3.8.1",
         "quill": "^2.0.0-beta.2",
-        "rollup": "npm:@rollup/wasm-node@latest",
         "sass": ">=1.97.3",
         "socket.io-client": ">=4.8.3",
         "temml": ">=0.11.12",
         "turndown": ">=7.2.1",
         "typescript": ">=6.0.0-beta",
-        "vite": ">=7.3.1",
+        "vite": "7.3.1",
         "vite-bundle-analyzer": ">=0.10.6",
         "vite-plugin-bundle-prefetch": ">=0.0.4",
         "vite-plugin-external": ">=6.2.2",

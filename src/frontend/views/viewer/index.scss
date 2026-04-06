@@ -73,6 +73,10 @@
         --color-surface-container-high: var(--view-btn-hover-bg);
         --color-primary: #8ab4ff;
 
+        /* toolbar control hit targets */
+        --view-toolbar-btn-pad-block: 0.4rem;
+        --view-toolbar-btn-pad-inline: 0.65rem;
+
         /* units */
         --view-code-font-size: 0.9em;
     }
@@ -258,10 +262,10 @@
         align-items: center;
         gap: var(--view-toolbar-gap);
         min-block-size: 2rem;
-        padding: 0.15rem 0.65rem;
+        padding: 0.2rem 0.75rem;
         background: var(--view-toolbar-bg, var(--color-surface-container-high));
-        border-block-end: 1px solid var(--view-border);
-        box-shadow: none;
+        border-block-end: none;
+        box-shadow: 0 10px 28px -22px color-mix(in oklab, var(--view-fg) 16%, transparent);
         flex-shrink: 0;
         overflow-inline: auto;
         overflow-block: hidden;
@@ -383,11 +387,12 @@
         justify-content: safe center;
         align-content: safe center;
         justify-items: safe center;
-        gap: 0.28rem;
+        gap: 0.3rem;
         min-block-size: max-content;
-        padding: 0.25rem 0.25rem;
+        padding-block: var(--view-toolbar-btn-pad-block, 0.375rem);
+        padding-inline: var(--view-toolbar-btn-pad-inline, 0.5625rem);
         border: none;
-        border-radius: var(--radius-sm, 4px);
+        border-radius: var(--view-toolbar-btn-radius, 0.625rem);
         background: var(--color-surface, transparent);
         color: var(--color-on-surface, var(--view-fg));
         font-family: inherit;
@@ -463,16 +468,18 @@
         }
 
         @container (max-inline-size: 1024px) {
-            gap: 0.15rem;
-            padding: 0.25rem 0.25rem;
-            min-block-size: 1.625rem;
+            gap: 0.2rem;
+            padding-block: max(0.3rem, var(--view-toolbar-btn-pad-block, 0.375rem));
+            padding-inline: max(0.45rem, var(--view-toolbar-btn-pad-inline, 0.5625rem));
+            min-block-size: 1.75rem;
         }
 
         @container (max-inline-size: 768px) {
             gap: 0;
-            min-block-size: 1.75rem;
-            min-inline-size: 1.75rem;
-            padding: 0.25rem;
+            min-block-size: 1.875rem;
+            min-inline-size: 1.875rem;
+            padding-block: var(--view-toolbar-btn-pad-block, 0.4rem);
+            padding-inline: var(--view-toolbar-btn-pad-block, 0.4rem);
 
             span {
                 display: none;
@@ -702,8 +709,9 @@
         align-items: center;
         justify-content: space-between;
         gap: 0.5rem;
-        padding: 0.4rem 0.55rem;
-        border-block-end: 1px solid var(--view-border, color-mix(in oklab, var(--color-outline-variant, #334155) 70%, transparent));
+        padding: 0.45rem 0.65rem;
+        border-block-end: none;
+        box-shadow: 0 12px 32px -20px color-mix(in oklab, #000 45%, transparent);
         background: var(
             --view-toolbar-bg,
             color-mix(in oklab, var(--color-surface-container, #0f1a2b) 88%, transparent)
@@ -757,21 +765,25 @@
     .view-viewer__btn {
         display: inline-flex;
         align-items: center;
-        gap: 0.3rem;
-        padding: 0.28rem 0.45rem;
-        border: 1px solid color-mix(in oklab, var(--color-outline-variant, #334155) 70%, transparent);
-        border-radius: 0.48rem;
-        background: color-mix(in oklab, var(--color-surface-container-high, #1f2937) 62%, transparent);
+        gap: 0.35rem;
+        padding-block: var(--view-toolbar-btn-pad-block, 0.4375rem);
+        padding-inline: var(--view-toolbar-btn-pad-inline, 0.6875rem);
+        border: none;
+        border-radius: var(--view-toolbar-btn-radius, 0.625rem);
+        background: color-mix(in oklab, var(--color-on-surface, #e5e7eb) 6%, transparent);
         color: color-mix(in oklab, var(--color-on-surface, #e5e7eb) 82%, transparent);
         font: inherit;
         font-size: 0.78rem;
         line-height: 1;
         cursor: pointer;
         white-space: nowrap;
+        transition:
+            background-color var(--motion-fast, 0.14s ease),
+            color var(--motion-fast, 0.14s ease);
     }
 
     .view-viewer__btn:hover {
-        background: color-mix(in oklab, var(--color-surface-container-high, #334155) 82%, transparent);
+        background: color-mix(in oklab, var(--color-on-surface, #e5e7eb) 11%, transparent);
         color: var(--color-on-surface, #f8fafc);
     }
 
@@ -1362,6 +1374,14 @@
     :is(:root, html):has([data-shell="base"] [data-view="viewer"]) {
         --view-content-max-width: 800px;
         --view-padding-x: var(--space-6);
+    }
+
+    :is(:root, html):has([data-shell="base"] [data-view="airpad"]),
+    :is(:root, html):has([data-shell="minimal"] [data-view="airpad"]) {
+        --view-content-max-width: none;
+        --view-padding: 0;
+        --view-padding-x: 0;
+        --view-padding-y: 0;
     }
 
     :is(:root, html):has([data-shell="raw"] [data-view="home"]) {
@@ -2152,6 +2172,20 @@
         }
     }
 
+    /* Settings: fill content area; inner body scrolls; outer content does not double-scroll. */
+    .content:has(> .view-settings) {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-block-size: 0;
+    }
+
+    .content > .view-settings {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        align-self: stretch;
+    }
+
     .content,
     .view-settings,
     .workcenter-view {
@@ -2848,6 +2882,8 @@
             position: relative;
             inline-size: 20px;
             block-size: 20px;
+            min-block-size: unset;
+            aspect-ratio: 1;
             border: none;
             background: var(--color-surface-container-highest);
             cursor: pointer;
@@ -3443,7 +3479,7 @@
         isolation: isolate;
 
         background: var(--color-surface-container-high, var(--view-toolbar-surface));
-        border-block-end: 1px solid var(--view-toolbar-divider);
+        border-block-end: none;
         box-shadow: var(--view-toolbar-shadow);
 
         button.view-viewer__btn > ui-icon.view-viewer__toolbar-icon,
@@ -3459,23 +3495,6 @@
             inline-size: var(--view-toolbar-icon-size);
             block-size: var(--view-toolbar-icon-size);
             aspect-ratio: 1;
-        }
-
-        &::after {
-            content: "";
-            position: absolute;
-            inset-block-start: 0;
-            inset-inline: 0;
-            block-size: 1px;
-            background: linear-gradient(
-                90deg,
-                transparent,
-                color-mix(in oklab, var(--color-primary, #007acc) 22%, transparent) 50%,
-                transparent
-            );
-            opacity: 45%;
-            pointer-events: none;
-            z-index: 0;
         }
 
         & > * {
@@ -3528,15 +3547,13 @@
     }
 
     .view-viewer__toolbar-left .view-viewer__toolbar-group + .view-viewer__toolbar-group {
-        padding-inline-start: var(--view-toolbar-gap, 0.5rem);
+        padding-inline-start: calc(var(--view-toolbar-gap, 0.5rem) + 0.15rem);
         margin-inline-start: 0;
-        border-inline-start: 1px solid var(--view-toolbar-divider);
     }
 
     .view-viewer__toolbar-right .view-viewer__toolbar-group + .view-viewer__toolbar-group {
-        padding-inline-start: var(--view-toolbar-gap, 0.5rem);
+        padding-inline-start: calc(var(--view-toolbar-gap, 0.5rem) + 0.15rem);
         margin-inline-start: 0;
-        border-inline-start: 1px solid var(--view-toolbar-divider);
     }
 
     .view-viewer__toolbar-left {
@@ -3545,9 +3562,8 @@
 
     .view-viewer__toolbar-right {
         justify-content: flex-end;
-        padding-inline-start: var(--view-toolbar-gap, 0.5rem);
+        padding-inline-start: calc(var(--view-toolbar-gap, 0.5rem) + 0.25rem);
         margin-inline-start: 0;
-        border-inline-start: 1px solid var(--view-toolbar-divider);
     }
 
     button.view-viewer__btn {
@@ -3555,11 +3571,12 @@
         flex-direction: row;
         align-items: center;
         justify-content: center;
-        gap: 0.35rem;
-        min-block-size: 2rem;
-        padding: 0.35rem 0.5rem;
-        border: 1px solid transparent;
-        border-radius: var(--radius-md, 6px);
+        gap: 0.375rem;
+        min-block-size: 2.125rem;
+        padding-block: var(--view-toolbar-btn-pad-block, 0.4375rem);
+        padding-inline: var(--view-toolbar-btn-pad-inline, 0.6875rem);
+        border: none;
+        border-radius: var(--view-toolbar-btn-radius, 0.625rem);
         background: transparent;
         color: var(--color-on-surface, var(--view-fg));
         font-family: inherit;
@@ -3576,10 +3593,9 @@
         contain: none;
         container-type: normal;
         transition:
-            background-color var(--motion-fast, 0.12s ease),
-            color var(--motion-fast, 0.12s ease),
-            border-color var(--motion-fast, 0.12s ease),
-            box-shadow var(--motion-fast, 0.12s ease);
+            background-color var(--motion-fast, 0.14s ease),
+            color var(--motion-fast, 0.14s ease),
+            box-shadow var(--motion-fast, 0.14s ease);
 
         span {
             font-size: 0.6875rem;
@@ -3592,8 +3608,7 @@
         }
 
         &:hover {
-            background: color-mix(in oklab, var(--color-on-surface, var(--view-fg)) 7%, transparent);
-            border-color: color-mix(in oklab, var(--view-border) 80%, transparent);
+            background: color-mix(in oklab, var(--color-on-surface, var(--view-fg)) 9%, transparent);
 
             span {
                 opacity: 0.95;
@@ -3605,7 +3620,7 @@
         }
 
         &:active {
-            background: color-mix(in oklab, var(--color-on-surface, var(--view-fg)) 11%, transparent);
+            background: color-mix(in oklab, var(--color-on-surface, var(--view-fg)) 13%, transparent);
 
             & > ui-icon.view-viewer__toolbar-icon {
                 --icon-color: var(--view-picon-fill-active);
@@ -3619,18 +3634,17 @@
 
         &:focus-visible {
             outline: none;
-            border-color: var(--color-primary, #007acc);
             box-shadow: var(--focus-ring, 0 0 0 2px color-mix(in oklab, var(--color-primary, #007acc) 45%, transparent));
         }
 
         &[aria-pressed="true"] {
-            background: color-mix(in oklab, var(--color-primary, #007acc) 12%, transparent);
-            border-color: color-mix(in oklab, var(--color-primary, #007acc) 35%, transparent);
+            background: color-mix(in oklab, var(--color-primary, #007acc) 16%, transparent);
         }
 
         @container (max-inline-size: 720px) {
-            gap: 0.2rem;
-            padding: 0.3rem 0.4rem;
+            gap: 0.25rem;
+            padding-block: 0.375rem;
+            padding-inline: 0.5625rem;
             min-block-size: 2.25rem;
         }
 
@@ -3639,8 +3653,9 @@
             gap: 0;
             min-block-size: 2.5rem;
             min-inline-size: 2.5rem;
-            padding: 0.35rem;
-            border-radius: var(--radius-lg, 8px);
+            padding-block: 0.45rem;
+            padding-inline: 0.45rem;
+            border-radius: var(--view-toolbar-btn-radius, 0.75rem);
 
             span {
                 position: absolute;
@@ -3862,14 +3877,17 @@
     --view-toolbar-pad-inline: 0.625rem;
     --view-toolbar-gap: 0.5rem;
     --view-toolbar-group-gap: 0.125rem;
-    --view-toolbar-divider: color-mix(in oklab, var(--view-border) 65%, transparent);
+    --view-toolbar-divider: color-mix(in oklab, var(--view-border) 35%, transparent);
+    --view-toolbar-btn-radius: 0.625rem;
+    --view-toolbar-btn-pad-block: 0.4375rem;
+    --view-toolbar-btn-pad-inline: 0.6875rem;
     --view-toolbar-surface: light-dark(
         color-mix(in oklab, var(--color-surface-container-high, #ececec) 92%, var(--color-surface, #fff) 8%),
         color-mix(in oklab, var(--color-surface-container-high, #2a2a2a) 88%, var(--color-surface, #121212) 12%)
     );
     --view-toolbar-shadow: light-dark(
-        0 1px 0 color-mix(in oklab, var(--color-on-surface, #000) 6%, transparent),
-        0 1px 0 color-mix(in oklab, #fff 8%, transparent)
+        0 10px 28px -18px color-mix(in oklab, var(--color-on-surface, #1a1a1a) 12%, transparent),
+        0 14px 36px -22px color-mix(in oklab, #000 50%, transparent)
     );
 
     /* units */

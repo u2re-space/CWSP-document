@@ -12,7 +12,7 @@
  */
 
 import { H } from "fest/lure";
-import type { ShellId, ShellLayoutConfig } from "@shells/types";
+import type { ShellId, ShellLayoutConfig, ShellTheme } from "@shells/types";
 
 // @ts-ignore - SCSS import
 import style from "./base.scss?inline";
@@ -38,12 +38,17 @@ export class BaseShell extends ShellBase {
 
     protected createLayout(): HTMLElement {
         const root = H`
-            <div class="app-shell" data-shell="base">
-                <div class="app-shell__status" data-shell-status hidden aria-live="polite"></div>
+            <div class="app-shell" data-shell="base" data-style="base">
                 <div class="app-shell__viewport">
-                    <div class="app-shell__content" data-shell-content></div>
+                    <main class="app-shell__content" data-shell-content role="main">
+                        <div class="app-shell__loading">
+                            <div class="loading-spinner"></div>
+                            <span>Loading...</span>
+                        </div>
+                    </main>
                     <div class="app-shell__overlays" data-shell-overlays></div>
                 </div>
+                <div class="app-shell__status" data-shell-status hidden aria-live="polite"></div>
             </div>
         ` as HTMLElement;
 
@@ -52,6 +57,55 @@ export class BaseShell extends ShellBase {
 
     protected getStylesheet(): string | null {
         return style;
+    }
+
+    /**
+     * Theme lives on `cw-shell-*` in `applyTheme`; inner `.app-shell` needs the same `data-theme`
+     * so shell SCSS `&[data-theme="light"|"dark"]` and token rules apply (matches MinimalShell).
+     */
+    protected applyTheme(theme: ShellTheme): void {
+        const inner = this.rootElement?.shadowRoot?.querySelector(".app-shell") as HTMLElement | null;
+        if (inner) {
+            inner.dataset.theme = this.resolveShellColorScheme(theme);
+        }
+        super.applyTheme(theme);
+    }
+
+    /**
+     * Match MinimalShell: assign `slot="view"` and append the view to the shell host (light DOM).
+     * Document-level view CSS (`views.scss`, adopted view sheets) does not pierce shadow roots; views
+     * must not live only under `.app-shell__content` inside the shadow tree.
+     */
+    protected renderView(element: HTMLElement): void {
+        if (!this.contentContainer || !this.rootElement) {
+            console.warn(`[${this.id}] No content container available`);
+            return;
+        }
+
+        this.contentContainer.setAttribute("data-current-view", this.currentView.value);
+
+        const previousId = this.navigationState.previousView;
+        if (previousId && previousId !== this.currentView.value && this.loadedViews.has(previousId)) {
+            const prev = this.loadedViews.get(previousId)!;
+            prev.element.removeAttribute("data-view");
+            prev.element.hidden = true;
+            if (this.rootElement.contains(prev.element)) {
+                prev.element.remove();
+            }
+        }
+
+        element.setAttribute("data-view", this.currentView.value);
+        element.hidden = false;
+        element.slot = "view";
+
+        if (!this.rootElement.contains(element)) {
+            this.rootElement.appendChild(element);
+        }
+
+        const loading = this.contentContainer.querySelector(".app-shell__loading") as HTMLElement | null;
+        if (loading) loading.hidden = true;
+
+        this.currentViewElement = element;
     }
 
     async mount(container: HTMLElement): Promise<void> {

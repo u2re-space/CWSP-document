@@ -815,29 +815,12 @@ export class ViewerView extends BaseElement implements View {
         }
     }
 
-    /** Toolbar center label: filename, first heading, source basename, or app default. */
-    private syncToolbarDocumentTitle(mdRoot?: Element | null): void {
+    /** Toolbar center title span stays empty (no document label in chrome). */
+    private syncToolbarDocumentTitle(_mdRoot?: Element | null): void {
         const titleEl = this.element?.querySelector("[data-viewer-toolbar-title]") as HTMLElement | null;
         if (!titleEl) return;
-        let label = (this.options.filename || "").trim();
-        if (!label && mdRoot) {
-            const h1 =
-                (mdRoot.querySelector(":scope > h1") as HTMLElement | null) ??
-                (mdRoot.querySelector("h1") as HTMLElement | null);
-            label = (h1?.textContent || "").trim();
-        }
-        if (!label && this.sourceUrl) {
-            try {
-                const u = new URL(this.sourceUrl, globalThis.location?.href ?? undefined);
-                const seg = u.pathname.split("/").filter(Boolean).pop();
-                if (seg) label = decodeURIComponent(seg);
-            } catch {
-                /* ignore */
-            }
-        }
-        if (!label) label = "Markdown viewer";
-        titleEl.textContent = label;
-        titleEl.setAttribute("title", label);
+        titleEl.textContent = "";
+        titleEl.removeAttribute("title");
     }
 
     private isUnsafeProtocol(value: string): boolean {

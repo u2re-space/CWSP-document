@@ -25,6 +25,7 @@ import { fetchSwCachedEntries } from "@rs-com/core/ShareTargetGateway";
 // @ts-ignore - bundled as inline stylesheet
 import style from "../../views/views.scss?inline";
 import { recognizeByInstructions } from "@rs-com/service/processing/unified";
+import type { FileManager } from "../../views/explorer";
 
 
 

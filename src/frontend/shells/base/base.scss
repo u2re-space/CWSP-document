@@ -1,11 +1,10 @@
 /* ai-refactor: optimized/refactored at 2026-02-13T00:24:03Z */
-@use "../scss/views.scss" as v;
 
 @layer shell.tokens, shell.base, shell.components, shell.utilities, shell.overrides;
 
 @layer shell.tokens {
-    :root:has(.app-shell, .app-shell[data-style="raw"]),
-    :where(.app-shell, .app-shell[data-style="raw"]) {
+    :root:has(.app-shell, .app-shell[data-style="base"], .app-shell[data-style="raw"]),
+    :where(.app-shell, .app-shell[data-style="base"], .app-shell[data-style="raw"]) {
         color-scheme: light dark;
 
         /* colors */
@@ -55,7 +54,12 @@
 }
 
 @layer shell.base {
-    :where(.app-shell, .app-shell[data-style="raw"]) {
+    /* Match inner chrome surface; avoids host vs .app-shell mismatch when theme updates (see MinimalShell). */
+    :host:has(> .app-shell) {
+        background-color: var(--shell-bg);
+    }
+
+    :where(.app-shell, .app-shell[data-style="base"], .app-shell[data-style="raw"]) {
         position: absolute;
         inset: 0;
         display: flex;
@@ -98,7 +102,7 @@
 }
 
 @layer shell.components {
-    :where(.app-shell, .app-shell[data-style="raw"]) {
+    :where(.app-shell, .app-shell[data-style="base"], .app-shell[data-style="raw"]) {
         .loading-spinner {
             inline-size: 32px;
             block-size: 32px;
@@ -120,6 +124,8 @@
         min-block-size: 0;
         overflow: hidden;
         isolation: isolate;
+        /* Flex/grid child: allow shrinking so nested `minmax(0,1fr)` chains don’t overflow the shell. */
+        align-self: stretch;
     }
 
     .app-shell__content {
@@ -195,8 +201,8 @@
 
     .app-shell__loading {
         position: absolute;
-        inset: -1;
-        display: none;
+        inset: 0;
+        display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
@@ -208,6 +214,13 @@
         min-inline-size: 0;
         min-block-size: 0;
         padding: var(--space-2xl, 2rem);
+        z-index: 1;
+        background-color: var(--shell-bg);
+        color: var(--shell-fg);
+
+        &[hidden] {
+            display: none !important;
+        }
 
         .loading-spinner {
             inline-size: 32px;
@@ -256,7 +269,7 @@
     
 
     @media (max-width: 480px) {
-        :where(.app-shell, .app-shell[data-style="raw"]) {
+        :where(.app-shell, .app-shell[data-style="base"], .app-shell[data-style="raw"]) {
             --shell-nav-height: 48px;
         }
     }

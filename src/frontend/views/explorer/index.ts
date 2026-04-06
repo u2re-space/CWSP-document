@@ -19,8 +19,11 @@ import {
     createEmptySpeedDialItem,
     speedDialItems
 } from "@rs-core/storage/StateStorage";
-import "@fl-ui/items/explorer/FileManager";
+import "../../../../shared/fest/fl-ui/services/file-manager";
 import { ensureCwViewExplorerDefined } from "./CwViewExplorer";
+
+/** Re-export for lazy-loaded routes that expect `FileManager` on the explorer module. */
+export { FileManager, FileManagerContent } from "../../../../shared/fest/fl-ui/services/file-manager";
 
 ensureCwViewExplorerDefined();
 
@@ -50,10 +53,24 @@ type ContextMenuItem = {
 const openExplorerContextMenu = (x: number, y: number, items: ContextMenuItem[]): void => {
     const menu = document.createElement("div");
     menu.className = "rs-explorer-context-menu";
-    menu.style.position = "fixed";
-    menu.style.left = `${x}px`;
-    menu.style.top = `${y}px`;
-    menu.style.zIndex = "10000";
+    menu.setAttribute("role", "menu");
+
+    const closeMenu = () => {
+        document.removeEventListener("click", onDocClick, true);
+        document.removeEventListener("keydown", onKey, true);
+        menu.remove();
+    };
+
+    const onDocClick = (ev: MouseEvent) => {
+        if (!menu.contains(ev.target as Node)) closeMenu();
+    };
+
+    const onKey = (ev: KeyboardEvent) => {
+        if (ev.key === "Escape") {
+            ev.preventDefault();
+            closeMenu();
+        }
+    };
 
     for (const item of items) {
         const button = document.createElement("button");
@@ -67,12 +84,33 @@ const openExplorerContextMenu = (x: number, y: number, items: ContextMenuItem[])
         menu.append(button);
     }
 
-    const closeMenu = () => {
-        document.removeEventListener("click", closeMenu);
-        menu.remove();
-    };
-    document.addEventListener("click", closeMenu, { once: true });
     document.body.append(menu);
+
+    const pad = 8;
+    const vw = globalThis.innerWidth;
+    const vh = globalThis.innerHeight;
+    let left = x;
+    let top = y;
+    const rect = menu.getBoundingClientRect();
+    if (left + rect.width > vw - pad) left = Math.max(pad, vw - rect.width - pad);
+    if (top + rect.height > vh - pad) top = Math.max(pad, vh - rect.height - pad);
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+
+    requestAnimationFrame(() => {
+        const r2 = menu.getBoundingClientRect();
+        let l2 = left;
+        let t2 = top;
+        if (l2 + r2.width > vw - pad) l2 = Math.max(pad, vw - r2.width - pad);
+        if (t2 + r2.height > vh - pad) t2 = Math.max(pad, vh - r2.height - pad);
+        menu.style.left = `${l2}px`;
+        menu.style.top = `${t2}px`;
+    });
+
+    queueMicrotask(() => {
+        document.addEventListener("click", onDocClick, true);
+    });
+    document.addEventListener("keydown", onKey, true);
 };
 
 const requestOpenView = (request: {

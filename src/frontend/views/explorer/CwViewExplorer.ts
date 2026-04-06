@@ -2,7 +2,7 @@
  * Semantic host for the Explorer file tree. Renders the standard shell layout
  * and a single <ui-file-manager> child (OPFS + virtual /assets).
  */
-import "@fl-ui/items/explorer/FileManager";
+import "../../../../shared/fest/fl-ui/services/file-manager";
 
 const TAG = "cw-view-explorer";
 
@@ -11,6 +11,7 @@ export class CwViewExplorer extends HTMLElement {
         if (this.querySelector(".view-explorer")) return;
         const shell = document.createElement("div");
         shell.className = "view-explorer";
+        shell.setAttribute("aria-label", "File explorer");
         const content = document.createElement("div");
         content.className = "view-explorer__content";
         content.setAttribute("data-explorer-content", "");

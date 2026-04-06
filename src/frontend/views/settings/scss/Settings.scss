@@ -117,46 +117,44 @@
         --view-layout: "flex";
         --view-sidebar-visible: true;
         --view-padding: var(--space-6);
-        --view-content-max-width: 640px;
+        --view-content-max-width: none;
         --view-section-gap: var(--space-8);
         --view-field-gap: var(--space-4);
 
         /* colors */
         --view-label-color: var(--color-text-secondary);
+
+        /* softer chrome (borders → low-contrast hairlines + lift) */
+        --settings-divider: color-mix(in oklab, var(--color-outline-variant) 32%, transparent);
+        --settings-card-surface: color-mix(in oklab, var(--color-surface-container) 92%, var(--color-surface));
+        --settings-card-edge: color-mix(in oklab, var(--color-outline-variant) 16%, transparent);
+        --settings-card-shadow: 0 2px 20px color-mix(in oklab, var(--color-on-surface) 5%, transparent);
+        --settings-chip-edge: color-mix(in oklab, var(--color-outline-variant) 12%, transparent);
     }
 }
 
 @layer components {
     .view-settings {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-xl);
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr);
+        align-content: stretch;
+        justify-items: stretch;
+        gap: 0;
+        row-gap: 0;
         inline-size: 100%;
         block-size: 100%;
         max-block-size: 100%;
-        margin-inline: auto;
-        padding: var(--space-lg);
-        overflow: auto;
+        min-block-size: 0;
+        margin-inline: 0;
+        padding: 0.25rem;
+        overflow: hidden;
         background-color: var(--view-bg, var(--color-surface, #ffffff));
         color: var(--view-fg, var(--color-on-surface, #1a1a1a));
         text-align: start;
-        scrollbar-width: thin;
-        scrollbar-color: var(--color-outline-variant) transparent;
 
-        @supports (justify-content: safe center) {
-            align-content: safe center;
-            align-items: safe center;
-            justify-content: safe center;
-            justify-items: safe center;
-        }
-
-        @supports not (justify-content: safe center) {
-            justify-content: flex-start;
-            align-items: stretch;
-        }
-
-        & {
-            justify-content: start;
+        [data-action="save"] {
+            justify-self: start;
         }
 
         :where(select, input, textarea, option) {
@@ -189,19 +187,23 @@
             gap: var(--spacing-md, 12px);
             padding: var(--spacing-md, 16px);
             inline-size: stretch;
-            background: var(--color-surface-container);
-            border: 1px solid var(--color-outline-variant);
-            border-radius: var(--radius-lg, 12px);
+            border: none;
+            border-radius: var(--radius-xl, 16px);
+            background: var(--settings-card-surface, color-mix(in oklab, var(--color-surface-container) 92%, var(--color-surface)));
+            box-shadow:
+                var(--settings-card-shadow, 0 2px 20px color-mix(in oklab, var(--color-on-surface) 5%, transparent)),
+                0 0 0 1px var(--settings-card-edge, color-mix(in oklab, var(--color-outline-variant) 16%, transparent));
 
             @container (max-inline-size: 480px) {
                 gap: var(--spacing-sm, 10px);
-                padding: var(--spacing-sm, 10px);
+                padding: var(--spacing-md, 14px);
+                border-radius: var(--radius-lg, 14px);
             }
 
             h3 {
                 margin: 0;
                 font-size: var(--text-base, 15px);
-                font-weight: var(--font-weight-bold, 700);
+                font-weight: var(--font-weight-semibold, 600);
                 letter-spacing: -0.01em;
                 color: var(--color-on-surface);
             }
@@ -250,10 +252,11 @@
         .mcp-row {
             display: grid;
             gap: var(--space-sm, 8px);
-            padding: var(--space-sm, 10px);
-            border: 1px dashed var(--color-outline-variant);
-            border-radius: var(--radius-md, 10px);
-            background: var(--color-surface-container-low);
+            padding: var(--space-md, 12px);
+            border: none;
+            border-radius: var(--radius-lg, 14px);
+            background: color-mix(in oklab, var(--color-surface-container-low) 88%, var(--color-surface));
+            box-shadow: inset 0 0 0 1px var(--settings-card-edge, color-mix(in oklab, var(--color-outline-variant) 14%, transparent));
         }
 
         .mcp-row .field {
@@ -267,86 +270,122 @@
             opacity: 0.85;
         }
 
-        .actions {
+        .settings-screen__top {
             display: flex;
-            align-items: center;
-            gap: var(--space-sm);
-            padding-block-start: var(--spacing-sm, 8px);
-            inline-size: stretch;
             flex-direction: column;
-            flex-wrap: nowrap;
+            align-items: stretch;
+            gap: var(--space-sm);
+            padding-block-end: var(--space-md);
+            border-block-end: 1px solid var(--settings-divider, color-mix(in oklab, var(--color-outline-variant) 32%, transparent));
+            flex-shrink: 0;
+            min-inline-size: 0;
+        }
 
-            place-content: center;
-            place-items: center;
-            align-items: start;
-            align-content: start;
-            max-inline-size: stretch;
+        .settings-screen__title {
+            font-weight: var(--font-weight-semibold, 600);
+            letter-spacing: -0.015em;
+        }
 
-            h2 {
-                flex-grow: 1;
-                flex-shrink: 1;
-                flex-basis: fit-content;
-                margin-inline-end: var(--spacing-sm, 10px);
-                padding-inline: var(--spacing-md, 16px);
-                text-align: end;
+        @media (min-width: 720px) {
+            .settings-screen__top {
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .settings-screen__top .settings-tab-actions {
+                flex: 1;
+                justify-content: flex-end;
             }
         }
 
-        .settings-header {
+        .settings-screen__body {
+            min-block-size: 0;
+            min-inline-size: 0;
+            overflow: auto;
+            overflow-block: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-lg);
+            padding-block: var(--space-md);
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-outline-variant) transparent;
+        }
+
+        .settings-screen__body::-webkit-scrollbar {
+            inline-size: 6px;
+        }
+
+        .settings-screen__body::-webkit-scrollbar-thumb {
+            background: color-mix(in oklab, var(--color-outline-variant) 45%, transparent);
+            border-radius: 99px;
+
+            &:hover {
+                background: color-mix(in oklab, var(--color-outline) 55%, transparent);
+            }
+        }
+
+        .settings-screen__footer {
+            inline-size: stretch;
             display: flex;
             align-items: center;
+            justify-content: start;
             gap: var(--space-sm);
-            padding-block-start: var(--spacing-sm, 8px);
-            inline-size: stretch;
-            flex-direction: row;
-            flex-wrap: nowrap;
-            padding-inline: var(--spacing-md, 16px);
-
-            place-content: center;
-            place-items: center;
-            justify-content: space-between;
-            max-inline-size: stretch;
-
-            h2 {
-                flex-grow: 1;
-                flex-shrink: 1;
-                flex-basis: fit-content;
-                margin-inline-end: var(--spacing-sm, 10px);
-                padding-inline: var(--spacing-md, 16px);
-                text-align: start;
-                padding-block: var(--spacing-md, 16px);
-            }
+            flex-wrap: wrap;
+            flex-shrink: 0;
+            padding-block: var(--space-md, 0.25rem);
+            padding-inline: var(--space-lg, 0.5rem);
+            margin-block-start: 0;
+            border-block-start: 1px solid var(--settings-divider, color-mix(in oklab, var(--color-outline-variant) 32%, transparent));
+            background: color-mix(in oklab, var(--color-surface-container-low, var(--color-surface-container)) 72%, var(--color-surface));
+            box-shadow: 0 -12px 28px color-mix(in oklab, var(--color-on-surface) 4%, transparent);
         }
 
         .settings-tab-actions {
             display: flex;
             flex-wrap: nowrap;
-            gap: var(--space-xs);
+            gap: var(--space-xs, 6px);
             align-items: center;
             inline-size: stretch;
             container-type: inline-size;
+            justify-content: flex-start;
+            inline-size: stretch;
+            max-inline-size: stretch;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-outline-variant) transparent;
         }
 
         .settings-tab-btn {
-            padding: var(--spacing-xs, 8px) var(--spacing-sm, 12px);
-            border: 1px solid var(--color-outline-variant);
-            border-radius: var(--radius-sm, 8px);
-            background: var(--color-surface-container-low);
+            padding: 0.5rem 0.875rem;
+            min-block-size: 2.5rem;
+            border: none;
+            border-radius: var(--radius-full, 999px);
+            background: color-mix(in oklab, var(--color-surface-container-low) 94%, transparent);
             color: var(--color-on-surface-variant);
             font-size: var(--text-xs, 12px);
             font-weight: var(--font-weight-medium, 500);
             cursor: pointer;
-            transition: all var(--motion-fast);
+            transition:
+                background-color var(--motion-fast),
+                color var(--motion-fast),
+                box-shadow var(--motion-fast);
+            box-shadow: 0 0 0 1px var(--settings-chip-edge, color-mix(in oklab, var(--color-outline-variant) 12%, transparent));
 
             &:hover {
-                background: var(--color-surface-container);
+                background: color-mix(in oklab, var(--color-surface-container) 92%, transparent);
                 color: var(--color-on-surface);
             }
 
             &.is-active {
                 background: var(--color-primary);
-                border-color: var(--color-primary);
                 color: var(--color-on-primary);
+                box-shadow:
+                    0 2px 12px color-mix(in oklab, var(--color-primary) 28%, transparent),
+                    0 0 0 1px color-mix(in oklab, var(--color-primary) 40%, transparent);
             }
         }
 
@@ -359,28 +398,36 @@
         }
 
         .btn {
-            padding: var(--spacing-xs, 8px) var(--spacing-lg, 20px);
-            border: 1px solid var(--color-outline-variant);
-            border-radius: var(--radius-md, 10px);
-            background: transparent;
+            padding: 0.5rem 1.125rem;
+            min-block-size: 2.5rem;
+            border: none;
+            border-radius: var(--radius-full, 999px);
+            background: color-mix(in oklab, var(--color-surface-container) 88%, transparent);
             color: var(--color-on-surface);
             font-family: inherit;
             font-size: var(--text-sm, 13px);
             font-weight: var(--font-weight-medium, 500);
             cursor: pointer;
-            transition: all var(--motion-fast);
+            transition:
+                background-color var(--motion-fast),
+                box-shadow var(--motion-fast),
+                filter var(--motion-fast);
+            box-shadow: 0 0 0 1px var(--settings-chip-edge, color-mix(in oklab, var(--color-outline-variant) 12%, transparent));
 
             &:hover {
-                background: color-mix(in oklab, var(--color-on-surface) 5%, transparent);
+                background: color-mix(in oklab, var(--color-on-surface) 6%, transparent);
             }
 
             &.primary {
                 background: var(--color-primary);
-                border-color: var(--color-primary);
+                border-color: transparent;
                 color: var(--color-on-primary, #fff);
+                box-shadow:
+                    0 2px 14px color-mix(in oklab, var(--color-primary) 32%, transparent),
+                    0 0 0 1px color-mix(in oklab, var(--color-primary) 55%, transparent);
 
                 &:hover {
-                    filter: brightness(1.1);
+                    filter: brightness(1.06);
                 }
             }
         }
@@ -412,40 +459,65 @@
         }
 
         @container (max-inline-size: 1024px) {
-            gap: var(--space-lg);
             padding: var(--space-md);
         }
 
         @container (max-inline-size: 768px) {
-            gap: var(--space-md);
             padding: var(--space-sm);
 
-            .actions {
-                h2 {
-                    display: none;
-                }
+            .settings-screen__title {
+                font-size: var(--text-lg, 17px);
+            }
 
-                .btn.primary {
-                    margin-inline-start: auto;
-                }
+            .settings-screen__top {
+                gap: var(--space-md);
+            }
+        }
+
+        @container (max-inline-size: 560px) {
+            .settings-tab-actions {
+                gap: 0.375rem;
+            }
+
+            .settings-tab-btn {
+                min-block-size: 2.75rem;
+                padding-inline: 0.75rem;
             }
         }
 
         @container (max-inline-size: 480px) {
-            gap: var(--space-sm);
-            padding: var(--space-xs);
-        }
+            padding: var(--space-sm);
 
-        &::-webkit-scrollbar {
-            inline-size: 6px;
-        }
+            .settings-screen__title {
+                display: none;
+            }
 
-        &::-webkit-scrollbar-thumb {
-            background: var(--color-outline-variant);
-            border-radius: 3px;
+            .settings-screen__body {
+                padding-block: var(--space-sm);
+                gap: var(--space-md);
+            }
 
-            &:hover {
-                background: var(--color-outline);
+            .settings-screen__footer {
+                inline-size: stretch;
+                flex-direction: column-reverse;
+                align-items: stretch;
+                gap: var(--space-sm);
+                box-shadow: 0 -8px 24px color-mix(in oklab, var(--color-on-surface) 5%, transparent);
+                padding-block: var(--space-md, 0.25rem);
+                padding-inline: var(--space-lg, 0.5rem);
+
+                .btn.primary {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    min-block-size: 2.75rem;
+                    inline-size: 100%;
+                }
+
+                .note {
+                    text-align: center;
+                    white-space: normal;
+                }
             }
         }
 
@@ -894,18 +966,25 @@
     }
 
     .view-settings {
-        display: flex;
-        gap: var(--gap-xl);
-        padding: 0px;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr);
+        align-content: stretch;
+        justify-items: stretch;
+        gap: 0;
+        row-gap: 0;
+        padding: 0.25rem;
         border-radius: 0;
         min-inline-size: 0;
+        min-block-size: 0;
         aspect-ratio: auto;
-
         inline-size: stretch;
         block-size: stretch;
+        max-block-size: 100%;
         background-color: transparent;
         overflow: hidden;
-        contain: strict;
+        -webkit-overflow-scrolling: touch;
+        contain: layout paint;
 
         header {
             line-height: normal;
@@ -1326,13 +1405,18 @@
 
     @include rs-breakpoint("md") {
         .view-settings {
-            .settings-actions {
+            .settings-screen__footer {
+                justify-content: start;
                 flex-direction: column-reverse;
                 align-items: stretch;
                 overflow: visible;
+                gap: var(--space-sm);
 
-                .btn.save {
+                .btn.primary {
+                    display: inline-flex;
+                    align-items: center;
                     justify-content: center;
+                    inline-size: 100%;
                 }
             }
         }
@@ -1355,7 +1439,6 @@
     }
 
     /* Canonical fallback: keep settings layout readable when token/mixin stacks vary. */
-    .view-settings,
     .settings-panel,
     .settings-form {
         place-content: start !important;
@@ -1366,14 +1449,35 @@
         text-align: start !important;
     }
 
-    .view-settings :where(input, select, textarea, button) {
+    .view-settings {
+        text-align: start !important;
+    }
+
+    .view-settings :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea, button) {
         min-block-size: 2rem;
         font-size: 0.875rem;
         line-height: 1.25;
     }
 
+    .view-settings :where(input[type="checkbox"], input[type="radio"]) {
+        min-block-size: unset;
+        min-inline-size: unset;
+        box-sizing: border-box;
+    }
+
+    .view-settings .form-checkbox input[type="checkbox"],
+    .view-settings label.field.checkbox input[type="checkbox"] {
+        inline-size: 1.25rem;
+        block-size: 1.25rem;
+        min-block-size: 1.25rem;
+        aspect-ratio: 1;
+        flex-shrink: 0;
+        align-self: center;
+        border-radius: var(--radius-xs, 4px);
+    }
+
     .view-settings .settings-tab-actions {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
 }
 
@@ -1384,47 +1488,41 @@
         --view-layout: "flex";
         --view-sidebar-visible: true;
         --view-padding: var(--space-6);
-        --view-content-max-width: 640px;
+        --view-content-max-width: none;
         --view-section-gap: var(--space-8);
         --view-field-gap: var(--space-4);
 
         /* colors */
         --view-label-color: var(--color-text-secondary);
+
+        /* softer chrome (borders → low-contrast hairlines + lift) */
+        --settings-divider: color-mix(in oklab, var(--color-outline-variant) 32%, transparent);
+        --settings-card-surface: color-mix(in oklab, var(--color-surface-container) 92%, var(--color-surface));
+        --settings-card-edge: color-mix(in oklab, var(--color-outline-variant) 16%, transparent);
+        --settings-card-shadow: 0 2px 20px color-mix(in oklab, var(--color-on-surface) 5%, transparent);
+        --settings-chip-edge: color-mix(in oklab, var(--color-outline-variant) 12%, transparent);
     }
 }
 
 @layer components {
     .view-settings {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-xl);
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr);
+        align-content: stretch;
+        justify-items: stretch;
+        gap: 0;
+        row-gap: 0;
         inline-size: 100%;
         block-size: 100%;
         max-block-size: 100%;
-        margin-inline: auto;
+        min-block-size: 0;
+        margin-inline: 0;
         padding: var(--space-lg);
-        overflow: auto;
+        overflow: hidden;
         background-color: var(--view-bg, var(--color-surface, #ffffff));
         color: var(--view-fg, var(--color-on-surface, #1a1a1a));
         text-align: start;
-        scrollbar-width: thin;
-        scrollbar-color: var(--color-outline-variant) transparent;
-
-        @supports (justify-content: safe center) {
-            align-content: safe center;
-            align-items: safe center;
-            justify-content: safe center;
-            justify-items: safe center;
-        }
-
-        @supports not (justify-content: safe center) {
-            justify-content: flex-start;
-            align-items: stretch;
-        }
-
-        & {
-            justify-content: start;
-        }
 
         :where(select, input, textarea, option) {
             pointer-events: auto;
@@ -1456,19 +1554,23 @@
             gap: var(--spacing-md, 12px);
             padding: var(--spacing-md, 16px);
             inline-size: stretch;
-            background: var(--color-surface-container);
-            border: 1px solid var(--color-outline-variant);
-            border-radius: var(--radius-lg, 12px);
+            border: none;
+            border-radius: var(--radius-xl, 16px);
+            background: var(--settings-card-surface, color-mix(in oklab, var(--color-surface-container) 92%, var(--color-surface)));
+            box-shadow:
+                var(--settings-card-shadow, 0 2px 20px color-mix(in oklab, var(--color-on-surface) 5%, transparent)),
+                0 0 0 1px var(--settings-card-edge, color-mix(in oklab, var(--color-outline-variant) 16%, transparent));
 
             @container (max-inline-size: 480px) {
                 gap: var(--spacing-sm, 10px);
-                padding: var(--spacing-sm, 10px);
+                padding: var(--spacing-md, 14px);
+                border-radius: var(--radius-lg, 14px);
             }
 
             h3 {
                 margin: 0;
                 font-size: var(--text-base, 15px);
-                font-weight: var(--font-weight-bold, 700);
+                font-weight: var(--font-weight-semibold, 600);
                 letter-spacing: -0.01em;
                 color: var(--color-on-surface);
             }
@@ -1517,10 +1619,11 @@
         .mcp-row {
             display: grid;
             gap: var(--space-sm, 8px);
-            padding: var(--space-sm, 10px);
-            border: 1px dashed var(--color-outline-variant);
-            border-radius: var(--radius-md, 10px);
-            background: var(--color-surface-container-low);
+            padding: var(--space-md, 12px);
+            border: none;
+            border-radius: var(--radius-lg, 14px);
+            background: color-mix(in oklab, var(--color-surface-container-low) 88%, var(--color-surface));
+            box-shadow: inset 0 0 0 1px var(--settings-card-edge, color-mix(in oklab, var(--color-outline-variant) 14%, transparent));
         }
 
         .mcp-row .field {
@@ -1534,86 +1637,117 @@
             opacity: 0.85;
         }
 
-        .actions {
+        .settings-screen__top {
             display: flex;
-            align-items: center;
-            gap: var(--space-sm);
-            padding-block-start: var(--spacing-sm, 8px);
-            inline-size: stretch;
             flex-direction: column;
-            flex-wrap: nowrap;
+            align-items: stretch;
+            gap: var(--space-sm);
+            padding-block-end: var(--space-md);
+            border-block-end: 1px solid var(--settings-divider, color-mix(in oklab, var(--color-outline-variant) 32%, transparent));
+            flex-shrink: 0;
+            min-inline-size: 0;
+        }
 
-            place-content: center;
-            place-items: center;
-            align-items: start;
-            align-content: start;
-            max-inline-size: stretch;
+        .settings-screen__title {
+            font-weight: var(--font-weight-semibold, 600);
+            letter-spacing: -0.015em;
+        }
 
-            h2 {
-                flex-grow: 1;
-                flex-shrink: 1;
-                flex-basis: fit-content;
-                margin-inline-end: var(--spacing-sm, 10px);
-                padding-inline: var(--spacing-md, 16px);
-                text-align: end;
+        @media (min-width: 720px) {
+            .settings-screen__top {
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .settings-screen__top .settings-tab-actions {
+                flex: 1;
+                justify-content: flex-end;
             }
         }
 
-        .settings-header {
+        .settings-screen__body {
+            min-block-size: 0;
+            min-inline-size: 0;
+            overflow: auto;
+            overflow-block: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-lg);
+            padding-block: var(--space-md);
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-outline-variant) transparent;
+        }
+
+        .settings-screen__body::-webkit-scrollbar {
+            inline-size: 6px;
+        }
+
+        .settings-screen__body::-webkit-scrollbar-thumb {
+            background: color-mix(in oklab, var(--color-outline-variant) 45%, transparent);
+            border-radius: 99px;
+
+            &:hover {
+                background: color-mix(in oklab, var(--color-outline) 55%, transparent);
+            }
+        }
+
+        .settings-screen__footer {
+            inline-size: stretch;
             display: flex;
             align-items: center;
+            justify-content: start;
             gap: var(--space-sm);
-            padding-block-start: var(--spacing-sm, 8px);
-            inline-size: stretch;
-            flex-direction: row;
-            flex-wrap: nowrap;
-            padding-inline: var(--spacing-md, 16px);
-
-            place-content: center;
-            place-items: center;
-            justify-content: space-between;
-            max-inline-size: stretch;
-
-            h2 {
-                flex-grow: 1;
-                flex-shrink: 1;
-                flex-basis: fit-content;
-                margin-inline-end: var(--spacing-sm, 10px);
-                padding-inline: var(--spacing-md, 16px);
-                text-align: start;
-                padding-block: var(--spacing-md, 16px);
-            }
+            flex-wrap: wrap;
+            flex-shrink: 0;
+            padding-block: var(--space-md, 0.25rem);
+            padding-inline: var(--space-lg, 0.5rem);
+            margin-block-start: 0;
+            border-block-start: 1px solid var(--settings-divider, color-mix(in oklab, var(--color-outline-variant) 32%, transparent));
+            background: color-mix(in oklab, var(--color-surface-container-low, var(--color-surface-container)) 72%, var(--color-surface));
+            box-shadow: 0 -12px 28px color-mix(in oklab, var(--color-on-surface) 4%, transparent);
         }
 
         .settings-tab-actions {
             display: flex;
             flex-wrap: nowrap;
-            gap: var(--space-xs);
+            gap: var(--space-xs, 6px);
             align-items: center;
             inline-size: stretch;
             container-type: inline-size;
+            justify-content: flex-start;
         }
 
         .settings-tab-btn {
-            padding: var(--spacing-xs, 8px) var(--spacing-sm, 12px);
-            border: 1px solid var(--color-outline-variant);
-            border-radius: var(--radius-sm, 8px);
-            background: var(--color-surface-container-low);
+            padding: 0.5rem 0.875rem;
+            min-block-size: 2.5rem;
+            border: none;
+            border-radius: var(--radius-full, 999px);
+            background: color-mix(in oklab, var(--color-surface-container-low) 94%, transparent);
             color: var(--color-on-surface-variant);
             font-size: var(--text-xs, 12px);
             font-weight: var(--font-weight-medium, 500);
             cursor: pointer;
-            transition: all var(--motion-fast);
+            transition:
+                background-color var(--motion-fast),
+                color var(--motion-fast),
+                box-shadow var(--motion-fast);
+            box-shadow: 0 0 0 1px var(--settings-chip-edge, color-mix(in oklab, var(--color-outline-variant) 12%, transparent));
 
             &:hover {
-                background: var(--color-surface-container);
+                background: color-mix(in oklab, var(--color-surface-container) 92%, transparent);
                 color: var(--color-on-surface);
             }
 
             &.is-active {
                 background: var(--color-primary);
-                border-color: var(--color-primary);
                 color: var(--color-on-primary);
+                box-shadow:
+                    0 2px 12px color-mix(in oklab, var(--color-primary) 28%, transparent),
+                    0 0 0 1px color-mix(in oklab, var(--color-primary) 40%, transparent);
             }
         }
 
@@ -1626,28 +1760,36 @@
         }
 
         .btn {
-            padding: var(--spacing-xs, 8px) var(--spacing-lg, 20px);
-            border: 1px solid var(--color-outline-variant);
-            border-radius: var(--radius-md, 10px);
-            background: transparent;
+            padding: 0.5rem 1.125rem;
+            min-block-size: 2.5rem;
+            border: none;
+            border-radius: var(--radius-full, 999px);
+            background: color-mix(in oklab, var(--color-surface-container) 88%, transparent);
             color: var(--color-on-surface);
             font-family: inherit;
             font-size: var(--text-sm, 13px);
             font-weight: var(--font-weight-medium, 500);
             cursor: pointer;
-            transition: all var(--motion-fast);
+            transition:
+                background-color var(--motion-fast),
+                box-shadow var(--motion-fast),
+                filter var(--motion-fast);
+            box-shadow: 0 0 0 1px var(--settings-chip-edge, color-mix(in oklab, var(--color-outline-variant) 12%, transparent));
 
             &:hover {
-                background: color-mix(in oklab, var(--color-on-surface) 5%, transparent);
+                background: color-mix(in oklab, var(--color-on-surface) 6%, transparent);
             }
 
             &.primary {
                 background: var(--color-primary);
-                border-color: var(--color-primary);
+                border-color: transparent;
                 color: var(--color-on-primary, #fff);
+                box-shadow:
+                    0 2px 14px color-mix(in oklab, var(--color-primary) 32%, transparent),
+                    0 0 0 1px color-mix(in oklab, var(--color-primary) 55%, transparent);
 
                 &:hover {
-                    filter: brightness(1.1);
+                    filter: brightness(1.06);
                 }
             }
         }
@@ -1679,40 +1821,64 @@
         }
 
         @container (max-inline-size: 1024px) {
-            gap: var(--space-lg);
             padding: var(--space-md);
         }
 
         @container (max-inline-size: 768px) {
-            gap: var(--space-md);
             padding: var(--space-sm);
 
-            .actions {
-                h2 {
-                    display: none;
-                }
+            .settings-screen__title {
+                font-size: var(--text-lg, 17px);
+            }
 
-                .btn.primary {
-                    margin-inline-start: auto;
-                }
+            .settings-screen__top {
+                gap: var(--space-md);
+            }
+        }
+
+        @container (max-inline-size: 560px) {
+            .settings-tab-actions {
+                gap: 0.375rem;
+            }
+
+            .settings-tab-btn {
+                min-block-size: 2.75rem;
+                padding-inline: 0.75rem;
             }
         }
 
         @container (max-inline-size: 480px) {
-            gap: var(--space-sm);
-            padding: var(--space-xs);
-        }
+            padding: var(--space-sm);
 
-        &::-webkit-scrollbar {
-            inline-size: 6px;
-        }
+            .settings-screen__title {
+                display: none;
+            }
 
-        &::-webkit-scrollbar-thumb {
-            background: var(--color-outline-variant);
-            border-radius: 3px;
+            .settings-screen__body {
+                padding-block: var(--space-sm);
+                gap: var(--space-md);
+            }
 
-            &:hover {
-                background: var(--color-outline);
+            .settings-screen__footer {
+                inline-size: stretch;
+                flex-direction: column-reverse;
+                align-items: stretch;
+                gap: var(--space-sm);
+                padding-block: var(--space-sm);
+                box-shadow: 0 -8px 24px color-mix(in oklab, var(--color-on-surface) 5%, transparent);
+
+                .btn.primary {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    min-block-size: 2.75rem;
+                    inline-size: 100%;
+                }
+
+                .note {
+                    text-align: center;
+                    white-space: normal;
+                }
             }
         }
 

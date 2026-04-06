@@ -243,7 +243,7 @@ export abstract class ShellBase implements Shell {
             const entry = this.loadedViews.get(viewId);
             if (
                 entry?.element.isConnected &&
-                this.contentContainer?.contains(entry.element) &&
+                (this.contentContainer?.contains(entry.element) || this.rootElement?.contains(entry.element)) &&
                 !entry.element.hidden
             ) {
                 return;

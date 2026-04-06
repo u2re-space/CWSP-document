@@ -4,11 +4,29 @@
 
 @layer view.airpad {
     /*
-     * Minimal shell forces `overflow: auto` on `.app-shell__content > *` ([data-view]).
-     * That clips `position: fixed` modals (logs, hints) and traps them under rails.
-     * Scroll only the inner `.container`; keep the view root visible for overlays.
+     * Shell `.app-shell__content` uses `overflow: auto` (base/minimal). That creates a
+     * second scroll container, clips `position: fixed` modals (logs, hints), and traps
+     * them under rails. Scroll only AirPad's inner `.container`; keep the view root
+     * and shell content non-scrolling for overlays.
      */
-    :where(.app-shell__content) > :where([data-view='airpad']) {
+    [data-shell-content]:has(> [data-view="airpad"]) {
+        overflow: hidden;
+        overscroll-behavior: none;
+    }
+
+    :where(.app-shell__content) > :where([data-view="airpad"]) {
+        overflow: visible;
+    }
+
+    /* Flex column hosts: custom element must participate in height so `.view-airpad` % height resolves. */
+    cw-airpad-app[data-view="airpad"] {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        align-self: stretch;
+        min-block-size: 0;
+        min-inline-size: 0;
+        block-size: 100%;
         overflow: visible;
     }
 
