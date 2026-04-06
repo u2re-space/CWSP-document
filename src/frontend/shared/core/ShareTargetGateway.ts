@@ -101,8 +101,9 @@ export const consumeCachedShareTargetPayload = async (opts: { clear?: boolean } 
 
         const files: File[] = [];
         for (const fm of fileMeta) {
-            if (!fm?.key) continue;
-            const response = await cache.match(fm.key);
+            const fileKey = typeof fm?.key === "string" ? fm.key.trim() : String(fm?.key ?? "").trim();
+            if (!fileKey) continue;
+            const response = await cache.match(fileKey);
             if (!response) continue;
             const blob = await response.blob();
             files.push(new File([blob], fm.name || "shared-file", {

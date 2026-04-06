@@ -53,7 +53,7 @@ const resolveViewId = (input?: string): ViewId =>
  * Mount the frontend for a Chrome extension page.
  *
  * - Uses the **base** shell (chrome-less CRX wrapper).
- * - Loads "vl-core" style system.
+ * - Loads **vl-basic** (core + component tokens/styles; vl-core alone is too minimal for views).
  * - No channels or preference persistence (CRX pages are single-purpose).
  *
  * @param mountElement - DOM element to mount into
@@ -79,7 +79,7 @@ export default async function crxFrontend(
     const hasPayload = options.viewPayload !== undefined && options.viewPayload !== null;
 
     const shell = await bootLoader.boot(layers.shellLayer, {
-        styleSystem: "vl-core",
+        styleSystem: "vl-basic",
         shell:       "base",
         defaultView: view,
         channels:    [],

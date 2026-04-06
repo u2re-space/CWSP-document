@@ -221,12 +221,15 @@
                 inset: auto;
             }
 
+            /* vl-basic exposes --color-* / --view-* ; --c2-* is vl-advanced only — avoid invalid/white fallback in CRX */
             body > #app {
                 position: absolute;
                 inset: 0;
                 inset-inline-end: auto;
                 inset-block-end: auto;
-                background-color: var(--c2-surface, var(--current, currentColor));
+                background-color: var(--view-bg, var(--color-background, var(--color-surface, #f1f5f9)));
+                color: var(--view-fg, var(--color-on-background, var(--color-on-surface, #0f172a)));
+                font-family: var(--font-sans, var(--font-family, system-ui, sans-serif));
             }
 
             #overlays {
