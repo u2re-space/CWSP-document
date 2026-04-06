@@ -296,7 +296,22 @@
         box-sizing: border-box;
         border-radius: 0px;
 
+        /*
+         * Views are assigned to <slot name="view"> (light DOM of cw-shell-*).
+         * Descendant selectors here do not cross shadow → assigned nodes; use ::slotted.
+         */
         [data-view] {
+            position: absolute;
+            inset: 0;
+            overflow: auto;
+            scrollbar-width: thin;
+            inline-size: stretch;
+            block-size: stretch;
+            min-inline-size: 0;
+            min-block-size: fit-content;
+        }
+
+        slot[name="view"]::slotted([data-view]) {
             position: absolute;
             inset: 0;
             overflow: auto;
@@ -309,6 +324,13 @@
 
         & > * {
             flex: 1;
+            overflow: auto;
+        }
+
+        slot[name="view"]::slotted(*) {
+            flex: 1 1 auto;
+            min-block-size: 0;
+            min-inline-size: 0;
             overflow: auto;
         }
 
@@ -434,7 +456,8 @@
                 display: none;
             }
 
-            & > [data-view] {
+            & > [data-view],
+            slot[name="view"]::slotted([data-view]) {
                 position: static !important;
                 inset: auto !important;
                 overflow: visible !important;

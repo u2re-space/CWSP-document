@@ -8,6 +8,15 @@
 }
 
 @layer view.workcenter.base {
+    /* Standalone custom element host (shadow content is styled via adopted sheets on shadowRoot). */
+    cw-workcenter-view {
+        display: block;
+        box-sizing: border-box;
+        block-size: 100%;
+        min-block-size: 0;
+        min-inline-size: 0;
+    }
+
     .workcenter-view {
         display: flex;
         flex-direction: column;

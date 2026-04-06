@@ -5,6 +5,7 @@
  * They do NOT contain application logic - only layout structure and navigation.
  */
 
+import type { CustomElementLifecycle } from "fest-src/fest/lure/lure/misc/Glit";
 import type { refType } from "fest/object";
 
 // ============================================================================
@@ -189,7 +190,7 @@ export interface ViewLifecycle {
  * Views are content components that can be loaded into any shell.
  * They should be shell-agnostic and render their own content.
  */
-export interface View {
+export interface View extends HTMLElement, CustomElementLifecycle {
     /** Unique identifier */
     id: ViewId;
     

@@ -19,8 +19,8 @@
         block-size: 100%;
         min-inline-size: 0;
         min-block-size: 0;
-        color: var(--color-on-surface, #e5e7eb);
-        background: var(--color-surface, #060d17);
+        color: var(--view-fg, var(--color-on-surface, #e5e7eb));
+        background: var(--view-bg, var(--color-surface, #060d17));
     }
 
     .view-viewer__toolbar {
@@ -30,8 +30,11 @@
         justify-content: space-between;
         gap: 0.5rem;
         padding: 0.4rem 0.55rem;
-        border-block-end: 1px solid color-mix(in oklab, var(--color-outline-variant, #334155) 70%, transparent);
-        background: color-mix(in oklab, var(--color-surface-container, #0f1a2b) 88%, transparent);
+        border-block-end: 1px solid var(--view-border, color-mix(in oklab, var(--color-outline-variant, #334155) 70%, transparent));
+        background: var(
+            --view-toolbar-bg,
+            color-mix(in oklab, var(--color-surface-container, #0f1a2b) 88%, transparent)
+        );
         min-inline-size: 100%;
         box-sizing: border-box;
     }
@@ -47,6 +50,28 @@
     .view-viewer__toolbar-center {
         flex: 1 1 auto;
         min-inline-size: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-inline: 0.35rem;
+        pointer-events: none;
+    }
+
+    .view-viewer__toolbar-title {
+        display: block;
+        max-inline-size: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        line-height: 1.25;
+        color: color-mix(in oklab, var(--color-on-surface, #e5e7eb) 88%, transparent);
+        text-align: center;
+    }
+
+    .view-viewer__toolbar-title:empty {
+        display: none;
     }
 
     .view-viewer__toolbar-group {
@@ -88,6 +113,7 @@
         min-inline-size: 0;
         min-block-size: 0;
         overflow: auto;
-        padding: 0.9rem 1rem 1.2rem;
+        /* Prose / raw apply their own inset via viewer tokens (--view-padding). */
+        padding: 0;
     }
 }

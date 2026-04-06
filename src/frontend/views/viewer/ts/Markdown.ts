@@ -2,12 +2,12 @@
 import styles from "fest/veela/scss/runtime/basic/markdown/markdown.scss?inline&compress";
 import DOMPurify from 'dompurify';
 import { marked, type MarkedExtension } from "marked";
-import { E, H, provide } from "fest/lure";
+import { E, H, provide, defineElement, property } from "fest/lure";
 import renderMathInElement from "katex/dist/contrib/auto-render.mjs";
-
-//
+import BaseElement from "@views/base/BaseElement";
 import markedKatex from "marked-katex-extension";
 
+//
 const MATH_DELIMITER_PATTERN = /\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|(?<!\$)\$[^$\n]+\$|\\\([\s\S]*?\\\)/;
 const FENCED_CODE_PATTERN = /(^|\n)(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n\2(?=\n|$)/g;
 const INLINE_CODE_PATTERN = /`[^`\n]+`/g;
@@ -81,7 +81,7 @@ marked?.use?.(markedKatex({
 /** One document-level injection: markdown typography targets `.markdown-body`, `md-view`, etc. (see veela tokens). */
 const MD_TYPOGRAPHY_STYLE_ID = "fl-md-view-typography";
 
-function ensureMarkdownTypographyStyles(): void {
+export function ensureMarkdownTypographyStyles(): void {
     if (typeof document === "undefined") return;
     if (document.getElementById(MD_TYPOGRAPHY_STYLE_ID)) return;
     const el = document.createElement("style");
@@ -164,30 +164,39 @@ const waitForClipboardFrame = (): Promise<void> =>
  * - Better error handling
  * - Optional UI features via attributes
  */
-export class MarkdownView extends HTMLElement {
-    static observedAttributes = ["src", "content", "show-actions", "show-title", "title"];
+// @ts-ignore
+@defineElement("md-view")
+export class MarkdownView extends BaseElement {
+    @property({ source: "attr" }) src: string = "";
+    @property({ source: "attr" }) content: string = "";
+    @property({ source: "attr" }) showActions: boolean = false;
+    @property({ source: "attr" }) showTitle: boolean = false;
+    @property({ source: "attr" }) title: string = "Markdown Viewer";
 
     #content: string = "";
     #showActions: boolean = false;
     #showTitle: boolean = false;
     #title: string = "Markdown Viewer";
 
-    constructor() {
+    constructor(options: MarkdownViewerOptions = {}) {
         super();
-        this.createShadowRoot();
+        this.createShadowRoot?.();
     }
 
-    connectedCallback() {
-        ensureMarkdownTypographyStyles();
-        this.style.setProperty("pointer-events", "auto");
-        this.style.setProperty("touch-action", "manipulation");
-        this.style.setProperty("user-select", "text");
+    connectedCallback(): any {
+        super.connectedCallback();
+        const self : any = this;
 
-        this.#ensureBodyElement();
+        self.loadStyleLibrary(ensureMarkdownTypographyStyles());
+        self.style.setProperty("pointer-events", "auto");
+        self.style.setProperty("touch-action", "manipulation");
+        self.style.setProperty("user-select", "text");
+
+        self.#ensureBodyElement();
 
         // Load initial content
-        const src = this.getAttribute("src");
-        const content = this.getAttribute("content");
+        const src = self.getAttribute("src");
+        const content = self.getAttribute("content");
         if (content) {
             this.setContent(content);
         } else if (src) {
@@ -231,10 +240,11 @@ export class MarkdownView extends HTMLElement {
 
     /** Light-DOM root for parsed markdown (projected through the default slot). */
     #ensureBodyElement(): HTMLElement {
-        let body = this.querySelector(":scope > .markdown-body") as HTMLElement | null;
+        const self : any = this;
+        let body = self.querySelector(":scope > .markdown-body") as HTMLElement | null;
         if (!body) {
             body = E("div.markdown-body", { dataset: { print: "" } })?.element as HTMLElement;
-            this.appendChild(body);
+            self.appendChild(body);
         }
         return body;
     }
@@ -359,6 +369,8 @@ export class MarkdownView extends HTMLElement {
      * Handle attribute changes
      */
     attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
+        super.attributeChangedCallback?.(name, oldValue, newValue);
+        
         if (oldValue === newValue) return;
 
         switch (name) {
@@ -387,8 +399,9 @@ export class MarkdownView extends HTMLElement {
     /**
      * Shadow root: optional chrome + default slot. Markdown body is a light-DOM child (`.markdown-body`).
      */
-    createShadowRoot(): void {
-        const shadowRoot = this.attachShadow({ mode: "open" });
+    createShadowRoot(): ShadowRoot {
+        const self : any = this;
+        const shadowRoot = self.createShadowRoot?.() ?? self.attachShadow?.({ mode: "open" });
         const chromeStyle = document.createElement("style");
         chromeStyle.textContent = MD_VIEW_SHADOW_STYLES;
 
@@ -406,14 +419,8 @@ export class MarkdownView extends HTMLElement {
 
         shell.append(chrome, frame);
         shadowRoot.append(chromeStyle, shell);
-    }
-}
 
-// Register the custom element (guard: `customElements` can be null in some runtimes; `typeof null` is "object")
-{
-    const ce = (globalThis as unknown as { customElements?: CustomElementRegistry | null }).customElements;
-    if (ce && typeof ce.get === "function" && typeof ce.define === "function" && !ce.get("md-view")) {
-        ce.define("md-view", MarkdownView);
+        return shadowRoot;
     }
 }
 
@@ -433,12 +440,22 @@ export interface MarkdownViewerOptions {
     onAttachToWorkCenter?: (content: string) => void;
 }
 
-export class MarkdownViewer {
+export interface MarkdownViewerLifecycle {
+    onMount: () => void;
+    onUnmount: () => void;
+    onShow: () => void;
+    onHide: () => void;
+    onRefresh: () => void;
+}
+
+@defineElement("cw-markdown-viewer")
+export class MarkdownViewer extends BaseElement {
     private options: MarkdownViewerOptions;
     private element: MarkdownView | null = null;
     private content: string = "";
 
     constructor(options: MarkdownViewerOptions = {}) {
+        super(options);
         this.options = {
             content: "",
             title: "Markdown Viewer",
@@ -449,10 +466,39 @@ export class MarkdownViewer {
         this.content = this.options.content || "";
     }
 
+    //@ts-ignore
+    public override readonly lifecycle: MarkdownViewerLifecycle = {
+        onMount: () => this.onMount(),
+        onUnmount: () => this.onUnmount(),
+        onShow: () => this.onShow(),
+        onHide: () => this.onHide()
+    };
+
+    private onMount(): void {
+        console.log("[MarkdownViewer] Mounted");
+    }
+
+    private onUnmount(): void {
+        console.log("[MarkdownViewer] Unmounted");
+    }
+
+    private onShow(): void {
+        console.log("[MarkdownViewer] Shown");
+    }
+
+    private onHide(): void {
+        console.log("[MarkdownViewer] Hidden");
+    }
+
+    private onRefresh(): void {
+        console.log("[MarkdownViewer] Refreshed");
+    }
+
     /**
      * Render the markdown viewer
      */
-    render(): HTMLElement {
+    render = function (): HTMLElement {
+        const self : any = this; //@ts-ignore
         // Create a container div
         const container = H`<div class="markdown-viewer-container">
             ${this.options.showTitle ? H`<div class="viewer-header">
@@ -482,11 +528,11 @@ export class MarkdownViewer {
         </div>` as HTMLElement;
 
         // Get the md-view element
-        this.element = container.querySelector('md-view') as MarkdownView;
+        this.element = container?.querySelector?.('md-view') as MarkdownView | null;
 
         // Set up event listeners
         if (this.options.showActions) {
-            container.addEventListener('click', (e) => {
+            container?.addEventListener?.('click', (e) => {
                 const target = e.target as HTMLElement;
                 const btn = target?.closest?.('[data-action]') as HTMLElement | null;
                 const action = btn?.getAttribute('data-action');
@@ -570,24 +616,25 @@ export class MarkdownViewer {
      * Print content
      */
     printContent(): void {
+        const self : any = this;
         try {
-            const viewElement = this.element?.querySelector(":scope > .markdown-body") as HTMLElement | null;
+            const viewElement = self.element?.querySelector?.(":scope > .markdown-body") as HTMLElement | null;
             if (!viewElement) {
                 console.error('[MarkdownViewer] Could not find markdown content for printing');
                 return;
             }
 
             // Try to use the server-side print route first
-            const printUrl = new URL('/print', globalThis.location.origin);
+            const printUrl = new URL('/print', globalThis?.location?.origin);
             printUrl.searchParams.set('content', viewElement.innerHTML);
             printUrl.searchParams.set('title', this.options.title || 'Markdown Content');
 
             // Open print URL in new window
-            const printWindow = globalThis.open(printUrl.toString(), '_blank', 'width=800,height=600');
+            const printWindow = globalThis?.open(printUrl.toString(), '_blank', 'width=800,height=600');
             if (!printWindow) {
                 console.warn('[MarkdownViewer] Failed to open print window - popup blocked?');
                 // Fallback: trigger browser print dialog
-                globalThis.print();
+                globalThis?.print();
                 return;
             }
 
@@ -595,7 +642,7 @@ export class MarkdownViewer {
         } catch (error) {
             console.error('[MarkdownViewer] Error printing content:', error);
             // Fallback to browser print
-            globalThis.print();
+            globalThis?.print();
         }
     }
 }
@@ -606,35 +653,3 @@ export class MarkdownViewer {
 export function createMarkdownViewer(options?: MarkdownViewerOptions): MarkdownViewer {
     return new MarkdownViewer(options);
 }
-
-const FRAME_TAG = "cw-markdown-view-frame";
-
-export function createMarkdownViewFrame(): HTMLElement {
-    return H`
-        <div class="view-viewer__content" data-viewer-content>
-            <pre class="markdown-viewer-raw" data-raw-target aria-label="Raw content" hidden></pre>
-            <div
-                class="cw-view-viewer__prose markdown-body markdown-viewer-content result-content"
-                data-render-target
-                data-cw-viewer-prose
-            ></div>
-        </div>
-    ` as HTMLElement;
-}
-
-class MarkdownViewFrameElement extends HTMLElement {
-    connectedCallback(): void {
-        if (this.dataset.ready === "1") return;
-        this.dataset.ready = "1";
-        this.classList.add("cw-markdown-view-frame");
-        this.replaceChildren(createMarkdownViewFrame());
-    }
-}
-
-export function ensureMarkdownViewFrame(): string {
-    if (!customElements.get(FRAME_TAG)) {
-        customElements.define(FRAME_TAG, MarkdownViewFrameElement);
-    }
-    return FRAME_TAG;
-}
-

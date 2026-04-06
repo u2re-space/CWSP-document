@@ -5,13 +5,15 @@
  */
 
 import { loadAsAdopted, removeAdopted } from "fest/dom";
-import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@shells/types";
-import type { BaseViewOptions } from "@views/types";
+import type { View, ViewOptions, ViewLifecycle, ShellContext } from "../../shells/types";
+import { type BaseViewOptions } from "../types";
 import { WorkCenterManager } from "./ts/WorkCenter";
 import type { WorkCenterDependencies } from "./ts/WorkCenterState";
 
 // @ts-ignore - SCSS import
 import workcenterStyles from "./scss/_index.scss?inline";
+import BaseElement from "../base/BaseElement";
+import { defineElement, type CustomElementLifecycle } from "fest/lure";
 
 export interface WorkCenterOptions extends BaseViewOptions {
     initialFiles?: File[];
@@ -20,7 +22,9 @@ export interface WorkCenterOptions extends BaseViewOptions {
     onFilesChange?: (files: File[]) => void;
 }
 
-export class WorkCenterView implements View {
+// @ts-ignore
+@defineElement("cw-workcenter-view")
+export class WorkCenterView extends BaseElement implements View {
     id = "workcenter" as const;
     name = "Work Center";
     icon = "lightning";
@@ -46,6 +50,7 @@ export class WorkCenterView implements View {
     };
 
     constructor(options: WorkCenterOptions = {}) {
+        super();
         this.options = options;
         this.shellContext = options.shellContext;
 
@@ -60,13 +65,40 @@ export class WorkCenterView implements View {
         };
     }
 
-    render(options?: ViewOptions): HTMLElement {
+    /**
+     * GLitElement calls `render(weakRef)` when the host is connected; the shell calls `render(options?)`.
+     * Only merge real view options — never a WeakRef from GLit.
+     */
+    private isGlitterWeakRef(arg: unknown): arg is WeakRef<HTMLElement> {
+        return Boolean(arg && typeof (arg as WeakRef<HTMLElement>).deref === "function");
+    }
+
+    private ensureWorkCenterStylesOnShadow(): void {
+        const sheet = loadAsAdopted(workcenterStyles) as CSSStyleSheet | null;
+        if (sheet) this._sheet = sheet;
+        const root = this.shadowRoot;
+        if (!sheet || !root?.adoptedStyleSheets) return;
+        if (!root.adoptedStyleSheets.includes(sheet)) {
+            root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
+        }
+    }
+
+    override onInitialize(): this {
+        const self = super.onInitialize();
+        this.ensureWorkCenterStylesOnShadow();
+        return (self ?? this) as this;
+    }
+
+    /** Shell passes `ViewOptions`; GLitElement passes a `WeakRef` — ignore the latter for option merging. */
+    render = (weakOrOptions?: unknown): HTMLElement => {
+        const options = this.isGlitterWeakRef(weakOrOptions) ? undefined : (weakOrOptions as ViewOptions | undefined);
         if (options) {
             this.options = { ...this.options, ...options };
             this.shellContext = options.shellContext || this.shellContext;
         }
 
         this._sheet = loadAsAdopted(workcenterStyles) as CSSStyleSheet;
+        this.ensureWorkCenterStylesOnShadow();
 
         this.manager ??= new WorkCenterManager(this.deps);
         if (!this.initializedFromOptions) {
@@ -80,8 +112,8 @@ export class WorkCenterView implements View {
         this.emitFilesChanged();
         void this.flushPendingMessages();
         return this.element;
-    }
-
+    };
+    
     getToolbar(): HTMLElement | null {
         return null;
     }

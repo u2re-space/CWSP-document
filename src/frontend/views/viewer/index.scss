@@ -8,7 +8,7 @@
         /* layout */
         --view-layout: "flex";
         --view-content-max-width: 800px;
-        --view-padding: var(--space-6);
+        --view-padding: clamp(1rem, 3cqw, 1.75rem);
 
         /* typography */
         --view-font-size-base: 1rem;
@@ -17,19 +17,28 @@
         --view-prose-line-height: 1.75;
         --view-prose-heading-margin: var(--space-6);
 
-        /* colors */
-        --view-bg: var(--color-surface, #ffffff);
-        --view-fg: var(--color-on-surface, #1a1a1a);
-        --view-border: var(--color-border, rgba(0, 0, 0, 0.1));
-        --view-toolbar-bg: light-dark(rgba(0, 0, 0, 0.02), rgba(255, 255, 255, 0.04));
-        --view-btn-hover-bg: light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08));
-        --view-code-bg: light-dark(#f5f5f5, #2d2d2d);
-        --view-code-fg: light-dark(var(--color-text, #1a1a1a), #e0e0e0);
-        --view-code-border: var(--color-border);
-        --view-blockquote-border: var(--color-primary);
-        --view-blockquote-bg: light-dark(var(--color-surface-hover), #252525);
-        --view-link-color: var(--color-link, #007acc);
-        --view-link-hover: var(--color-link-hover, #005fa3);
+        /*
+         * Deep dark chrome (reference: compact markdown viewer — charcoal shell, slightly lifted toolbar).
+         * Keeps prose readable without fighting global light tokens.
+         */
+        --view-bg: #0b0d12;
+        --view-fg: #e8eaef;
+        --view-border: rgba(255, 255, 255, 0.07);
+        --view-toolbar-bg: #12151c;
+        --view-btn-hover-bg: rgba(255, 255, 255, 0.07);
+        --view-code-bg: #161a22;
+        --view-code-fg: #d8dce6;
+        --view-code-border: rgba(255, 255, 255, 0.08);
+        --view-blockquote-border: #5b8cff;
+        --view-blockquote-bg: rgba(255, 255, 255, 0.04);
+        --view-link-color: #7eb8ff;
+        --view-link-hover: #a8d0ff;
+
+        /* Align fl-ui / surface tokens used by toolbar buttons */
+        --color-surface: transparent;
+        --color-on-surface: #c4c9d4;
+        --color-surface-container-high: var(--view-btn-hover-bg);
+        --color-primary: #8ab4ff;
 
         /* units */
         --view-code-font-size: 0.9em;
@@ -176,6 +185,19 @@
 }
 
 @layer viewer.components {
+    /*
+     * Nested toolbar host must always stretch full row inside view-viewer.
+     * If it shrink-wraps, left/right groups wrap into two toolbar rows.
+     */
+    .view-viewer > cw-markdown-toolbar-frame {
+        display: block;
+        box-sizing: border-box;
+        inline-size: 100%;
+        min-inline-size: 0;
+        min-block-size: 0;
+        flex: 0 0 auto;
+    }
+
     /* Compact toolbar: tight rhythm, icon-led controls (theme tokens when present). */
     .view-viewer__toolbar {
         /*
@@ -199,34 +221,27 @@
 
         position: relative;
         display: grid;
-        grid-template-columns: minmax(0px, max-content) minmax(0px, 1fr) minmax(0px, max-content);
-        grid-template-rows: minmax(0px, 1fr);
-        grid-auto-flow: column;
-        
-        place-items: center;
-        place-content: center;
-        place-self: center;
+        grid-template-columns: max-content minmax(0, 1fr) max-content;
+        align-items: center;
         gap: var(--view-toolbar-gap);
-        min-block-size: 2.25rem;
-        padding: var(--view-toolbar-row-pad-block) var(--view-toolbar-row-pad-inline);
-        background: var(--color-surface-container-high, var(--view-toolbar-bg));
+        min-block-size: 2rem;
+        padding: 0.15rem 0.65rem;
+        background: var(--view-toolbar-bg, var(--color-surface-container-high));
         border-block-end: 1px solid var(--view-border);
-        box-shadow: var(--elev-1, 0 1px 2px light-dark(rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.25)));
+        box-shadow: none;
         flex-shrink: 0;
         overflow-inline: auto;
         overflow-block: hidden;
         scrollbar-width: none;
         scrollbar-color: transparent transparent;
         -webkit-overflow-scrolling: touch;
-        container-type: size;
-        contain: strict;
-
-        inline-size: stretch;
-        max-inline-size: stretch;
-
-        & > * {
-            grid-row: 1 / 1;
-        }
+        container-type: inline-size;
+        contain: layout style paint;
+        box-sizing: border-box;
+        inline-size: 100%;
+        min-inline-size: 0;
+        max-inline-size: 100%;
+        white-space: nowrap;
 
         button.view-viewer__btn > ui-icon.view-viewer__toolbar-icon {
             order: -1;
@@ -249,10 +264,9 @@
             position: absolute;
             inset: 0;
             background: linear-gradient(
-                90deg,
-                color-mix(in oklab, var(--color-primary, #007acc) 2%, transparent) 0%,
-                transparent 50%,
-                color-mix(in oklab, var(--color-primary, #007acc) 2%, transparent) 100%
+                180deg,
+                rgba(255, 255, 255, 0.03) 0%,
+                transparent 100%
             );
             pointer-events: none;
         }
@@ -278,44 +292,56 @@
     }
 
     .view-viewer__toolbar-center {
+        flex: 1 1 auto;
+        min-inline-size: 0;
+        min-block-size: 0;
         display: flex;
-        flex-shrink: 0;
-        flex-grow: 0;
-        flex-basis: auto;
-        gap: 0.25rem;
-        padding: 0.25rem;
-        justify-content: safe center;
-        align-content: safe center;
-        justify-items: safe center;
-        align-items: safe center;
-        min-inline-size: max-content;
-        inline-size: stretch;
-        max-inline-size: stretch;
+        align-items: center;
+        justify-content: center;
+        padding-inline: 0.35rem;
+        pointer-events: none;
+    }
 
-        @container (max-inline-size: 480px) {
-            gap: 0.25rem;
-        }
+    .view-viewer__toolbar-title {
+        display: block;
+        max-inline-size: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: var(--text-sm, 0.8125rem);
+        font-weight: var(--font-weight-medium, 500);
+        line-height: 1.25;
+        letter-spacing: 0.02em;
+        color: color-mix(in oklab, var(--color-on-surface, var(--view-fg)) 88%, transparent);
+        text-align: center;
+    }
+
+    .view-viewer__toolbar-title:empty {
+        display: none;
     }
 
     .view-viewer__toolbar-left,
     .view-viewer__toolbar-right {
         display: flex;
         flex-shrink: 0;
-        flex-grow: 1;
+        flex-grow: 0;
         flex-basis: max-content;
-        gap: 0.25rem;
-        padding: 0.25rem;
-        justify-content: safe center;
-        align-content: safe center;
-        justify-items: safe center;
-        align-items: safe center;
-        min-inline-size: max-content;
+        flex-wrap: nowrap;
+        gap: 0.15rem;
+        padding: 0.1rem 0;
+        align-items: center;
+        min-inline-size: 0;
         inline-size: max-content;
-        max-inline-size: stretch;
+        max-inline-size: 100%;
+        overflow: hidden;
+    }
 
-        @container (max-inline-size: 480px) {
-            gap: 0.5rem;
-        }
+    .view-viewer__toolbar-left {
+        justify-content: flex-start;
+    }
+
+    .view-viewer__toolbar-right {
+        justify-content: flex-end;
     }
 
     .view-viewer__btn {
@@ -343,7 +369,7 @@
         box-sizing: border-box;
         flex-shrink: 0;
         flex-basis: max-content;
-        flex-grow: 1;
+        flex-grow: 0;
         contain: none;
         container-type: normal;
         transition:
@@ -369,7 +395,7 @@
             letter-spacing: 0.03em;
             text-transform: uppercase;
             display: inline-block;
-            opacity: 0.72;
+            opacity: 0.88;
             flex-shrink: 0;
         }
 
@@ -377,7 +403,7 @@
             background: var(--color-surface-container-high, var(--view-btn-hover-bg));
 
             span {
-                opacity: 0.9;
+                opacity: 1;
             }
 
             & > ui-icon.view-viewer__toolbar-icon {
@@ -446,7 +472,8 @@
         display: flex;
         flex-direction: column;
         box-sizing: border-box;
-        padding: 0px;
+        padding: 0;
+        background-color: var(--view-bg);
 
         &.dragover {
             background-color: rgba(0, 122, 204, 0.05);
@@ -500,6 +527,45 @@
         overflow-block: auto;
         overflow-inline: hidden;
         overscroll-behavior: contain;
+    }
+
+    /* Prose chrome: comfortable inset + large first heading (reference layout). */
+    .cw-view-viewer-shell .markdown-viewer-raw,
+    .cw-view-viewer-shell pre[data-raw-target] {
+        margin: 0;
+        padding: var(--view-padding);
+        color: var(--view-fg);
+        background-color: var(--view-bg);
+        border: none;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.8125rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .cw-view-viewer-shell .cw-view-viewer__prose.markdown-body,
+    .cw-view-viewer-shell [data-render-target].markdown-body {
+        padding: var(--view-padding);
+        color: var(--view-fg);
+        background-color: var(--view-bg);
+    }
+
+    cw-view-viewer [data-render-target].markdown-body,
+    cw-view-viewer [data-render-target].cw-view-viewer__prose {
+        padding: var(--view-padding);
+        color: var(--view-fg);
+        background-color: var(--view-bg);
+    }
+
+    .cw-view-viewer-shell .markdown-body h1,
+    cw-view-viewer .markdown-body h1 {
+        color: var(--view-fg);
+        font-weight: 600;
+        font-size: clamp(1.5rem, 4.5cqw, 2.125rem);
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        margin-block: 0 0.75em;
     }
 
 }

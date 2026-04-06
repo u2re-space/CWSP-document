@@ -79,7 +79,6 @@ export class WorkCenterEvents {
         // Input tabs
         this.setupInputTabs();
         this.setupResultsTabs();
-        this.setupHeaderControlsOverlay();
 
         // Format selectors
         this.setupFormatSelectors();
@@ -485,26 +484,6 @@ export class WorkCenterEvents {
     private setupResultsTabs(): void {
         if (!this.container) return;
         this.switchResultsTab(this.state.activeResultsTab || "output");
-    }
-
-    private setupHeaderControlsOverlay(): void {
-        if (!this.container) return;
-        const disclosure = this.container.querySelector('.header-controls-disclosure') as HTMLDetailsElement | null;
-        if (!disclosure) return;
-
-        document.addEventListener('click', (event) => {
-            if (!disclosure.open) return;
-            const target = event.target as Node | null;
-            if (target && !disclosure.contains(target)) {
-                disclosure.open = false;
-            }
-        });
-
-        this.container.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' && disclosure.open) {
-                disclosure.open = false;
-            }
-        });
     }
 
     private switchInputTab(tab: string): void {

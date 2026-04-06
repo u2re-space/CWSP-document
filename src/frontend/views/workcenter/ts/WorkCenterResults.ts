@@ -171,7 +171,9 @@ export class WorkCenterResults {
     // Output content rendering
     renderOutputContent(): string {
         return `
-            <div class="wc-output-content" data-output> No results yet </div>
+            <div class="wc-output-content" data-output>
+                <div class="wc-results-empty">No results yet</div>
+            </div>
         `;
     }
 

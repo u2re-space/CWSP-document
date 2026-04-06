@@ -7,7 +7,7 @@
 
 import { H } from "fest/lure";
 import type { ShellId, ShellLayoutConfig, ViewId } from "@shells/types";
-import { ShellBase } from "@shells/base/shell";
+import { ShellBase } from "@shells/shell";
 import { isEnabledView } from "@shared/routing/views";
 import type { WindowFrameElement } from "@fl-ui/items/BaseElement.ts";
 import { subscribeViewChannel } from "@shared/routing/view-api";

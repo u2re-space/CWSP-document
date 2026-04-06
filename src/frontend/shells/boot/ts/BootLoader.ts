@@ -32,6 +32,7 @@ import type { AppSettings } from "@rs-com/config/SettingsTypes";
 import { isEnabledView, pickEnabledView } from "../../../shared/routing/views";
 
 import { initializeLayers } from "../../../shared/routing/layer-manager";
+import { loadStyleSystem } from "../../../shared/styles";
 
 // ============================================================================
 // BOOT TYPES
@@ -145,7 +146,7 @@ export function getRecommendedStyle(shell: ShellId): StyleSystem {
         case "minimal":
             return "vl-basic";
         case "base":
-            return "vl-core";
+            return "vl-basic";
         case "content":
             return "vl-basic";
         default:
@@ -294,12 +295,13 @@ export class BootLoader {
         
         const config = STYLE_CONFIGS[styleSystem] || STYLE_CONFIGS["vl-basic"];
 
-        // Temporary fallback: skip Veela runtime loader while runtime SCSS graph is unstable.
-        // Shell-level styles still load via view/shell local stylesheets.
-        if (styleSystem !== "raw") {
-            console.warn(`[BootLoader] Skipping Veela runtime loader for style system: ${styleSystem}`);
+        try {
+            await loadStyleSystem(styleSystem);
+        } catch (error) {
+            console.error(`[BootLoader] Failed to load style system: ${styleSystem}`, error);
+            throw error;
         }
-        
+
         // Load any additional stylesheets
         for (const sheet of config.stylesheets) {
             try {
@@ -620,7 +622,7 @@ export async function bootBase(
     view: ViewId = "viewer"
 ): Promise<Shell> {
     return bootLoader.boot(container, {
-        styleSystem: "vl-core",
+        styleSystem: "vl-basic",
         shell: "base",
         defaultView: pickEnabledView(view, "viewer"),
         channels: [],

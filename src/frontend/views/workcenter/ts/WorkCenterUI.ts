@@ -43,13 +43,10 @@ export class WorkCenterUI {
         const container = H`<div class="workcenter-view">
       <div class="workcenter-header">
         <h2>AI Work Center</h2>
-        <details class="header-controls-disclosure">
-          <summary class="header-controls-summary">
-            <span>AI Work Center</span>
-          </summary>
+        <div class="header-controls" aria-label="AI work center output and processing options">
           <div class="control-selectors">
           <div class="format-selector">
-            <label>Output Format:</label>
+            <label title="Output format for AI responses">Output</label>
             <select class="format-select">
               <option value="auto" ${state.outputFormat === 'auto' ? 'selected' : ''}>Auto</option>
               <option value="markdown" ${state.outputFormat === 'markdown' ? 'selected' : ''}>Markdown</option>
@@ -61,7 +58,7 @@ export class WorkCenterUI {
             </select>
           </div>
           <div class="language-selector">
-            <label>Language:</label>
+            <label title="Response language">Language</label>
             <select class="language-select">
               <option value="auto" ${state.selectedLanguage === 'auto' ? 'selected' : ''}>Auto</option>
               <option value="en" ${state.selectedLanguage === 'en' ? 'selected' : ''}>English</option>
@@ -69,7 +66,7 @@ export class WorkCenterUI {
             </select>
           </div>
           <div class="recognition-selector">
-            <label>Recognize as:</label>
+            <label title="How to recognize incoming content">Recognize</label>
             <select class="recognition-select">
               <option value="auto" ${state.recognitionFormat === 'auto' ? 'selected' : ''}>Auto</option>
               <option value="most-suitable" ${state.recognitionFormat === 'most-suitable' ? 'selected' : ''}>Most Suitable</option>
@@ -82,7 +79,7 @@ export class WorkCenterUI {
             </select>
           </div>
           <div class="processing-selector">
-            <label>Process as:</label>
+            <label title="Treat content as this format when processing">Process</label>
             <select class="processing-select">
               <option value="markdown" ${state.processingFormat === 'markdown' ? 'selected' : ''}>Markdown</option>
               <option value="html" ${state.processingFormat === 'html' ? 'selected' : ''}>HTML</option>
@@ -105,7 +102,7 @@ export class WorkCenterUI {
             </select>
           </div>
           </div>
-        </details>
+        </div>
       </div>
 
       <div class="workcenter-content">
@@ -130,6 +127,7 @@ export class WorkCenterUI {
         this.attachments.setContainer(container);
         this.prompts.setContainer(container);
         this.results.setContainer(container);
+        this.history.setContainer(container);
 
         // Initialize UI components
         this.initializeUI(state);

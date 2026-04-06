@@ -7,11 +7,12 @@
  *   `__content` wrapping `<slot name="raw">` + default `<slot>`); light DOM = `<pre slot="raw">` + prose `[data-render-target]`.
  */
 
-import { H, normalizeDataAsset, parseDataUrl, isBase64Like, decodeBase64ToBytes, openDirectory, provide } from "fest/lure";
+import { H, normalizeDataAsset, parseDataUrl, isBase64Like, decodeBase64ToBytes, openDirectory, provide, defineElement } from "fest/lure";
 import { ref, affected } from "fest/object";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
 import DOMPurify from 'dompurify';
 import renderMathInElement from "katex/dist/contrib/auto-render.mjs";
+import { ensureStyleSheet, reinitializeRegistry } from "fest/icon";
 import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@shells/types";
 import type { CwViewViewerHostElement } from "@views/base/UIElement";
 import type { BaseViewOptions } from "@views/types";
@@ -26,8 +27,7 @@ import "fest/icon";
 // @ts-ignore - SCSS import
 import style from "./index.scss?inline";
 import type { MarkedExtension } from "marked";
-import { createViewerToolbar, ensureMarkdownToolbarFrame } from "./ts/Toolbar";
-import { ensureMarkdownViewFrame } from "./ts/Markdown";
+import BaseElement from "@views/base/BaseElement";
 
 let markedParserPromise: Promise<(markdown: string) => Promise<string>> | null = null;
 
@@ -65,6 +65,19 @@ const VIEWER_CSS_LAYER_ORDER = [
     "rs-md-print",
     "rs-md-user-print"
 ] as const;
+
+let viewerIconRuntimeInitialized = false;
+
+const ensureViewerIconRuntime = (): void => {
+    if (viewerIconRuntimeInitialized) return;
+    try {
+        ensureStyleSheet();
+        reinitializeRegistry();
+        viewerIconRuntimeInitialized = true;
+    } catch (error) {
+        console.warn("[Viewer] Failed to initialize icon runtime:", error);
+    }
+};
 
 type ViewerMarkdownSettings = {
     preset: "default" | "classic" | "compact" | "paper";
@@ -190,7 +203,7 @@ interface ViewerState {
 }
 
 const STORAGE_KEY = "rs-viewer-state";
-const DEFAULT_CONTENT = `# Welcome to the Viewer\n\nThis is a markdown viewer component.`;
+const DEFAULT_CONTENT = `# This is content`;
 
 // ============================================================================
 // VIEWER OPTIONS
@@ -227,7 +240,11 @@ export interface ViewerOptions extends BaseViewOptions {
 // VIEWER VIEW IMPLEMENTATION
 // ============================================================================
 
-export class ViewerView implements View {
+// Must register before `new ViewerView()` — HTMLElement subclasses throw Illegal constructor otherwise.
+// Distinct from shell host tag `cw-view-viewer` (ViewHostElement); this tag is only for CE construction.
+// @ts-ignore
+@defineElement("cw-viewer-view")
+export class ViewerView extends BaseElement implements View {
     id = "viewer" as const;
     name = "Viewer";
     icon = "eye";
@@ -290,6 +307,7 @@ export class ViewerView implements View {
     };
 
     constructor(options: ViewerOptions = {}) {
+        super();
         this.options = options;
         this.shellContext = options.shellContext;
         this.sourceUrl = this.normalizeSourceUrl(options.source);
@@ -312,44 +330,28 @@ export class ViewerView implements View {
         }
     }
 
-    render(options?: ViewOptions): HTMLElement {
+    render = function (options?: ViewOptions): HTMLElement {
+        ensureViewerIconRuntime();
         this.slotProjectingHost = null;
-
-        // Merge options
         if (options) {
             this.options = { ...this.options, ...options };
             this.shellContext = options.shellContext || this.shellContext;
             this.applyRouteParams(options.params);
         }
 
-        // Load styles (idempotent — returns cached sheet)
         this._sheet = loadAsAdopted(style) as CSSStyleSheet;
-        ensureMarkdownToolbarFrame();
-        ensureMarkdownViewFrame();
+        this.element = this.createViewerShellElement();
 
-        this.element = H`
-            <div class="cw-view-viewer-shell">
-                <div class="view-viewer">
-                    <cw-markdown-toolbar-frame></cw-markdown-toolbar-frame>
-                    <cw-markdown-view-frame></cw-markdown-view-frame>
-                </div>
-            </div>
-        ` as HTMLElement;
-
-        // Get references to render and raw targets
         const renderTarget = this.element.querySelector("[data-render-target]") as HTMLElement | null;
         const rawTarget = this.element.querySelector("[data-raw-target]") as HTMLPreElement | null;
-
-        // Setup event handlers
         this.setupEventHandlers(rawTarget || undefined);
         this.syncOutlineToolbarState();
+        this.syncToolbarDocumentTitle();
 
-        // Set initial content
         if (renderTarget && rawTarget) {
             this.renderMarkdown(this.contentRef.value, renderTarget, rawTarget);
         }
 
-        // Setup reactive updates
         affected(this.contentRef, () => {
             if (renderTarget && rawTarget) {
                 this.renderMarkdown(this.contentRef.value, renderTarget, rawTarget);
@@ -364,81 +366,21 @@ export class ViewerView implements View {
      * Mount under `<cw-view-viewer>`: chrome in shadow, raw + rendered bodies in light DOM (slotted).
      */
     renderIntoWebComponentHost(host: CwViewViewerHostElement, options?: ViewOptions): void {
+        ensureViewerIconRuntime();
         if (options) {
             this.options = { ...this.options, ...options };
             this.shellContext = options.shellContext || this.shellContext;
+            this.applyRouteParams(options.params);
         }
 
         this.slotProjectingHost = host;
         this._sheet ??= loadAsAdopted(style) as CSSStyleSheet;
-
-        let shadow = host.shadowRoot;
-        if (!shadow) {
-            shadow = host.attachShadow({ mode: "open" });
-            const hostCss = document.createElement("style");
-            hostCss.textContent = `
-                :host {
-                    display: block;
-                    box-sizing: border-box;
-                    block-size: 100%;
-                    inline-size: 100%;
-                    min-block-size: 0;
-                    min-inline-size: 0;
-                    overflow: hidden;
-                }
-
-                .cw-view-element__mount {
-                    display: block;
-                    box-sizing: border-box;
-                    block-size: 100%;
-                    inline-size: 100%;
-                    min-block-size: 0;
-                    min-inline-size: 0;
-                    overflow: hidden;
-                }
-
-                .cw-view-viewer-shell,
-                .view-viewer {
-                    box-sizing: border-box;
-                    block-size: 100%;
-                    inline-size: 100%;
-                    min-block-size: 0;
-                    min-inline-size: 0;
-                }
-            `;
-            shadow.appendChild(hostCss);
-
-            const mount = document.createElement("div");
-            mount.className = "cw-view-element__mount";
-            const shell = document.createElement("div");
-            shell.className = "cw-view-viewer-shell";
-            const viewViewer = this.buildViewViewerChromeForShadow();
-            shell.append(viewViewer);
-            mount.appendChild(shell);
-            shadow.appendChild(mount);
-            this.adoptViewerStylesIntoShadowRoot(shadow);
-        }
-
-        this.element = shadow!.querySelector(".cw-view-viewer-shell") as HTMLElement;
-
-        let pre = host.querySelector(":scope > pre[data-raw-target]") as HTMLPreElement | null;
-        let prose = host.querySelector(":scope > [data-render-target]") as HTMLElement | null;
-        if (!pre) {
-            pre = document.createElement("pre");
-            pre.className = "markdown-viewer-raw";
-            pre.setAttribute("data-raw-target", "");
-            pre.setAttribute("aria-label", "Raw content");
-            pre.slot = "raw";
-        } else if (!pre.slot) {
-            pre.slot = "raw";
-        }
-        if (!prose) {
-            prose = document.createElement("div");
-            prose.className = "cw-view-viewer__prose markdown-body markdown-viewer-content result-content";
-            prose.toggleAttribute("data-render-target", true);
-            prose.toggleAttribute("data-cw-viewer-prose", true);
-        }
-        host.replaceChildren(pre, prose);
+        this.element = this.createViewerShellElement();
+        host.replaceChildren(this.element);
+        const pre = host.querySelector("[data-raw-target]") as HTMLPreElement | null;
+        const prose = host.querySelector("[data-render-target]") as HTMLElement | null;
+        host.setAttribute("data-view-id", "viewer");
+        host.toggleAttribute("data-cw-view-host", true);
 
         this.syncAdoptedSheetsToShadow();
 
@@ -446,6 +388,7 @@ export class ViewerView implements View {
         const rawTarget = pre;
         this.setupEventHandlers(rawTarget);
         this.syncOutlineToolbarState();
+        this.syncToolbarDocumentTitle();
 
         if (renderTarget && rawTarget) {
             this.renderMarkdown(this.contentRef.value, renderTarget, rawTarget);
@@ -477,6 +420,7 @@ export class ViewerView implements View {
             this.sourceUrl = this.normalizeSourceUrl(source);
             this.options.source = source || undefined;
         }
+        this.syncToolbarDocumentTitle();
     }
 
     /**
@@ -490,16 +434,67 @@ export class ViewerView implements View {
     // PRIVATE METHODS
     // ========================================================================
 
-    private buildViewViewerChromeForShadow(): HTMLElement {
+    private createViewerShellElement(): HTMLElement {
         return H`
-            <div class="view-viewer">
-                ${createViewerToolbar()}
-                <div class="view-viewer__content" data-viewer-content>
-                    <div class="cw-view-viewer__slot-raw">
-                        <slot name="raw"></slot>
+            <div class="cw-view-viewer-shell">
+                <div class="view-viewer">
+                    <div
+                        class="view-viewer__toolbar"
+                        data-viewer-toolbar
+                        role="toolbar"
+                        aria-label="Markdown document actions"
+                    >
+                        <div class="view-viewer__toolbar-left" role="group" aria-label="Document">
+                            <button class="view-viewer__btn" data-action="open" type="button" title="Open file">
+                                <ui-icon class="view-viewer__toolbar-icon" icon="folder-open" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
+                                <span>Open</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="toggle-raw" type="button" title="Toggle raw/rendered view">
+                                <ui-icon class="view-viewer__toolbar-icon" icon="code" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
+                                <span>Raw</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="copy" type="button" title="Copy raw content">
+                                <ui-icon class="view-viewer__toolbar-icon" icon="copy" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
+                                <span>Copy</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="paste" type="button" title="Paste from clipboard (mobile-friendly)" aria-label="Paste from clipboard">
+                                <ui-icon class="view-viewer__toolbar-icon" icon="clipboard-text" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
+                                <span>Paste</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="download" type="button" title="Download as markdown">
+                                <ui-icon class="view-viewer__toolbar-icon" icon="download" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
+                                <span>Download</span>
+                            </button>
+                        </div>
+                        <div class="view-viewer__toolbar-center" role="presentation">
+                            <span class="view-viewer__toolbar-title" data-viewer-toolbar-title></span>
+                        </div>
+                        <div class="view-viewer__toolbar-right" role="group" aria-label="Output and workspace">
+                            <button class="view-viewer__btn" data-action="attach" type="button" title="Attach to Work Center">
+                                <ui-icon class="view-viewer__toolbar-icon" icon="paperclip" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
+                                <span>Attach</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="open-style-settings" type="button" title="Markdown styling, modules, plugins">
+                                <ui-icon class="view-viewer__toolbar-icon" icon="paint-roller" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
+                                <span>Style</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="copy-rendered" type="button" title="Copy rendered text">
+                                <ui-icon class="view-viewer__toolbar-icon" icon="text-t" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
+                                <span>Copy text</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="export-docx" type="button" title="Export as DOCX">
+                                <ui-icon class="view-viewer__toolbar-icon" icon="file-doc" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
+                                <span>DOCX</span>
+                            </button>
+                            <button class="view-viewer__btn" data-action="print" type="button" title="Print content">
+                                <ui-icon class="view-viewer__toolbar-icon" icon="printer" icon-style="duotone" size="20" aria-hidden="true"></ui-icon>
+                                <span>Print</span>
+                            </button>
+                        </div>
                     </div>
-                    <div class="cw-view-viewer__slot-default">
-                        <slot></slot>
+                    <div class="view-viewer__content" data-viewer-content>
+                        <pre class="markdown-viewer-raw" data-raw-target aria-label="Raw content" hidden></pre>
+                        <div class="cw-view-viewer__prose markdown-body markdown-viewer-content result-content" data-render-target data-cw-viewer-prose></div>
                     </div>
                 </div>
             </div>
@@ -694,6 +689,7 @@ export class ViewerView implements View {
             renderTarget.setAttribute("data-md-state", "empty");
             renderTarget.innerHTML =
                 `<div class="view-viewer__md-empty" role="status">Empty document</div>`;
+            this.syncToolbarDocumentTitle();
             return;
         }
 
@@ -703,6 +699,7 @@ export class ViewerView implements View {
             this.syncViewerRawMode(true);
             if (rawTarget) rawTarget.hidden = false;
             renderTarget.hidden = true;
+            this.syncToolbarDocumentTitle();
             endBusy();
             return;
         }
@@ -734,6 +731,7 @@ export class ViewerView implements View {
                     this.applyRenderedLinkBehavior(mdRoot);
                     this.refreshDocumentOutline(outlineNav, mdRoot);
                     this.syncOutlineToolbarState();
+                    this.syncToolbarDocumentTitle(mdRoot);
                     endBusy();
                     console.log("[ViewerView] Markdown rendered successfully");
                 };
@@ -812,6 +810,34 @@ export class ViewerView implements View {
         if (contentParam.trim()) {
             this.contentRef.value = contentParam;
         }
+        if (this.element) {
+            this.syncToolbarDocumentTitle();
+        }
+    }
+
+    /** Toolbar center label: filename, first heading, source basename, or app default. */
+    private syncToolbarDocumentTitle(mdRoot?: Element | null): void {
+        const titleEl = this.element?.querySelector("[data-viewer-toolbar-title]") as HTMLElement | null;
+        if (!titleEl) return;
+        let label = (this.options.filename || "").trim();
+        if (!label && mdRoot) {
+            const h1 =
+                (mdRoot.querySelector(":scope > h1") as HTMLElement | null) ??
+                (mdRoot.querySelector("h1") as HTMLElement | null);
+            label = (h1?.textContent || "").trim();
+        }
+        if (!label && this.sourceUrl) {
+            try {
+                const u = new URL(this.sourceUrl, globalThis.location?.href ?? undefined);
+                const seg = u.pathname.split("/").filter(Boolean).pop();
+                if (seg) label = decodeURIComponent(seg);
+            } catch {
+                /* ignore */
+            }
+        }
+        if (!label) label = "Markdown viewer";
+        titleEl.textContent = label;
+        titleEl.setAttribute("title", label);
     }
 
     private isUnsafeProtocol(value: string): boolean {
@@ -1991,6 +2017,7 @@ export class ViewerView implements View {
 
     private onMount(): void {
         console.log("[Viewer] Mounted");
+        ensureViewerIconRuntime();
         this._sheet ??= loadAsAdopted(style) as CSSStyleSheet;
         this.applyCustomStyles();
         void this.markdownSettingsPromise;
@@ -2143,9 +2170,3 @@ export default createView;
  *
  * See fest/fl-ui/services/markdown-view/Markdown for implementation.
  */
-
-// Re-export MarkdownView component (Web Component)
-export { MarkdownView as MdViewElement, MarkdownView } from "./ts/Markdown";
-
-// Re-export MarkdownViewer class and factory function (Class-based API)
-export { MarkdownViewer, createMarkdownViewer, type MarkdownViewerOptions } from "./ts/Markdown";

@@ -19,6 +19,7 @@ import {
     createEmptySpeedDialItem,
     speedDialItems
 } from "@rs-core/storage/StateStorage";
+import "@fl-ui/items/explorer/FileManager";
 
 // @ts-ignore
 import style from "./scss/index.scss?inline";
@@ -205,6 +206,8 @@ export class ExplorerView implements View {
 
         this.explorer = this.element.querySelector("ui-file-manager") as LocalFileManager | null;
         if (this.explorer) {
+            this.explorer.removeAttribute("hidden");
+            this.explorer.style.display = "block";
             this.setupExplorerEvents();
         } else {
             this.setupFallbackExplorerEvents();
@@ -500,14 +503,16 @@ export class ExplorerView implements View {
                 this.explorer.path = this.initialPath.trim();
                 return;
             }
-            const lastPath = getString("view-explorer-path", "/");
-            this.explorer.path = lastPath;
+            const persisted = String(getString("view-explorer-path", "/user/") || "").trim();
+            // Recover old readonly default "/" from previous builds.
+            const nextPath = !persisted || persisted === "/" ? "/user/" : persisted;
+            this.explorer.path = nextPath;
         }
     }
 
     private saveCurrentPath(): void {
         if (this.explorer) {
-            const currentPath = this.explorer.path || "/";
+            const currentPath = this.explorer.path || "/user/";
             setString("view-explorer-path", currentPath);
         }
     }

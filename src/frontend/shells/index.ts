@@ -6,7 +6,7 @@
  */
 
 export * from "./types";
-export * from "./base/shell";
+export * from "./shell";
 export * from "@fl-ui/items/BaseElement.ts";
 
 export * from "@shared/routing/registry";
