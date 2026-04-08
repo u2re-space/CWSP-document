@@ -90,7 +90,35 @@ export class MinimalShell extends ShellBase {
         ` as HTMLElement;
 
         this.setupNavClickHandlers(root);
+        this.setupAdminDoorButton(root);
         return root;
+    }
+
+    private setupAdminDoorButton(root: HTMLElement): void {
+        const navRight = root.querySelector("[data-shell-toolbar]");
+        if (!navRight || navRight.querySelector("[data-admin-door]")) return;
+
+        const btn = H`
+            <button
+                type="button"
+                class="app-shell__admin-door"
+                data-admin-door
+                aria-label="Open server admin (HTTPS)"
+                title="Server admin (HTTPS :8443). Configure origins in Settings → Server."
+            >ADM</button>
+        ` as HTMLButtonElement;
+
+        navRight.appendChild(btn);
+        btn.addEventListener("click", () => {
+            void import("@rs-com/config/Settings")
+                .then(({ loadSettings }) => loadSettings())
+                .then((s) =>
+                    import("@rs-com/config/admin-doors").then(({ openAdminDoorFromCore }) => {
+                        openAdminDoorFromCore(s.core, "https");
+                    })
+                )
+                .catch((e) => console.warn("[MinimalShell] admin door:", e));
+        });
     }
 
     private renderNavButtons(): DocumentFragment {

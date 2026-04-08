@@ -1,9 +1,4 @@
-// Needs to combine from:
-// - SpeedDial
-// - OrientDesktop
-// - OrientBox
-// - Interact
-// - GridBox
-// - ShortcutEditor
-// - Some from `/items`
-// - etc.
+export { SpeedDial, makeWallpaper, createCtxMenu } from "./SpeedDial";
+export { initializeOrientedDesktop } from "./OrientDesktop";
+export { bindInteraction, reflectCell, resolveGridCellFromClientPoint } from "./Interact";
+export { openShortcutEditor } from "./ShortcutEditor";

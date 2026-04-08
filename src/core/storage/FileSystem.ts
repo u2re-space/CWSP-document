@@ -8,6 +8,9 @@ import { writeFileSmart } from "./WriteFileSmart-v2";
 import { JSOX } from "jsox";
 import { canParseURL } from "@rs-core/utils/Runtime";
 
+const viteEnv = (import.meta as unknown as { env?: { PROD?: boolean } }).env;
+const isViteProd = Boolean(viteEnv?.PROD);
+
 /** Dynamic-only: static `fest/lure` pulls `com-app` into the MV3 service worker graph. */
 type LureFs = Pick<
     typeof import("fest/lure"),
@@ -29,7 +32,8 @@ const getLureFs = (): Promise<LureFs> => {
 
 const notifyFsToast = async (kind: "success" | "error", message: string) => {
     try {
-        const mod = await import(new URL("../../frontend/shared/items/overlay/Toast.ts", import.meta.url).href);
+        // Static specifier so Vite can split this chunk; avoid `import(new URL(...).href)` (import-analysis warning + @fs URLs in dev).
+        const mod = await import("@fl-ui/items/overlay/Toast");
         (kind === "success" ? mod.showSuccess : mod.showError)(message);
     } catch {
         try {
@@ -458,9 +462,20 @@ controlChannel.addEventListener('message', (event: MessageEvent) => {
         }
 });
 
-// Try recover from previous session
-if (typeof navigator !== "undefined" && 'storage' in navigator && typeof navigator.storage.getDirectory === 'function') {
-    if (typeof requestIdleCallback === 'function') {
+const warnUnlessAbort = (e: unknown) => {
+    const name = e && typeof e === "object" && "name" in e ? String((e as { name?: string }).name) : "";
+    if (name === "AbortError") return;
+    console.warn(e);
+};
+
+// Try recover from previous session (prod: avoids dev OPFS churn + AbortError noise during HMR/SW reloads)
+if (
+    isViteProd &&
+    typeof navigator !== "undefined" &&
+    "storage" in navigator &&
+    typeof navigator.storage.getDirectory === "function"
+) {
+    if (typeof requestIdleCallback === "function") {
         requestIdleCallback?.(() => {
             flushQueueIntoOPFS();
         });
@@ -487,29 +502,35 @@ export async function flushQueueIntoOPFS() {
 }
 
 //
-try {
-    opfsModifyJson({
-    dirPath: "/data/",
-    transform: (data) => {
-        if (data && typeof data === "object") { fixEntityId(data, { mutate: true }); };
-        return data;
+// Entity-id migration touches OPFS on import; skip in dev to speed boot and avoid AbortError spam when SW/HMR reloads.
+if (isViteProd) {
+    try {
+        opfsModifyJson({
+            dirPath: "/data/",
+            transform: (data) => {
+                if (data && typeof data === "object") {
+                    fixEntityId(data, { mutate: true });
+                }
+                return data;
+            },
+        })?.catch?.(warnUnlessAbort);
+    } catch (e) {
+        warnUnlessAbort(e);
     }
-    })?.catch?.(console.warn.bind(console));
-} catch (e) {
-    console.warn(e);
-}
 
-//
-try {
-    opfsModifyJson({
-        dirPath: "/timeline/",
-        transform: (data) => {
-            if (data && typeof data === "object") { fixEntityId(data, { mutate: true }); };
-            return data;
-        }
-    })?.catch?.(console.warn.bind(console));
-} catch (e) {
-    console.warn(e);
+    try {
+        opfsModifyJson({
+            dirPath: "/timeline/",
+            transform: (data) => {
+                if (data && typeof data === "object") {
+                    fixEntityId(data, { mutate: true });
+                }
+                return data;
+            },
+        })?.catch?.(warnUnlessAbort);
+    } catch (e) {
+        warnUnlessAbort(e);
+    }
 }
 
 

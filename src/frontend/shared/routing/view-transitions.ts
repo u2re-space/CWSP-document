@@ -122,10 +122,19 @@ export async function withViewTransition(
             : doc.startViewTransition(update);
 
     try {
-        await transition.finished;
+        // Wait only until the DOM update callback settles. `finished` can stall in some Chromium
+        // builds when transitions overlap or animations never complete, which blocks shell
+        // `navigate()` and leaves the shell spinner / blank content indefinitely.
+        const settled =
+            (transition as ViewTransition & { updateCallbackDone?: Promise<void> })
+                .updateCallbackDone ?? transition.finished;
+        await settled;
     } catch {
         // Expected when a subsequent navigation aborts this transition.
     } finally {
         delete document.documentElement.dataset.vtDirection;
     }
+    void transition.finished.catch(() => {
+        // Let the visual transition finish without blocking routing/boot.
+    });
 }

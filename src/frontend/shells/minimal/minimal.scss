@@ -187,6 +187,30 @@
         }
     }
 
+    /* CWS / cwsp: reach :8443 admin when there is no address bar (PWA, embedded). */
+    .app-shell__admin-door {
+        flex-shrink: 0;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        padding: 0.3rem 0.5rem;
+        border-radius: var(--radius-sm, 6px);
+        border: 1px solid color-mix(in srgb, var(--color-error, #c62828) 40%, var(--shell-nav-border));
+        background: color-mix(in srgb, var(--color-error, #c62828) 16%, var(--shell-nav-bg));
+        color: color-mix(in srgb, var(--color-error, #b71c1c) 70%, var(--shell-nav-fg));
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: background-color 0.15s ease, border-color 0.15s ease;
+
+        &:hover {
+            background: color-mix(in srgb, var(--color-error, #c62828) 24%, var(--shell-nav-bg));
+        }
+
+        &:active {
+            background: color-mix(in srgb, var(--color-error, #c62828) 30%, var(--shell-nav-bg));
+        }
+    }
+
     /*
      * WCO: drag empty chrome to move the window; keep controls clickable.
      * https://developer.mozilla.org/en-US/docs/Web/API/Window_Controls_Overlay_API

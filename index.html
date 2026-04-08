@@ -331,11 +331,13 @@
 
             @media print {
                 :where(body) {
-                    min-block-size: 100dvb !important;
+                    min-block-size: max(100%, 100cqb) !important;
                     block-size: max-content !important;
                     min-inline-size: stretch !important;
                     inline-size: 100dvi !important;
                     max-inline-size: 100dvi !important;
+                    max-block-size: none !important;
+                    overflow: visible !important;
                 }
 
                 :where(body, html) {
@@ -351,6 +353,10 @@
                     scrollbar-color: transparent transparent;
                     -webkit-overflow-scrolling: touch;
                     font-family: var(--print-font-family);
+                    min-block-size: max(100%, 100cqb) !important;
+                    max-block-size: none !important;
+                    block-size: max-content !important;
+                    overflow: visible !important;
 
                     min-inline-size: stretch !important;
                     inline-size: 100dvi !important;
@@ -388,10 +394,13 @@
                     padding: 0px !important;
                     margin: 0px !important;
                     overflow-x: hidden !important;
-                    overflow-y: auto !important;
+                    overflow-y: visible !important;
                     container-type: inline-size !important;
                     border: 0px none transparent !important;
                     outline: 0px none transparent !important;
+                    max-block-size: none !important;
+                    min-block-size: max(100%, 100cqb) !important;
+                    block-size: max-content !important;
                 }
 
                 :where(*) {
@@ -473,11 +482,13 @@
                 .cw-view-viewer__prose,
                 [data-cw-viewer-prose],
                 .view-viewer,
+                .view-viewer__md-root,
                 .view-viewer__content,
                 .app-shell__content,
                 .markdown-body,
                 .markdown-viewer-content,
-                .result-content {
+                .result-content,
+                [data-app-layer="shell"] {
                     display: contents !important;
                     margin: 0 !important;
                     padding: 0 !important;
@@ -502,12 +513,15 @@
                     touch-action: auto !important;
                     cursor: auto !important;
                     opacity: 1 !important;
-                    visibility: visible !important;
+                    max-block-size: none !important;
+                    min-block-size: max(100%, 100cqb) !important;
+                    block-size: max-content !important;
                 }
             }
         }
     </style>
     <link rel="modulepreload" href="/src/index.ts" fetchpriority="high" />
+    <link rel="modulepreload" href="/src/html-boot.ts" fetchpriority="high" />
 </head>
 
 <body>
@@ -515,14 +529,7 @@
         <div class="loading-spinner"></div>
         <div class="loading-message">Initializing application...</div>
     </div>
-    <script type="module">
-        const app = import("/src/index.ts");
-        app?.then?.((app) => {
-            app?.default?.(document.getElementById("app"));
-        })?.catch?.((error) => {
-            console.error(error);
-        });
-    </script>
+    <script type="module" src="/src/html-boot.ts"></script>
 </body>
 
 </html>

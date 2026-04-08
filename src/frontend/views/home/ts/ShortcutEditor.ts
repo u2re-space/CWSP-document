@@ -17,6 +17,8 @@ export type ShortcutEditorDraft = {
     view: string;
     href: string;
     description: string;
+    /** Tile shape: square, circle, or squircle */
+    shape: string;
 };
 
 type ShortcutEditorOptions = {
@@ -96,6 +98,14 @@ export const openShortcutEditor = (options: ShortcutEditorOptions): void => {
                     <input name="icon" type="text" placeholder="phosphor icon name" />
                 </label>
                 <label class="modal-field">
+                    <span>Shape</span>
+                    <select name="shape">
+                        <option value="squircle">Squircle</option>
+                        <option value="circle">Circle</option>
+                        <option value="square">Rounded square</option>
+                    </select>
+                </label>
+                <label class="modal-field">
                     <span>Action</span>
                     <select name="action"></select>
                 </label>
@@ -105,7 +115,7 @@ export const openShortcutEditor = (options: ShortcutEditorOptions): void => {
                 </label>
                 <label class="modal-field" data-field="href">
                     <span>Link</span>
-                    <input name="href" type="url" placeholder="https://example.com" />
+                    <input name="href" type="text" inputmode="url" autocomplete="off" placeholder="https://…, mailto:…" />
                 </label>
                 <label class="modal-field">
                     <span>Description</span>
@@ -127,6 +137,7 @@ export const openShortcutEditor = (options: ShortcutEditorOptions): void => {
     const form = modal.querySelector("form") as HTMLFormElement | null;
     const labelInput = form?.querySelector('input[name="label"]') as HTMLInputElement | null;
     const iconInput = form?.querySelector('input[name="icon"]') as HTMLInputElement | null;
+    const shapeSelect = form?.querySelector('select[name="shape"]') as HTMLSelectElement | null;
     const actionSelect = form?.querySelector('select[name="action"]') as HTMLSelectElement | null;
     const viewSelect = form?.querySelector('select[name="view"]') as HTMLSelectElement | null;
     const hrefInput = form?.querySelector('input[name="href"]') as HTMLInputElement | null;
@@ -136,6 +147,8 @@ export const openShortcutEditor = (options: ShortcutEditorOptions): void => {
 
     if (labelInput) labelInput.value = String(initial.label || "New shortcut");
     if (iconInput) iconInput.value = String(initial.icon || "sparkle");
+    const shapeVal = String(initial.shape || "squircle").toLowerCase();
+    if (shapeSelect) shapeSelect.value = ["circle", "square", "squircle"].includes(shapeVal) ? shapeVal : "squircle";
     if (hrefInput) hrefInput.value = String(initial.href || "");
     if (descriptionInput) descriptionInput.value = String(initial.description || "");
 
@@ -191,7 +204,8 @@ export const openShortcutEditor = (options: ShortcutEditorOptions): void => {
             action: String(actionSelect?.value || "open-view"),
             view: String(viewSelect?.value || "").trim(),
             href: String(hrefInput?.value || "").trim(),
-            description: String(descriptionInput?.value || "").trim()
+            description: String(descriptionInput?.value || "").trim(),
+            shape: String(shapeSelect?.value || "squircle").toLowerCase()
         });
         closeModal();
     });

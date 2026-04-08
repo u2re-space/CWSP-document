@@ -12,6 +12,7 @@ import { ensureStyleSheet } from "fest/icon";
 import "fest/icon";
 import { dynamicTheme } from "fest/lure";
 import { ensureShellElementDefined, type ShellElement, MinimalShellHostElement } from "@fl-ui/items/BaseElement";
+import { initBootShellWindowActivity } from "./boot/ts/shell-preference";
 
 //@ts-ignore
 import style from "../views/views.scss?inline";
@@ -54,6 +55,7 @@ export abstract class ShellBase implements Shell {
     protected themeCycleButton: HTMLButtonElement | null = null;
     protected themeCycleIcon: HTMLElement | null = null;
     protected themeAttrObserver: MutationObserver | null = null;
+    private shellActivityDispose: (() => void) | null = null;
 
     // ========================================================================
     // ABSTRACT METHODS (to be implemented by concrete shells)
@@ -147,6 +149,7 @@ export abstract class ShellBase implements Shell {
         // Mount to container
         container.replaceChildren(this.rootElement);
         this.mounted = true;
+        this.shellActivityDispose = initBootShellWindowActivity(this.id);
 
         // Align navigation state with the URL before the first boot navigate(), so the
         // outgoing "previous" view is not a stale placeholder (e.g. "home" on /viewer).
@@ -205,6 +208,9 @@ export abstract class ShellBase implements Shell {
 
     unmount(): void {
         if (!this.mounted) return;
+
+        this.shellActivityDispose?.();
+        this.shellActivityDispose = null;
 
         // Cleanup views
         for (const [viewId] of this.loadedViews) {
@@ -320,6 +326,23 @@ export abstract class ShellBase implements Shell {
     }
 
     async loadView(viewId: ViewId, params?: Record<string, string>): Promise<HTMLElement> {
+        // Hydrate body token: when a process is opened as a dedicated browser
+        // window, the parent shell stashes POST body data in sessionStorage
+        // under `_bodyToken`. Recover it and pass as `initialData`.
+        let initialData: unknown;
+        const bodyToken = params?._bodyToken;
+        if (bodyToken) {
+            try {
+                const raw = globalThis?.sessionStorage?.getItem?.(bodyToken);
+                if (raw != null) {
+                    globalThis?.sessionStorage?.removeItem?.(bodyToken);
+                    try { initialData = JSON.parse(raw); } catch { initialData = raw; }
+                }
+            } catch {
+                // sessionStorage unavailable
+            }
+        }
+
         // Check cache first
         const cached = this.loadedViews.get(viewId);
         if (cached) {
@@ -328,11 +351,10 @@ export abstract class ShellBase implements Shell {
             if (!cached.element.isConnected) {
                 const refreshed = cached.view.render({
                     shellContext: this.getContext(),
-                    params
+                    params,
+                    initialData,
                 });
                 this.loadedViews.set(viewId, { view: cached.view, element: refreshed });
-                // First mount ran when the previous root was created; a fresh root still needs
-                // lifecycle init (e.g. Airpad async init replaces the loading placeholder).
                 if (cached.view.lifecycle?.onMount) {
                     await cached.view.lifecycle.onMount();
                 }
@@ -349,13 +371,15 @@ export abstract class ShellBase implements Shell {
         // Load view from registry
         const view = await ViewRegistry.load(viewId, {
             shellContext: this.getContext(),
-            params
+            params,
+            initialData,
         });
 
         // Render view
         const element = view.render({
             shellContext: this.getContext(),
-            params
+            params,
+            initialData,
         });
 
         // Cache view

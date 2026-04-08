@@ -1,7 +1,12 @@
-@use "../views.scss" as *;
+@use "sass:string";
 @use "./markdown.scss" as *;
 @use "veela-lib" as *;
 @use "veela-lib" as ui;
+
+/// Literal CSS `light-dark()` — Veela defines SCSS `light-dark($name)` (one arg), so call this instead.
+@function _viewer-css-light-dark($css) {
+    @return string.unquote($css);
+}
 
 @mixin grid-auto-fill($min) {
     display: grid;
@@ -51,27 +56,10 @@
         --view-prose-heading-margin: var(--space-6);
 
         /*
-         * Deep dark chrome (reference: compact markdown viewer — charcoal shell, slightly lifted toolbar).
-         * Keeps prose readable without fighting global light tokens.
+         * Chrome colors come from @include viewer-view-tokens (layer.view.viewer) using light-dark().
+         * This block only sets layout + color-scheme so UA widgets and light-dark() match the OS.
          */
-        --view-bg: #0b0d12;
-        --view-fg: #e8eaef;
-        --view-border: rgba(255, 255, 255, 0.07);
-        --view-toolbar-bg: #12151c;
-        --view-btn-hover-bg: rgba(255, 255, 255, 0.07);
-        --view-code-bg: #161a22;
-        --view-code-fg: #d8dce6;
-        --view-code-border: rgba(255, 255, 255, 0.08);
-        --view-blockquote-border: #5b8cff;
-        --view-blockquote-bg: rgba(255, 255, 255, 0.04);
-        --view-link-color: #7eb8ff;
-        --view-link-hover: #a8d0ff;
-
-        /* Align fl-ui / surface tokens used by toolbar buttons */
-        --color-surface: transparent;
-        --color-on-surface: #c4c9d4;
-        --color-surface-container-high: var(--view-btn-hover-bg);
-        --color-primary: #8ab4ff;
+        color-scheme: light dark;
 
         /* toolbar control hit targets */
         --view-toolbar-btn-pad-block: 0.4rem;
@@ -99,9 +87,9 @@
         box-sizing: border-box;
         inline-size: var(--viewer-shell-inline-size, 100%);
         block-size: var(--viewer-shell-block-size, 100%);
-        max-inline-size: 100%;
-        max-block-size: 100%;
-        min-block-size: 0;
+        max-inline-size: none;
+        max-block-size: none;
+        min-block-size: max(100%, 100cqb);
         min-inline-size: 0;
         container-type: var(--viewer-shell-container-type, inline-size);
         contain: var(--viewer-shell-contain, layout style paint);
@@ -115,10 +103,11 @@
         box-sizing: border-box;
         background-color: var(--view-bg);
         color: var(--view-fg);
-        min-block-size: 0;
+        min-block-size: max(100%, 100cqb);
         min-inline-size: 0;
-        block-size: 100%;
+        block-size: max-content;
         inline-size: 100%;
+        max-block-size: stretch;
         overflow: hidden;
     }
 
@@ -164,22 +153,27 @@
         min-block-size: 0;
         min-inline-size: 0;
         block-size: 100%;
+        inline-size: 100%;
         box-sizing: border-box;
         overflow-block: auto;
         overflow-inline: hidden;
         overscroll-behavior: contain;
 
-        > slot {
+        & > slot {
             display: block;
             block-size: 100%;
+            inline-size: 100%;
             min-block-size: 0;
+            min-inline-size: 0;
         }
 
-        > slot::slotted([data-render-target]) {
+        & > slot::slotted([data-render-target]) {
             display: block;
             block-size: 100%;
-            max-block-size: 100%;
+            inline-size: 100%;
+            max-block-size: none;
             min-block-size: 0;
+            min-inline-size: 0;
             overflow-block: auto;
             overflow-inline: hidden;
             overscroll-behavior: contain;
@@ -190,6 +184,8 @@
         flex: 1 1 auto;
         min-block-size: 0;
         min-inline-size: 0;
+        block-size: 100%;
+        inline-size: 100%;
         box-sizing: border-box;
         overflow-block: auto;
         overflow-inline: hidden;
@@ -209,6 +205,8 @@
         flex: 1 1 auto;
         min-block-size: 0;
         min-inline-size: 0;
+        block-size: 100%;
+        inline-size: 100%;
         box-sizing: border-box;
         overflow-block: auto;
         overflow-inline: hidden;
@@ -218,6 +216,9 @@
     .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default))[data-raw] .view-viewer__content {
         flex: 1 1 auto;
         min-block-size: 0;
+        min-inline-size: 0;
+        block-size: 100%;
+        inline-size: 100%;
     }
 }
 
@@ -512,6 +513,8 @@
         display: flex;
         flex-direction: column;
         box-sizing: border-box;
+        inline-size: 100%;
+        min-inline-size: 0;
         padding: 0;
         background-color: var(--view-bg);
 
@@ -561,7 +564,7 @@
         display: block;
         box-sizing: border-box;
         block-size: 100%;
-        max-block-size: 100%;
+        max-block-size: none;
         min-block-size: 0;
         min-inline-size: 0;
         overflow-block: auto;
@@ -620,18 +623,22 @@
     @media print {
         .cw-view-viewer-shell {
             display: block !important;
-            block-size: auto !important;
+            block-size: max-content !important;
             inline-size: 100% !important;
             overflow: visible !important;
+            max-block-size: none !important;
+            min-block-size: max(100%, 100cqb) !important;
         }
 
         .view-viewer {
             display: block !important;
-            block-size: auto !important;
+            min-block-size: max(100%, 100cqb) !important;
+            block-size: max-content !important;
             inline-size: 100% !important;
             overflow: visible !important;
             background: transparent !important;
             color: #000 !important;
+            max-block-size: none !important;
         }
 
         .view-viewer__toolbar {
@@ -642,24 +649,30 @@
             display: block !important;
             padding: 0 !important;
             overflow: visible !important;
-            block-size: auto !important;
+            block-size: max-content !important;
             inline-size: 100% !important;
+            max-block-size: none !important;
+            min-block-size: max(100%, 100cqb) !important;
         }
 
         .cw-view-viewer__prose {
             display: block !important;
-            block-size: auto !important;
+            block-size: max-content !important;
             inline-size: 100% !important;
             overflow: visible !important;
             contain: none !important;
+            max-block-size: none !important;
+            min-block-size: max(100%, 100cqb) !important;
         }
 
         .cw-view-viewer__slot-raw,
         .cw-view-viewer__slot-default {
             display: block !important;
-            block-size: auto !important;
+            block-size: max-content !important;
             inline-size: 100% !important;
             overflow: visible !important;
+            max-block-size: none !important;
+            min-block-size: max(100%, 100cqb) !important;
         }
 
         [data-render-target],
@@ -670,7 +683,9 @@
             visibility: visible !important;
             opacity: 1 !important;
             overflow: visible !important;
-            block-size: auto !important;
+            block-size: max-content !important;
+            max-block-size: none !important;
+            min-block-size: max(100%, 100cqb) !important;
             inline-size: 100% !important;
             color: #000 !important;
             background: transparent !important;
@@ -691,16 +706,26 @@
 }
 
 @layer layer.view.viewer {
-    .cw-view-viewer-shell,
+    .cw-view-viewer-shell {
+        display: flex;
+        flex-direction: column;
+        inline-size: 100%;
+        block-size: 100%;
+        min-inline-size: 0;
+        min-block-size: max(100%, 100cqb);
+        max-block-size: none;
+    }
+
     .view-viewer {
         display: grid;
         grid-template-rows: [toolbar-row] max-content [content-row] minmax(0, 1fr);
+        flex: 1 1 0%;
         inline-size: 100%;
         block-size: 100%;
         min-inline-size: 0;
         min-block-size: 0;
-        color: var(--view-fg, var(--color-on-surface, #e5e7eb));
-        background: var(--view-bg, var(--color-surface, #060d17));
+        color: var(--view-fg, var(--color-on-surface, #{_viewer-css-light-dark("light-dark(#1a1a1a, #e5e7eb)")}));
+        background: var(--view-bg, var(--color-surface, #{_viewer-css-light-dark("light-dark(#f4f6fa, #060d17)")}));
     }
 
     .view-viewer__toolbar {
@@ -714,7 +739,9 @@
         box-shadow: 0 12px 32px -20px color-mix(in oklab, #000 45%, transparent);
         background: var(
             --view-toolbar-bg,
-            color-mix(in oklab, var(--color-surface-container, #0f1a2b) 88%, transparent)
+            #{_viewer-css-light-dark(
+                    "light-dark(color-mix(in oklab, var(--color-surface-container, #e2e8f0) 88%, transparent), color-mix(in oklab, var(--color-surface-container, #0f1a2b) 88%, transparent))"
+                )}
         );
         min-inline-size: 100%;
         box-sizing: border-box;
@@ -747,7 +774,11 @@
         font-size: 0.8125rem;
         font-weight: 500;
         line-height: 1.25;
-        color: color-mix(in oklab, var(--color-on-surface, #e5e7eb) 88%, transparent);
+        color: color-mix(
+            in oklab,
+            var(--color-on-surface, #{_viewer-css-light-dark("light-dark(#334155, #e5e7eb)")}) 88%,
+            transparent
+        );
         text-align: center;
     }
 
@@ -770,8 +801,16 @@
         padding-inline: var(--view-toolbar-btn-pad-inline, 0.6875rem);
         border: none;
         border-radius: var(--view-toolbar-btn-radius, 0.625rem);
-        background: color-mix(in oklab, var(--color-on-surface, #e5e7eb) 6%, transparent);
-        color: color-mix(in oklab, var(--color-on-surface, #e5e7eb) 82%, transparent);
+        background: color-mix(
+            in oklab,
+            var(--color-on-surface, #{_viewer-css-light-dark("light-dark(#334155, #e5e7eb)")}) 6%,
+            transparent
+        );
+        color: color-mix(
+            in oklab,
+            var(--color-on-surface, #{_viewer-css-light-dark("light-dark(#334155, #e5e7eb)")}) 82%,
+            transparent
+        );
         font: inherit;
         font-size: 0.78rem;
         line-height: 1;
@@ -783,8 +822,12 @@
     }
 
     .view-viewer__btn:hover {
-        background: color-mix(in oklab, var(--color-on-surface, #e5e7eb) 11%, transparent);
-        color: var(--color-on-surface, #f8fafc);
+        background: color-mix(
+            in oklab,
+            var(--color-on-surface, #{_viewer-css-light-dark("light-dark(#334155, #e5e7eb)")}) 11%,
+            transparent
+        );
+        color: var(--color-on-surface, #{_viewer-css-light-dark("light-dark(#0f172a, #f8fafc)")});
     }
 
     .view-viewer__toolbar-icon {
@@ -795,6 +838,7 @@
     .view-viewer__content {
         grid-row: content-row;
         position: relative;
+        inline-size: 100%;
         min-inline-size: 0;
         min-block-size: 0;
         overflow: auto;
@@ -978,7 +1022,7 @@
                 min-inline-size: 0px;
                 min-block-size: 0px;
                 max-inline-size: stretch;
-                max-block-size: stretch;
+                max-block-size: none;
                 inline-size: stretch;
                 block-size: stretch;
                 box-sizing: border-box;
@@ -1401,8 +1445,8 @@
 
     @media (prefers-contrast: more) {
         :root {
-            --view-fg: light-dark(#000000, #ffffff);
-            --view-nav-border: light-dark(#000000, #ffffff);
+            --view-fg: #{_viewer-css-light-dark("light-dark(#000, #fff)")};
+            --view-nav-border: #{_viewer-css-light-dark("light-dark(#000, #fff)")};
         }
     }
 
@@ -2288,7 +2332,7 @@
         display: flex;
         flex-direction: column;
         gap: var(--space-lg);
-        max-block-size: 100%;
+        max-block-size: none;
         overflow: auto;
     }
 
@@ -2436,7 +2480,7 @@
         display: flex;
         flex-direction: column;
         block-size: 100%;
-        max-block-size: 100%;
+        max-block-size: none;
         gap: var(--space-lg);
         box-sizing: border-box;
 
@@ -3405,8 +3449,9 @@
             overflow: visible !important;
             position: static !important;
             inset: auto !important;
+            min-block-size: max(100%, 100cqb) !important;
             inline-size: 100% !important;
-            block-size: auto !important;
+            block-size: max-content !important;
             max-inline-size: none !important;
             max-block-size: none !important;
             contain: none !important;
@@ -3414,6 +3459,7 @@
             content-visibility: visible !important;
             break-before: auto !important;
             break-after: auto !important;
+            contain: none !important;
         }
 
         .view-viewer__toolbar,
@@ -3696,6 +3742,9 @@
         display: flex;
         flex-direction: column;
         box-sizing: border-box;
+        inline-size: 100%;
+        min-inline-size: 0;
+        grid-row: content-row;
         padding: 0px;
 
         &.dragover {
@@ -3744,8 +3793,8 @@
         display: flex;
         flex-direction: column;
         box-sizing: border-box;
-        block-size: 100%;
-        max-block-size: 100%;
+        block-size: stretch;
+        max-block-size: none;
         min-block-size: 0;
         min-inline-size: 0;
         overflow-block: auto;
@@ -3858,19 +3907,36 @@
     --view-prose-line-height: 1.75;
     --view-prose-heading-margin: var(--space-6);
 
-    /* colors */
-    --view-bg: var(--color-surface, #ffffff);
-    --view-fg: var(--color-on-surface, #1a1a1a);
-    --view-border: var(--color-border, rgba(0, 0, 0, 0.1));
-    --view-toolbar-bg: light-dark(rgba(0, 0, 0, 0.02), rgba(255, 255, 255, 0.04));
-    --view-btn-hover-bg: light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08));
-    --view-code-bg: light-dark(#f5f5f5, #2d2d2d);
-    --view-code-fg: light-dark(var(--color-text, #1a1a1a), #e0e0e0);
-    --view-code-border: var(--color-border);
-    --view-blockquote-border: var(--color-primary);
-    --view-blockquote-bg: light-dark(var(--color-surface-hover), #252525);
-    --view-link-color: var(--color-link, #007acc);
-    --view-link-hover: var(--color-link-hover, #005fa3);
+    color-scheme: light dark;
+
+    /* colors — app tokens win when set; otherwise follow prefers-color-scheme via CSS light-dark() */
+    --view-bg: var(--color-surface, #{_viewer-css-light-dark("light-dark(#f4f6fa, #0b0d12)")});
+    --view-fg: var(--color-on-surface, #{_viewer-css-light-dark("light-dark(#1a1a1a, #e8eaef)")});
+    --view-border: var(
+        --color-border,
+        #{_viewer-css-light-dark("light-dark(rgba(0, 0, 0, 0.12), rgba(255, 255, 255, 0.07))")}
+    );
+    --view-toolbar-bg: #{_viewer-css-light-dark("light-dark(rgba(0, 0, 0, 0.03), rgba(255, 255, 255, 0.05))")};
+    --view-btn-hover-bg: #{_viewer-css-light-dark("light-dark(rgba(0, 0, 0, 0.07), rgba(255, 255, 255, 0.08))")};
+    --view-code-bg: #{_viewer-css-light-dark("light-dark(#f0f2f5, #161a22)")};
+    --view-code-fg: #{_viewer-css-light-dark("light-dark(var(--color-text, #1a1a1a), #d8dce6)")};
+    --view-code-border: var(
+        --color-border,
+        #{_viewer-css-light-dark("light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.08))")}
+    );
+    --view-blockquote-border: var(
+        --color-primary,
+        #{_viewer-css-light-dark("light-dark(#2563eb, #5b8cff)")}
+    );
+    --view-blockquote-bg: #{_viewer-css-light-dark("light-dark(rgba(0, 0, 0, 0.03), rgba(255, 255, 255, 0.04))")};
+    --view-link-color: var(--color-link, #{_viewer-css-light-dark("light-dark(#06c, #7eb8ff)")});
+    --view-link-hover: var(--color-link-hover, #{_viewer-css-light-dark("light-dark(#005fa3, #a8d0ff)")});
+
+    /* fl-ui / toolbar controls (transparent chrome; icons follow scheme) */
+    --color-surface: transparent;
+    --color-on-surface: #{_viewer-css-light-dark("light-dark(#2d3748, #c4c9d4)")};
+    --color-surface-container-high: var(--view-btn-hover-bg);
+    --color-primary: #{_viewer-css-light-dark("light-dark(#2563eb, #8ab4ff)")};
 
     /* toolbar (see .view-viewer__toolbar) */
     --view-toolbar-pad-block: 0.375rem;
@@ -3881,14 +3947,12 @@
     --view-toolbar-btn-radius: 0.625rem;
     --view-toolbar-btn-pad-block: 0.4375rem;
     --view-toolbar-btn-pad-inline: 0.6875rem;
-    --view-toolbar-surface: light-dark(
-        color-mix(in oklab, var(--color-surface-container-high, #ececec) 92%, var(--color-surface, #fff) 8%),
-        color-mix(in oklab, var(--color-surface-container-high, #2a2a2a) 88%, var(--color-surface, #121212) 12%)
-    );
-    --view-toolbar-shadow: light-dark(
-        0 10px 28px -18px color-mix(in oklab, var(--color-on-surface, #1a1a1a) 12%, transparent),
-        0 14px 36px -22px color-mix(in oklab, #000 50%, transparent)
-    );
+    --view-toolbar-surface: #{_viewer-css-light-dark(
+            "light-dark(color-mix(in oklab, var(--color-surface-container-high, #ececec) 92%, var(--color-surface, #fff) 8%), color-mix(in oklab, var(--color-surface-container-high, #2a2a2a) 88%, var(--color-surface, #121212) 12%))"
+        )};
+    --view-toolbar-shadow: #{_viewer-css-light-dark(
+            "light-dark(0 10px 28px -18px color-mix(in oklab, var(--color-on-surface, #1a1a1a) 12%, transparent), 0 14px 36px -22px color-mix(in oklab, #000 50%, transparent))"
+        )};
 
     /* units */
     --view-code-font-size: 0.9em;
@@ -3934,7 +3998,7 @@
         inline-size: var(--viewer-shell-inline-size, 100%);
         block-size: var(--viewer-shell-block-size, 100%);
         max-inline-size: 100%;
-        max-block-size: 100%;
+        max-block-size: none;
         min-block-size: 0;
         min-inline-size: 0;
         align-self: stretch;
@@ -3982,6 +4046,7 @@
         min-block-size: 0;
         min-inline-size: 0;
         block-size: 100%;
+        inline-size: 100%;
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -4000,6 +4065,7 @@
         min-block-size: 0;
         min-inline-size: 0;
         block-size: 100%;
+        inline-size: 100%;
         box-sizing: border-box;
         overflow-block: auto;
         overflow-inline: hidden;
@@ -4008,15 +4074,19 @@
         & > slot {
             display: block;
             block-size: 100%;
+            inline-size: 100%;
             min-block-size: 0;
+            min-inline-size: 0;
         }
 
         & > slot::slotted([data-render-target]) {
             display: flex;
             flex-direction: column;
             block-size: 100%;
-            max-block-size: 100%;
+            inline-size: 100%;
+            max-block-size: none;
             min-block-size: 0;
+            min-inline-size: 0;
             overflow-block: auto;
             overflow-inline: hidden;
             overscroll-behavior: contain;
@@ -4027,6 +4097,8 @@
         flex: 1 1 auto;
         min-block-size: 0;
         min-inline-size: 0;
+        block-size: 100%;
+        inline-size: 100%;
         box-sizing: border-box;
         overflow-block: auto;
         overflow-inline: hidden;
@@ -4048,6 +4120,8 @@
         display: flex;
         min-block-size: 0;
         min-inline-size: 0;
+        block-size: 100%;
+        inline-size: 100%;
         box-sizing: border-box;
         overflow-block: auto;
         overflow-inline: hidden;
@@ -4057,6 +4131,9 @@
     .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default))[data-raw] .view-viewer__content {
         flex: 1 1 auto;
         min-block-size: 0;
+        min-inline-size: 0;
+        block-size: 100%;
+        inline-size: 100%;
     }
 }
 
@@ -4130,6 +4207,7 @@
             visibility: visible !important;
             opacity: 1 !important;
             overflow: visible !important;
+            min-block-size: 100% !important;
             block-size: auto !important;
             inline-size: 100% !important;
             color: #000 !important;

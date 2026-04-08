@@ -131,7 +131,9 @@ async function getDirByPath(rootDirHandle, path) {
         try {
             dir = await dir?.getDirectoryHandle?.(part, { create: false });
         } catch (e: any) {
-            if (e?.name === 'NotFoundError') return null;
+            if (e?.name === "NotFoundError") return null;
+            // Teardown / user dismiss / navigation can abort in-flight directory ops (esp. with dev SW reloads).
+            if (e?.name === "AbortError") return null;
             throw e;
         }
         if (!dir) return null;

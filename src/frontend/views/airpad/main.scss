@@ -1948,6 +1948,20 @@
         color: var(--on-primary);
     }
 
+    .view-airpad .bottom-toolbar #btnAdminDoor {
+        order: 55;
+    }
+
+    .view-airpad .toolbar-btn.toolbar-btn--admin-door {
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+        padding-inline: 0.45rem;
+        border-color: color-mix(in srgb, var(--color-error, #c62828) 45%, var(--surface-outline, transparent));
+        background: color-mix(in srgb, var(--color-error, #c62828) 20%, var(--surface-container-high));
+        color: color-mix(in srgb, var(--color-error, #b71c1c) 75%, var(--on-surface));
+    }
+
     .view-airpad .hint-overlay .hint-panel {
         inline-size: min(44rem, calc(100vw - var(--space-8)));
     }

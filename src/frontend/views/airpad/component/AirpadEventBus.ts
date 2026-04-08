@@ -1,5 +1,7 @@
 export type AirpadEventMap = {
     "ui.config.open": undefined;
+    /** Open CWS admin UI (HTTPS :8443 by default); use Settings → Server for HTTP or origins. */
+    "ui.admin.open": undefined;
     "ui.reload.request": undefined;
     "ui.motion.reset": undefined;
     "session.connect.request": undefined;

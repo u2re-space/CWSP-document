@@ -22,6 +22,8 @@ export const StorageKeys = {
     // Boot preferences
     BOOT_STYLE: "rs-boot-style",
     BOOT_SHELL: "rs-boot-shell",
+    /** Last-focused app window shell (JSON `{ shell, t }`); see shell-preference.ts */
+    BOOT_SHELL_LAST_ACTIVE: "rs-boot-shell-last-active",
     BOOT_VIEW: "rs-boot-view",
     BOOT_REMEMBER: "rs-boot-remember",
 

@@ -48,23 +48,19 @@
     }
 
     .speed-dial-grid {
-        // Grid layout from data attributes - using CSS custom properties set by attr()
-        // Modern approach: use registered @property with attr() fallback
         --grid-cols: 4;
         --grid-rows: 8;
 
         grid-row: 1 / -1;
         grid-column: 1 / -1;
-        display: grid;
-        gap: 0;
         padding: var(--padding-lg);
 
-        // Grid columns via data attribute
         &[data-grid-columns="4"] { --grid-cols: 4; }
         &[data-grid-columns="5"] { --grid-cols: 5; }
         &[data-grid-columns="6"] { --grid-cols: 6; }
+        &[data-grid-columns="7"] { --grid-cols: 7; }
+        &[data-grid-columns="8"] { --grid-cols: 8; }
 
-        // Grid rows via data attribute
         &[data-grid-rows="6"] { --grid-rows: 6; }
         &[data-grid-rows="7"] { --grid-rows: 7; }
         &[data-grid-rows="8"] { --grid-rows: 8; }
@@ -73,93 +69,94 @@
         &[data-grid-rows="11"] { --grid-rows: 11; }
         &[data-grid-rows="12"] { --grid-rows: 12; }
 
-        //
         --layout-c: var(--grid-cols, 4);
         --layout-r: var(--grid-rows, 8);
 
-        grid-template-columns: repeat(var(--cs-layout-c, 4), minmax(0px, 1fr));
-        grid-template-rows: repeat(var(--cs-layout-r, 8), minmax(0px, 1fr));
-
-        min-inline-size: 0px;
-        min-block-size: 0px;
-        max-inline-size: stretch;
-        max-block-size: stretch;
-        inline-size: stretch;
-        block-size: stretch;
-        box-sizing: border-box;
-        pointer-events: none; // Background click should go through if needed, but items are auto
-
-        place-content: center;
-        place-items: center;
         border-radius: 0px;
 
-        &.app-oriented-desktop__grid--labels,
-        &[data-grid-layer="labels"],
-        &.speed-dial-grid--labels {
+        // Stack order: labels on top so overflowing text below icon tiles is visible.
+        // Labels layer is pointer-events: none so it never blocks interaction.
+        &[data-grid-layer="icons"] {
             z-index: 1;
             background: transparent !important;
-            pointer-events: none !important;
+            pointer-events: none;
+            isolation: isolate;
+            contain: layout style;
+
+            &:has([data-dragging]) {
+                z-index: 3;
+            }
         }
 
-        &.app-oriented-desktop__grid--icons,
-        &[data-grid-layer="icons"],
-        &.speed-dial-grid--icons {
+        &[data-grid-layer="labels"] {
             z-index: 2;
             background: transparent !important;
-            pointer-events: none;
+            pointer-events: none !important;
+            isolation: isolate;
+            contain: layout style;
         }
 
-        // Items
         .ui-ws-item {
             --drag-x: 0;
             --drag-y: 0;
-            background-color: transparent;
-            pointer-events: auto;
-            display: grid;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            aspect-ratio: 1 / 1;
-            position: relative;
+            --cs-drag-x: calc(var(--drag-x, 0) * 1px);
+            --cs-drag-y: calc(var(--drag-y, 0) * 1px);
+            --tile-size: clamp(3.2rem, 7.5vmin, 4.6rem);
 
-            text-align: center;
+            grid-column: clamp(1, calc(1 + round(nearest, var(--cs-grid-c, 0), 1)), var(--cs-layout-c, 4));
+            grid-row: clamp(1, calc(1 + round(nearest, var(--cs-grid-r, 0), 1)), var(--cs-layout-r, 8));
+
+            position: relative;
+            display: grid;
             place-content: center;
             place-items: center;
             place-self: center;
-
+            aspect-ratio: 1 / 1;
+            min-inline-size: var(--tile-size);
+            min-block-size: var(--tile-size);
             grid-template-columns: minmax(0px, 1fr);
             grid-template-rows: minmax(0px, 1fr);
 
-            box-shadow: none;
-            filter: drop-shadow(0px 0px 0.25rem #0004) !important;
-
-            // Visuals
-            transition:
-                transform var(--drag-settle-ms, 200ms) cubic-bezier(0.22, 0.8, 0.3, 1),
-                filter var(--transition-fast) var(--ease-out);
-            contain: none;
-            overflow: visible;
+            background-color: transparent;
+            pointer-events: auto;
+            touch-action: none;
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
+            contain: none;
+            overflow: visible;
+            z-index: 1;
+            filter: none;
+
+            transform:
+                translate3d(
+                    calc(var(--cs-drag-x, 0px) + var(--cs-transition-c, 0px)),
+                    calc(var(--cs-drag-y, 0px) + var(--cs-transition-r, 0px)),
+                    0px
+                );
+            transform-origin: 50% 50%;
+
+            transition:
+                transform var(--drag-settle-ms, 200ms) cubic-bezier(0.22, 0.8, 0.3, 1),
+                scale 180ms var(--ease-out, ease-out),
+                filter 180ms var(--ease-out, ease-out);
 
             &:hover {
-                transform: scale(1.05);
+                scale: 1.06;
 
                 .ui-ws-item-icon {
-                    background: color-mix(in oklab, var(--color-surface-container-high, #1f2937) 82%, transparent);
-                    box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.65);
+                    background: color-mix(in oklab, var(--color-surface-container-high, #1f2937) 60%, transparent);
+                    box-shadow: 0 10px 36px -10px color-mix(in oklab, #000 40%, transparent);
                 }
             }
 
             &:active {
-                transform: scale(0.95);
+                scale: 0.94;
             }
 
             .ui-ws-item-icon {
                 display: grid;
-                /*border-radius: var(--radius-lg);*/
-                transition: background-color var(--transition-colors), box-shadow var(--transition-colors), clip-path var(--transition-fast); /*, border-radius var(--transition-fast);*/
+                transition: background-color 200ms ease, box-shadow 200ms ease;
                 grid-column: 1 / -1;
                 grid-row: 1 / -1;
                 aspect-ratio: 1 / 1;
@@ -171,28 +168,36 @@
                 place-items: center;
                 line-height: 0;
                 overflow: hidden;
-                contain: strict;
+                contain: layout style;
                 cursor: pointer;
 
-                inline-size: clamp(3.1rem, 7vmin, 4.6rem);
-                block-size: clamp(3.1rem, 7vmin, 4.6rem);
+                inline-size: var(--tile-size);
+                block-size: var(--tile-size);
                 min-inline-size: fit-content;
                 min-block-size: fit-content;
                 max-inline-size: 100%;
                 max-block-size: 100%;
-                padding: 0.85rem;
+                padding: 0.8rem;
 
-                box-shadow: none;
+                background: color-mix(in oklab, var(--color-surface-container, #111827) 56%, transparent);
+                border: none;
+                box-shadow: 0 6px 24px -8px color-mix(in oklab, #000 38%, transparent);
+                backdrop-filter: blur(16px) saturate(1.2);
+                -webkit-backdrop-filter: blur(16px) saturate(1.2);
                 filter: none;
 
-                // Lightweight fallback surface (avoid advanced mixin dependency).
-                background: color-mix(in oklab, var(--color-surface-container, #111827) 78%, transparent);
-                border: 1px solid color-mix(in oklab, var(--color-on-surface, #e5e7eb) 20%, transparent);
-                backdrop-filter: blur(10px) saturate(1.12);
-                -webkit-backdrop-filter: blur(10px) saturate(1.12);
+                border-radius: 22%;
 
-                &, &:hover, &:active {
-                    border-radius: var(--border-radius);
+                &[data-shape="circle"] {
+                    border-radius: 50%;
+                }
+
+                &[data-shape="square"] {
+                    border-radius: max(0.55rem, 14%);
+                }
+
+                &[data-shape="squircle"] {
+                    border-radius: 22%;
                 }
 
                 .ui-ws-item-icon-image {
@@ -204,88 +209,72 @@
                     object-position: center;
                     pointer-events: none;
                     z-index: 3;
-                    filter: drop-shadow(0px 0px 0.25rem #0006);
+                    filter: drop-shadow(0 1px 3px #0003);
                 }
 
                 ui-icon {
-                    --icon-size: clamp(2rem, 100%, 3rem);
+                    --icon-size: clamp(1.6rem, 60%, 2.4rem);
                     color: var(--on-surface-variant, var(--on-surface-color, currentColor));
                     aspect-ratio: 1 / 1;
-                    max-inline-size: var(--icon-size, 2rem);
-                    max-block-size: var(--icon-size, 2rem);
+                    max-inline-size: var(--icon-size, 1.8rem);
+                    max-block-size: var(--icon-size, 1.8rem);
                     min-inline-size: fit-content;
                     min-block-size: fit-content;
-                    inline-size: var(--icon-size, 2rem);
-                    block-size: var(--icon-size, 2rem);
+                    inline-size: var(--icon-size, 1.8rem);
+                    block-size: var(--icon-size, 1.8rem);
                     object-fit: contain;
                     object-position: center;
                     line-height: 0;
                     z-index: 2;
                     pointer-events: none;
-
-                    filter: drop-shadow(0px 0px 0.25rem oklch(from var(--on-surface-variant, var(--on-surface-color, currentColor)) l c h / 0.4));
+                    filter: drop-shadow(0 1px 2px #0002);
                 }
             }
 
             .ui-ws-item-label {
                 position: absolute;
-                inset: 0;
+                inset-inline: 0;
+                inset-block-start: 100%;
                 pointer-events: none;
                 text-align: center;
-                place-content: center;
-                place-items: center;
-                grid-column: 1 / -1;
-                grid-row: 1 / -1;
-                perspective: 1000;
-                backface-visibility: hidden;
-                transform: translate3d(0px, calc(50% + 0.68rem), 0px);
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+                padding-block-start: 0.35rem;
                 color: var(--on-surface-color, currentColor);
-                background-color: transparent;
-                background-image: none;
+                background: transparent;
                 white-space: nowrap;
-                aspect-ratio: auto;
-
-                inline-size: 100%;
-                max-inline-size: 100%;
-                min-inline-size: 0px;
-                min-block-size: 1px;
-                block-size: 100%;
-                line-height: 1.2;
                 overflow: visible;
-                display: grid;
                 filter: none;
 
                 span {
-                    display: flex;
+                    display: inline-flex;
                     place-content: center;
                     place-items: center;
 
-                    font-size: var(--text-sm, 0.8rem);
+                    font-size: 0.72rem;
                     font-weight: 500;
                     letter-spacing: 0.01em;
-                    color: var(--on-surface-color, currentColor);
-                    background-color: transparent;
-                    background-image: none;
+                    color: color-mix(in oklab, var(--on-surface-color, #e5e7eb) 90%, transparent);
 
-                    // Truncate
                     white-space: nowrap;
                     text-overflow: ellipsis;
-                    padding-inline: var(--padding-xs);
-                    background: rgba(0,0,0,0.2); // Subtle backdrop for readability
-                    border-radius: var(--radius-sm);
+                    overflow: hidden;
+                    padding-block: 0.15rem;
+                    padding-inline: 0.4rem;
+                    max-inline-size: min(100%, 9rem);
+                    inline-size: max-content;
+                    border-radius: 6px;
                     pointer-events: none;
                     text-align: center;
                     line-height: 1.25;
-                    inline-size: 100%;
 
-                    min-block-size: 1px;
-                    block-size: fit-content;
-                    max-block-size: fit-content;
-                    overflow: visible;
-                    max-inline-size: 100%;
-                    min-inline-size: 1px;
-
-                    text-shadow: 0px 0px 0.25rem #0004;
+                    text-shadow: 0 1px 4px #0006;
+                    border: none;
+                    background: transparent;
+                    backdrop-filter: none;
+                    -webkit-backdrop-filter: none;
+                    box-shadow: none;
                 }
             }
 
@@ -297,15 +286,14 @@
             &[data-interaction-state="onMoving"] {
                 will-change: transform;
                 cursor: grabbing;
+                z-index: 120;
                 transition: none !important;
                 transform:
                     translate3d(
-                        calc(var(--cs-drag-x, calc(var(--drag-x, 0) * 1px)) + var(--cs-transition-c, 0px)),
-                        calc(var(--cs-drag-y, calc(var(--drag-y, 0) * 1px)) + var(--cs-transition-r, 0px)),
+                        calc(var(--cs-drag-x, 0px) + var(--cs-transition-c, 0px)),
+                        calc(var(--cs-drag-y, 0px) + var(--cs-transition-r, 0px)),
                         0px
-                    )
-                    scale3d(var(--scale, 1), var(--scale, 1), var(--scale, 1))
-                    translate3d(var(--translate-x, 0px), var(--translate-y, 0px), 0px) !important;
+                    ) !important;
 
                 .ui-ws-item-label {
                     opacity: 1;
@@ -315,14 +303,27 @@
 
             &[data-interaction-state="onRelax"] {
                 will-change: transform;
+                z-index: 120;
                 transform:
                     translate3d(
-                        calc(var(--cs-drag-x, calc(var(--drag-x, 0) * 1px)) + var(--cs-transition-c, 0px)),
-                        calc(var(--cs-drag-y, calc(var(--drag-y, 0) * 1px)) + var(--cs-transition-r, 0px)),
+                        calc(var(--cs-drag-x, 0px) + var(--cs-transition-c, 0px)),
+                        calc(var(--cs-drag-y, 0px) + var(--cs-transition-r, 0px)),
                         0px
-                    )
-                    scale3d(var(--scale, 1), var(--scale, 1), var(--scale, 1))
-                    translate3d(var(--translate-x, 0px), var(--translate-y, 0px), 0px) !important;
+                    ) !important;
+            }
+
+            &[data-interaction-state="onPlace"] {
+                will-change: transform;
+                z-index: 120;
+                transition:
+                    transform var(--drag-settle-ms, 240ms) cubic-bezier(0.22, 0.8, 0.3, 1),
+                    filter var(--transition-fast) var(--ease-out) !important;
+                transform:
+                    translate3d(
+                        calc(var(--cs-drag-x, 0px) + var(--cs-transition-c, 0px)),
+                        calc(var(--cs-drag-y, 0px) + var(--cs-transition-r, 0px)),
+                        0px
+                    ) !important;
             }
 
             &[data-layer="labels"] {
@@ -330,20 +331,66 @@
                 filter: none;
                 background: transparent !important;
                 pointer-events: none !important;
+                transition:
+                    transform var(--drag-settle-ms, 240ms) cubic-bezier(0.22, 0.8, 0.3, 1);
 
-                .ui-ws-item-label,
-                .ui-ws-item-label span {
+                .ui-ws-item-label {
                     background: transparent !important;
-                    background-color: transparent !important;
-                    background-image: none !important;
                     pointer-events: none !important;
                 }
+
+                .ui-ws-item-label span {
+                    pointer-events: none !important;
+                }
+            }
+
+            // Label layer: independent of icon drag offset; only grid cell (synced on m-dragsettled).
+            &[data-layer="labels"][data-interaction-state="onLabelDocked"] {
+                transform: none !important;
+                transition: none !important;
+                cursor: default;
+            }
+
+            &[data-layer="labels"][data-interaction-state="onGrab"],
+            &[data-layer="labels"][data-interaction-state="onMoving"] {
+                transition: none !important;
             }
 
             &[data-layer="icons"] {
                 z-index: 99;
                 filter: none;
                 touch-action: none;
+            }
+
+            &[data-layer="icons"][data-interaction-state="onGrab"],
+            &[data-layer="icons"][data-interaction-state="onMoving"],
+            &[data-layer="icons"][data-interaction-state="onRelax"] {
+                z-index: 120;
+            }
+        }
+    }
+
+    // Home orient layer: tighter padding and tiles on narrow / short containers (parent `ui-orientbox` is `container-type: size`).
+    .speed-dial-root.app-oriented-desktop {
+        .speed-dial-grid.app-oriented-desktop__grid--labels,
+        .speed-dial-grid.app-oriented-desktop__grid--icons {
+            @container (max-width: 28rem) {
+                padding-inline: clamp(0.35rem, 3.2cqw, var(--padding-lg));
+                padding-block: clamp(0.35rem, 2.8cqh, var(--padding-lg));
+            }
+
+            @container (max-height: 29rem) {
+                padding-block: clamp(0.3rem, 2.2cqh, var(--padding-md));
+            }
+        }
+
+        .ui-ws-item {
+            @container (max-width: 28rem) {
+                --tile-size: clamp(2.6rem, 11cqmin, 4.2rem);
+
+                .ui-ws-item-icon {
+                    padding: 0.65rem;
+                }
             }
         }
     }
@@ -364,22 +411,25 @@
     .speed-dial-editor__form {
         inline-size: min(100%, 980px);
         margin-inline: auto;
-        border-radius: 14px;
-        border: 1px solid color-mix(in oklab, var(--color-outline-variant, #334155) 70%, transparent);
-        background: color-mix(in oklab, var(--color-surface, #0b1220) 92%, #000);
+        border-radius: 18px;
+        border: none;
+        background: color-mix(in oklab, var(--color-surface, #0b1220) 88%, #000);
         color: var(--color-on-surface, #e2e8f0);
         display: grid;
         grid-template-rows: auto minmax(0, 1fr) auto;
         max-block-size: min(86vh, 760px);
         overflow: hidden;
-        box-shadow: 0 -10px 45px -20px #000e;
+        box-shadow:
+            0 24px 64px -28px color-mix(in oklab, #000 65%, transparent),
+            0 0 0 1px color-mix(in oklab, var(--color-outline-variant, #334155) 35%, transparent) inset;
     }
 
     .speed-dial-editor__form .modal-header {
         display: grid;
         gap: 0.4rem;
         padding: 1rem 1rem 0.75rem;
-        border-block-end: 1px solid color-mix(in oklab, var(--color-outline-variant, #334155) 64%, transparent);
+        border-block-end: none;
+        box-shadow: 0 1px 0 color-mix(in oklab, var(--color-outline-variant, #334155) 28%, transparent);
     }
 
     .speed-dial-editor__form .modal-title {

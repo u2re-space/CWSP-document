@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import {
     assetFileNames as distAssetFileNames,
@@ -16,6 +17,59 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { VitePWA } from 'vite-plugin-pwa'
 import { searchForWorkspaceRoot } from "vite";
 import { ViteMcp } from 'vite-plugin-mcp';
+
+/**
+ * Drop stale `node_modules/.vite/deps` when old KaTeX pre-bundles linger (missing `katex-*.js` on disk
+ * but still referenced) or when hashed `katex-*.js` files exist while `optimizeDeps.exclude` includes katex.
+ * Prevents "Pre-transform error ... deps/katex-XXXX.js" + broken optimizer state that can balloon memory.
+ */
+const evictStaleKatexDepChunksPlugin = () => ({
+    name: "cw-evict-stale-katex-dep-chunks",
+    enforce: "pre",
+    configResolved(config) {
+        if (config.command !== "serve") return;
+        if (process.env.VITE_SKIP_KATEX_DEPS_EVICTION === "1") return;
+        const depsDir = join(config.cacheDir, "deps");
+        const metaFile = join(depsDir, "_metadata.json");
+        if (!existsSync(depsDir)) return;
+
+        let names;
+        try {
+            names = readdirSync(depsDir);
+        } catch {
+            return;
+        }
+
+        const hasKatexChunkFiles = names.some((f) => f.startsWith("katex-") && f.endsWith(".js"));
+
+        let metadataReferencesMissingKatex = false;
+        if (existsSync(metaFile)) {
+            try {
+                const text = readFileSync(metaFile, "utf8");
+                for (const m of text.matchAll(/"(katex-[A-Za-z0-9_-]+\.js)"/g)) {
+                    const chunk = m[1];
+                    if (!existsSync(join(depsDir, chunk))) {
+                        metadataReferencesMissingKatex = true;
+                        break;
+                    }
+                }
+            } catch {
+                /* ignore */
+            }
+        }
+
+        if (!hasKatexChunkFiles && !metadataReferencesMissingKatex) return;
+
+        try {
+            rmSync(depsDir, { recursive: true, force: true });
+            console.warn(
+                "[cw-vite] Cleared node_modules/.vite/deps (stale or missing KaTeX optimizer chunks). Re-scanning dependencies."
+            );
+        } catch (e) {
+            console.warn("[cw-vite] Could not clear .vite/deps:", e);
+        }
+    },
+});
 
 /**
  * Plugin to handle SPA fallback routes (share-target, etc.)
@@ -244,11 +298,53 @@ const importFromTSConfig = (tsconfig, __dirname) => {
     return alias;
 };
 
+/** Stable real path for `server.fs.allow` (symlinked `shared/fest` → monorepo modules). */
+const tryRealpath = (dir) => {
+    try {
+        return realpathSync(dir);
+    } catch {
+        return resolve(dir);
+    }
+};
+
+/**
+ * Only real directories — avoid resolve(root, "./star-star-slash-…") style paths (literal glob chars, invalid folders).
+ * Lets Vite read fest imports through symlinks without bogus parent entries.
+ *
+ * Do **not** add the whole `workspaceRoot`: that makes the entire monorepo a legal `fs` target and
+ * blows up dev cold start / dep crawl (10+ minute “loading” on large trees). Allow the app, hoisted
+ * deps, symlink targets under `modules/projects`, and shared assets only.
+ */
+const buildDevFsAllowList = (appRoot, workspaceRoot, phosphorCoreRoot) => {
+    const out = new Set();
+    const add = (p) => {
+        const n = tryRealpath(p);
+        if (existsSync(n)) out.add(n);
+    };
+    add(appRoot);
+    add(resolve(appRoot, "shared"));
+    add(resolve(appRoot, "shared/fest"));
+    add(resolve(appRoot, "src"));
+    add(phosphorCoreRoot);
+    add(resolve(workspaceRoot, "node_modules"));
+    add(resolve(workspaceRoot, "modules/projects"));
+    add(resolve(workspaceRoot, "modules/shared"));
+    add(resolve(workspaceRoot, "assets"));
+    for (const rel of ["assets", "../assets", "../../assets"]) {
+        add(resolve(appRoot, rel));
+    }
+    return Array.from(out);
+};
+
 //
 export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve("./", import.meta.dirname))=>{
     const workspaceRoot = searchForWorkspaceRoot(__dirname);
     const phosphorCoreRoot = resolve(workspaceRoot, "node_modules", "@phosphor-icons", "core");
+    const devFsAllow = buildDevFsAllowList(__dirname, workspaceRoot, phosphorCoreRoot);
     const $resolve = {
+        dedupe: ["katex"],
+        // `shared/fest` is symlinked; realpath resolution can duplicate modules vs `fest/*` tsconfig paths.
+        preserveSymlinks: process.env.VITE_RESOLVE_PRESERVE_SYMLINKS !== "0",
         alias: [
             { find: "@phosphor-icons/core", replacement: phosphorCoreRoot },
             ...importFromTSConfig(tsconfig, __dirname),
@@ -271,8 +367,24 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
     };
 
     //
-    const isBuild = process.env.npm_lifecycle_event === 'build' || process.env.NODE_ENV === 'production';
+    const argvHas = (word) =>
+        Array.isArray(process.argv) && process.argv.some((a) => String(a).toLowerCase() === word);
+    const isBuild =
+        argvHas("build") ||
+        process.env.npm_lifecycle_event === "build" ||
+        process.env.npm_lifecycle_event === "build:pwa" ||
+        process.env.NODE_ENV === "production";
+    /** Set `VITE_PWA_DEV_DISABLE=1` when the dev service worker still causes stale UI (same tab as old precache). */
+    const pwaDevServiceWorkerEnabled = process.env.VITE_PWA_DEV_DISABLE !== "1";
+    /**
+     * Optional absolute origin for generated module / HMR URLs (reverse proxy, odd LAN setups).
+     * If unset, Vite uses the browser’s current host:port — required when you open dev via
+     * localhost, 127.0.0.1, or a different machine IP than a hardcoded LAN address.
+     * Example: VITE_DEV_SERVER_ORIGIN=https://192.168.0.200:5173
+     */
+    const devServerOrigin = (process.env.VITE_DEV_SERVER_ORIGIN || "").trim();
     const plugins = [
+        evictStaleKatexDepChunksPlugin(),
         // SPA fallback for PWA routes (share-target, etc.)
         spaFallbackPlugin(),
         relocateWorkerBundleAssetsPlugin(),
@@ -280,25 +392,29 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             downloadDeps: true,
             inputMap: true
         }),*/
-        //...(isBuild ? [] :
-        ...[
-            viteStaticCopy({
-                targets: [
-                    { src: resolve(__dirname, './src/pwa/manifest.json'), dest: resolve(__dirname, './dist/pwa/') },
-                    { src: resolve(__dirname, './src/pwa/icons/icon.svg'), dest: resolve(__dirname, './dist/pwa/icons/') },
-                    { src: resolve(__dirname, './src/pwa/icons/icon.png'), dest: resolve(__dirname, './dist/pwa/icons/') },
-                    { src: resolve(__dirname, './src/pwa/icons/icon.ico'), dest: resolve(__dirname, './dist/pwa/icons/') }
-                ]
-            })
-        ],
-        ViteMcp({
-            target: "browser",
-            mode: "development",
-            port: 443,
-            host: "0.0.0.0",
-            origin: "https://192.168.0.200",
-            allowedHosts: ['localhost', '127.0.0.1', '0.0.0.0', '192.168.0.200', '95.188.82.223'],
-        }),
+        // PWA icon/manifest copy targets `dist/` — skip during `vite dev` (saves startup I/O; no dev use).
+        ...(isBuild
+            ? viteStaticCopy({
+                  targets: [
+                      { src: resolve(__dirname, "./src/pwa/manifest.json"), dest: resolve(__dirname, "./dist/pwa/") },
+                      { src: resolve(__dirname, "./src/pwa/icons/icon.svg"), dest: resolve(__dirname, "./dist/pwa/icons/") },
+                      { src: resolve(__dirname, "./src/pwa/icons/icon.png"), dest: resolve(__dirname, "./dist/pwa/icons/") },
+                      { src: resolve(__dirname, "./src/pwa/icons/icon.ico"), dest: resolve(__dirname, "./dist/pwa/icons/") },
+                  ],
+              })
+            : []),
+        ...(process.env.VITE_MCP_DISABLE === "1"
+            ? []
+            : [
+                  ViteMcp({
+                      target: "browser",
+                      mode: "development",
+                      port: 443,
+                      host: "0.0.0.0",
+                      ...(devServerOrigin ? { origin: devServerOrigin } : {}),
+                      allowedHosts: true,
+                  }),
+              ]),
         VitePWA({
             srcDir: resolve(__dirname, "./src/pwa/"),
             dstDir: resolve(__dirname, "./dist/"),
@@ -313,14 +429,21 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
                 injectionPoint: "self.__WB_MANIFEST",
                 maximumFileSizeToCacheInBytes: 1024 * 1024 * 16,
                 globPatterns: ['**/*.{js,css,html,png,svg,json}'],
+                // Smaller precache manifest → faster SW `install` (fewer parallel cache.put + less CPU).
+                globIgnores: [
+                    "**/node_modules/**/*",
+                    "**/*.map",
+                    "**/stats.html",
+                    "**/report.html",
+                ],
             },
             includeAssets: [
                 resolve(__dirname, './src/pwa/icons/icon.svg')
             ],
             manifest: false,
             devOptions: {
-                type: 'module',
-                enabled: true
+                type: "module",
+                enabled: pwaDevServiceWorkerEnabled,
             }
         })
     ];
@@ -356,6 +479,7 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
     };
 
     //
+    const veelaScssRoot = resolve(workspaceRoot, "modules/projects/veela.css/src/scss");
     const css = {
         postcss: postcssConfig,
         preprocessorOptions: {
@@ -364,34 +488,31 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
                 quietDeps: true,
                 charset: false,
                 precision: 8,
+                // Explorer (and other) SCSS copies Veela `misc/_config.scss` which forwards `lib/core/misc/functions`.
+                loadPaths: existsSync(veelaScssRoot) ? [veelaScssRoot] : [],
             }
         }
     }
 
     //
     const optimizeDeps = {
-        // List CJS packages by their npm name so Vite pre-bundles them during startup
-        // (Vite 8: Rolldown-based dep optimizer; options still live under optimizeDeps).
-        // Kept for packages that used to need explicit pre-bundle before Rollup WASM.
-        include: [
-            // CJS libraries imported in Conversion.ts
-            'turndown',
-            'temml',
-            'mathml-to-latex',
-            // Used via dynamic import() in Conversion.ts
-            'marked-katex-extension',
-        ],
-        entries: [resolve(__dirname, './src/index.ts')],
-        force: true,
-    }
+        // Avoid a huge eager `include` (pulls most of the graph at dev start and spikes RAM).
+        // Do not pin `entries` to a single HTML file: that can shrink dep discovery enough that dev
+        // pre-bundling misses reachable imports → stuck loaders / white screen with spinner.
+        // KaTeX + marked-katex-extension: pre-bundle often emits split chunks (e.g. katex-*.js) that
+        // go missing after optimizer/cache churn → "Pre-transform error ... deps/katex-XXXX.js".
+        exclude: ["katex", "marked-katex-extension"],
+        // Start the dev server before the full dep crawl finishes; remaining deps pre-bundle on demand.
+        holdUntilCrawlEnd: false,
+    };
 
     //
     const server = {
         port: 443,
         open: false,
         host: "0.0.0.0",
-        origin: "https://192.168.0.200",
-        allowedHosts: ['localhost', '127.0.0.1', '0.0.0.0', '192.168.0.200', '95.188.82.223'],
+        ...(devServerOrigin ? { origin: devServerOrigin } : {}),
+        allowedHosts: true,
         appType: 'spa',
         https,
         proxy: {
@@ -414,7 +535,9 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
                     }
 
                     const rewrittenPath = `/npm/@phosphor-icons/core@2/assets/${style}/${finalIconName}.svg`;
-                    console.log('Proxying Phosphor icon request:', path, '->', rewrittenPath);
+                    if (process.env.VITE_DEBUG_PHOSPHOR_PROXY === "1") {
+                        console.log("Proxying Phosphor icon request:", path, "->", rewrittenPath);
+                    }
                     return rewrittenPath;
                 },
                 configure: (proxy, options) => {
@@ -426,18 +549,21 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
         },
         fs: {
             strict: false,
-            allow: [
-                searchForWorkspaceRoot(process.cwd()),
-                '../**/*', '../*', '..',
-                '../assets/**/*', '../assets/*', '../assets',
-                '../../assets/**/*', '../../assets/*', '../../assets',
-                resolve(__dirname, './**/*'), resolve(__dirname, './*'), __dirname,
-                resolve(__dirname, '../../assets/**/*'), resolve(__dirname, '../../assets/*'), resolve(__dirname, '../../assets'),
-                resolve(__dirname, '../assets/**/*'), resolve(__dirname, '../assets/*'), resolve(__dirname, '../assets'),
-            ]
+            allow: devFsAllow,
         },
         // Configure route-specific handling for different app entry points
         middlewareMode: false,
+        watch: {
+            ignored: [
+                "**/node_modules/**",
+                "**/dist/**",
+                "**/dist-crx/**",
+                "**/.git/**",
+                "**/runtime/**",
+                "**/externals/**",
+                "**/.cursor/**",
+            ],
+        },
         configureServer(server) {
             // Handle specific routes to serve appropriate HTML files
             server.middlewares.use((req, res, next) => {
@@ -477,9 +603,15 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             "Cross-Origin-Embedder-Policy": "require-corp",
             "Cross-Origin-Opener-Policy": "same-origin",
             "Access-Control-Allow-Methods": "PROPFIND,HEAD,GET,POST,PUT,MOVE,DELETE,PATCH,OPTIONS",
-            "Access-Control-Request-Headers": "*"
+            "Access-Control-Request-Headers": "*",
+            // Dev: discourage browser/CDN caching of the module graph (avoids “stuck on old version” after edits).
+            "Cache-Control": "no-store"
         }
     };
+
+    if (process.env.VITE_USE_POLLING === "1") {
+        server.watch = { usePolling: true, interval: 300 };
+    }
 
     //
     const build = {
@@ -521,6 +653,8 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
     //
     return {
         "base": "",
+        /** Keep Vite cache inside the app; avoids workspace-root .vite clashes when cwd differs. */
+        cacheDir: resolve(__dirname, "node_modules/.vite"),
         rollupOptions, plugins, resolve: $resolve, build, css, optimizeDeps, server, worker: {format: 'es'},
         define: { 'process.env': {} }
     };

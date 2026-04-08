@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import "./sw-preamble";
 import { registerRoute, setCatchHandler, setDefaultHandler } from 'workbox-routing'
 import { CacheFirst, NetworkFirst, StaleWhileRevalidate, NetworkOnly } from 'workbox-strategies'
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
@@ -659,16 +660,19 @@ async function broadcastToClients(type: string, data: any): Promise<void> {
 // (Share target AI processing uses executionCore; no direct image conversion needed here.)
 
 //
+/** When true, this is the Vite dev worker (`/dev-sw.js`): precache + SWR would freeze HMR and the speed-dial shell. */
+const isViteDevServiceWorker = import.meta.env.DEV;
+
 // @ts-ignore
 const manifest = self.__WB_MANIFEST;
-if (manifest) {
+cleanupOutdatedCaches();
+if (manifest && !isViteDevServiceWorker) {
     const filteredManifest = manifest.filter((entry: any) => {
         const url = typeof entry === "string" ? entry : String(entry?.url || "");
         // icon.ico is non-critical and intermittently 408s in some deploys;
         // keep SW install resilient by excluding it from hard precache.
         return !/\/pwa\/icons\/icon\.ico(?:$|\?)/i.test(url);
     });
-    cleanupOutdatedCaches();
     precacheAndRoute(filteredManifest);
 }
 
@@ -1285,46 +1289,58 @@ registerRoute(
 );
 
 //
-setDefaultHandler(new StaleWhileRevalidate({
-    cacheName: 'default-cache',
-    fetchOptions: {
-        // Never force credentials=include for cross-origin requests (breaks many CDNs with ACAO="*").
-        // same-origin keeps cookies for same-origin only.
-        credentials: 'same-origin',
-        priority: 'auto',
-        cache: 'force-cache'
-    },
-    plugins: [
-        new ExpirationPlugin({
-            maxEntries: 120,
-            maxAgeSeconds: 1800
+if (isViteDevServiceWorker) {
+    setDefaultHandler(
+        new NetworkOnly({
+            fetchOptions: {
+                credentials: "same-origin",
+                cache: "no-store",
+            },
         })
-    ]
-}));
+    );
+} else {
+    setDefaultHandler(
+        new StaleWhileRevalidate({
+            cacheName: "default-cache",
+            fetchOptions: {
+                // Never force credentials=include for cross-origin requests (breaks many CDNs with ACAO="*").
+                // same-origin keeps cookies for same-origin only.
+                credentials: "same-origin",
+                priority: "auto",
+                cache: "force-cache",
+            },
+            plugins: [
+                new ExpirationPlugin({
+                    maxEntries: 120,
+                    maxAgeSeconds: 1800,
+                }),
+            ],
+        })
+    );
+}
 
-// Assets (JS/CSS)
+// Assets (JS/CSS) — skip in dev so requests are not handled by NetworkFirst + workbox cache before the default handler.
 registerRoute(
-    ({ url, request }) => (
-        !safeIsUserScopePath(url?.pathname || "") && (
-            request?.destination === 'script' ||
-            request?.destination === 'style' ||
-            request?.destination === 'worker' ||
-            request?.url?.trim?.().toLowerCase?.()?.match?.(/(\.m?js|\.css)$/)
-        )
-    ),
+    ({ url, request }) =>
+        !isViteDevServiceWorker &&
+        !safeIsUserScopePath(url?.pathname || "") &&
+        (request?.destination === "script" ||
+            request?.destination === "style" ||
+            request?.destination === "worker" ||
+            request?.url?.trim?.().toLowerCase?.()?.match?.(/(\.m?js|\.css)$/)),
     new NetworkFirst({
-        cacheName: 'assets-cache',
+        cacheName: "assets-cache",
         fetchOptions: {
-            credentials: 'same-origin',
-            priority: 'high',
-            cache: 'default'
+            credentials: "same-origin",
+            priority: "high",
+            cache: "default",
         },
         plugins: [
             new ExpirationPlugin({
                 maxEntries: 120,
-                maxAgeSeconds: 1800
-            })
-        ]
+                maxAgeSeconds: 1800,
+            }),
+        ],
     })
 );
 
@@ -1876,23 +1892,26 @@ const resolveOfflineNavigationResponse = async (pathname = "/"): Promise<Respons
 const warmupOfflineNavigationCache = async (reason: "install" | "activate"): Promise<void> => {
     try {
         const cache = await caches.open("default-cache");
-        for (const path of OFFLINE_WARMUP_PATHS) {
-            try {
-                const request = new Request(new URL(path, self.location.origin).toString(), {
-                    method: "GET",
-                    credentials: "same-origin",
-                    cache: "no-store"
-                });
-                const response = await fetch(request);
-                if (!response?.ok) {
-                    console.warn(`[SW] Warmup skipped (non-ok): ${path} status=${response?.status}`);
-                    continue;
+        const origin = self.location.origin;
+        await Promise.all(
+            OFFLINE_WARMUP_PATHS.map(async (path) => {
+                try {
+                    const request = new Request(new URL(path, origin).toString(), {
+                        method: "GET",
+                        credentials: "same-origin",
+                        cache: "no-store",
+                    });
+                    const response = await fetch(request);
+                    if (!response?.ok) {
+                        console.warn(`[SW] Warmup skipped (non-ok): ${path} status=${response?.status}`);
+                        return;
+                    }
+                    await cache.put(request, response.clone());
+                } catch (entryError) {
+                    console.warn(`[SW] Warmup failed for ${path}:`, entryError);
                 }
-                await cache.put(request, response.clone());
-            } catch (entryError) {
-                console.warn(`[SW] Warmup failed for ${path}:`, entryError);
-            }
-        }
+            })
+        );
         console.log(`[SW] Offline navigation warmup completed (${reason})`);
     } catch (error) {
         console.warn(`[SW] Offline navigation warmup failed (${reason}):`, error);
@@ -1944,10 +1963,12 @@ self.addEventListener?.('notificationclick', (event: any) => {
 // Handle service worker lifecycle events
 self.addEventListener?.('install', (e: any) => {
     console.log('[SW] Installing new service worker...');
-    e?.waitUntil?.(Promise.all([
-        (self as any)?.skipWaiting?.(),
-        warmupOfflineNavigationCache("install")
-    ]));
+    // Only skipWaiting must block install; offline HTML warmup does network fetches and was
+    // serializing 5+ document requests here — that delayed activation and first paint for minutes
+    // on slow links while Workbox precache also ran in parallel.
+    const sw = (self as any)?.skipWaiting?.();
+    e?.waitUntil?.(sw && typeof sw.then === "function" ? sw : Promise.resolve());
+    void warmupOfflineNavigationCache("install");
 });
 
 self.addEventListener?.('activate', (e: any) => {
@@ -1955,13 +1976,12 @@ self.addEventListener?.('activate', (e: any) => {
     e?.waitUntil?.(
         Promise.all([
             (self as any).clients?.claim?.(),
-            // Enable Navigation Preload if supported
             (self as any).registration?.navigationPreload?.enable?.() ?? Promise.resolve(),
-            warmupOfflineNavigationCache("activate"),
-            // Notify clients about activation
-            notifyClients('sw-activated')
-        ]) ?? Promise.resolve()
+        ])
+            .then(() => notifyClients("sw-activated"))
+            .catch(() => notifyClients("sw-activated"))
     );
+    void warmupOfflineNavigationCache("activate");
 });
 
 // Handle messages from clients

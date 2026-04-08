@@ -1,12 +1,40 @@
-import { bindInteraction } from "./Interact";
-import { requestOpenView } from "../../../shared/routing/view-api";
-import type { ViewId } from "../../../types";
+import { loadAsAdopted } from "fest/dom";
+import type { GridItemType } from "fest/core";
+import { bindInteraction, resolveGridCellFromClientPoint } from "./Interact";
+import { requestOpenView } from "@frontend/shared/routing/view-api";
 import { openUnifiedContextMenu, closeUnifiedContextMenu, type ContextMenuEntry } from "@fl-ui/items/context/ContextMenu";
 import { setAppWallpaper } from "@fl-ui/items/image/Canvas";
-import { ENABLED_VIEW_IDS, pickEnabledView } from "../../../shared/routing/views";
+import { ENABLED_VIEW_IDS, pickEnabledView } from "@frontend/shared/routing/views";
 import { openShortcutEditor } from "./ShortcutEditor";
+import {
+    loadDesktopRaw,
+    decodeDesktopState,
+    persistDesktopMain,
+    persistDesktopDraft
+} from "../modules/DesktopStateStorage";
+import {
+    compactIconSrcForStorage,
+    expandIconSrcForDom,
+    normalizeIconSrcFromPayload,
+    hostnameToFaviconRef,
+    serializeDesktopItemCompact,
+    ITEM_COMPACT_KIND,
+    parseDesktopItemCompact
+} from "../modules/DesktopItemIconCodec";
+
+// @ts-ignore Vite inline SCSS
+import speedDialViewStyles from "./SpeedDial.scss?inline";
+
+/** Orient-layer desktop shares SpeedDial styles; HomeView only adopts this sheet while home is visible, so load once here. */
+let orientDesktopStyleSheet: CSSStyleSheet | null = null;
+const ensureOrientDesktopStyles = (): void => {
+    if (orientDesktopStyleSheet) return;
+    orientDesktopStyleSheet = loadAsAdopted(speedDialViewStyles) as CSSStyleSheet;
+};
 
 type DesktopAction = "open-view" | "open-link";
+export type DesktopTileShape = "square" | "circle" | "squircle";
+export type ViewId = string;
 
 type DesktopItem = {
     id: string;
@@ -17,6 +45,8 @@ type DesktopItem = {
     cell: [number, number];
     action?: DesktopAction;
     href?: string;
+    /** Visual tile shape (persisted in JSON). */
+    shape?: DesktopTileShape;
 };
 
 type DesktopState = {
@@ -25,7 +55,6 @@ type DesktopState = {
     items: DesktopItem[];
 };
 
-const STORAGE_KEY = "cw-oriented-desktop-layout-v1";
 const SUPPRESS_CLICK_MS = 280;
 const ITEM_ENVELOPE_KIND = "cw-speed-dial-item";
 const REGISTRY_ENVELOPE_KIND = "cw-speed-dial-registry";
@@ -35,14 +64,28 @@ const ACTION_OPTIONS: Array<{ value: DesktopAction; label: string }> = [
     { value: "open-link", label: "Open link" }
 ];
 
+const normalizeTileShape = (raw: unknown): DesktopTileShape => {
+    const s = String(raw || "").toLowerCase();
+    if (s === "circle" || s === "square" || s === "squircle") return s;
+    return "squircle";
+};
+
+/** `data-grid-shape` on launcher grids: dominant tile shape, or `mixed` if icons disagree (per-tile is still `data-shape` on `.ui-ws-item-icon`). */
+const gridShapeAttributeFromItems = (items: DesktopItem[]): string => {
+    if (!items.length) return "squircle";
+    const distinct = new Set(items.map((it) => normalizeTileShape(it.shape)));
+    if (distinct.size === 1) return normalizeTileShape(items[0].shape);
+    return "mixed";
+};
+
 const DEFAULT_STATE: DesktopState = {
-    columns: 6,
+    columns: 4,
     rows: 8,
     items: [
-        { id: "viewer", label: "Viewer", icon: "article", viewId: "viewer", cell: [0, 0], action: "open-view" },
-        { id: "explorer", label: "Explorer", icon: "books", viewId: "explorer", cell: [0, 1], action: "open-view" },
-        { id: "settings", label: "Settings", icon: "gear-six", viewId: "settings", cell: [0, 2], action: "open-view" },
-        { id: "airpad", label: "AirPad", icon: "paper-plane-tilt", viewId: "airpad", cell: [1, 0], action: "open-view" }
+        { id: "viewer", label: "Viewer", icon: "article", viewId: "viewer", cell: [0, 0], action: "open-view", shape: "squircle" },
+        { id: "explorer", label: "Explorer", icon: "books", viewId: "explorer", cell: [1, 0], action: "open-view", shape: "squircle" },
+        { id: "settings", label: "Settings", icon: "gear-six", viewId: "settings", cell: [2, 0], action: "open-view", shape: "squircle" },
+        { id: "airpad", label: "AirPad", icon: "paper-plane-tilt", viewId: "airpad", cell: [3, 0], action: "open-view", shape: "squircle" }
     ]
 };
 
@@ -103,11 +146,12 @@ const normalizeItem = (raw: any, columns: number, rows: number): DesktopItem | n
         id,
         label: String(raw?.label || "Item"),
         icon: String(raw?.icon || (action === "open-link" ? "link" : "sparkle")),
-        iconSrc: raw?.iconSrc ? String(raw.iconSrc) : "",
+        iconSrc: normalizeIconSrcFromPayload(raw?.iconSrc, raw?.href, action),
         viewId: String(raw?.viewId || "home") as ViewId,
         cell: clampCell([Number(raw?.cell?.[0] || 0), Number(raw?.cell?.[1] || 0)], columns, rows),
         action: action === "open-link" ? "open-link" : "open-view",
-        href: raw?.href ? String(raw.href) : ""
+        href: raw?.href ? String(raw.href) : "",
+        shape: normalizeTileShape(raw?.shape)
     };
     if (item.action === "open-link") {
         item.viewId = "home";
@@ -117,27 +161,36 @@ const normalizeItem = (raw: any, columns: number, rows: number): DesktopItem | n
 
 const readState = (): DesktopState => {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = loadDesktopRaw();
         if (!raw) return { ...DEFAULT_STATE, items: [...DEFAULT_STATE.items] };
-        const parsed = JSON.parse(raw) as Partial<DesktopState> | null;
-        const columns = Math.max(4, Math.min(8, Number(parsed?.columns || DEFAULT_STATE.columns)));
-        const rows = Math.max(6, Math.min(12, Number(parsed?.rows || DEFAULT_STATE.rows)));
+        const decoded = decodeDesktopState(raw);
+        if (!decoded) return { ...DEFAULT_STATE, items: [...DEFAULT_STATE.items] };
+        const columns = Math.max(4, Math.min(8, Number(decoded.columns || DEFAULT_STATE.columns)));
+        const rows = Math.max(6, Math.min(12, Number(decoded.rows || DEFAULT_STATE.rows)));
         const fallbackItems = [...DEFAULT_STATE.items];
-        const sourceItems = Array.isArray(parsed?.items) && parsed?.items.length ? parsed.items : fallbackItems;
+        const sourceItems = Array.isArray(decoded.items) && decoded.items.length ? decoded.items : fallbackItems;
         const items = enforceUniqueCells(sourceItems
             .map((item) => normalizeItem(item, columns, rows))
             .filter((item): item is DesktopItem => Boolean(item)), columns, rows);
-        return { columns, rows, items };
+        // Corrupt or legacy payloads can normalize to zero items; restore defaults instead of an empty desktop.
+        const restored = items.length
+            ? items
+            : enforceUniqueCells(
+                  fallbackItems
+                      .map((entry) =>
+                          normalizeItem(
+                              { ...entry, cell: [entry.cell[0], entry.cell[1]] as [number, number] },
+                              columns,
+                              rows
+                          )
+                      )
+                      .filter((item): item is DesktopItem => Boolean(item)),
+                  columns,
+                  rows
+              );
+        return { columns, rows, items: restored };
     } catch {
         return { ...DEFAULT_STATE, items: [...DEFAULT_STATE.items] };
-    }
-};
-
-const persistState = (state: DesktopState): void => {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-        // ignore quota/storage errors
     }
 };
 
@@ -179,10 +232,6 @@ const applyWallpaperFromFile = async (file: File): Promise<boolean> => {
     if (!dataUrl) return false;
     setAppWallpaper(dataUrl);
     return true;
-};
-
-const faviconForUrl = (url: URL): string => {
-    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(url.hostname)}&sz=128`;
 };
 
 const parseUrlFromText = (text: string): URL | null => {
@@ -228,11 +277,12 @@ const createLinkItem = (url: URL, cell: [number, number], labelHint = ""): Deskt
         id: createDesktopItemId("link"),
         label,
         icon: "link",
-        iconSrc: faviconForUrl(url),
+        iconSrc: hostnameToFaviconRef(url.hostname),
         viewId: "home",
         cell,
         action: "open-link",
-        href: url.href
+        href: url.href,
+        shape: "squircle"
     };
 };
 
@@ -279,6 +329,12 @@ const parseItemsFromTextPayload = (
     if (plain.startsWith("{") || plain.startsWith("[")) {
         try {
             const parsed = JSON.parse(plain) as any;
+            if (parsed?.k === ITEM_COMPACT_KIND) {
+                const flat = parseDesktopItemCompact(parsed);
+                if (flat?.id) {
+                    return normalizeImportedItems({ items: [flat] }, columns, rows, preferredCell);
+                }
+            }
             if (parsed?.kind === ITEM_ENVELOPE_KIND || parsed?.kind === REGISTRY_ENVELOPE_KIND || parsed?.items || parsed?.item || Array.isArray(parsed)) {
                 return normalizeImportedItems(parsed, columns, rows, preferredCell);
             }
@@ -303,13 +359,11 @@ const parseItemsFromTextPayload = (
     return plainItem ? [plainItem] : [];
 };
 
-const serializeItemEnvelope = (item: DesktopItem): string => {
-    return JSON.stringify({
-        kind: ITEM_ENVELOPE_KIND,
-        version: 1,
-        item
-    }, null, 2);
-};
+const itemsForStoragePayload = (items: DesktopItem[]): DesktopItem[] =>
+    items.map((it) => ({
+        ...it,
+        iconSrc: compactIconSrcForStorage(it.iconSrc || "", it.action, it.href)
+    }));
 
 const serializeRegistryEnvelope = (state: DesktopState): string => {
     return JSON.stringify({
@@ -317,7 +371,7 @@ const serializeRegistryEnvelope = (state: DesktopState): string => {
         version: 1,
         columns: state.columns,
         rows: state.rows,
-        items: state.items
+        items: itemsForStoragePayload(state.items)
     }, null, 2);
 };
 
@@ -357,9 +411,14 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
     if (!host || host.dataset.desktopMounted === "true") return;
     host.dataset.desktopMounted = "true";
 
+    ensureOrientDesktopStyles();
+
     const state = readState();
     const itemById = new Map(state.items.map((item) => [item.id, item] as const));
     const itemIdList = state.items.map((item) => item.id);
+
+    let draftTimer: ReturnType<typeof setTimeout> | null = null;
+    const DRAFT_DEBOUNCE_MS = 400;
 
     const desktopRoot = document.createElement("div");
     desktopRoot.className = "speed-dial-root app-oriented-desktop";
@@ -371,28 +430,56 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
     desktopRoot.tabIndex = 0;
 
 
-    const labelsGrid = document.createElement("div");
-    labelsGrid.className = "speed-dial-grid app-oriented-desktop__grid app-oriented-desktop__grid--labels";
-    labelsGrid.setAttribute("data-mixin", "ui-gridbox");
-    labelsGrid.dataset.gridColumns = String(state.columns);
-    labelsGrid.dataset.gridRows = String(state.rows);
-    labelsGrid.style.background = "transparent";
-    labelsGrid.style.pointerEvents = "none";
-    labelsGrid.style.display = "grid";
-    labelsGrid.style.zIndex = "1";
+    // Two stacks: `data-grid-layer` controls z-index (see SpeedDial.scss). BEM --labels/--icons are swapped vs
+    // layer on purpose — shapes live in the “labels” slot, caption text in the “icons” slot.
+    const applyGridLayoutVars = (el: HTMLElement): void => {
+        el.style.setProperty("--layout-c", String(state.columns));
+        el.style.setProperty("--layout-r", String(state.rows));
+    };
 
-    const iconsGrid = document.createElement("div");
-    iconsGrid.className = "speed-dial-grid app-oriented-desktop__grid app-oriented-desktop__grid--icons";
-    iconsGrid.setAttribute("data-mixin", "ui-gridbox");
-    iconsGrid.dataset.gridColumns = String(state.columns);
-    iconsGrid.dataset.gridRows = String(state.rows);
-    iconsGrid.style.background = "transparent";
-    iconsGrid.style.pointerEvents = "none";
-    iconsGrid.style.zIndex = "2";
-    iconsGrid.style.display = "grid";
+    const shapeStack = document.createElement("div");
+    shapeStack.className =
+        "speed-dial-grid speed-dial-grid--labels ui-launcher-grid app-oriented-desktop__grid app-oriented-desktop__grid--labels";
+    shapeStack.dataset.gridLayer = "icons";
+    shapeStack.setAttribute("data-grid-columns", String(state.columns));
+    shapeStack.setAttribute("data-grid-rows", String(state.rows));
+    applyGridLayoutVars(shapeStack);
+    shapeStack.dataset.dialStack = "shapes";
 
-    desktopRoot.append(labelsGrid, iconsGrid);
+    const textStack = document.createElement("div");
+    textStack.className =
+        "speed-dial-grid speed-dial-grid--icons ui-launcher-grid app-oriented-desktop__grid app-oriented-desktop__grid--icons";
+    textStack.dataset.gridLayer = "labels";
+    textStack.setAttribute("data-grid-columns", String(state.columns));
+    textStack.setAttribute("data-grid-rows", String(state.rows));
+    applyGridLayoutVars(textStack);
+    textStack.dataset.dialStack = "text";
+
+    desktopRoot.append(shapeStack, textStack);
     host.appendChild(desktopRoot);
+
+    const applyGridShapeMetadata = (): void => {
+        const attr = gridShapeAttributeFromItems(state.items);
+        shapeStack.setAttribute("data-grid-shape", attr);
+        textStack.setAttribute("data-grid-shape", attr);
+    };
+    applyGridShapeMetadata();
+
+    const commitDesktop = (): void => {
+        if (draftTimer !== null) {
+            clearTimeout(draftTimer);
+            draftTimer = null;
+        }
+        persistDesktopMain(state.columns, state.rows, itemsForStoragePayload(state.items));
+        applyGridShapeMetadata();
+    };
+    const scheduleDesktopDraft = (): void => {
+        if (draftTimer !== null) clearTimeout(draftTimer);
+        draftTimer = setTimeout(() => {
+            draftTimer = null;
+            persistDesktopDraft(state.columns, state.rows, itemsForStoragePayload(state.items));
+        }, DRAFT_DEBOUNCE_MS);
+    };
 
     let suppressClickUntil = 0;
     const iconNodeById = new Map<string, HTMLElement>();
@@ -442,7 +529,7 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
             mountDesktopItem(item);
             added += 1;
         }
-        if (added > 0) persistState(state);
+        if (added > 0) commitDesktop();
         return added;
     };
     const refreshDesktopItemNodes = (item: DesktopItem): void => {
@@ -455,13 +542,15 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
         }
         if (iconNode) {
             const iconShape = iconNode.querySelector(".ui-ws-item-icon") as HTMLElement | null;
-            const iconElement = iconNode.querySelector("ui-icon") as HTMLElement | null;
-            if (iconElement) iconElement.setAttribute("icon", item.icon || "sparkle");
             if (iconShape) {
+                iconShape.dataset.shape = normalizeTileShape(item.shape);
                 const existingImage = iconShape.querySelector(".ui-ws-item-icon-image") as HTMLImageElement | null;
-                if (item.iconSrc) {
+                let iconElement = iconShape.querySelector("ui-icon") as HTMLElement | null;
+                const domIconSrc = expandIconSrcForDom(item.iconSrc || "");
+                if (domIconSrc) {
+                    iconElement?.remove();
                     if (existingImage) {
-                        existingImage.src = item.iconSrc;
+                        existingImage.src = domIconSrc;
                     } else {
                         const image = document.createElement("img");
                         image.className = "ui-ws-item-icon-image";
@@ -469,24 +558,34 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
                         image.loading = "lazy";
                         image.decoding = "async";
                         image.referrerPolicy = "no-referrer";
-                        image.src = item.iconSrc;
+                        image.src = domIconSrc;
                         image.addEventListener("error", () => image.remove());
                         iconShape.insertBefore(image, iconShape.firstChild);
                     }
-                } else if (existingImage) {
-                    existingImage.remove();
+                } else {
+                    if (existingImage) existingImage.remove();
+                    if (!iconElement) {
+                        iconElement = document.createElement("ui-icon");
+                        iconShape.appendChild(iconElement);
+                    }
+                    iconElement.setAttribute("icon", item.icon || "sparkle");
                 }
             }
             applyCellVars(iconNode, item.cell);
         }
     };
     const guessCellFromPoint = (x: number, y: number): [number, number] => {
-        const rect = iconsGrid.getBoundingClientRect();
-        const localX = Math.max(0, Math.min(rect.width, x - rect.left));
-        const localY = Math.max(0, Math.min(rect.height, y - rect.top));
-        const cellX = Math.floor(localX / Math.max(1, rect.width / state.columns));
-        const cellY = Math.floor(localY / Math.max(1, rect.height / state.rows));
-        return clampCell([cellX, cellY], state.columns, state.rows);
+        return resolveGridCellFromClientPoint(
+            shapeStack,
+            [x, y],
+            {
+                layout: { columns: state.columns, rows: state.rows },
+                items: itemById,
+                list: itemIdList,
+                item: { id: "__menu__", cell: [0, 0] } satisfies GridItemType
+            },
+            "round"
+        );
     };
     const importFromClipboard = async (cell: [number, number]): Promise<boolean> => {
         try {
@@ -528,21 +627,23 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
         applyCellVars(el, item.cell);
         const icon = document.createElement("div");
         icon.className = "ui-ws-item-icon shaped";
-        icon.dataset.shape = "square";
-        if (item.iconSrc) {
+        icon.dataset.shape = normalizeTileShape(item.shape);
+        const mountIconSrc = expandIconSrcForDom(item.iconSrc || "");
+        if (mountIconSrc) {
             const image = document.createElement("img");
             image.className = "ui-ws-item-icon-image";
             image.alt = "";
             image.loading = "lazy";
             image.decoding = "async";
             image.referrerPolicy = "no-referrer";
-            image.src = item.iconSrc;
+            image.src = mountIconSrc;
             image.addEventListener("error", () => image.remove());
             icon.appendChild(image);
+        } else {
+            const iconElement = document.createElement("ui-icon");
+            iconElement.setAttribute("icon", item.icon || "sparkle");
+            icon.appendChild(iconElement);
         }
-        const iconElement = document.createElement("ui-icon");
-        iconElement.setAttribute("icon", item.icon || "sparkle");
-        icon.appendChild(iconElement);
         el.appendChild(icon);
         return el;
     };
@@ -562,6 +663,9 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
     const removeDesktopItem = (itemId: string): void => {
         const index = state.items.findIndex((item) => item.id === itemId);
         if (index === -1) return;
+        if (desktopRoot.dataset.dialDraggingId === itemId) {
+            desktopRoot.dataset.dialDraggingId = "";
+        }
         state.items.splice(index, 1);
         itemById.delete(itemId);
 
@@ -574,7 +678,7 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
         labelNodeById.delete(itemId);
 
         enforceUniqueCells(state.items, state.columns, state.rows);
-        persistState(state);
+        commitDesktop();
     };
 
     const mountDesktopItem = (item: DesktopItem): void => {
@@ -582,14 +686,14 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
         const labelNode = makeLabelItem(item);
         iconNodeById.set(item.id, iconNode);
         labelNodeById.set(item.id, labelNode);
-        iconsGrid.appendChild(iconNode);
-        labelsGrid.appendChild(labelNode);
+        shapeStack.appendChild(iconNode);
+        textStack.appendChild(labelNode);
 
         const iconShape = iconNode.querySelector(".ui-ws-item-icon") as HTMLElement | null;
-        if (!iconShape) return;
-
-        iconShape.style.pointerEvents = "auto";
-        iconShape.style.touchAction = "none";
+        if (iconShape) {
+            iconShape.style.pointerEvents = "auto";
+            iconShape.style.touchAction = "none";
+        }
 
         bindInteraction(iconNode, {
             layout: [state.columns, state.rows],
@@ -601,26 +705,26 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
 
         iconNode.addEventListener("m-dragstart", () => {
             closeUnifiedContextMenu();
+            desktopRoot.dataset.dialDraggingId = item.id;
             iconNode.dataset.interactionState = "onGrab";
             iconNode.dataset.gridCoordinateState = "source";
             const labelNode = labelNodeById.get(item.id);
             if (labelNode) {
-                labelNode.dataset.interactionState = "onGrab";
+                // Labels stay on the source cell (no shared drag transform); sync again on m-dragsettled.
+                labelNode.dataset.interactionState = "onLabelDocked";
                 labelNode.dataset.gridCoordinateState = "source";
                 applyCellVars(labelNode, item.cell);
+                labelNode.style.setProperty("--drag-x", "0");
+                labelNode.style.setProperty("--drag-y", "0");
+                labelNode.style.setProperty("--cs-drag-x", "0px");
+                labelNode.style.setProperty("--cs-drag-y", "0px");
             }
         });
 
         iconNode.addEventListener("m-dragging", () => {
+            scheduleDesktopDraft();
             iconNode.dataset.interactionState = "onMoving";
             iconNode.dataset.gridCoordinateState = "intermediate";
-            const labelNode = labelNodeById.get(item.id);
-            if (labelNode) {
-                labelNode.dataset.interactionState = "onMoving";
-                labelNode.dataset.gridCoordinateState = "intermediate";
-                labelNode.style.setProperty("--drag-x", iconNode.style.getPropertyValue("--drag-x") || "0");
-                labelNode.style.setProperty("--drag-y", iconNode.style.getPropertyValue("--drag-y") || "0");
-            }
         });
 
         iconNode.addEventListener("m-dragend", () => {
@@ -629,8 +733,8 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
             iconNode.dataset.gridCoordinateState = "destination";
             const labelNode = labelNodeById.get(item.id);
             if (labelNode) {
-                labelNode.dataset.interactionState = "onRelax";
-                labelNode.dataset.gridCoordinateState = "destination";
+                labelNode.dataset.interactionState = "onLabelDocked";
+                labelNode.dataset.gridCoordinateState = "source";
             }
         });
 
@@ -658,7 +762,8 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
             iconNode.style.setProperty("--cs-drag-x", "0px");
             iconNode.style.setProperty("--cs-drag-y", "0px");
             applyCellVars(iconNode, finalCell);
-            persistState(state);
+            commitDesktop();
+            desktopRoot.dataset.dialDraggingId = "";
             setTimeout(() => {
                 iconNode.dataset.interactionState = "onHover";
                 iconNode.dataset.gridCoordinateState = "source";
@@ -667,10 +772,11 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
                     nextLabelNode.dataset.interactionState = "onHover";
                     nextLabelNode.dataset.gridCoordinateState = "source";
                 }
-            }, 220);
+            }, 280);
         });
 
-        iconShape.addEventListener("click", (event) => {
+        const openTarget = iconShape ?? iconNode;
+        openTarget.addEventListener("click", (event) => {
             event.preventDefault();
             event.stopPropagation();
             if (performance.now() < suppressClickUntil) return;
@@ -683,30 +789,46 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
     };
     const openItemEditor = (
         item?: DesktopItem | null,
-        opts?: { suggestedCell?: [number, number]; seed?: Partial<{ label: string; icon: string; action: DesktopAction; viewId: string; href: string; description: string }> }
+        opts?: {
+            suggestedCell?: [number, number];
+            seed?: Partial<{
+                label: string;
+                icon: string;
+                action: DesktopAction;
+                viewId: string;
+                href: string;
+                description: string;
+                shape: DesktopTileShape;
+            }>;
+        }
     ): void => {
         const isNew = !item;
         const seed = opts?.seed || {};
         const suggestedCell = opts?.suggestedCell || [0, 0];
-        const workingItem: DesktopItem = item ? item : {
-            id: createDesktopItemId("item"),
-            label: seed.label || "New shortcut",
-            icon: seed.icon || "sparkle",
-            iconSrc: "",
-            viewId: pickEnabledView(seed.viewId || "viewer", "home"),
-            cell: suggestedCell,
-            action: seed.action || "open-view",
-            href: seed.href || ""
-        };
+        const workingItem: DesktopItem = item
+            ? item
+            : {
+                id: createDesktopItemId("item"),
+                label: seed.label || "New shortcut",
+                icon: seed.icon || "sparkle",
+                iconSrc: "",
+                viewId: pickEnabledView(seed.viewId || "viewer", "home"),
+                cell: suggestedCell,
+                action: seed.action || "open-view",
+                href: seed.href || "",
+                shape: normalizeTileShape(seed.shape)
+            };
         openShortcutEditor({
             mode: isNew ? "create" : "edit",
+            registerForBackNavigation: true,
             initial: {
                 label: workingItem.label || "Item",
                 icon: workingItem.icon || "sparkle",
                 action: workingItem.action || "open-view",
                 view: workingItem.viewId || "",
                 href: workingItem.href || "",
-                description: String(seed.description || "")
+                description: String(seed.description || ""),
+                shape: normalizeTileShape(workingItem.shape)
             },
             actionOptions: ACTION_OPTIONS,
             viewOptions: ENABLED_VIEW_IDS.map((viewId) => ({ value: viewId, label: prettifyView(viewId) })),
@@ -719,9 +841,11 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
                 workingItem.action = action;
                 workingItem.href = action === "open-link" ? nextHref : "";
                 workingItem.viewId = action === "open-link" ? "home" : nextView;
+                workingItem.shape = normalizeTileShape(next.shape);
                 if (action === "open-link" && nextHref) {
                     try {
-                        workingItem.iconSrc = faviconForUrl(new URL(nextHref));
+                        const u = new URL(nextHref, window.location.href);
+                        workingItem.iconSrc = /^https?:$/i.test(u.protocol) ? hostnameToFaviconRef(u.hostname) : "";
                     } catch {
                         workingItem.iconSrc = "";
                     }
@@ -736,7 +860,7 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
                         Object.assign(existing, workingItem);
                         itemById.set(existing.id, existing);
                         refreshDesktopItemNodes(existing);
-                        persistState(state);
+                        commitDesktop();
                     }
                 }
             },
@@ -786,11 +910,11 @@ export const initializeOrientedDesktop = (host: HTMLElement): void => {
                         }] : []),
                         {
                             id: "copy-item-json",
-                            label: "Copy item JSON",
+                            label: "Copy item (compact JSON)",
                             icon: "clipboard-text",
                             action: async () => {
                                 try {
-                                    await navigator.clipboard.writeText(serializeItemEnvelope(item));
+                                    await navigator.clipboard.writeText(serializeDesktopItemCompact(item));
                                 } catch {
                                     // ignore
                                 }

@@ -261,9 +261,9 @@ $_h-sizes: (
             margin: 0;
             padding: 0;
             inline-size: 100%;
-            block-size: 100%;
-            min-block-size: 100%;
-            max-block-size: min(100dvb, 100cqb);
+            block-size: max-content;
+            min-block-size: max(100%, 100cqb);
+            max-block-size: none;
             overflow: auto;
             background-color: transparent;
             color-scheme: inherit;
@@ -527,6 +527,7 @@ $_h-sizes: (
             max-inline-size: stretch;
             block-size: max-content !important;
             max-block-size: none !important;
+            min-block-size: max(100%, 100cqb) !important;
             min-inline-size: fit-content;
             overflow: hidden !important;
             overflow-inline: hidden !important;
@@ -1159,7 +1160,8 @@ $_h-sizes: (
 
         body {
             block-size: max-content !important;
-            max-block-size: max-content !important;
+            max-block-size: none !important;
+            min-block-size: max(100%, 100cqb) !important;
             inline-size: 100% !important;
             max-inline-size: 100% !important;
             zoom: 1 !important;
@@ -1189,8 +1191,8 @@ $_h-sizes: (
             font-variant-emoji: text;
             display: block !important;
             flex: none !important;
-            block-size: auto !important;
-            min-block-size: 0 !important;
+            block-size: max-content !important;
+            min-block-size: max(100%, 100cqb) !important;
             max-block-size: none !important;
             inline-size: 100%;
             max-inline-size: 100%;

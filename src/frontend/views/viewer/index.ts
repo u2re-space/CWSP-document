@@ -1759,8 +1759,6 @@ export class ViewerView extends BaseElement implements View {
                 font-size: ${fontSizePx}px;
                 line-height: ${lineHeight};
                 letter-spacing: var(--md-letter-spacing, 0);
-                max-width: ${maxWidth}px;
-                margin-inline: auto;
                 padding: 1rem 1.1rem 3rem;
             }
 

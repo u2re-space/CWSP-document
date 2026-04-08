@@ -132,6 +132,19 @@ export type AppSettings = {
         encrypt?: boolean;
         preferBackendSync?: boolean;
         ntpEnabled?: boolean;
+        /** Instance id for cwsp / offline / multi-device (distinct from Airpad peer clientId). */
+        appClientId?: string;
+        /**
+         * Hint for Electron/Capacitor/cwsp: allow self-signed TLS to the endpoint.
+         * WebView `fetch` still follows platform certificate rules unless the shell applies this.
+         */
+        allowInsecureTls?: boolean;
+        /** HTTPS :8443 and HTTP :8080 admin/control entry points for the CWS server. */
+        admin?: {
+            httpsOrigin?: string;
+            httpOrigin?: string;
+            path?: string;
+        };
         ops?: {
             allowUnencrypted?: boolean;
             httpTargets?: RemoteTarget[];
@@ -221,6 +234,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
         encrypt: false,
         preferBackendSync: true,
         ntpEnabled: false,
+        appClientId: "",
+        allowInsecureTls: false,
+        admin: {
+            httpsOrigin: "https://localhost:8443",
+            httpOrigin: "http://localhost:8080",
+            path: "/"
+        },
         ops: {
             allowUnencrypted: false,
             httpTargets: [],

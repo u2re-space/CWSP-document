@@ -22,8 +22,13 @@
 
 import type { ShellId, ViewId, Shell } from "../../types";
 import type { FrontendChoice } from "./boot-menu";
-import { bootMinimal, bootBase, bootWindow, type BootConfig, type StyleSystem } from "./BootLoader";
+import { bootMinimal, bootBase, bootWindow, bootTabbed, bootEnvironment, type BootConfig, type StyleSystem } from "./BootLoader";
 import { ENABLED_VIEW_IDS, DEFAULT_VIEW_ID, isEnabledView, pickEnabledView } from "../../../shared/routing/views";
+import {
+    coerceShellForBootViewport,
+    normalizeBootShellId,
+    readLastActiveBootShell
+} from "./shell-preference";
 
 // ============================================================================
 // ROUTE TYPES
@@ -48,24 +53,10 @@ export type RoutingMode = "path-based";
 export type NavigateOptions = { replace?: boolean; state?: unknown };
 export type RouteHandler = (route: Route) => void | Promise<void>;
 
-const normalizeShellPreference = (shell: ShellId | null | undefined): ShellId => {
-    if (shell === "faint") {
-        return "tabbed";
-    }
-    if (
-        shell === "base" ||
-        shell === "minimal" ||
-        shell === "window" ||
-        shell === "tabbed" ||
-        shell === "environment" ||
-        shell === "content"
-    ) {
-        return shell;
-    }
-    return "minimal";
-};
+const normalizeShellPreference = (shell: ShellId | null | undefined): ShellId =>
+    normalizeBootShellId(shell);
 
-const getShellFromQuery = (): ShellId | null => {
+export const getShellFromQuery = (): ShellId | null => {
     try {
         const params = new URLSearchParams(location.search);
         const shell = (params.get("shell") || "").trim().toLowerCase();
@@ -278,18 +269,7 @@ export function getSavedShellPreference(): ShellId | null {
         } catch {
             // Ignore storage issues
         }
-        return fromQuery;
-    }
-
-    // Canonical origin entry defaults to minimal shell unless explicitly overridden by ?shell=...
-    try {
-        const isOriginRoot = normalizePathname(location.pathname) === "";
-        if (isOriginRoot) {
-            localStorage.setItem("rs-boot-shell", "minimal");
-            return "minimal";
-        }
-    } catch {
-        // ignore URL/storage issues and continue with stored preference fallback
+        return coerceShellForBootViewport(fromQuery);
     }
 
     try {
@@ -307,7 +287,12 @@ export function getSavedShellPreference(): ShellId | null {
             if (normalized !== saved) {
                 localStorage.setItem("rs-boot-shell", normalized);
             }
-            return normalized;
+            return coerceShellForBootViewport(normalized);
+        }
+
+        const lastActive = readLastActiveBootShell();
+        if (lastActive) {
+            return coerceShellForBootViewport(lastActive);
         }
     } catch {
         // Ignore
@@ -335,14 +320,14 @@ export const loadSubAppWithShell = async (
             case "tabbed":
                 return {
                     mount: async (el: HTMLElement) => {
-                        await bootWindow(el, view);
+                        await bootTabbed(el, view);
                     }
                 };
 
             case "environment":
                 return {
                     mount: async (el: HTMLElement) => {
-                        await bootWindow(el, view);
+                        await bootEnvironment(el, view);
                     }
                 };
 

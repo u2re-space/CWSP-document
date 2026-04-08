@@ -1,4 +1,4 @@
-import { defineElement, property, H, E, DragHandler, ResizeHandler, ITask  } from "fest/lure";
+import { defineElement, property, H, E, DragHandler, ResizeHandler, type ITask } from "fest/lure";
 import { handleAttribute, preloadStyle, setStyleProperty } from "fest/dom";
 
 //
@@ -99,8 +99,8 @@ export class WindowFrame extends UIElement {
         const parentBox = parent?.getBoundingClientRect();
         const cX = (parentBox?.width || 0) / 2 - (box?.width || 0) / 2;
         const cY = (parentBox?.height || 0) / 2 - (box?.height || 0) / 2;
-        setStyleProperty(holder, "--shift-x", cX - (parentBox?.left || 0));
-        setStyleProperty(holder, "--shift-y", cY - (parentBox?.top || 0));
+        setStyleProperty(holder, "--shift-x", `${cX - (parentBox?.left || 0)}px`);
+        setStyleProperty(holder, "--shift-y", `${cY - (parentBox?.top || 0)}px`);
         holder.removeAttribute("data-dragging");
     }
 

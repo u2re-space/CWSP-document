@@ -1,3 +1,10 @@
+@use "sass:string";
+
+/// Literal CSS `light-dark()` when a theme lib defines SCSS `light-dark($name)`.
+@function _viewer-css-light-dark($css) {
+    @return string.unquote($css);
+}
+
 @layer layer.view.common, layer.view.viewer;
 
 @layer layer.view.common {
@@ -19,8 +26,8 @@
         block-size: 100%;
         min-inline-size: 0;
         min-block-size: 0;
-        color: var(--view-fg, var(--color-on-surface, #e5e7eb));
-        background: var(--view-bg, var(--color-surface, #060d17));
+        color: var(--view-fg, var(--color-on-surface, #{_viewer-css-light-dark("light-dark(#1a1a1a, #e5e7eb)")}));
+        background: var(--view-bg, var(--color-surface, #{_viewer-css-light-dark("light-dark(#f4f6fa, #060d17)")}));
     }
 
     .view-viewer__toolbar {
@@ -30,10 +37,19 @@
         justify-content: space-between;
         gap: 0.5rem;
         padding: 0.4rem 0.55rem;
-        border-block-end: 1px solid var(--view-border, color-mix(in oklab, var(--color-outline-variant, #334155) 70%, transparent));
+        border-block-end: 1px solid var(
+            --view-border,
+            color-mix(
+                in oklab,
+                var(--color-outline-variant, #{_viewer-css-light-dark("light-dark(#94a3b8, #334155)")}) 70%,
+                transparent
+            )
+        );
         background: var(
             --view-toolbar-bg,
-            color-mix(in oklab, var(--color-surface-container, #0f1a2b) 88%, transparent)
+            #{_viewer-css-light-dark(
+                    "light-dark(color-mix(in oklab, var(--color-surface-container, #e2e8f0) 88%, transparent), color-mix(in oklab, var(--color-surface-container, #0f1a2b) 88%, transparent))"
+                )}
         );
         min-inline-size: 100%;
         box-sizing: border-box;
@@ -66,7 +82,11 @@
         font-size: 0.8125rem;
         font-weight: 500;
         line-height: 1.25;
-        color: color-mix(in oklab, var(--color-on-surface, #e5e7eb) 88%, transparent);
+        color: color-mix(
+            in oklab,
+            var(--color-on-surface, #{_viewer-css-light-dark("light-dark(#334155, #e5e7eb)")}) 88%,
+            transparent
+        );
         text-align: center;
     }
 
@@ -86,10 +106,26 @@
         align-items: center;
         gap: 0.3rem;
         padding: 0.28rem 0.45rem;
-        border: 1px solid color-mix(in oklab, var(--color-outline-variant, #334155) 70%, transparent);
+        border: 1px solid color-mix(
+            in oklab,
+            var(--color-outline-variant, #{_viewer-css-light-dark("light-dark(#cbd5e1, #334155)")}) 70%,
+            transparent
+        );
         border-radius: 0.48rem;
-        background: color-mix(in oklab, var(--color-surface-container-high, #1f2937) 62%, transparent);
-        color: color-mix(in oklab, var(--color-on-surface, #e5e7eb) 82%, transparent);
+        background: color-mix(
+            in oklab,
+            var(
+                    --color-surface-container-high,
+                    #{_viewer-css-light-dark("light-dark(#e2e8f0, #1f2937)")}
+                )
+                62%,
+            transparent
+        );
+        color: color-mix(
+            in oklab,
+            var(--color-on-surface, #{_viewer-css-light-dark("light-dark(#334155, #e5e7eb)")}) 82%,
+            transparent
+        );
         font: inherit;
         font-size: 0.78rem;
         line-height: 1;
@@ -98,8 +134,12 @@
     }
 
     .view-viewer__btn:hover {
-        background: color-mix(in oklab, var(--color-surface-container-high, #334155) 82%, transparent);
-        color: var(--color-on-surface, #f8fafc);
+        background: color-mix(
+            in oklab,
+            var(--color-surface-container-high, #{_viewer-css-light-dark("light-dark(#cbd5e1, #334155)")}) 82%,
+            transparent
+        );
+        color: var(--color-on-surface, #{_viewer-css-light-dark("light-dark(#0f172a, #f8fafc)")});
     }
 
     .view-viewer__toolbar-icon {

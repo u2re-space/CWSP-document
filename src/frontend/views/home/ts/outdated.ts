@@ -1,6 +1,6 @@
 /**
  * Home View
- * 
+ *
  * Shell-agnostic home/dashboard component.
  * Provides quick access to main features.
  */
@@ -8,16 +8,12 @@
 import { H } from "fest/lure";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
 import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@rs-frontend/shells/types";
-import type { BaseViewOptions } from "../../types";
 import { isEnabledView } from "@rs-frontend/shared/routing/views";
 import { SpeedDial, createCtxMenu } from "./SpeedDial";
 
 // @ts-ignore
-import style from "../scss/SpeedDial.scss?inline";
-
-// ============================================================================
-// HOME VIEW
-// ============================================================================
+import style from "./SpeedDial.scss?inline";
+import type { BaseViewOptions } from "/frontend/views/types";
 
 export class HomeView implements View {
     id = "home" as const;

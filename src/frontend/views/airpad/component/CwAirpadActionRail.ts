@@ -31,6 +31,9 @@ export class CwAirpadActionRailElement extends HTMLElement {
                 if (t.closest("#btnConfig")) {
                     bus.emit("ui.config.open", undefined);
                 }
+                if (t.closest("#btnAdminDoor")) {
+                    bus.emit("ui.admin.open", undefined);
+                }
                 // WS ↔ is wired by `initWebSocket(getBtnConnect())` — do not duplicate here.
             },
             { capture: true, signal }
@@ -50,6 +53,7 @@ export class CwAirpadActionRailElement extends HTMLElement {
                 <button type="button" id="btnCopy" name="airpad-clipboard-copy" class="toolbar-btn" aria-label="Copy (Ctrl+C)">📋</button>
                 <button type="button" id="btnPaste" name="airpad-clipboard-paste" class="toolbar-btn" aria-label="Paste (Ctrl+V)">📥</button>
                 <button type="button" id="btnConnect" name="airpad-ws-connect" class="toolbar-btn connect-fab connect-fab--ws">WS ↔</button>
+                <button type="button" id="btnAdminDoor" name="airpad-admin-door" class="toolbar-btn toolbar-btn--admin-door" aria-label="Open server admin (HTTPS)" title="Server admin (HTTPS :8443)">ADM</button>
                 <button type="button" id="btnConfig" name="airpad-config" class="toolbar-btn" aria-label="Configuration" title="Configuration">⚙️</button>
             </div>
             <div id="clipboardPreview" class="clipboard-preview" aria-live="polite"></div>

@@ -72,6 +72,7 @@ export {
     // Shell loading
     loadSubAppWithShell,
     loadBootMenu,
+    getShellFromQuery,
     getSavedShellPreference,
     resolvePathToView,
     parseRoutingParams,
@@ -91,6 +92,15 @@ export {
     type AppLoaderResult,
     type RoutingMode
 } from "./ts/routing";
+
+export {
+    coerceShellForBootViewport,
+    isMobileBootShellViewport,
+    readLastActiveBootShell,
+    recordBootShellWindowActivity,
+    initBootShellWindowActivity,
+    LS_BOOT_SHELL_LAST_ACTIVE
+} from "./ts/shell-preference";
 
 // ============================================================================
 // BOOT MENU

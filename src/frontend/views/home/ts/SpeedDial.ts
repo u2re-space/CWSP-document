@@ -1,6 +1,6 @@
 import { observe, numberRef, propRef, stringRef, affected } from "fest/object";
 import { E, H, orientRef, M, provide, handleIncomingEntries, pointerAnchorRef } from "fest/lure";
-import { bindInteraction } from "./Interact";
+import { bindInteraction, resolveGridCellFromClientPoint } from "./Interact";
 import { actionRegistry, iconsPerAction, labelsPerAction } from "@rs-core/utils/Actions";
 import { showSuccess, showError } from "@fl-ui/items/overlay/Toast";
 import { openUnifiedContextMenu, type ContextMenuEntry } from "@fl-ui/items/context/ContextMenu";
@@ -59,7 +59,6 @@ function getCoordinateRef(): PointerAnchorPair | NumberRefPair {
     return coordinateRefSingleton;
 }
 
-/** Grid cell from client coords: manual math only. Do not read `resolveGridCellFromClientPoint` from lure at module scope — bundlers hoist it to `com-app` and hit TDZ (see vite-chunk-placement). */
 const schedulePersistItems = () => {
     if (persistItemsTimer) clearTimeout(persistItemsTimer);
     persistItemsTimer = setTimeout(() => {
@@ -79,6 +78,7 @@ const ACTION_OPTIONS = [
     { value: "copy-link", label: "Copy link" },
     { value: "copy-state-desc", label: "Copy state + desc" }
 ];
+const DEFAULT_WALLPAPER_SRC = "/assets/wallpaper.jpg";
 const WALLPAPER_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg", "avif"]);
 
 const getRefValue = (ref: any, fallback = "") => {
@@ -207,32 +207,20 @@ const attachItemNode = (item: SpeedDialItem, el?: HTMLElement | null, interactiv
     }
 };
 
-const deriveCellFromEvent = (ev?: MouseEvent): GridCell =>{
+const deriveCellFromEvent = (ev?: MouseEvent): GridCell => {
     const grid = document.querySelector<HTMLElement>('#home .speed-dial-grid[data-grid-layer="icons"]')
         || document.querySelector<HTMLElement>("#home .speed-dial-grid:last-of-type")
         || document.querySelector<HTMLElement>("#home .speed-dial-grid");
     if (!grid || !ev) return [0, 0];
-    const rect = grid.getBoundingClientRect();
-    const L = getLayout();
-    const cols = Math.max(1, L[0] || 1);
-    const rows = Math.max(1, L[1] || 1);
-    const x = Math.floor(((ev.clientX - rect.left) / Math.max(rect.width, 1)) * cols);
-    const y = Math.floor(((ev.clientY - rect.top) / Math.max(rect.height, 1)) * rows);
-    return [Math.min(cols - 1, Math.max(0, x)), Math.min(rows - 1, Math.max(0, y))];
+    return resolveGridCellFromClientPoint(grid, [ev.clientX, ev.clientY], { layout: getLayout() as [number, number] }, "floor");
 };
 
-const deriveCellFromCoordinate = (coordinate: [number, number]): GridCell =>{
+const deriveCellFromCoordinate = (coordinate: [number, number]): GridCell => {
     const grid = document.querySelector<HTMLElement>('#home .speed-dial-grid[data-grid-layer="icons"]')
         || document.querySelector<HTMLElement>("#home .speed-dial-grid:last-of-type")
         || document.querySelector<HTMLElement>("#home .speed-dial-grid");
     if (!grid || !coordinate) return [0, 0];
-    const rect = grid.getBoundingClientRect();
-    const L = getLayout();
-    const cols = Math.max(1, L[0] || 1);
-    const rows = Math.max(1, L[1] || 1);
-    const x = Math.floor(((coordinate[0] - rect.left) / Math.max(rect.width, 1)) * cols);
-    const y = Math.floor(((coordinate[1] - rect.top) / Math.max(rect.height, 1)) * rows);
-    return [Math.min(cols - 1, Math.max(0, x)), Math.min(rows - 1, Math.max(0, y))];
+    return resolveGridCellFromClientPoint(grid, coordinate, { layout: getLayout() as [number, number] }, "floor");
 };
 
 const deriveCellFromAnchor = (): GridCell => {
@@ -282,8 +270,12 @@ const createMenuEntryForAction = (actionId: string, item: SpeedDialItem, fallbac
 //
 export function makeWallpaper() {
     const oRef = orientRef();
-    const srcRef = stringRef("./assets/imgs/test.webp");
-    affected([wallpaperState, "src"], (s) => provide("/user" + (s?.src || (typeof s == "string" ? s : null)))?.then?.(blob => (srcRef.value = URL.createObjectURL(blob)))?.catch?.(console.warn.bind(console)) || "./assets/imgs/test.webp");
+    const srcRef = stringRef(DEFAULT_WALLPAPER_SRC);
+    affected([wallpaperState, "src"], (s) => provide("/user" + (s?.src || (typeof s == "string" ? s : null)))
+        ?.then?.(blob => (srcRef.value = URL.createObjectURL(blob)))
+        ?.catch?.(() => {
+            srcRef.value = DEFAULT_WALLPAPER_SRC;
+        }) || DEFAULT_WALLPAPER_SRC);
     const CE = H`<canvas slot="backdrop" style="position: absolute; pointer-events: none; min-inline-size: 0px; min-block-size: 0px; inline-size: stretch; block-size: stretch; max-block-size: stretch; max-inline-size: stretch; transform: none; scale: 1; inset: 0; pointer-events: none;" data-orient=${oRef} is="ui-canvas" data-src=${srcRef}></canvas>`;
     return CE;
 }
@@ -410,10 +402,15 @@ export function SpeedDial(makeView: any) {
     const rowsRef = propRef(gridLayoutState, "rows", 8);
     const shapeRef = propRef(gridLayoutState, "shape", "square");
 
+    const tileShapeForItem = (item: SpeedDialItem): string => {
+        const raw = String(getSpeedDialMeta(item.id)?.shape || "squircle").toLowerCase();
+        return raw === "circle" || raw === "square" || raw === "squircle" ? raw : "squircle";
+    };
+
     //
     const renderIconItem = (item: SpeedDialItem)=>{
         return H`<div class="ui-ws-item" data-speed-dial-item data-layer="icons" ref=${(el) => attachItemNode(item, el as HTMLElement, true, makeView)}>
-            <div data-shape=${shapeRef} class="ui-ws-item-icon shaped">
+            <div data-shape=${tileShapeForItem(item)} class="ui-ws-item-icon shaped">
                 <ui-icon icon=${item.icon}></ui-icon>
             </div>
         </div>`;
@@ -430,11 +427,11 @@ export function SpeedDial(makeView: any) {
 
     //
     const oRef = orientRef();
-    const box = H`<div slot="underlay" style="pointer-events: auto; position: relative; contain: strict; overflow: hidden; display: grid;" id="home" data-mixin="ui-orientbox" class="speed-dial-root" prop:orient=${oRef} on:dragover=${(ev: DragEvent) => ev.preventDefault()} on:drop=${(ev: DragEvent) => handleWallpaperDropOrPaste(ev)} prop:onPaste=${async (ev: ClipboardEvent) => await handleWallpaperDropOrPaste(ev)}>
-        <div style="background-color: transparent; color-scheme: dark; pointer-events: none;" class="speed-dial-grid speed-dial-grid--labels" data-layer="items" data-grid-layer="labels" data-mixin="ui-gridbox" data-grid-columns=${columnsRef} data-grid-rows=${rowsRef} data-grid-shape=${shapeRef}>
+    const box = H`<div slot="underlay" style="pointer-events: auto; position: relative; contain: strict; overflow: hidden; display: grid;" id="home" data-mixin="ui-orientbox" class="speed-dial-root" prop:orient=${oRef} ref=${(el: HTMLElement) => E(el, { style: { "--orient": oRef } })} on:dragover=${(ev: DragEvent) => ev.preventDefault()} on:drop=${(ev: DragEvent) => handleWallpaperDropOrPaste(ev)} prop:onPaste=${async (ev: ClipboardEvent) => await handleWallpaperDropOrPaste(ev)}>
+        <div style="background-color: transparent; color-scheme: dark; pointer-events: none;" class="speed-dial-grid speed-dial-grid--labels ui-launcher-grid" data-layer="items" data-grid-layer="labels" data-grid-columns=${columnsRef} data-grid-rows=${rowsRef} data-grid-shape=${shapeRef} ref=${(el: HTMLElement) => E(el, { style: { "--layout-c": columnsRef, "--layout-r": rowsRef } })}>
             ${M(speedDialItems, renderLabelItem)}
         </div>
-        <div style="background-color: transparent; pointer-events: none;" class="speed-dial-grid speed-dial-grid--icons" data-layer="items" data-grid-layer="icons" data-mixin="ui-gridbox" data-grid-columns=${columnsRef} data-grid-rows=${rowsRef} data-grid-shape=${shapeRef}>
+        <div style="background-color: transparent; pointer-events: none;" class="speed-dial-grid speed-dial-grid--icons ui-launcher-grid" data-layer="items" data-grid-layer="icons" data-grid-columns=${columnsRef} data-grid-rows=${rowsRef} data-grid-shape=${shapeRef} ref=${(el: HTMLElement) => E(el, { style: { "--layout-c": columnsRef, "--layout-r": rowsRef } })}>
             ${M(speedDialItems, renderIconItem)}
         </div>
     </div>`;
@@ -477,7 +474,8 @@ const openItemEditor = (item?: SpeedDialItem, opts?: {
         action: resolveItemAction(workingItem),
         href: workingMeta?.href || "",
         view: workingMeta?.view || "",
-        description: workingMeta?.description || ""
+        description: workingMeta?.description || "",
+        shape: String(workingMeta?.shape || "squircle")
     };
 
     openShortcutEditor({
@@ -488,7 +486,8 @@ const openItemEditor = (item?: SpeedDialItem, opts?: {
             action: draft.action,
             href: draft.href,
             view: draft.view,
-            description: draft.description
+            description: draft.description,
+            shape: draft.shape
         },
         actionOptions: ACTION_OPTIONS,
         viewOptions: NAVIGATION_SHORTCUTS.map((shortcut) => ({
@@ -506,6 +505,7 @@ const openItemEditor = (item?: SpeedDialItem, opts?: {
             workingMeta.view = next.view;
             workingMeta.href = next.href;
             workingMeta.description = next.description;
+            workingMeta.shape = next.shape;
             if (isNew) {
                 addSpeedDialItem(workingItem);
             } else {
@@ -546,6 +546,14 @@ export function createCtxMenu(makeView?: any) {
                 icon: String(entry?.icon || "command"),
                 action: () => entry?.action?.(targetEl as HTMLElement, entry, event)
             });
+            const openViewTask = (view: string, params: Record<string, string> = {}) => {
+                const opener = homeViewOpener || makeView;
+                if (opener) {
+                    opener(view, { ...params, newTask: "1" });
+                    return;
+                }
+                actionRegistry.get(`open-view-${view}`)?.({ id: "", items: speedDialItems, meta: speedDialMeta }, {});
+            };
 
             const menuItems: ContextMenuEntry[] = item
                 ? [
@@ -567,6 +575,32 @@ export function createCtxMenu(makeView?: any) {
                                 toLeaf(createMenuEntryForAction("copy-link", item, "Copy link", homeViewOpener))
                             ] : []),
                             toLeaf(createMenuEntryForAction("copy-state-desc", item, "Copy shortcut JSON", homeViewOpener))
+                        ]
+                    },
+                    {
+                        id: "open-in",
+                        label: "Open In New",
+                        icon: "app-window",
+                        action: () => {},
+                        children: [
+                            {
+                                id: "open-in-regular-window",
+                                label: "Regular window",
+                                icon: "app-window",
+                                action: () => {
+                                    const targetView = String(getSpeedDialMeta(item.id)?.view || "viewer");
+                                    openViewTask(targetView, { windowType: "regular" });
+                                }
+                            },
+                            {
+                                id: "open-in-tabbed-window",
+                                label: "Tabbed window",
+                                icon: "rows-plus-bottom",
+                                action: () => {
+                                    const targetView = String(getSpeedDialMeta(item.id)?.view || "viewer");
+                                    openViewTask(targetView, { windowType: "tabbed" });
+                                }
+                            }
                         ]
                     },
                     {
@@ -657,7 +691,27 @@ export function createCtxMenu(makeView?: any) {
                             } },
                             { id: "open-settings", label: "Settings", icon: "gear-six", action: ()=>{
                                 actionRegistry.get("open-view-settings")?.({ id: "", items: speedDialItems, meta: speedDialMeta, viewMaker: homeViewOpener }, {});
-                            } }
+                            } },
+                            {
+                                id: "open-window-type",
+                                label: "New Window",
+                                icon: "app-window",
+                                action: () => {},
+                                children: [
+                                    {
+                                        id: "open-viewer-regular",
+                                        label: "Viewer (regular)",
+                                        icon: "article",
+                                        action: () => openViewTask("viewer", { windowType: "regular" })
+                                    },
+                                    {
+                                        id: "open-viewer-tabbed",
+                                        label: "Viewer (tabbed)",
+                                        icon: "rows-plus-bottom",
+                                        action: () => openViewTask("viewer", { windowType: "tabbed" })
+                                    }
+                                ]
+                            }
                         ]
                     },
                     {

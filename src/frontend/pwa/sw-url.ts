@@ -10,17 +10,24 @@ const isLikelyJavaScriptContentType = (contentType: string | null | undefined): 
     return ct.includes("javascript") || ct.includes("ecmascript") || ct.includes("module");
 };
 
+const PROBE_TIMEOUT_MS = 8000;
+
 const probeScriptUrl = async (url: string): Promise<ProbeResult> => {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), PROBE_TIMEOUT_MS);
     try {
         const res = await fetch(url, {
             method: "GET",
             cache: "no-store",
             credentials: "same-origin",
+            signal: ac.signal,
         });
         const contentType = res.headers.get("content-type");
         return { ok: res.ok && isLikelyJavaScriptContentType(contentType), url, contentType, status: res.status };
     } catch {
         return { ok: false, url };
+    } finally {
+        clearTimeout(timer);
     }
 };
 

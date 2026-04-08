@@ -266,12 +266,15 @@ class ServiceWorkerUpdateManager {
                 console.warn('[SW] Service worker registration skipped: no valid script candidate');
                 return null;
             }
-            await navigator.serviceWorker.ready.catch(() => undefined);
-            await this.waitForController().catch(() => false);
-            console.log('[SW] Service worker registered successfully');
-
             this.setupUpdateListeners();
             this.startPeriodicUpdates();
+
+            // Do not block PWA init on `ready` / controller: first install + precache can take a long
+            // time; the app shell should paint while the SW finishes in the background.
+            void navigator.serviceWorker.ready.catch(() => undefined);
+            void this.waitForController(1500).catch(() => false);
+
+            console.log('[SW] Service worker registered successfully');
 
             return this.registration;
         } catch (error) {
@@ -348,6 +351,8 @@ class ServiceWorkerUpdateManager {
     }
 
     private startPeriodicUpdates(): void {
+        const dev = Boolean((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV);
+        if (dev) return;
         // Check for updates every 30 minutes
         globalThis?.setInterval?.(() => {
             this.registration?.update().catch(console.warn);

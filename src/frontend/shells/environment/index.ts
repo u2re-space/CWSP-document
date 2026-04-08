@@ -1,10 +1,16 @@
-import type { ShellId, ShellLayoutConfig } from "@shells/types";
+import type { ShellId, ShellLayoutConfig, ViewId } from "@shells/types";
 import { WindowShell } from "@shells/window";
+import { ENABLED_VIEW_IDS } from "@shared/routing/views";
 
 /**
- * Environment shell: desktop/webtop orchestrator identity.
- * Current implementation inherits window mechanics until dedicated
- * environment layers/chrome are fully split.
+ * Environment shell: canonical desktop/webtop orchestrator.
+ *
+ * Inherits the full window process system (processes, PIDs, channels,
+ * drag-and-drop attach, parameterized view opening) and enables
+ * desktop chrome (dock bar + status bar) rendered into the shell layer.
+ *
+ * Entry URLs like `/{view}?key=val` are normalized to `/#pid` on boot,
+ * making the environment the primary desktop experience for PWA.
  */
 export class EnvironmentShell extends WindowShell {
     id: ShellId = "environment";
@@ -20,6 +26,11 @@ export class EnvironmentShell extends WindowShell {
 
     protected shouldRenderDesktopChrome(): boolean {
         return true;
+    }
+
+    protected override getPinnedViews(): ViewId[] {
+        const preferred: ViewId[] = ["viewer", "explorer", "workcenter", "editor", "airpad", "settings"];
+        return preferred.filter((v) => ENABLED_VIEW_IDS.includes(v));
     }
 }
 

@@ -26,6 +26,7 @@ import {
 } from "../../../shared/routing/registry";
 import type { ShellId, ViewId, Shell, ShellTheme } from "../../types";
 import { serviceChannels, type ServiceChannelId } from "@rs-com/core/ServiceChannels";
+import { LS_BOOT_SHELL_LAST_ACTIVE } from "./shell-preference";
 import { loadSettings } from "@rs-com/config/Settings";
 import { applyTheme as applyAppTheme } from "@rs-core/utils/Theme";
 import { DEFAULT_SETTINGS, type AppSettings } from "@rs-com/config/SettingsTypes";
@@ -493,7 +494,7 @@ export class BootLoader {
         try {
             const remember = localStorage.getItem("rs-boot-remember");
             if (remember !== "1") return null;
-            const shell = normalizeShellId((localStorage.getItem("rs-boot-shell") as ShellId) || "window");
+            const shell = normalizeShellId((localStorage.getItem("rs-boot-shell") as ShellId) || "minimal");
             
             return {
                 styleSystem: (localStorage.getItem("rs-boot-style") as StyleSystem) || undefined,
@@ -514,6 +515,7 @@ export class BootLoader {
             localStorage.removeItem("rs-boot-shell");
             localStorage.removeItem("rs-boot-view");
             localStorage.removeItem("rs-boot-remember");
+            localStorage.removeItem(LS_BOOT_SHELL_LAST_ACTIVE);
         } catch {
             // Ignore
         }
@@ -560,14 +562,38 @@ export async function bootTabbed(
     container: HTMLElement,
     view: ViewId = "home"
 ): Promise<Shell> {
-    return bootWindow(container, view);
+    const channels = ["workcenter", "settings", "viewer", "explorer", "history", "editor", "airpad", "home"]
+        .filter((channelId) => isEnabledView(channelId)) as ServiceChannelId[];
+    const defaultView = pickEnabledView(view, "home");
+    const channelPriorityId: ServiceChannelId | undefined =
+        (channels.find((c) => c === defaultView) ?? channels[0]) as ServiceChannelId | undefined;
+    return bootLoader.boot(container, {
+        styleSystem: "vl-basic",
+        shell: "tabbed",
+        defaultView,
+        channels,
+        channelPriorityId,
+        rememberChoice: true
+    });
 }
 
 export async function bootEnvironment(
     container: HTMLElement,
     view: ViewId = "home"
 ): Promise<Shell> {
-    return bootWindow(container, view);
+    const channels = ["workcenter", "settings", "viewer", "explorer", "history", "editor", "airpad", "home"]
+        .filter((channelId) => isEnabledView(channelId)) as ServiceChannelId[];
+    const defaultView = pickEnabledView(view, "home");
+    const channelPriorityId: ServiceChannelId | undefined =
+        (channels.find((c) => c === defaultView) ?? channels[0]) as ServiceChannelId | undefined;
+    return bootLoader.boot(container, {
+        styleSystem: "vl-basic",
+        shell: "environment",
+        defaultView,
+        channels,
+        channelPriorityId,
+        rememberChoice: true
+    });
 }
 
 /**

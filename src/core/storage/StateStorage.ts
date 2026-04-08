@@ -11,6 +11,8 @@ export interface SpeedDialItemMeta {
     view?: string;
     href?: string;
     description?: string;
+    /** Tile shape for orient / speed-dial styling (squircle | circle | square). */
+    shape?: string;
     entityType?: string;
     tags?: string[];
     [key: string]: any;
@@ -451,11 +453,11 @@ export const snapshotSpeedDialItem = (item: SpeedDialItem) => {
 
 const WALLPAPER_KEY = "cw::workspace::wallpaper";
 export const wallpaperState = makeUIState(WALLPAPER_KEY, () => observe({
-    src: "./assets/imgs/test.webp",
+    src: "/assets/wallpaper.jpg",
     opacity: 1,
     blur: 0
 }), (raw) => observe(raw || {
-    src: "./assets/imgs/test.webp",
+    src: "/assets/wallpaper.jpg",
     opacity: 1,
     blur: 0
 }), (state) => ({ ...state })) as unknown as { src: string; opacity: number; blur: number };

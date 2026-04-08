@@ -18,13 +18,31 @@ export type ViewTransferChannelPayload = {
     message: unknown;
 };
 
-export type ViewOpenTarget = "window" | "frame" | "shell" | "base" | "headless";
+export type ViewOpenTarget = "window" | "frame" | "shell" | "base" | "minimal" | "headless";
 
 export type ViewOpenRequest = {
     viewId: string;
     target?: ViewOpenTarget;
     params?: Record<string, string>;
     pid?: string;
+    /** POST-style body payload (JSON data, options) */
+    body?: unknown;
+    /** MIME type hint for body */
+    contentType?: string;
+    /** Named channel for inter-process messaging */
+    channel?: string;
+    /** Attached data assets from another process */
+    attachments?: Array<{
+        name: string;
+        type: string;
+        size: number;
+        data: File | Blob | string;
+        source?: string;
+    }>;
+    /** Window sub-type: "regular" or "tabbed" */
+    windowType?: string;
+    /** Force new task/instance */
+    newTask?: boolean;
 };
 
 export function postViewChannelPayload(viewId: string, payload: unknown): void {
@@ -104,7 +122,13 @@ export function requestOpenView(request: ViewOpenRequest): void {
             viewId,
             target: request?.target || "window",
             params: request?.params || {},
-            pid: request?.pid || null
+            pid: request?.pid || null,
+            body: request?.body,
+            contentType: request?.contentType,
+            channel: request?.channel,
+            attachments: request?.attachments,
+            windowType: request?.windowType,
+            newTask: request?.newTask,
         }
     }));
 }

@@ -8,7 +8,13 @@
  */
 
 import { initPWA, checkForUpdates, forceRefreshAssets } from "./frontend/pwa/pwa-handling";
-import { loadSubAppWithShell, VALID_VIEWS } from "./frontend/shells/boot";
+import {
+    loadSubAppWithShell,
+    VALID_VIEWS,
+    getShellFromQuery,
+    getSavedShellPreference
+} from "./frontend/shells/boot";
+import type { ShellId } from "./frontend/shells/types";
 import { initializeLayers } from "@rs-frontend/shared/routing/layer-manager";
 import type { ViewId } from "./frontend/shells/types";
 import { pickEnabledView } from "./frontend/shared/routing/views";
@@ -72,58 +78,6 @@ const isPwaDisplayMode = (): boolean => {
  */
 const isValidViewPath = (path: string): path is ViewId =>
     (VALID_VIEWS as readonly string[]).includes(path);
-
-/** Valid shell identifiers */
-const VALID_SHELLS = ["base", "minimal", "faint", "window"] as const;
-type ShellPreference = (typeof VALID_SHELLS)[number] | "window";
-
-const normalizeShellPreference = (shell: ShellPreference | null): "base" | "minimal" | "window" => {
-    if (shell === "base") return "base";
-    if (shell === "minimal" || shell === "faint") return "minimal";
-    return "minimal";
-};
-
-const getShellFromQuery = (): ShellPreference | null => {
-    try {
-        const params = new URLSearchParams(globalThis?.location?.search);
-        const shell = (params.get("shell") || "").trim().toLowerCase();
-        if ((VALID_SHELLS as readonly string[]).includes(shell)) {
-            return normalizeShellPreference(shell as ShellPreference);
-        }
-    } catch {
-        // Ignore query parsing issues
-    }
-    return null;
-};
-
-/**
- * Get saved shell preference from localStorage
- */
-const getSavedShell = (): ShellPreference | null => {
-    const fromQuery = getShellFromQuery();
-    if (fromQuery) {
-        try {
-            localStorage.setItem("rs-boot-shell", fromQuery);
-        } catch {
-            // localStorage unavailable
-        }
-        return fromQuery;
-    }
-
-    try {
-        const saved = localStorage.getItem("rs-boot-shell");
-        if (saved && (VALID_SHELLS as readonly string[]).includes(saved)) {
-            const normalized = normalizeShellPreference(saved as ShellPreference);
-            if (normalized !== saved) {
-                localStorage.setItem("rs-boot-shell", normalized);
-            }
-            return normalized;
-        }
-    } catch {
-        // localStorage unavailable
-    }
-    return null;
-};
 
 // ============================================================================
 // LOADING STATE MANAGEMENT
@@ -338,28 +292,44 @@ export default async function index(mountElement: HTMLElement) {
                 ? pickEnabledView("viewer", "home")
                 : null;
         const queryShell = getShellFromQuery();
-        const savedShell = getSavedShell();
-        const preferredShell = queryShell || (
-            explicitRequestedView === "print"
+        if (queryShell) {
+            try {
+                localStorage.setItem("rs-boot-shell", queryShell);
+            } catch {
+                /* localStorage unavailable */
+            }
+        }
+        const preferredShell: ShellId =
+            queryShell ||
+            (explicitRequestedView === "print"
                 ? "base"
-                : (savedShell || "minimal")
-        );
+                : (getSavedShellPreference() ?? "minimal"));
         const requestedView = explicitRequestedView || (
             preferredShell === "base" || preferredShell === "minimal"
                 ? pickEnabledView("viewer", "home")
                 : pickEnabledView("home", "home")
         );
         const allowPathRoutedShell = preferredShell === "base" || preferredShell === "minimal";
+        const useDesktopLayers =
+            preferredShell === "window" ||
+            preferredShell === "environment" ||
+            preferredShell === "tabbed";
         const layers = ensureAppLayers(mountElement, {
-            enableOrientLayer: preferredShell === "window",
-            enableCanvasLayer: preferredShell === "window",
+            enableOrientLayer: useDesktopLayers,
+            enableCanvasLayer: useDesktopLayers,
         });
         clearLoadingState(mountElement);
 
+        // For window/environment/tabbed shells: normalize /{view}?params to
+        // canonical root. Query params are preserved so the shell's syncInitialRoute
+        // can forward them as ProcessOpenParams to the view's process window.
+        // The shell will further normalize to /#pid after process creation.
         if (!allowPathRoutedShell && (isLegacyViewRoute || pathname === "share-target" || pathname === "share_target")) {
+            const queryParams = Object.fromEntries(urlParams);
             const state = {
                 ...(globalThis?.history?.state || {}),
                 viewId: requestedView,
+                params: queryParams,
                 redirectedFrom: pathname || null
             };
             const search = globalThis?.location?.search || "";
@@ -374,7 +344,7 @@ export default async function index(mountElement: HTMLElement) {
             globalThis?.history?.replaceState?.(state, "", "/");
         }
 
-        const appLoader = await loadSubAppWithShell(preferredShell as any, requestedView);
+        const appLoader = await loadSubAppWithShell(preferredShell, requestedView);
         await appLoader.mount(layers.shellLayer);
         return;
 

@@ -184,7 +184,15 @@ export const loadSettings = async (): Promise<AppSettings> => {
             const result = {
                 core: {
                     ...DEFAULT_SETTINGS.core,
-                    ...(stored as any)?.core
+                    ...(stored as any)?.core,
+                    ops: {
+                        ...(DEFAULT_SETTINGS.core?.ops || {}),
+                        ...((stored as any)?.core?.ops || {})
+                    },
+                    admin: {
+                        ...(DEFAULT_SETTINGS.core?.admin || {}),
+                        ...((stored as any)?.core?.admin || {})
+                    }
                 },
                 ai: {
                     ...DEFAULT_SETTINGS.ai, ...(stored as any)?.ai,
@@ -269,7 +277,17 @@ export const saveSettings = async (settings: AppSettings) => {
         core: {
             ...(DEFAULT_SETTINGS.core || {}),
             ...(current.core || {}),
-            ...(settings.core || {})
+            ...(settings.core || {}),
+            ops: {
+                ...(DEFAULT_SETTINGS.core?.ops || {}),
+                ...(current.core?.ops || {}),
+                ...(settings.core?.ops || {})
+            },
+            admin: {
+                ...(DEFAULT_SETTINGS.core?.admin || {}),
+                ...(current.core?.admin || {}),
+                ...(settings.core?.admin || {})
+            }
         },
         ai: {
             ...(DEFAULT_SETTINGS.ai || {}),

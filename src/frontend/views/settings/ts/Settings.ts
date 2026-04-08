@@ -3,7 +3,8 @@ import style from "../scss/Settings.scss?inline";
 
 import { H } from "fest/lure";
 import { loadSettings, saveSettings } from "@rs-com/config/Settings";
-import { BUILTIN_AI_MODELS, type AppSettings, type MCPConfig } from "@rs-com/config/SettingsTypes";
+import { BUILTIN_AI_MODELS, type AppSettings, type CoreMode, type MCPConfig } from "@rs-com/config/SettingsTypes";
+import { openAdminDoorFromCore, resolveAdminDoorUrls } from "@rs-com/config/admin-doors";
 import { applyTheme } from "@rs-core/utils/Theme";
 import { setString, StorageKeys } from "@rs-core/storage";
 import { navigateToView } from "@shells/boot";
@@ -97,6 +98,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         <button class="settings-tab-btn" type="button" role="tab" data-action="switch-settings-tab" data-tab="markdown" aria-selected="false">Markdown</button>
         <button class="settings-tab-btn is-active" type="button" role="tab" data-action="switch-settings-tab" data-tab="ai" aria-selected="true">AI</button>
         <button class="settings-tab-btn" type="button" role="tab" data-action="switch-settings-tab" data-tab="mcp" aria-selected="false">MCP</button>
+        <button class="settings-tab-btn" type="button" role="tab" data-action="switch-settings-tab" data-tab="server" aria-selected="false">Server</button>
         <button class="settings-tab-btn" type="button" role="tab" data-action="switch-settings-tab" data-tab="instructions" aria-selected="false">Instructions</button>
         <button class="settings-tab-btn" type="button" role="tab" data-action="switch-settings-tab" data-tab="extension" aria-selected="false" data-extension-tab hidden>Extension</button>
         </div>
@@ -381,6 +383,76 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
       </div>
     </section>
 
+    <section class="card settings-tab-panel" data-tab-panel="server">
+      <h3>Server &amp; admin</h3>
+      <p class="field-hint" style="margin: 0 0 0.75rem; opacity: 0.88; font-size: 0.9em;">
+        Endpoint sync, TLS hints for cwsp/Electron/Capacitor, and quick links to the CWS admin UI (HTTPS :8443, HTTP :8080).
+        Airpad still has its own peer <strong>Client ID</strong> in the Airpad configuration overlay.
+        On <strong>Android (Capacitor cwsp)</strong>, these values are the same as in the browser; cleartext HTTP to LAN hosts may need extra
+        <code>&lt;domain&gt;</code> entries in cwsp <code>resources/android/network_security_config.xml</code> (re-applied after <code>cap sync</code>).
+        Self-signed HTTPS: install the server CA on the device or use a trusted certificate.
+      </p>
+      <label class="field">
+        <span>Core mode</span>
+        <select class="form-select" data-field="core.mode">
+          <option value="native">Native / offline-first</option>
+          <option value="endpoint">Endpoint (backend sync)</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Endpoint base URL</span>
+        <input class="form-input" type="url" inputmode="url" autocomplete="off" placeholder="https://host:6065 or http://localhost:6065" data-field="core.endpointUrl" />
+      </label>
+      <label class="field">
+        <span>User ID</span>
+        <input class="form-input" type="text" autocomplete="off" data-field="core.userId" />
+      </label>
+      <label class="field">
+        <span>User key</span>
+        <input class="form-input" type="password" autocomplete="off" data-field="core.userKey" />
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="core.preferBackendSync" />
+        <span>Prefer backend sync when in endpoint mode</span>
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="core.encrypt" />
+        <span>Encrypt transport to endpoint (when supported)</span>
+      </label>
+      <label class="field">
+        <span>Application client ID</span>
+        <input class="form-input" type="text" autocomplete="off" placeholder="Optional instance id for this install (cwsp, PWA, …)" data-field="core.appClientId" />
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="core.allowInsecureTls" />
+        <span>Allow insecure / self-signed TLS (native shells only; browsers ignore this for fetch)</span>
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="core.ops.allowUnencrypted" />
+        <span>Allow unencrypted HTTP targets in operations (advanced)</span>
+      </label>
+      <h4>Admin doors</h4>
+      <label class="field">
+        <span>Admin HTTPS origin</span>
+        <input class="form-input" type="url" inputmode="url" autocomplete="off" placeholder="https://localhost:8443" data-field="core.admin.httpsOrigin" />
+      </label>
+      <label class="field">
+        <span>Admin HTTP origin</span>
+        <input class="form-input" type="url" inputmode="url" autocomplete="off" placeholder="http://localhost:8080" data-field="core.admin.httpOrigin" />
+      </label>
+      <label class="field">
+        <span>Admin path</span>
+        <input class="form-input" type="text" autocomplete="off" placeholder="/" data-field="core.admin.path" />
+      </label>
+      <div class="mcp-actions" style="flex-wrap: wrap; gap: 0.5rem;">
+        <button class="btn primary" type="button" data-action="open-admin-https">Open admin (HTTPS)</button>
+        <button class="btn" type="button" data-action="open-admin-http">Open admin (HTTP)</button>
+        <button class="btn" type="button" data-action="copy-admin-https">Copy HTTPS URL</button>
+        <button class="btn" type="button" data-action="copy-admin-http">Copy HTTP URL</button>
+      </div>
+      <p class="mcp-empty-note" data-admin-preview style="margin-top: 0.75rem; word-break: break-all;"></p>
+    </section>
+
     <section class="card settings-tab-panel" data-tab-panel="instructions" data-section="instructions">
       <h3>Recognition Instructions</h3>
       <div data-custom-instructions="editor">
@@ -480,6 +552,19 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     const markdownPrintCss = root.querySelector('[data-field="appearance.markdown.printCss"]') as HTMLTextAreaElement | null;
     const markdownExtensions = root.querySelector('[data-field="appearance.markdown.extensions"]') as HTMLTextAreaElement | null;
     const ntpEnabled = field('[data-field="core.ntpEnabled"]') as HTMLInputElement | null;
+    const coreMode = field('[data-field="core.mode"]') as HTMLSelectElement | null;
+    const coreEndpointUrl = field('[data-field="core.endpointUrl"]') as HTMLInputElement | null;
+    const coreUserId = field('[data-field="core.userId"]') as HTMLInputElement | null;
+    const coreUserKey = field('[data-field="core.userKey"]') as HTMLInputElement | null;
+    const corePreferBackendSync = field('[data-field="core.preferBackendSync"]') as HTMLInputElement | null;
+    const coreEncrypt = field('[data-field="core.encrypt"]') as HTMLInputElement | null;
+    const coreAppClientId = field('[data-field="core.appClientId"]') as HTMLInputElement | null;
+    const coreAllowInsecureTls = field('[data-field="core.allowInsecureTls"]') as HTMLInputElement | null;
+    const coreOpsAllowUnencrypted = field('[data-field="core.ops.allowUnencrypted"]') as HTMLInputElement | null;
+    const coreAdminHttps = field('[data-field="core.admin.httpsOrigin"]') as HTMLInputElement | null;
+    const coreAdminHttp = field('[data-field="core.admin.httpOrigin"]') as HTMLInputElement | null;
+    const coreAdminPath = field('[data-field="core.admin.path"]') as HTMLInputElement | null;
+    const adminPreview = root.querySelector("[data-admin-preview]") as HTMLElement | null;
     const mcpSection = root.querySelector("[data-mcp-section]") as HTMLElement | null;
     const extSection = root.querySelector('[data-section="extension"]') as HTMLElement | null;
     const extTab = root.querySelector('[data-extension-tab]') as HTMLButtonElement | null;
@@ -518,6 +603,15 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         }
     }
 
+    root.addEventListener("input", (ev) => {
+        const el = ev.target as HTMLElement | null;
+        if (el?.matches?.('[data-field^="core."]')) refreshAdminDoorPreview();
+    });
+    root.addEventListener("change", (ev) => {
+        const el = ev.target as HTMLElement | null;
+        if (el?.matches?.('[data-field^="core."]')) refreshAdminDoorPreview();
+    });
+
     const switchSettingsTab = (tab: string) => {
         const nextTab = tab || "ai";
         const tabRoot = root.querySelector('[data-settings-tabs]') as HTMLElement | null;
@@ -544,8 +638,33 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         const normalized = (raw || "").trim().toLowerCase();
         if (!normalized) return "ai";
         if (normalized === "style" || normalized === "styles" || normalized === "styling") return "markdown";
-        const availableTabs = new Set(["appearance", "markdown", "ai", "mcp", "instructions", "extension"]);
+        const availableTabs = new Set(["appearance", "markdown", "ai", "mcp", "server", "instructions", "extension"]);
         return availableTabs.has(normalized) ? normalized : "ai";
+    };
+
+    const buildCoreSnapshotForAdminPreview = (): AppSettings["core"] => ({
+        mode: ((coreMode?.value as CoreMode) || "native") as CoreMode,
+        endpointUrl: coreEndpointUrl?.value?.trim() || "",
+        userId: coreUserId?.value?.trim() || "",
+        userKey: coreUserKey?.value?.trim() || "",
+        encrypt: Boolean(coreEncrypt?.checked),
+        preferBackendSync: (corePreferBackendSync?.checked ?? true) !== false,
+        appClientId: coreAppClientId?.value?.trim() || "",
+        allowInsecureTls: Boolean(coreAllowInsecureTls?.checked),
+        admin: {
+            httpsOrigin: coreAdminHttps?.value?.trim() || "",
+            httpOrigin: coreAdminHttp?.value?.trim() || "",
+            path: coreAdminPath?.value?.trim() || "/",
+        },
+        ops: {
+            allowUnencrypted: Boolean(coreOpsAllowUnencrypted?.checked),
+        },
+    });
+
+    const refreshAdminDoorPreview = () => {
+        if (!adminPreview) return;
+        const urls = resolveAdminDoorUrls(buildCoreSnapshotForAdminPreview());
+        adminPreview.textContent = `Resolved: ${urls.https} · ${urls.http}`;
     };
 
     const openExplorerPath = (path: string) => {
@@ -692,6 +811,19 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                     : "";
             }
             if (ntpEnabled) ntpEnabled.checked = Boolean(s?.core?.ntpEnabled);
+            if (coreMode) coreMode.value = (s?.core?.mode || "native") as string;
+            if (coreEndpointUrl) coreEndpointUrl.value = (s?.core?.endpointUrl || "").trim();
+            if (coreUserId) coreUserId.value = (s?.core?.userId || "").trim();
+            if (coreUserKey) coreUserKey.value = (s?.core?.userKey || "").trim();
+            if (corePreferBackendSync) corePreferBackendSync.checked = (s?.core?.preferBackendSync ?? true) !== false;
+            if (coreEncrypt) coreEncrypt.checked = Boolean(s?.core?.encrypt);
+            if (coreAppClientId) coreAppClientId.value = (s?.core?.appClientId || "").trim();
+            if (coreAllowInsecureTls) coreAllowInsecureTls.checked = Boolean(s?.core?.allowInsecureTls);
+            if (coreOpsAllowUnencrypted) coreOpsAllowUnencrypted.checked = Boolean(s?.core?.ops?.allowUnencrypted);
+            if (coreAdminHttps) coreAdminHttps.value = (s?.core?.admin?.httpsOrigin || "").trim();
+            if (coreAdminHttp) coreAdminHttp.value = (s?.core?.admin?.httpOrigin || "").trim();
+            if (coreAdminPath) coreAdminPath.value = (s?.core?.admin?.path || "/").trim() || "/";
+            refreshAdminDoorPreview();
             renderMcpConfigurations(Array.isArray(s?.ai?.mcp) ? s.ai.mcp : []);
             opts.onTheme?.((theme?.value as any) || "auto");
         })
@@ -750,10 +882,43 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
             return;
         }
 
+        const openAdminHttpsBtn = t?.closest?.('button[data-action="open-admin-https"]') as HTMLButtonElement | null;
+        if (openAdminHttpsBtn) {
+            openAdminDoorFromCore(buildCoreSnapshotForAdminPreview(), "https");
+            return;
+        }
+
+        const openAdminHttpBtn = t?.closest?.('button[data-action="open-admin-http"]') as HTMLButtonElement | null;
+        if (openAdminHttpBtn) {
+            openAdminDoorFromCore(buildCoreSnapshotForAdminPreview(), "http");
+            return;
+        }
+
+        const copyAdminHttpsBtn = t?.closest?.('button[data-action="copy-admin-https"]') as HTMLButtonElement | null;
+        if (copyAdminHttpsBtn) {
+            const urls = resolveAdminDoorUrls(buildCoreSnapshotForAdminPreview());
+            void navigator.clipboard?.writeText?.(urls.https).then(
+                () => setNote("HTTPS admin URL copied."),
+                () => setNote("Copy failed.")
+            );
+            return;
+        }
+
+        const copyAdminHttpBtn = t?.closest?.('button[data-action="copy-admin-http"]') as HTMLButtonElement | null;
+        if (copyAdminHttpBtn) {
+            const urls = resolveAdminDoorUrls(buildCoreSnapshotForAdminPreview());
+            void navigator.clipboard?.writeText?.(urls.http).then(
+                () => setNote("HTTP admin URL copied."),
+                () => setNote("Copy failed.")
+            );
+            return;
+        }
+
         const btn = t?.closest?.('button[data-action="save"]') as HTMLButtonElement | null;
         if (!btn) return;
 
         void (async () => {
+            const current = await loadSettings();
             let parsedMarkdownExtensions: any[] = [];
             const rawExtensions = markdownExtensions?.value?.trim() || "";
             if (rawExtensions) {
@@ -798,7 +963,26 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                     language: (speechLanguage?.value as any) || "en-US",
                 },
                 core: {
+                    ...current.core,
                     ntpEnabled: Boolean(ntpEnabled?.checked),
+                    mode: ((coreMode?.value as CoreMode) || "native") as CoreMode,
+                    endpointUrl: coreEndpointUrl?.value?.trim() || "",
+                    userId: coreUserId?.value?.trim() || "",
+                    userKey: coreUserKey?.value?.trim() || "",
+                    encrypt: Boolean(coreEncrypt?.checked),
+                    preferBackendSync: (corePreferBackendSync?.checked ?? true) !== false,
+                    appClientId: coreAppClientId?.value?.trim() || "",
+                    allowInsecureTls: Boolean(coreAllowInsecureTls?.checked),
+                    admin: {
+                        ...(current.core?.admin || {}),
+                        httpsOrigin: coreAdminHttps?.value?.trim() || "",
+                        httpOrigin: coreAdminHttp?.value?.trim() || "",
+                        path: coreAdminPath?.value?.trim() || "/",
+                    },
+                    ops: {
+                        ...(current.core?.ops || {}),
+                        allowUnencrypted: Boolean(coreOpsAllowUnencrypted?.checked),
+                    },
                 },
                 appearance: {
                     theme: (theme?.value as any) || "auto",

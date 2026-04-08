@@ -181,14 +181,16 @@ export const initServiceWorker = async (_options: { immediate?: boolean, onRegis
                 }
             });
 
-            // Check for updates periodically (every 30 minutes)
+            // Check for updates periodically (every 30 minutes) — prod only; dev SW churn is noisy.
             if (_swUpdateInterval) {
                 globalThis?.clearInterval?.(_swUpdateInterval);
                 _swUpdateInterval = null;
             }
-            _swUpdateInterval = globalThis?.setInterval?.(() => {
-                registration?.update?.().catch?.(console.warn);
-            }, 30 * 60 * 1000) as unknown as number | null;
+            if (!viteEnv?.DEV) {
+                _swUpdateInterval = globalThis?.setInterval?.(() => {
+                    registration?.update?.().catch?.(console.warn);
+                }, 30 * 60 * 1000) as unknown as number | null;
+            }
 
             console.log('[PWA] Service worker registered successfully');
             return registration;

@@ -179,6 +179,14 @@ async function initAirpadApp(initToken: number | undefined, signal: AbortSignal,
     }
 
     bindBus("ui.config.open", () => showConfigUI());
+    bindBus("ui.admin.open", () => {
+        void import("@rs-com/config/Settings")
+            .then(({ loadSettings }) => loadSettings())
+            .then((s) => import("@rs-com/config/admin-doors").then(({ openAdminDoorFromCore }) => {
+                openAdminDoorFromCore(s.core, "https");
+            }))
+            .catch((e) => console.warn("[Airpad] admin door:", e));
+    });
     bindBus("ui.motion.reset", () => resetMotionRuntime());
     bindBus("ui.reload.request", () => {
         try {
