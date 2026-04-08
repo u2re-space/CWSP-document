@@ -52,6 +52,21 @@ const AIRPAD_CANDIDATE_PARALLEL = 3;
 const AIRPAD_COORDINATOR_TIMEOUT_MS = 8000;
 const AIRPAD_CONNECTION_TYPE = "exchanger-initiator";
 const AIRPAD_ARCHETYPE = "server-v2";
+
+/**
+ * Chrome/Edge MV3: content-script XHR (Engine.IO polling) to LAN often fails with
+ * `xhr poll error` / `unsafeHeaders` / `net::ERR_FAILED` while `wss:` still works.
+ * Normal tabs keep polling-first for Private Network Access; extension skips polling to private IPs.
+ */
+const isChromiumExtensionRuntime = (): boolean => {
+    try {
+        const chromeApi = (globalThis as unknown as { chrome?: { runtime?: { id?: string } } }).chrome;
+        return typeof chromeApi?.runtime?.id === "string" && chromeApi.runtime.id.length > 0;
+    } catch {
+        return false;
+    }
+};
+
 type WSConnectionHandler = (connected: boolean) => void;
 const wsConnectionHandlers = new Set<WSConnectionHandler>();
 
@@ -443,16 +458,24 @@ const unwrapIncomingPayload = async (payload: any): Promise<any> => {
     return unwrapSignedPayload(payload);
 };
 
+/** Strip `L-` node id prefix (e.g. `L-192.168.0.110` → `192.168.0.110`) for IP / LNA checks. */
+function stripWireEndpointIdPrefix(host: string): string {
+    const t = host.trim();
+    return /^l-/i.test(t) ? t.slice(2).trim() : t;
+}
+
 function isPrivateOrLocalTarget(host: string): boolean {
     if (!host) return false;
-    if (host === 'localhost') return true;
+    const bare = stripWireEndpointIdPrefix(host);
+    if (bare === 'localhost' || host === 'localhost') return true;
     if (host.endsWith('.local')) return true;
-    if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return false;
+    if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(bare)) return false;
     return (
-        host.startsWith('10.') ||
-        host.startsWith('192.168.') ||
-        /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-        host.startsWith('127.')
+        bare.startsWith('10.') ||
+        bare.startsWith('192.168.') ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(bare) ||
+        bare.startsWith('127.') ||
+        /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(bare)
     );
 }
 
@@ -731,28 +754,35 @@ export function connectWS() {
         return (
             host.startsWith('10.') ||
             host.startsWith('192.168.') ||
-            /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+            /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+            /** CGNAT / Tailscale-style 100.64.0.0/10 */
+            /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host)
         );
     };
 
-    /** Prefer hostname (SNI) before public IPv4 for HTTPS — certs rarely include the bare IP. */
+    /**
+     * HTTPS probe order: LAN / private IPs first (where CWSP admin usually listens), then DNS names
+     * from **remote** settings, then **page** origin (PWA shell). Putting `u2re.space` last avoids
+     * timeouts and PNA noise when the real gateway is 192.168.x.x only.
+     */
     const reorderHostEntriesForHttps = (
         entries: Array<{ host: string; source: WSConnectCandidate['source']; preferPort?: string }>
     ) => {
-        const dns: typeof entries = [];
+        const dnsRemote: typeof entries = [];
+        const dnsPage: typeof entries = [];
         const privateIpv4: typeof entries = [];
         const publicIpv4: typeof entries = [];
         for (const e of entries) {
             if (!isIpv4Literal(e.host)) {
-                dns.push(e);
+                if (e.source === 'page') dnsPage.push(e);
+                else dnsRemote.push(e);
             } else if (isPrivateIp(e.host) || e.host === '127.0.0.1') {
                 privateIpv4.push(e);
             } else {
                 publicIpv4.push(e);
             }
         }
-        dns.sort((a, b) => (a.source === 'page' ? 0 : 1) - (b.source === 'page' ? 0 : 1));
-        return [...dns, ...privateIpv4, ...publicIpv4];
+        return [...privateIpv4, ...dnsRemote, ...dnsPage, ...publicIpv4];
     };
 
     const isLikelyPort = (value: string): boolean => /^\d{1,5}$/.test(value);
@@ -804,7 +834,7 @@ export function connectWS() {
 
     const inferProtocol = (): 'http' | 'https' => {
         if (remoteProtocol === 'http' || remoteProtocol === 'https') return remoteProtocol;
-        if (remotePort === '443' || remotePort === '8443') return 'https';
+        if (remotePort === '443' || remotePort === '8443' || remotePort === '8444') return 'https';
         if (remotePort === '80' || remotePort === '8080') return 'http';
         return location.protocol === 'https:' ? 'https' : 'http';
     };
@@ -816,14 +846,16 @@ export function connectWS() {
     const routeTargetPortForQuery = (parsedConfiguredRouteTarget?.port || "").trim();
 
     const primaryProtocol = inferProtocol();
-    const probeHost = parsedRemoteHost || resolvedRemoteHost;
+    const rawProbeHost = (parsedRemoteHost || resolvedRemoteHost || "").trim();
+    const probeHost = stripWireEndpointIdPrefix(rawProbeHost) || rawProbeHost;
     const probePort = remotePort || (primaryProtocol === 'https' ? '8443' : '8080');
     const probeOrigin = `${primaryProtocol}://${probeHost}:${probePort}`;
     void tryRequestLocalNetworkPermission(probeOrigin, probeHost);
     const fallbackProtocol = primaryProtocol === 'https' ? 'http' : 'https';
     const defaultPortsByProtocol = {
         http: ['8080', '80'],
-        https: ['8443', '443'],
+        /** 8444 matches CWSP public-port fallbacks when 443 is unavailable (e.g. Windows without elevation). */
+        https: ['8443', '443', '8444'],
     } as const;
     const locationPort = location.port?.trim?.() || '';
 
@@ -833,7 +865,8 @@ export function connectWS() {
             ? (['https'] as const)
             : ([primaryProtocol, fallbackProtocol] as const);
 
-    const isLikelyHttpsPort = (port: string): boolean => port === '443' || port === '8443';
+    const isLikelyHttpsPort = (port: string): boolean =>
+        port === '443' || port === '8443' || port === '8444';
     const isLikelyHttpPort = (port: string): boolean => port === '80' || port === '8080';
 
     const getPortsForProtocol = (protocol: 'http' | 'https', preferredPort?: string) => {
@@ -855,21 +888,66 @@ export function connectWS() {
         return ports.filter((port, idx) => ports.indexOf(port) === idx);
     };
 
+    const connectHostFromRemote = (h: string): string => {
+        const t = stripWireEndpointIdPrefix(h.trim());
+        return t || h.trim();
+    };
+
     const hostEntries: Array<{ host: string; source: WSConnectCandidate['source']; preferPort?: string }> = [];
     for (const remoteHostSpecEntry of remoteHostSpecs) {
+        const ch = connectHostFromRemote(remoteHostSpecEntry.host);
+        if (!ch) continue;
         hostEntries.push({
-            host: remoteHostSpecEntry.host,
+            host: ch,
             source: "remote",
             preferPort: remoteHostSpecEntry.port
         });
     }
     if (remoteHostSpecs.length === 0 && remoteHost) {
-        hostEntries.push({
-            host: remoteHost,
-            source: "remote"
-        });
+        const ch = connectHostFromRemote(remoteHost);
+        if (ch) {
+            hostEntries.push({
+                host: ch,
+                source: "remote"
+            });
+        }
     }
-    if (location.hostname) {
+
+    /** Hostnames the user configured for the transport (Connect URL), lowercased. */
+    const normalizedRemoteHosts = new Set<string>();
+    for (const spec of remoteHostSpecs) {
+        if (spec.host) normalizedRemoteHosts.add(spec.host.toLowerCase());
+    }
+    if (remoteHostSpecs.length === 0 && remoteHost.trim()) {
+        for (const part of splitHostList(remoteHost.trim())) {
+            const parsed = parseHostAndPort(part);
+            if (parsed?.host) normalizedRemoteHosts.add(parsed.host.toLowerCase());
+        }
+    }
+
+    /**
+     * If the user configured **any** LAN / local transport host, skip adding `location.hostname`
+     * unless it is already listed as a remote host. (Connect URL may list both 192.168.x.x and a
+     * public name — we still drop the redundant **page** copy of u2re.space when remotes already
+     * include a private gateway.)
+     */
+    const hasPrivateOrLocalTransportHost = (): boolean => {
+        for (const h of normalizedRemoteHosts) {
+            const bare = stripWireEndpointIdPrefix(h).toLowerCase();
+            if (bare === "localhost" || bare === "127.0.0.1") return true;
+            if (isIpv4Literal(bare) && isPrivateIp(bare)) return true;
+        }
+        return false;
+    };
+    const pageHostnameLower = pageHost.toLowerCase();
+    const skipPageOriginForDirectLan =
+        Boolean(pageHost) &&
+        normalizedRemoteHosts.size > 0 &&
+        hasPrivateOrLocalTransportHost() &&
+        !isLocalPageHost &&
+        !normalizedRemoteHosts.has(pageHostnameLower);
+
+    if (location.hostname && !skipPageOriginForDirectLan) {
         hostEntries.push({
             host: location.hostname,
             source: "page"
@@ -893,10 +971,17 @@ export function connectWS() {
             const { host, source, preferPort } = hostEntry;
             const hostPortOverride = preferPort;
             for (const port of getPortsForProtocol(protocol, hostPortOverride)) {
-                const useWebSocketOnly = location.protocol === "https:" && isPrivateIp(host) && !isLocalPageHost;
-                // WebSocket-first is faster with server-v2 / same-port TLS; polling first adds a round-trip.
-                // If an environment breaks WS upgrade behind a proxy, set transports manually in a fork.
-                const preferPollingFirst = false;
+                const hostBare = stripWireEndpointIdPrefix(host).trim() || host.trim();
+                const hostLooksPrivate = isIpv4Literal(hostBare) && isPrivateIp(hostBare);
+                const crossOriginHttpsToPrivateLan =
+                    location.protocol === "https:" && !isLocalPageHost && hostLooksPrivate;
+                const inExtension = isChromiumExtensionRuntime();
+                // Public PWA (e.g. u2re.space) → RFC1918: polling first lets Chrome finish LNA/PNA before WS upgrade.
+                const preferPollingFirst = crossOriginHttpsToPrivateLan && !inExtension;
+                // Local/LAN page: WS-only. Extension + https + private target: WS-only (no MV3 XHR polling).
+                const useWebSocketOnly =
+                    (location.protocol === "https:" && isLocalPageHost && hostLooksPrivate) ||
+                    (inExtension && crossOriginHttpsToPrivateLan && hostLooksPrivate);
                 candidates.push({
                     url: `${protocol}://${host}:${port}`,
                     protocol,
@@ -938,7 +1023,7 @@ export function connectWS() {
 
     const maxRounds = 3;
     const retryDelayMs = 450;
-    const targetHost = parsedRemoteHost || remoteHost;
+    const targetHost = connectHostFromRemote(parsedRemoteHost || remoteHost || "");
     const targetPort =
         routeTargetPortForQuery ||
         parsedRemotePort ||

@@ -434,8 +434,16 @@ const safeCacheMatch = async (
 ): Promise<Response | undefined> => {
     const request = toCacheRequestInfo(requestLike);
     if (!cache || !request) return undefined;
+    /** Cache#match rejects non-Request / non-string (minified callers may pass plain objects). */
+    const key =
+        typeof request === 'string'
+            ? request
+            : request instanceof Request
+              ? request
+              : undefined;
+    if (!key) return undefined;
     try {
-        return await cache.match(request);
+        return await cache.match(key);
     } catch (error) {
         console.warn('[SW] Cache.match failed:', request, error);
         return undefined;
@@ -1264,7 +1272,9 @@ registerRoute(
             host.startsWith('10.') ||
             host.startsWith('192.168.') ||
             /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-            host.startsWith('127.')
+            host.startsWith('127.') ||
+            /** CGNAT / Tailscale-style 100.64.0.0/10 — same bypass as LAN for AirPad */
+            /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host)
         );
         const isLocalHost = host === 'localhost' || host.endsWith('.local');
         const isSocketIoPath = pathname === '/socket.io' || pathname.startsWith('/socket.io/');
@@ -1276,6 +1286,9 @@ registerRoute(
         // Socket.IO transport must bypass SW caching/proxy on all hosts (LAN + WAN),
         // otherwise polling/ws handshakes can fail with synthetic SW network errors.
         if (isSocketIoPath) return true;
+
+        // LNA / PNA probe — same as socket.io: never let Workbox/cache touch it (any host).
+        if (pathname === '/lna-probe') return true;
 
         // Avoid swallowing app/view and /user/* requests on private-host deployments.
         return isControlPath && (isPrivateIp || isLocalHost);
