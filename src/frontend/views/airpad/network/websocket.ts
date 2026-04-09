@@ -20,7 +20,11 @@ import {
     getClipboardPushIntervalMs,
     getClipboardBroadcastTargetNodes,
 } from '../config/config';
-import { readClipboardTextFromDevice, writeClipboardTextToDevice } from "@shared/native/clipboard-device";
+import {
+    isCapacitorNativeShell,
+    readClipboardTextFromDevice,
+    writeClipboardTextToDevice,
+} from "@shared/native/clipboard-device";
 import { setAirpadCredentialInvalidator } from '../credential-cache-bridge';
 
 let socket: Socket | null = null;
@@ -725,12 +729,14 @@ const WS_STATUS_TLS_HINT_CLASS = 'ws-status-tls-hint';
 
 function setWsStatusTlsHint(originUrl: string) {
     const wsStatusEl = getWsStatusEl();
-    if (wsStatusEl) {
-        wsStatusEl.textContent = `Untrusted cert — open ${originUrl} in this browser, accept, then retry`;
-        wsStatusEl.classList.add(WS_STATUS_TLS_HINT_CLASS);
-        wsStatusEl.classList.remove('ws-status-ok');
-        wsStatusEl.classList.add('ws-status-bad');
-    }
+    if (!wsStatusEl) return;
+    const native = isCapacitorNativeShell();
+    wsStatusEl.textContent = native
+        ? `TLS failed — install your CA in Android Settings → Security → Encryption & credentials (or use Remote host = name on the cert). Try HTTP :8080 if the server allows. ${originUrl}`
+        : `Untrusted cert — open ${originUrl} in this browser, accept, then retry`;
+    wsStatusEl.classList.add(WS_STATUS_TLS_HINT_CLASS);
+    wsStatusEl.classList.remove('ws-status-ok');
+    wsStatusEl.classList.add('ws-status-bad');
 }
 
 /** When the server cert is issued for a hostname, https://&lt;public-ip&gt; fails before the user can "trust" it. */
@@ -1035,10 +1041,13 @@ export function connectWS() {
                 const crossOriginHttpsToPrivateLan =
                     location.protocol === "https:" && !isLocalPageHost && hostLooksPrivate;
                 const inExtension = isChromiumExtensionRuntime();
+                const nativeShell = isCapacitorNativeShell();
+                // Capacitor/WebView: avoid Engine.IO **polling** to LAN — XHR often fails (false "untrusted cert" UX) even when WSS works.
                 // Public PWA (e.g. u2re.space) → RFC1918: polling first lets Chrome finish LNA/PNA before WS upgrade.
-                const preferPollingFirst = crossOriginHttpsToPrivateLan && !inExtension;
-                // Local/LAN page: WS-only. Extension + https + private target: WS-only (no MV3 XHR polling).
+                const preferPollingFirst = !nativeShell && crossOriginHttpsToPrivateLan && !inExtension;
+                // Local/LAN page: WS-only. Extension + https + private target: WS-only. Native + private: WS-only.
                 const useWebSocketOnly =
+                    (nativeShell && hostLooksPrivate) ||
                     (location.protocol === "https:" && isLocalPageHost && hostLooksPrivate) ||
                     (inExtension && crossOriginHttpsToPrivateLan && hostLooksPrivate);
                 candidates.push({
@@ -1448,11 +1457,24 @@ export function connectWS() {
                     probeSocket.close();
                     const details = (error as any)?.description || (error as any)?.context || "";
                     const errorMessage = String((error as any)?.message || error || "");
-                    const certLikely =
+                    const combinedProbeErr = `${errorMessage} ${String(details)}`;
+                    const weakEngineIoTlsSuspect =
                         candidate.protocol === "https" &&
                         isPrivateIp(candidate.host) &&
                         /xhr poll error|websocket error/i.test(errorMessage);
-                    if (certLikely && !batchTlsCertUrl) {
+                    /** Capacitor/WebView often reports generic xhr/WS errors; do not label "Untrusted cert" without TLS signals. */
+                    const tlsKeywordsInErr = /certificate|cert\.|ssl|tls|trust|ERR_CERT|ERR_SSL|handshake|authority|SELF_SIGNED|unknown.*cert|invalid.*cert|unable to verify|pkix|hostname|name mismatch/i.test(
+                        combinedProbeErr
+                    );
+                    const plainTransportFailure = /refused|ECONNREFUSED|ENOTFOUND|timed out|timeout|unreachable|ERR_CONNECTION|ADDRESS_UNREACHABLE|NAME_NOT_RESOLVED|INTERNET_DISCONNECTED|network.*lost/i.test(
+                        combinedProbeErr
+                    );
+                    const nativeAir = isCapacitorNativeShell();
+                    if (
+                        weakEngineIoTlsSuspect &&
+                        !batchTlsCertUrl &&
+                        (tlsKeywordsInErr || (!nativeAir && !plainTransportFailure))
+                    ) {
                         batchTlsCertUrl = url;
                     }
                     const publicIpv4Https =

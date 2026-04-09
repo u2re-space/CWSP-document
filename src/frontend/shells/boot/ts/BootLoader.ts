@@ -34,6 +34,7 @@ import { isEnabledView, pickEnabledView } from "../../../shared/routing/views";
 
 import { initializeLayers } from "../../../shared/routing/layer-manager";
 import { loadStyleSystem } from "../../../shared/styles";
+import { initCwsNativeBridge } from "../../../shared/native/cws-bridge";
 
 // ============================================================================
 // BOOT TYPES
@@ -224,6 +225,10 @@ export class BootLoader {
 
             // Establish canonical cascade layer order before any stylesheet loads.
             initializeLayers();
+
+            void initCwsNativeBridge().catch(() => {
+                /* Capacitor / CWSAndroid bridge is optional on pure web */
+            });
 
             // Phase 0–1: Settings + Veela in parallel (both are on the critical path to first paint).
             const [persistedSettings] = await Promise.all([

@@ -14,6 +14,9 @@ const isCapacitorNative = (): boolean => {
 
 export const isNativeClipboardShell = (): boolean => isCapacitorNative();
 
+/** Same check — use when "clipboard" naming is misleading (e.g. AirPad WebSocket transport). */
+export const isCapacitorNativeShell = (): boolean => isCapacitorNative();
+
 export async function writeClipboardTextToDevice(text: string): Promise<void> {
     const value = String(text ?? "");
     if (isCapacitorNative()) {

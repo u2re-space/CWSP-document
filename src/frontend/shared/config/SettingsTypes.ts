@@ -123,7 +123,7 @@ const defaultSpeechLanguage = (): SpeechRecognitionLanguage => {
     return fallback;
 };
 
-/** Capacitor / embedded WebView shell — mirrors CWSAndroid-style toggles and AirPad transport defaults. */
+/** Capacitor / embedded WebView shell — mirrors CWSAndroid-style toggles and AirPad transport defaults. Native IPC: {@code shared/native/cws-bridge.ts} + {@code CwsBridge} plugin. */
 export type ShellSettings = {
     /** Optional Socket.IO / hub hosts (comma-separated), used when not syncing from endpoint URL. */
     airPadConnectHosts?: string;
