@@ -28,6 +28,9 @@
         "last 1 edge version"
     ],
     "devDependencies": {
+        "@capacitor/clipboard": "^8.0.1",
+        "@capacitor/core": "^8.3.0",
+        "capacitor-native-settings": "^8.1.0",
         "@cap-js-community/websocket": "^1.10.0",
         "@crxjs/vite-plugin": "^2.4.0",
         "@jsquash/jpeg": ">=1.6.0",

@@ -155,6 +155,11 @@ let coreIdentityUseForAirpad = true;
 
 /** Shell / Capacitor toggles (coordinator + future native bridges). */
 let shellRemoteClipboardEnabled = true;
+let shellApplyRemoteToDevice = true;
+let shellPushLocalClipboard = false;
+let shellClipboardPushIntervalMs = 2000;
+let shellClipboardBroadcastTargets = "";
+let shellMaintainHubSocket = false;
 let shellNativeSmsEnabled = true;
 let shellNativeContactsEnabled = true;
 
@@ -283,6 +288,13 @@ export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
     coreIdentityBridgeUserKey = (core?.userKey || "").trim();
     coreIdentityUseForAirpad = (core?.useCoreIdentityForAirPad ?? true) !== false;
     shellRemoteClipboardEnabled = (shell?.enableRemoteClipboardBridge ?? true) !== false;
+    shellApplyRemoteToDevice = (shell?.applyRemoteClipboardToDevice ?? true) !== false;
+    shellPushLocalClipboard = Boolean(shell?.pushLocalClipboardToLan);
+    const intervalRaw = Number(shell?.clipboardPushIntervalMs);
+    shellClipboardPushIntervalMs =
+        Number.isFinite(intervalRaw) && intervalRaw >= 800 ? Math.min(Math.round(intervalRaw), 60000) : 2000;
+    shellClipboardBroadcastTargets = (shell?.clipboardBroadcastTargets || "").trim();
+    shellMaintainHubSocket = Boolean(shell?.maintainHubSocketConnection);
     shellNativeSmsEnabled = (shell?.enableNativeSms ?? true) !== false;
     shellNativeContactsEnabled = (shell?.enableNativeContacts ?? true) !== false;
 
@@ -301,6 +313,9 @@ export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
     try {
         (globalThis as unknown as { __CWS_SHELL_FEATURES__?: Record<string, boolean> }).__CWS_SHELL_FEATURES__ = {
             clipboardBridge: shellRemoteClipboardEnabled,
+            applyRemoteClipboard: shellApplyRemoteToDevice,
+            pushLocalClipboard: shellPushLocalClipboard,
+            maintainHubSocket: shellMaintainHubSocket,
             sms: shellNativeSmsEnabled,
             contacts: shellNativeContactsEnabled
         };
@@ -311,6 +326,41 @@ export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
 
 export function isShellRemoteClipboardBridgeEnabled(): boolean {
     return shellRemoteClipboardEnabled !== false;
+}
+
+export function isApplyRemoteClipboardToDeviceEnabled(): boolean {
+    return shellApplyRemoteToDevice !== false;
+}
+
+export function isPushLocalClipboardToLanEnabled(): boolean {
+    return shellPushLocalClipboard === true;
+}
+
+export function getClipboardPushIntervalMs(): number {
+    return shellClipboardPushIntervalMs;
+}
+
+const parseClipboardTargetList = (value: string): string[] => {
+    return Array.from(
+        new Set(
+            value
+                .split(/[;,]/)
+                .map((item) => item.trim())
+                .filter(Boolean)
+        )
+    );
+};
+
+/** Device ids for outbound clipboard acts (Settings → clipboard broadcast targets, else route target). */
+export function getClipboardBroadcastTargetNodes(): string[] {
+    const explicit = parseClipboardTargetList(shellClipboardBroadcastTargets);
+    if (explicit.length) return explicit;
+    return parseClipboardTargetList(remoteRouteTarget);
+}
+
+/** Background Socket.IO to cwsp / endpoint hub (any shell, not only AirPad view). */
+export function isMaintainHubSocketConnectionEnabled(): boolean {
+    return shellMaintainHubSocket === true;
 }
 
 /** Reserved for native integration (CWSAndroid-style). */

@@ -67,6 +67,10 @@ export default async function crxFrontend(
     // CRX pages can bypass main index entry, so initialize layers here too.
     initializeLayers();
 
+    void import("../../../shared/transport/hub-socket-boot")
+        .then((m) => m.bootHubSocketFromStoredSettings())
+        .catch(() => undefined);
+
     // Same grid shell layer as PWA (`content-row` / `content-column`); ShellBase.mount
     // positions cw-shell-* on those named lines — mounting directly on #app had no lines.
     const layers = ensureAppLayers(mountElement, {

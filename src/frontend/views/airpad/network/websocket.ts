@@ -15,7 +15,12 @@ import {
     getAirPadClientId,
     getAirPadPeerInstanceId,
     isShellRemoteClipboardBridgeEnabled,
+    isApplyRemoteClipboardToDeviceEnabled,
+    isPushLocalClipboardToLanEnabled,
+    getClipboardPushIntervalMs,
+    getClipboardBroadcastTargetNodes,
 } from '../config/config';
+import { readClipboardTextFromDevice, writeClipboardTextToDevice } from "@shared/native/clipboard-device";
 import { setAirpadCredentialInvalidator } from '../credential-cache-bridge';
 
 let socket: Socket | null = null;
@@ -171,6 +176,60 @@ function notifyClipboardHandlers(text: string, meta?: { source?: string }) {
     }
 }
 
+/** Suppress echo when applying remote text to the device clipboard vs. push polling. */
+let lastClipboardPushSent = "";
+let lastClipboardWrittenFromRemote = "";
+
+let clipboardPushIntervalId: ReturnType<typeof setInterval> | null = null;
+
+const stopClipboardPushLoop = (): void => {
+    if (clipboardPushIntervalId) {
+        globalThis.clearInterval(clipboardPushIntervalId);
+        clipboardPushIntervalId = null;
+    }
+};
+
+const startClipboardPushLoop = (): void => {
+    stopClipboardPushLoop();
+    if (!isPushLocalClipboardToLanEnabled() || !isShellRemoteClipboardBridgeEnabled()) return;
+    const ms = getClipboardPushIntervalMs();
+    clipboardPushIntervalId = globalThis.setInterval(() => {
+        void tickLocalClipboardPush();
+    }, ms);
+};
+
+async function tickLocalClipboardPush(): Promise<void> {
+    if (!socket?.connected) return;
+    if (!isShellRemoteClipboardBridgeEnabled() || !isPushLocalClipboardToLanEnabled()) return;
+    const nodes = getClipboardBroadcastTargetNodes();
+    if (!nodes.length) return;
+    try {
+        const text = await readClipboardTextFromDevice();
+        const t = String(text ?? "");
+        if (!t || t === lastClipboardPushSent) return;
+        lastClipboardPushSent = t;
+        sendCoordinatorAct("clipboard:update", { text: t }, nodes);
+    } catch {
+        // Permission or transient read failure
+    }
+}
+
+async function applyIncomingClipboardText(text: string, meta?: { source?: string }): Promise<void> {
+    if (!isShellRemoteClipboardBridgeEnabled()) return;
+    const t = typeof text === "string" ? text : "";
+    lastServerClipboardText = t;
+    notifyClipboardHandlers(t, meta);
+    if (!isApplyRemoteClipboardToDeviceEnabled() || !t) return;
+    if (t === lastClipboardWrittenFromRemote) return;
+    try {
+        await writeClipboardTextToDevice(t);
+        lastClipboardWrittenFromRemote = t;
+        lastClipboardPushSent = t;
+    } catch {
+        // WebView may block clipboard without gesture
+    }
+}
+
 function safeJson(value: unknown): string {
     try {
         return JSON.stringify(value);
@@ -299,11 +358,9 @@ const handleCoordinatorPacket = (packet: CoordinatorPacket): void => {
     }
 
     if (packet.what === "clipboard:update") {
-        if (!isShellRemoteClipboardBridgeEnabled()) return;
         const clipboardPayload = packet.result ?? packet.payload;
         const text = typeof clipboardPayload?.text === "string" ? clipboardPayload.text : "";
-        lastServerClipboardText = text;
-        notifyClipboardHandlers(text, { source: clipboardPayload?.source });
+        void applyIncomingClipboardText(text, { source: clipboardPayload?.source });
     }
 };
 
@@ -1117,6 +1174,7 @@ export function connectWS() {
         isConnecting = false;
         autoReconnectAttempts = 0;
         setWsStatus(true);
+        startClipboardPushLoop();
         socket.emit("hello", {
             id: peerInstanceId || clientId,
             byId: clientId,
@@ -1127,6 +1185,7 @@ export function connectWS() {
         });
 
         socket.on("disconnect", (reason?: string) => {
+            stopClipboardPushLoop();
             logWsState(
                 "disconnected",
                 `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=${reason || "unknown"}`
@@ -1202,11 +1261,9 @@ export function connectWS() {
         });
 
         socket.on("clipboard:update", async (msg: any) => {
-            if (!isShellRemoteClipboardBridgeEnabled()) return;
             const decoded = await unwrapIncomingPayload(msg);
             const text = typeof decoded?.text === "string" ? decoded.text : "";
-            lastServerClipboardText = text;
-            notifyClipboardHandlers(text, { source: decoded?.source });
+            void applyIncomingClipboardText(text, { source: decoded?.source });
         });
         socket.on("data", async (packet: any) => {
             const decoded = await unwrapIncomingPayload(packet);
@@ -1459,6 +1516,7 @@ export function connectWS() {
 }
 
 export function disconnectWS() {
+    stopClipboardPushLoop();
     connectAttemptId += 1;
     manualDisconnectRequested = true;
     for (const probe of [...activeProbeSockets]) {

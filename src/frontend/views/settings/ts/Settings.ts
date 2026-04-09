@@ -461,6 +461,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
       <h4>Embedded shell (Capacitor / WebView)</h4>
       <p class="field-hint" style="margin: 0 0 0.75rem; opacity: 0.88; font-size: 0.9em;">
         Defaults for AirPad hub/tunnel and coordinator features (aligned with CWSAndroid-style toggles). Clipboard gate applies to web AirPad coordinator calls; SMS/contacts are stored for future native bridges.
+        Server routing for who receives clipboard (e.g. <code>L-192.168.0.110</code> → <code>L-192.168.0.196</code>) uses cwsp <code>clients.json</code> (<code>modules.clipboard</code> <code>shareTo</code> / <code>acceptFrom</code>) or HTTPS POST <code>/clipboard</code> with <code>targets</code>, same as CWSAndroid.
       </p>
       <label class="field">
         <span>AirPad connect host(s)</span>
@@ -475,9 +476,33 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         <span>Set AirPad connect host from Endpoint base URL origin (when saved)</span>
       </label>
       <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="shell.maintainHubSocketConnection" />
+        <span>Keep hub Socket.IO connected in background (cwsp / endpoint; clipboard + coordinator without opening AirPad)</span>
+      </label>
+      <label class="field checkbox form-checkbox">
         <input type="checkbox" data-field="shell.enableRemoteClipboardBridge" />
         <span>Enable remote clipboard bridge (coordinator / server clipboard)</span>
       </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="shell.applyRemoteClipboardToDevice" />
+        <span>Apply incoming remote clipboard to this device (Web or Capacitor <code>@capacitor/clipboard</code>)</span>
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="shell.pushLocalClipboardToLan" />
+        <span>Push local clipboard to LAN peers (polls; uses targets below)</span>
+      </label>
+      <label class="field">
+        <span>Clipboard push interval (ms)</span>
+        <input class="form-input" type="number" min="800" max="60000" step="100" data-field="shell.clipboardPushIntervalMs" placeholder="2000" />
+      </label>
+      <label class="field">
+        <span>Clipboard broadcast targets (optional)</span>
+        <input class="form-input" type="text" autocomplete="off" data-field="shell.clipboardBroadcastTargets" placeholder="L-192.168.0.196, L-192.168.0.208 — overrides route target if set" />
+      </label>
+      <div class="mcp-actions" style="flex-wrap: wrap; gap: 0.5rem;">
+        <button class="btn" type="button" data-action="open-native-app-settings">Open app settings (Android / iOS)</button>
+        <button class="btn" type="button" data-action="open-native-notification-settings">Notification settings (native)</button>
+      </div>
       <label class="field checkbox form-checkbox">
         <input type="checkbox" data-field="shell.enableNativeSms" />
         <span>Allow native SMS bridge (shell must implement)</span>
@@ -603,7 +628,12 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     const shellAirPadHosts = field('[data-field="shell.airPadConnectHosts"]') as HTMLInputElement | null;
     const shellAirPadRoute = field('[data-field="shell.airPadRouteTarget"]') as HTMLInputElement | null;
     const shellSyncEndpointHost = field('[data-field="shell.syncAirPadHostFromEndpointUrl"]') as HTMLInputElement | null;
+    const shellMaintainHubSocket = field('[data-field="shell.maintainHubSocketConnection"]') as HTMLInputElement | null;
     const shellClipboard = field('[data-field="shell.enableRemoteClipboardBridge"]') as HTMLInputElement | null;
+    const shellApplyRemoteDevice = field('[data-field="shell.applyRemoteClipboardToDevice"]') as HTMLInputElement | null;
+    const shellPushClipboard = field('[data-field="shell.pushLocalClipboardToLan"]') as HTMLInputElement | null;
+    const shellClipboardPushMs = field('[data-field="shell.clipboardPushIntervalMs"]') as HTMLInputElement | null;
+    const shellClipboardTargets = field('[data-field="shell.clipboardBroadcastTargets"]') as HTMLInputElement | null;
     const shellSms = field('[data-field="shell.enableNativeSms"]') as HTMLInputElement | null;
     const shellContacts = field('[data-field="shell.enableNativeContacts"]') as HTMLInputElement | null;
     const adminPreview = root.querySelector("[data-admin-preview]") as HTMLElement | null;
@@ -870,7 +900,18 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
             if (shellAirPadHosts) shellAirPadHosts.value = (s?.shell?.airPadConnectHosts || "").trim();
             if (shellAirPadRoute) shellAirPadRoute.value = (s?.shell?.airPadRouteTarget || "").trim();
             if (shellSyncEndpointHost) shellSyncEndpointHost.checked = Boolean(s?.shell?.syncAirPadHostFromEndpointUrl);
+            if (shellMaintainHubSocket) shellMaintainHubSocket.checked = Boolean(s?.shell?.maintainHubSocketConnection);
             if (shellClipboard) shellClipboard.checked = (s?.shell?.enableRemoteClipboardBridge ?? true) !== false;
+            if (shellApplyRemoteDevice) shellApplyRemoteDevice.checked = (s?.shell?.applyRemoteClipboardToDevice ?? true) !== false;
+            if (shellPushClipboard) shellPushClipboard.checked = Boolean(s?.shell?.pushLocalClipboardToLan);
+            if (shellClipboardPushMs) {
+                shellClipboardPushMs.value = String(
+                    s?.shell?.clipboardPushIntervalMs != null && Number.isFinite(Number(s.shell.clipboardPushIntervalMs))
+                        ? s.shell.clipboardPushIntervalMs
+                        : 2000
+                );
+            }
+            if (shellClipboardTargets) shellClipboardTargets.value = (s?.shell?.clipboardBroadcastTargets || "").trim();
             if (shellSms) shellSms.checked = (s?.shell?.enableNativeSms ?? true) !== false;
             if (shellContacts) shellContacts.checked = (s?.shell?.enableNativeContacts ?? true) !== false;
             refreshAdminDoorPreview();
@@ -965,6 +1006,24 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
             return;
         }
 
+        const openNativeSettingsBtn = t?.closest?.('button[data-action="open-native-app-settings"]') as HTMLButtonElement | null;
+        if (openNativeSettingsBtn) {
+            void import("@shared/native/clipboard-device")
+                .then((m) => m.openAppClipboardRelatedSettings())
+                .then(() => setNote("App settings opened (native shell only)."))
+                .catch(() => setNote("Native settings unavailable in this context."));
+            return;
+        }
+
+        const openNativeNotifBtn = t?.closest?.('button[data-action="open-native-notification-settings"]') as HTMLButtonElement | null;
+        if (openNativeNotifBtn) {
+            void import("@shared/native/clipboard-device")
+                .then((m) => m.openNativeNotificationSettings?.())
+                .then(() => setNote("Notification settings opened (native shell only)."))
+                .catch(() => setNote("Native settings unavailable in this context."));
+            return;
+        }
+
         const btn = t?.closest?.('button[data-action="save"]') as HTMLButtonElement | null;
         if (!btn) return;
 
@@ -1041,7 +1100,15 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                     airPadConnectHosts: shellAirPadHosts?.value?.trim() || "",
                     airPadRouteTarget: shellAirPadRoute?.value?.trim() || "",
                     syncAirPadHostFromEndpointUrl: Boolean(shellSyncEndpointHost?.checked),
+                    maintainHubSocketConnection: Boolean(shellMaintainHubSocket?.checked),
                     enableRemoteClipboardBridge: (shellClipboard?.checked ?? true) !== false,
+                    applyRemoteClipboardToDevice: (shellApplyRemoteDevice?.checked ?? true) !== false,
+                    pushLocalClipboardToLan: Boolean(shellPushClipboard?.checked),
+                    clipboardPushIntervalMs: Math.max(
+                        800,
+                        Math.min(60000, parseNumberOrDefault(shellClipboardPushMs?.value, 2000))
+                    ),
+                    clipboardBroadcastTargets: shellClipboardTargets?.value?.trim() || "",
                     enableNativeSms: (shellSms?.checked ?? true) !== false,
                     enableNativeContacts: (shellContacts?.checked ?? true) !== false,
                 },
@@ -1081,7 +1148,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                 },
             };
             const saved = await saveSettings(next);
-            applyAirpadRuntimeFromAppSettings(saved);
+            void import("@shared/transport/hub-socket-boot").then((m) => m.applyHubSocketFromSettings(saved));
             applyTheme(saved);
             opts.onTheme?.((saved.appearance?.theme as any) || "auto");
             setNote("Saved.");

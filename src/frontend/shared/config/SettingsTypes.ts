@@ -131,8 +131,31 @@ export type ShellSettings = {
     airPadRouteTarget?: string;
     /** When true, set AirPad connect host from {@link AppSettings.core.endpointUrl} origin on each sync. */
     syncAirPadHostFromEndpointUrl?: boolean;
+    /**
+     * When true, CrossWord keeps a **Socket.IO** connection to the hub (cwsp / endpoint) in the background,
+     * not only when the AirPad view is open — enables clipboard coordinator and realtime ops from any shell (PWA, CRX, Capacitor).
+     * Requires a non-empty {@link airPadConnectHosts} or {@link syncAirPadHostFromEndpointUrl} + {@link AppSettings.core.endpointUrl}.
+     */
+    maintainHubSocketConnection?: boolean;
     /** Coordinator / remote clipboard bridge (PC clipboard from server). */
     enableRemoteClipboardBridge?: boolean;
+    /**
+     * When true (default), incoming `clipboard:update` / coordinator packets are written to the device clipboard
+     * (Web `navigator.clipboard` or Capacitor `@capacitor/clipboard` on cwsp Android).
+     */
+    applyRemoteClipboardToDevice?: boolean;
+    /**
+     * Periodically read the local clipboard and broadcast to {@link clipboardBroadcastTargets} (or {@link airPadRouteTarget}).
+     * Use sparingly; pairs with server `clients.json` / `modules.clipboard` share/accept rules.
+     */
+    pushLocalClipboardToLan?: boolean;
+    /** Polling interval for {@link pushLocalClipboardToLan} (ms). */
+    clipboardPushIntervalMs?: number;
+    /**
+     * Comma-separated device / peer ids to receive outbound clipboard (e.g. `L-192.168.0.196`).
+     * When empty, {@link airPadRouteTarget} is used.
+     */
+    clipboardBroadcastTargets?: string;
     /** Reserved for native SMS bridge (Kotlin shell); persisted for parity with CWSAndroid. */
     enableNativeSms?: boolean;
     /** Reserved for native contacts bridge; persisted for parity with CWSAndroid. */
@@ -280,7 +303,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
         airPadConnectHosts: "",
         airPadRouteTarget: "",
         syncAirPadHostFromEndpointUrl: false,
+        maintainHubSocketConnection: false,
         enableRemoteClipboardBridge: true,
+        applyRemoteClipboardToDevice: true,
+        pushLocalClipboardToLan: false,
+        clipboardPushIntervalMs: 2000,
+        clipboardBroadcastTargets: "",
         enableNativeSms: true,
         enableNativeContacts: true
     },
