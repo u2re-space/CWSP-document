@@ -5,7 +5,7 @@ import { loadSettings } from '@rs-com/config/Settings';
 import type { ResponseLanguage } from '@rs-com/config/SettingsTypes';
 
 // Lazy-load CJS packages so vite:import-analysis never needs to run
-// transformCjsImport → parseAst on them (which fails with @rollup/wasm-node).
+// transformCjsImport → parseAst on them (fragile with some bundler CJS interop paths).
 const getTurndownService = (() => {
     let svc: InstanceType<any> | null = null;
     return async () => {

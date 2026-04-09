@@ -14,6 +14,7 @@ import {
     getAirPadSigningSecret,
     getAirPadClientId,
     getAirPadPeerInstanceId,
+    isShellRemoteClipboardBridgeEnabled,
 } from '../config/config';
 import { setAirpadCredentialInvalidator } from '../credential-cache-bridge';
 
@@ -298,6 +299,7 @@ const handleCoordinatorPacket = (packet: CoordinatorPacket): void => {
     }
 
     if (packet.what === "clipboard:update") {
+        if (!isShellRemoteClipboardBridgeEnabled()) return;
         const clipboardPayload = packet.result ?? packet.payload;
         const text = typeof clipboardPayload?.text === "string" ? clipboardPayload.text : "";
         lastServerClipboardText = text;
@@ -1200,6 +1202,7 @@ export function connectWS() {
         });
 
         socket.on("clipboard:update", async (msg: any) => {
+            if (!isShellRemoteClipboardBridgeEnabled()) return;
             const decoded = await unwrapIncomingPayload(msg);
             const text = typeof decoded?.text === "string" ? decoded.text : "";
             lastServerClipboardText = text;

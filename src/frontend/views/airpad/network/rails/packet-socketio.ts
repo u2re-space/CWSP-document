@@ -1,3 +1,4 @@
+import { isShellRemoteClipboardBridgeEnabled } from "../../config/config";
 import {
     connectWS,
     disconnectWS,
@@ -121,6 +122,9 @@ export const createPacketSocketIoKeyboardMessage = (codePoint: number, flags = 0
 };
 
 export const requestPacketSocketIoClipboardRead = async (): Promise<AirPadClipboardResult> => {
+    if (!isShellRemoteClipboardBridgeEnabled()) {
+        return { ok: false, error: "Remote clipboard bridge disabled in Settings → Server → Embedded shell." };
+    }
     try {
         const text = await sendCoordinatorRequest("clipboard:get", {});
         return { ok: true, text: typeof text === "string" ? text : String(text || "") };
@@ -130,6 +134,9 @@ export const requestPacketSocketIoClipboardRead = async (): Promise<AirPadClipbo
 };
 
 export const requestPacketSocketIoClipboardCopy = async (): Promise<AirPadClipboardResult> => {
+    if (!isShellRemoteClipboardBridgeEnabled()) {
+        return { ok: false, error: "Remote clipboard bridge disabled in Settings → Server → Embedded shell." };
+    }
     try {
         await sendCoordinatorRequest("keyboard:tap", { key: "c", modifier: ["control"] });
         await sleep(60);
@@ -140,6 +147,9 @@ export const requestPacketSocketIoClipboardCopy = async (): Promise<AirPadClipbo
 };
 
 export const requestPacketSocketIoClipboardCut = async (): Promise<AirPadClipboardResult> => {
+    if (!isShellRemoteClipboardBridgeEnabled()) {
+        return { ok: false, error: "Remote clipboard bridge disabled in Settings → Server → Embedded shell." };
+    }
     try {
         await sendCoordinatorRequest("keyboard:tap", { key: "x", modifier: ["control"] });
         await sleep(60);
@@ -150,6 +160,9 @@ export const requestPacketSocketIoClipboardCut = async (): Promise<AirPadClipboa
 };
 
 export const requestPacketSocketIoClipboardPaste = async (text: string): Promise<AirPadClipboardResult> => {
+    if (!isShellRemoteClipboardBridgeEnabled()) {
+        return { ok: false, error: "Remote clipboard bridge disabled in Settings → Server → Embedded shell." };
+    }
     try {
         await sendCoordinatorRequest("clipboard:update", { text });
         await sleep(20);

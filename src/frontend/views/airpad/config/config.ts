@@ -2,6 +2,7 @@
 // Конфигурация
 // =========================
 
+import type { AppSettings } from "@rs-com/config/SettingsTypes";
 import { invalidateAirpadTransportCredentials } from "../credential-cache-bridge";
 
 type RemoteProtocol = 'auto' | 'http' | 'https';
@@ -147,6 +148,16 @@ const remoteConfig: {
     signingSecret: "",
 };
 
+/** IndexedDB “Server” tab: userId/userKey as fallbacks for AirPad when local client/token empty (CWS_ASSOCIATED_*). */
+let coreIdentityBridgeUserId = "";
+let coreIdentityBridgeUserKey = "";
+let coreIdentityUseForAirpad = true;
+
+/** Shell / Capacitor toggles (coordinator + future native bridges). */
+let shellRemoteClipboardEnabled = true;
+let shellNativeSmsEnabled = true;
+let shellNativeContactsEnabled = true;
+
 export let remoteHost = "";
 export let remoteProtocol: RemoteProtocol = "auto";
 export let remoteRouteTarget = "";
@@ -252,6 +263,66 @@ export function applyAirpadRemoteConfig(input: AirpadRemoteConfigInput): void {
     }
 }
 
+const endpointUrlToAirpadConnectHost = (endpointUrl: string): string => {
+    try {
+        const u = new URL(endpointUrl);
+        return `${u.protocol}//${u.host}`;
+    } catch {
+        return "";
+    }
+};
+
+/**
+ * Apply CrossWord AppSettings shell + identity overlay (call after load/save settings and on boot).
+ * Does not clear AirPad localStorage fields; only updates in-memory host/route when shell requests it.
+ */
+export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
+    const core = settings.core;
+    const shell = settings.shell;
+    coreIdentityBridgeUserId = (core?.userId || "").trim();
+    coreIdentityBridgeUserKey = (core?.userKey || "").trim();
+    coreIdentityUseForAirpad = (core?.useCoreIdentityForAirPad ?? true) !== false;
+    shellRemoteClipboardEnabled = (shell?.enableRemoteClipboardBridge ?? true) !== false;
+    shellNativeSmsEnabled = (shell?.enableNativeSms ?? true) !== false;
+    shellNativeContactsEnabled = (shell?.enableNativeContacts ?? true) !== false;
+
+    const input: AirpadRemoteConfigInput = {};
+    if (shell?.syncAirPadHostFromEndpointUrl && core?.endpointUrl?.trim()) {
+        const origin = endpointUrlToAirpadConnectHost(core.endpointUrl.trim());
+        if (origin) input.host = origin;
+    } else if (shell?.airPadConnectHosts?.trim()) {
+        input.host = shell.airPadConnectHosts.trim();
+    }
+    const routeT = (shell?.airPadRouteTarget || "").trim();
+    if (routeT) input.routeTarget = routeT;
+    if (Object.keys(input).length) {
+        applyAirpadRemoteConfig(input);
+    }
+    try {
+        (globalThis as unknown as { __CWS_SHELL_FEATURES__?: Record<string, boolean> }).__CWS_SHELL_FEATURES__ = {
+            clipboardBridge: shellRemoteClipboardEnabled,
+            sms: shellNativeSmsEnabled,
+            contacts: shellNativeContactsEnabled
+        };
+    } catch {
+        // ignore
+    }
+}
+
+export function isShellRemoteClipboardBridgeEnabled(): boolean {
+    return shellRemoteClipboardEnabled !== false;
+}
+
+/** Reserved for native integration (CWSAndroid-style). */
+export function isShellNativeSmsEnabled(): boolean {
+    return shellNativeSmsEnabled !== false;
+}
+
+/** Reserved for native integration (CWSAndroid-style). */
+export function isShellNativeContactsEnabled(): boolean {
+    return shellNativeContactsEnabled !== false;
+}
+
 // Configuration getters and setters
 export function getRemoteHost(): string {
     return remoteHost;
@@ -294,7 +365,10 @@ export function setAirPadTransportMode(mode: string): void {
 }
 
 export function getAirPadAuthToken(): string {
-    return remoteConfig.authToken || readGlobalAirpadValue(["AIRPAD_AUTH_TOKEN", "AIRPAD_TOKEN"]);
+    const local = (remoteConfig.authToken || "").trim();
+    if (local) return local;
+    if (coreIdentityUseForAirpad && coreIdentityBridgeUserKey.trim()) return coreIdentityBridgeUserKey.trim();
+    return readGlobalAirpadValue(["AIRPAD_AUTH_TOKEN", "AIRPAD_TOKEN"]);
 }
 
 export function setAirPadAuthToken(token: string): void {
@@ -303,7 +377,10 @@ export function setAirPadAuthToken(token: string): void {
 }
 
 export function getAirPadClientId(): string {
-    return remoteConfig.clientId || readGlobalAirpadValue(["AIRPAD_CLIENT_ID", "AIRPAD_CLIENT"]);
+    const local = (remoteConfig.clientId || "").trim();
+    if (local) return local;
+    if (coreIdentityUseForAirpad && coreIdentityBridgeUserId.trim()) return coreIdentityBridgeUserId.trim();
+    return readGlobalAirpadValue(["AIRPAD_CLIENT_ID", "AIRPAD_CLIENT"]);
 }
 
 export function setAirPadClientId(clientId: string): void {

@@ -223,7 +223,11 @@ export const loadSettings = async (): Promise<AppSettings> => {
                     }
                 },
                 speech: { ...DEFAULT_SETTINGS.speech, ...(stored as any)?.speech },
-                grid: { ...DEFAULT_SETTINGS.grid, ...(stored as any)?.grid }
+                grid: { ...DEFAULT_SETTINGS.grid, ...(stored as any)?.grid },
+                shell: {
+                    ...(DEFAULT_SETTINGS.shell || {}),
+                    ...((stored as any)?.shell || {})
+                }
             };
 
             console.log("[Settings] loadSettings result:", {
@@ -341,6 +345,11 @@ export const saveSettings = async (settings: AppSettings) => {
             ...(DEFAULT_SETTINGS.grid || {}),
             ...(current.grid || {}),
             ...(settings.grid || {})
+        },
+        shell: {
+            ...(DEFAULT_SETTINGS.shell || {}),
+            ...(current.shell || {}),
+            ...(settings.shell || {})
         }
     };
     await idbPutSettings(merged);

@@ -36,6 +36,8 @@ import {
 
 // Import uniform channel manager
 import { initializeAppChannels } from "./com/core/UniformChannelManager";
+import { loadSettings } from "./frontend/shared/config/Settings";
+import { applyAirpadRuntimeFromAppSettings } from "./frontend/views/airpad/config/config";
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -222,6 +224,10 @@ export default async function index(mountElement: HTMLElement) {
     // Initialize uniform channel manager
     console.log('[Index] Initializing uniform channels...');
     initializeAppChannels();
+
+    void loadSettings()
+        .then((s) => applyAirpadRuntimeFromAppSettings(s))
+        .catch(() => undefined);
 
     setLoadingState(mountElement, 'Initializing CrossWord...');
 

@@ -123,17 +123,43 @@ const defaultSpeechLanguage = (): SpeechRecognitionLanguage => {
     return fallback;
 };
 
+/** Capacitor / embedded WebView shell — mirrors CWSAndroid-style toggles and AirPad transport defaults. */
+export type ShellSettings = {
+    /** Optional Socket.IO / hub hosts (comma-separated), used when not syncing from endpoint URL. */
+    airPadConnectHosts?: string;
+    /** Default routed peer / destination id (AirPad “Remote host” field). */
+    airPadRouteTarget?: string;
+    /** When true, set AirPad connect host from {@link AppSettings.core.endpointUrl} origin on each sync. */
+    syncAirPadHostFromEndpointUrl?: boolean;
+    /** Coordinator / remote clipboard bridge (PC clipboard from server). */
+    enableRemoteClipboardBridge?: boolean;
+    /** Reserved for native SMS bridge (Kotlin shell); persisted for parity with CWSAndroid. */
+    enableNativeSms?: boolean;
+    /** Reserved for native contacts bridge; persisted for parity with CWSAndroid. */
+    enableNativeContacts?: boolean;
+};
+
 export type AppSettings = {
     core?: {
         mode?: CoreMode;
         endpointUrl?: string;
+        /**
+         * Associated client / device id for cwsp, endpoint, and (optionally) AirPad — env: CWS_ASSOCIATED_ID.
+         */
         userId?: string;
+        /**
+         * Associated auth token — env: CWS_ASSOCIATED_TOKEN.
+         */
         userKey?: string;
         encrypt?: boolean;
         preferBackendSync?: boolean;
         ntpEnabled?: boolean;
         /** Instance id for cwsp / offline / multi-device (distinct from Airpad peer clientId). */
         appClientId?: string;
+        /**
+         * When true and AirPad’s own Client ID / token fields are empty, use {@link userId} / {@link userKey}.
+         */
+        useCoreIdentityForAirPad?: boolean;
         /**
          * Hint for Electron/Capacitor/cwsp: allow self-signed TLS to the endpoint.
          * WebView `fetch` still follows platform certificate rules unless the shell applies this.
@@ -152,6 +178,7 @@ export type AppSettings = {
             syncTargets?: RemoteTarget[];
         };
     };
+    shell?: ShellSettings;
     ai?: {
         apiKey?: string;
         baseUrl?: string;
@@ -235,6 +262,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
         preferBackendSync: true,
         ntpEnabled: false,
         appClientId: "",
+        useCoreIdentityForAirPad: true,
         allowInsecureTls: false,
         admin: {
             httpsOrigin: "https://localhost:8443",
@@ -247,6 +275,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
             wsTargets: [],
             syncTargets: []
         }
+    },
+    shell: {
+        airPadConnectHosts: "",
+        airPadRouteTarget: "",
+        syncAirPadHostFromEndpointUrl: false,
+        enableRemoteClipboardBridge: true,
+        enableNativeSms: true,
+        enableNativeContacts: true
     },
     ai: {
         apiKey: "",

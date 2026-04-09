@@ -1,3 +1,6 @@
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { dirname, extname, join, resolve } from "node:path";
+
 /**
  * Rollup chunk → dist/ layout for hot-swappable deploy slices:
  * dist/views, dist/shells, dist/fest, dist/pwa, dist/core/*, dist/com/*, dist/workers/*, dist/vendor, dist/assets.
@@ -210,8 +213,19 @@ export function chunkFileNames(chunkInfo) {
     return `chunks/${n.replace(/[^a-zA-Z0-9._-]/g, "_")}.js`;
 }
 
+function walkFilesSync(dir, out = []) {
+    for (const name of readdirSync(dir)) {
+        const p = join(dir, name);
+        const st = statSync(p);
+        if (st.isDirectory()) walkFilesSync(p, out);
+        else out.push(p);
+    }
+    return out;
+}
+
 /**
- * Vite worker emits often ignore `assetFileNames` heuristics; relocate in generateBundle.
+ * Vite worker emits often ignore `assetFileNames` heuristics; move OPFS worker to `workers/opfs/`.
+ * Rolldown (Vite 8+) does not support mutating `bundle` in `generateBundle`; use `writeBundle` + rewrites.
  * @returns {import("vite").Plugin}
  */
 export function relocateWorkerBundleAssetsPlugin() {
@@ -219,7 +233,12 @@ export function relocateWorkerBundleAssetsPlugin() {
         name: "relocate-worker-bundle-assets",
         apply: "build",
         enforce: "post",
-        generateBundle(_options, bundle) {
+        writeBundle(outputOptions, bundle) {
+            const outDir = outputOptions.dir;
+            if (!outDir) return;
+
+            /** @type {{ from: string; to: string }[]} */
+            const moves = [];
             for (const key of Object.keys(bundle)) {
                 const item = bundle[key];
                 if (!item || (item.type !== "asset" && item.type !== "chunk")) continue;
@@ -232,9 +251,32 @@ export function relocateWorkerBundleAssetsPlugin() {
                 );
                 const next = `workers/opfs/${base}`;
                 if (fn === next) continue;
-                item.fileName = next;
-                bundle[next] = item;
-                delete bundle[key];
+                moves.push({ from: fn, to: next });
+            }
+            if (!moves.length) return;
+
+            moves.sort((a, b) => b.from.length - a.from.length);
+
+            for (const { from, to } of moves) {
+                const fromAbs = resolve(outDir, from);
+                const toAbs = resolve(outDir, to);
+                if (!existsSync(fromAbs)) continue;
+                mkdirSync(dirname(toAbs), { recursive: true });
+                renameSync(fromAbs, toAbs);
+            }
+
+            const textExts = new Set([".js", ".mjs", ".html", ".json", ".css", ".map", ".txt", ".ts"]);
+            for (const abs of walkFilesSync(outDir)) {
+                const ext = extname(abs).toLowerCase();
+                if (!textExts.has(ext)) continue;
+                let text = readFileSync(abs, "utf8");
+                let changed = false;
+                for (const { from, to } of moves) {
+                    if (!text.includes(from)) continue;
+                    text = text.split(from).join(to);
+                    changed = true;
+                }
+                if (changed) writeFileSync(abs, text);
             }
         },
     };

@@ -36,9 +36,20 @@ const isExtension = () => {
     }
 };
 
+const isCapacitorNative = (): boolean => {
+    try {
+        const c = (globalThis as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+        return typeof c?.isNativePlatform === "function" && Boolean(c.isNativePlatform());
+    } catch {
+        return false;
+    }
+};
+
 const isServiceWorkerAllowedContext = () => {
     const protocol = (globalThis?.location?.protocol || "").toLowerCase();
     if (protocol === "chrome-extension:" || protocol === "file:" || protocol === "about:") return false;
+    if (protocol === "capacitor:" || protocol === "ionic:") return true;
+    if (isCapacitorNative() && (protocol === "https:" || protocol === "http:")) return true;
     return protocol === "https:" || protocol === "http:";
 };
 
