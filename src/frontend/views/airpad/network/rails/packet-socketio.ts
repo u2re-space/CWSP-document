@@ -8,7 +8,7 @@ import {
     onWSConnectionChange,
     sendCoordinatorAct,
     sendCoordinatorRequest
-} from "../websocket";
+} from "@shared/transport/websocket";
 import type { AirPadClipboardResult, AirPadIntent } from "../intents";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));

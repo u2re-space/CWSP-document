@@ -463,18 +463,6 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         Defaults for AirPad hub/tunnel and coordinator features (aligned with CWSAndroid-style toggles). Clipboard gate applies to web AirPad coordinator calls; SMS/contacts are stored for future native bridges.
         Server routing for who receives clipboard (e.g. <code>L-192.168.0.110</code> → <code>L-192.168.0.196</code>) uses cwsp <code>clients.json</code> (<code>modules.clipboard</code> <code>shareTo</code> / <code>acceptFrom</code>) or HTTPS POST <code>/clipboard</code> with <code>targets</code>, same as CWSAndroid.
       </p>
-      <label class="field">
-        <span>AirPad connect host(s)</span>
-        <input class="form-input" type="text" autocomplete="off" data-field="shell.airPadConnectHosts" placeholder="host:port or https://host:443 (comma-separated)" />
-      </label>
-      <label class="field">
-        <span>AirPad destination / route target ID</span>
-        <input class="form-input" type="text" autocomplete="off" data-field="shell.airPadRouteTarget" placeholder="peer or device id" />
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.syncAirPadHostFromEndpointUrl" />
-        <span>Set AirPad connect host from Endpoint base URL origin (when saved)</span>
-      </label>
       <label class="field checkbox form-checkbox">
         <input type="checkbox" data-field="shell.maintainHubSocketConnection" />
         <span>Keep hub Socket.IO connected in background (cwsp / endpoint; clipboard + coordinator without opening AirPad)</span>
@@ -625,9 +613,6 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     const coreAdminHttp = field('[data-field="core.admin.httpOrigin"]') as HTMLInputElement | null;
     const coreAdminPath = field('[data-field="core.admin.path"]') as HTMLInputElement | null;
     const coreUseCoreIdentityAirpad = field('[data-field="core.useCoreIdentityForAirPad"]') as HTMLInputElement | null;
-    const shellAirPadHosts = field('[data-field="shell.airPadConnectHosts"]') as HTMLInputElement | null;
-    const shellAirPadRoute = field('[data-field="shell.airPadRouteTarget"]') as HTMLInputElement | null;
-    const shellSyncEndpointHost = field('[data-field="shell.syncAirPadHostFromEndpointUrl"]') as HTMLInputElement | null;
     const shellMaintainHubSocket = field('[data-field="shell.maintainHubSocketConnection"]') as HTMLInputElement | null;
     const shellClipboard = field('[data-field="shell.enableRemoteClipboardBridge"]') as HTMLInputElement | null;
     const shellApplyRemoteDevice = field('[data-field="shell.applyRemoteClipboardToDevice"]') as HTMLInputElement | null;
@@ -897,9 +882,6 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
             if (coreAdminHttps) coreAdminHttps.value = (s?.core?.admin?.httpsOrigin || "").trim();
             if (coreAdminHttp) coreAdminHttp.value = (s?.core?.admin?.httpOrigin || "").trim();
             if (coreAdminPath) coreAdminPath.value = (s?.core?.admin?.path || "/").trim() || "/";
-            if (shellAirPadHosts) shellAirPadHosts.value = (s?.shell?.airPadConnectHosts || "").trim();
-            if (shellAirPadRoute) shellAirPadRoute.value = (s?.shell?.airPadRouteTarget || "").trim();
-            if (shellSyncEndpointHost) shellSyncEndpointHost.checked = Boolean(s?.shell?.syncAirPadHostFromEndpointUrl);
             if (shellMaintainHubSocket) shellMaintainHubSocket.checked = Boolean(s?.shell?.maintainHubSocketConnection);
             if (shellClipboard) shellClipboard.checked = (s?.shell?.enableRemoteClipboardBridge ?? true) !== false;
             if (shellApplyRemoteDevice) shellApplyRemoteDevice.checked = (s?.shell?.applyRemoteClipboardToDevice ?? true) !== false;
@@ -1097,9 +1079,6 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                 },
                 shell: {
                     ...(current.shell || {}),
-                    airPadConnectHosts: shellAirPadHosts?.value?.trim() || "",
-                    airPadRouteTarget: shellAirPadRoute?.value?.trim() || "",
-                    syncAirPadHostFromEndpointUrl: Boolean(shellSyncEndpointHost?.checked),
                     maintainHubSocketConnection: Boolean(shellMaintainHubSocket?.checked),
                     enableRemoteClipboardBridge: (shellClipboard?.checked ?? true) !== false,
                     applyRemoteClipboardToDevice: (shellApplyRemoteDevice?.checked ?? true) !== false,

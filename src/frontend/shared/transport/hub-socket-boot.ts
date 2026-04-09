@@ -35,7 +35,7 @@ export async function applyHubSocketFromSettings(settings: AppSettings): Promise
         return;
     }
 
-    const { initWebSocket, connectWS } = await import("../../views/airpad/network/websocket");
+    const { initWebSocket, connectWS } = await import("./websocket");
     initWebSocket(null);
     connectWS();
 }

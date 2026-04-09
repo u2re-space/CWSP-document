@@ -13,7 +13,7 @@ import {
     sendPacketSocketIoBinary,
     sendPacketSocketIoIntent
 } from "../rails/packet-socketio";
-import { onVoiceResult } from "../websocket";
+import { onVoiceResult } from "@shared/transport/websocket";
 
 export const airpadTransport = {
     init: initPacketSocketIoRail,

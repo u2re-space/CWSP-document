@@ -125,16 +125,10 @@ const defaultSpeechLanguage = (): SpeechRecognitionLanguage => {
 
 /** Capacitor / embedded WebView shell — mirrors CWSAndroid-style toggles and AirPad transport defaults. Native IPC: {@code shared/native/cws-bridge.ts} + {@code CwsBridge} plugin. */
 export type ShellSettings = {
-    /** Optional Socket.IO / hub hosts (comma-separated), used when not syncing from endpoint URL. */
-    airPadConnectHosts?: string;
-    /** Default routed peer / destination id (AirPad “Remote host” field). */
-    airPadRouteTarget?: string;
-    /** When true, set AirPad connect host from {@link AppSettings.core.endpointUrl} origin on each sync. */
-    syncAirPadHostFromEndpointUrl?: boolean;
     /**
      * When true, CrossWord keeps a **Socket.IO** connection to the hub (cwsp / endpoint) in the background,
      * not only when the AirPad view is open — enables clipboard coordinator and realtime ops from any shell (PWA, CRX, Capacitor).
-     * Requires a non-empty {@link airPadConnectHosts} or {@link syncAirPadHostFromEndpointUrl} + {@link AppSettings.core.endpointUrl}.
+     * Connection uses {@link AppSettings.core.endpointUrl}.
      */
     maintainHubSocketConnection?: boolean;
     /** Coordinator / remote clipboard bridge (PC clipboard from server). */
@@ -145,7 +139,7 @@ export type ShellSettings = {
      */
     applyRemoteClipboardToDevice?: boolean;
     /**
-     * Periodically read the local clipboard and broadcast to {@link clipboardBroadcastTargets} (or {@link airPadRouteTarget}).
+     * Periodically read the local clipboard and broadcast to {@link clipboardBroadcastTargets}.
      * Use sparingly; pairs with server `clients.json` / `modules.clipboard` share/accept rules.
      */
     pushLocalClipboardToLan?: boolean;
@@ -153,7 +147,6 @@ export type ShellSettings = {
     clipboardPushIntervalMs?: number;
     /**
      * Comma-separated device / peer ids to receive outbound clipboard (e.g. `L-192.168.0.196`).
-     * When empty, {@link airPadRouteTarget} is used.
      */
     clipboardBroadcastTargets?: string;
     /** Reserved for native SMS bridge (Kotlin shell); persisted for parity with CWSAndroid. */
@@ -300,9 +293,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
         }
     },
     shell: {
-        airPadConnectHosts: "",
-        airPadRouteTarget: "",
-        syncAirPadHostFromEndpointUrl: false,
         maintainHubSocketConnection: false,
         enableRemoteClipboardBridge: true,
         applyRemoteClipboardToDevice: true,

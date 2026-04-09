@@ -4,13 +4,7 @@
 
 import {
     getRemoteHost,
-    getRemoteProtocol,
-    getRemoteRouteTarget,
-    getAirPadTransportMode,
     getAirPadAuthToken,
-    getAirPadClientId,
-    getAirPadTransportSecret,
-    getAirPadSigningSecret,
     applyAirpadRemoteConfig,
 } from '../config/config';
 import { reconnectAirPadSessionAfterConfigChange } from '../network/session';
@@ -60,46 +54,12 @@ export function createConfigUI(): HTMLElement {
                     <label for="remoteHost">Connect URL / Relay Host (optional, comma separated):</label>
                     <input type="text" id="remoteHost" />
                 </div>
-
-                <div class="config-group">
-                    <label for="remoteRouteTarget">Remote Host [optional] (peerId/deviceId/alias/IP):</label>
-                    <input type="text" id="remoteRouteTarget" placeholder="optional target after connect" />
-                </div>
-
                 <div class="config-group">
                     <strong>Routing / identifiers</strong>
-                </div>
-
-                <div class="config-group">
-                    <label for="remoteProtocol">Remote Protocol:</label>
-                    <select id="remoteProtocol">
-                        <option value="auto">Auto (recommended)</option>
-                        <option value="https">HTTPS / WSS</option>
-                        <option value="http">HTTP / WS</option>
-                    </select>
-                </div>
-                <div class="config-group">
-                    <label for="airpadTransportMode">Transport:</label>
-                    <select id="airpadTransportMode">
-                        <option value="plaintext">Plaintext</option>
-                        <option value="secure">Secure (signed envelope)</option>
-                    </select>
                 </div>
                 <div class="config-group">
                     <label for="airpadAuthToken">Airpad Auth Token:</label>
                     <input type="text" id="airpadAuthToken" />
-                </div>
-                <div class="config-group">
-                    <label for="airpadClientId">Airpad Client ID:</label>
-                    <input type="text" id="airpadClientId" />
-                </div>
-                <div class="config-group">
-                    <label for="airpadTransportSecret">Secure Transport Secret:</label>
-                    <input type="text" id="airpadTransportSecret" />
-                </div>
-                <div class="config-group">
-                    <label for="airpadSigningSecret">Signing Secret (HMAC):</label>
-                    <input type="password" id="airpadSigningSecret" />
                 </div>
             </div>
 
@@ -112,23 +72,11 @@ export function createConfigUI(): HTMLElement {
 
     // Add event listeners
     const hostInput = overlay.querySelector('#remoteHost') as HTMLInputElement;
-    const routeTargetInput = overlay.querySelector('#remoteRouteTarget') as HTMLInputElement;
-    const protocolInput = overlay.querySelector('#remoteProtocol') as HTMLSelectElement;
-    const transportModeInput = overlay.querySelector('#airpadTransportMode') as HTMLSelectElement;
     const authTokenInput = overlay.querySelector('#airpadAuthToken') as HTMLInputElement;
-    const clientIdInput = overlay.querySelector('#airpadClientId') as HTMLInputElement;
-    const transportSecretInput = overlay.querySelector('#airpadTransportSecret') as HTMLInputElement;
-    const signingSecretInput = overlay.querySelector('#airpadSigningSecret') as HTMLInputElement;
     const saveButton = overlay.querySelector('#saveConfig') as HTMLButtonElement;
     const cancelButton = overlay.querySelector('#cancelConfig') as HTMLButtonElement;
     hostInput.value = getRemoteHost();
-    routeTargetInput.value = getRemoteRouteTarget();
-    protocolInput.value = getRemoteProtocol();
-    transportModeInput.value = getAirPadTransportMode();
     authTokenInput.value = getAirPadAuthToken();
-    clientIdInput.value = getAirPadClientId();
-    transportSecretInput.value = getAirPadTransportSecret();
-    signingSecretInput.value = getAirPadSigningSecret();
 
     const closeOverlay = () => {
         overlay.classList.remove('flex');
@@ -139,13 +87,7 @@ export function createConfigUI(): HTMLElement {
     saveButton.addEventListener('click', () => {
         applyAirpadRemoteConfig({
             host: hostInput.value,
-            routeTarget: routeTargetInput.value,
-            protocol: protocolInput.value,
-            transportMode: transportModeInput.value,
             authToken: authTokenInput.value,
-            clientId: clientIdInput.value,
-            transportSecret: transportSecretInput.value,
-            signingSecret: signingSecretInput.value,
         });
         reconnectAirPadSessionAfterConfigChange({ delayMs: 100 });
         closeOverlay();
@@ -184,21 +126,9 @@ export function showConfigUI(): void {
         host.appendChild(overlay);
     } else {
         const hostInput = overlay.querySelector('#remoteHost') as HTMLInputElement | null;
-        const routeTargetInput = overlay.querySelector('#remoteRouteTarget') as HTMLInputElement | null;
-        const protocolInput = overlay.querySelector('#remoteProtocol') as HTMLSelectElement | null;
-        const transportModeInput = overlay.querySelector('#airpadTransportMode') as HTMLSelectElement | null;
         const authTokenInput = overlay.querySelector('#airpadAuthToken') as HTMLInputElement | null;
-        const clientIdInput = overlay.querySelector('#airpadClientId') as HTMLInputElement | null;
-        const transportSecretInput = overlay.querySelector('#airpadTransportSecret') as HTMLInputElement | null;
-        const signingSecretInput = overlay.querySelector('#airpadSigningSecret') as HTMLInputElement | null;
         if (hostInput) hostInput.value = getRemoteHost();
-        if (routeTargetInput) routeTargetInput.value = getRemoteRouteTarget();
-        if (protocolInput) protocolInput.value = getRemoteProtocol();
-        if (transportModeInput) transportModeInput.value = getAirPadTransportMode();
         if (authTokenInput) authTokenInput.value = getAirPadAuthToken();
-        if (clientIdInput) clientIdInput.value = getAirPadClientId();
-        if (transportSecretInput) transportSecretInput.value = getAirPadTransportSecret();
-        if (signingSecretInput) signingSecretInput.value = getAirPadSigningSecret();
     }
     syncAirpadConfigOverlayShellTheme(overlay, doc);
     overlay.classList.add('flex');

@@ -3,7 +3,7 @@
 // =========================
 
 import { io, Socket } from 'socket.io-client';
-import { log, getWsStatusEl } from '../utils/utils';
+import { log, getWsStatusEl } from '../../views/airpad/utils/utils';
 import {
     getRemoteHost,
     getRemoteProtocol,
@@ -19,13 +19,13 @@ import {
     isPushLocalClipboardToLanEnabled,
     getClipboardPushIntervalMs,
     getClipboardBroadcastTargetNodes,
-} from '../config/config';
+} from '../../views/airpad/config/config';
 import {
     isCapacitorNativeShell,
     readClipboardTextFromDevice,
     writeClipboardTextToDevice,
-} from "@shared/native/clipboard-device";
-import { setAirpadCredentialInvalidator } from '../credential-cache-bridge';
+} from "../native/clipboard-device";
+import { setAirpadCredentialInvalidator } from '../../views/airpad/credential-cache-bridge';
 
 let socket: Socket | null = null;
 let wsConnected = false;
@@ -345,7 +345,7 @@ const isCoordinatorPacket = (value: unknown): value is CoordinatorPacket => {
     );
 };
 
-const handleCoordinatorPacket = (packet: CoordinatorPacket): void => {
+const handleCoordinatorPacket = async (packet: CoordinatorPacket): Promise<void> => {
     const uuid = typeof packet.uuid === "string" ? packet.uuid : "";
     if (uuid && coordinatorPending.has(uuid)) {
         const pending = coordinatorPending.get(uuid);
@@ -357,6 +357,28 @@ const handleCoordinatorPacket = (packet: CoordinatorPacket): void => {
             } else {
                 pending.resolve(packet.result);
             }
+        }
+        return;
+    }
+
+    if (packet.op === "ask" && packet.what === "clipboard:get") {
+        try {
+            const text = await readClipboardTextFromDevice();
+            emitCoordinatorPacket({
+                ...buildCoordinatorPacket("result", packet.what, null, {
+                    uuid,
+                    nodes: packet.from ? [packet.from] : undefined
+                }),
+                result: typeof text === "string" ? text : String(text || "")
+            });
+        } catch (error: any) {
+            emitCoordinatorPacket({
+                ...buildCoordinatorPacket("error", packet.what, null, {
+                    uuid,
+                    nodes: packet.from ? [packet.from] : undefined
+                }),
+                error: error?.message || String(error)
+            });
         }
         return;
     }
