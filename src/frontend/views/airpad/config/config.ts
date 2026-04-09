@@ -307,6 +307,9 @@ export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
     }
     const routeT = (shell?.airPadRouteTarget || "").trim();
     if (routeT) input.routeTarget = routeT;
+    /** Same id as cwsp `clients.json` / coordinator `L-*` (e.g. `L-192.168.0.196` on Android). */
+    const appClient = (core?.appClientId || "").trim();
+    if (appClient) input.clientId = appClient;
     if (Object.keys(input).length) {
         applyAirpadRemoteConfig(input);
     }

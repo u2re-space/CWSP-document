@@ -889,7 +889,7 @@ export function connectWS() {
             /^172\.(1[6-9]|2\d|3[01])\./.test(pageHost)
         )
     );
-    if (location.protocol === 'https:' && remoteProtocol === 'http') {
+    if (location.protocol === 'https:' && remoteProtocol === 'http' && !isCapacitorNativeShell()) {
         log('Socket.IO error: browser blocks ws/http from https page (mixed content). Open Airpad via http:// or use valid HTTPS cert on endpoint.');
         isConnecting = false;
         setWsStatus(false);
@@ -897,21 +897,43 @@ export function connectWS() {
         return;
     }
 
-    const inferProtocol = (): 'http' | 'https' => {
-        if (remoteProtocol === 'http' || remoteProtocol === 'https') return remoteProtocol;
-        if (remotePort === '443' || remotePort === '8443' || remotePort === '8444') return 'https';
-        if (remotePort === '80' || remotePort === '8080') return 'http';
-        return location.protocol === 'https:' ? 'https' : 'http';
-    };
-
     const remoteHostSpec = remoteHostSpecs[0];
     const parsedRemoteHost = remoteHostSpec?.host || resolvedRemoteHost;
     const parsedRemotePort = remoteHostSpec?.port;
     const routeTargetForQuery = parsedConfiguredRouteTarget?.host || configuredRouteTarget || "";
     const routeTargetPortForQuery = (parsedConfiguredRouteTarget?.port || "").trim();
 
+    const rawProbeHostEarly = (parsedRemoteHost || resolvedRemoteHost || "").trim();
+    const firstHostBare =
+        rawProbeHostEarly.length > 0
+            ? stripWireEndpointIdPrefix(rawProbeHostEarly) || rawProbeHostEarly
+            : "";
+    const firstHostIpv4 = (() => {
+        const b = firstHostBare.trim();
+        if (!b) return "";
+        const at = b.lastIndexOf(":");
+        if (at > 0 && isLikelyPort(b.slice(at + 1))) return b.slice(0, at);
+        return b;
+    })();
+
+    const inferProtocol = (): 'http' | 'https' => {
+        if (remoteProtocol === 'http' || remoteProtocol === 'https') return remoteProtocol;
+        if (remotePort === '443' || remotePort === '8443' || remotePort === '8444') return 'https';
+        if (remotePort === '80' || remotePort === '8080') return 'http';
+        // Hybrid Android: shell is https:// but LAN cwsp is almost always HTTP :8080 (cleartext in network_security_config).
+        if (
+            isCapacitorNativeShell() &&
+            firstHostIpv4 &&
+            isIpv4Literal(firstHostIpv4) &&
+            isPrivateIp(firstHostIpv4)
+        ) {
+            return 'http';
+        }
+        return location.protocol === 'https:' ? 'https' : 'http';
+    };
+
     const primaryProtocol = inferProtocol();
-    const rawProbeHost = (parsedRemoteHost || resolvedRemoteHost || "").trim();
+    const rawProbeHost = rawProbeHostEarly;
     const probeHost = stripWireEndpointIdPrefix(rawProbeHost) || rawProbeHost;
     const probePort = remotePort || (primaryProtocol === 'https' ? '8443' : '8080');
     const probeOrigin = `${primaryProtocol}://${probeHost}:${probePort}`;
@@ -1028,9 +1050,10 @@ export function connectWS() {
     const httpsOrderedHostEntries = reorderHostEntriesForHttps(candidateHostEntries);
 
     const candidates: WSConnectCandidate[] = [];
+    /** Capacitor WebView: mixed content allowed in {@code CapacitorWebActivity} so `ws:` to LAN HTTP works. */
+    const allowHttpSocketFromHttpsShell = isCapacitorNativeShell();
     for (const protocol of protocolOrder) {
-        // Browsers block active mixed content from HTTPS pages to HTTP endpoints.
-        if (location.protocol === 'https:' && protocol === 'http') continue;
+        if (location.protocol === 'https:' && protocol === 'http' && !allowHttpSocketFromHttpsShell) continue;
         const hostList = protocol === 'https' ? httpsOrderedHostEntries : candidateHostEntries;
         for (const hostEntry of hostList) {
             const { host, source, preferPort } = hostEntry;
