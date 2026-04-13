@@ -83,3 +83,11 @@ Do not skip either step. Notes are how context survives across sessions.
 Search and read in:
 - `/home/u2re-dev/U2RE.space/modules/projects/uniform.ts/src/newer/` (internal)
 - `/home/u2re-dev/U2RE.space/runtime/cwsp/endpoint/` (network)
+
+---
+
+## Доступы SSH
+
+- (`U2RE@192.168.0.110` или `U2RE@192.168.0.111`) и/или 
+- (`u2re-dev@192.168.0.200` или `u2re-dev@192.168.0.201`)
+- Для внешки (`u2re-dev@45.147.121.152`) с VDS например
