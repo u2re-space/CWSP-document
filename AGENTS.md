@@ -75,3 +75,11 @@ Do not skip either step. Notes are how context survives across sessions.
 - **Баги, тесты, доработки**: Claude 4.5 Haiku / Gemini 3 Flash / GPT-5.3-codex-spark (для экономии токенов и времени на простых задачах)
 - **Архитектура, план**: Claude 4.6 (Sonnet / Opus) / Gemini 3.1 Pro / GPT-5.4
 - **Документации или спецификации**: Claude 4.6 (Sonnet / Opus) / Gemini 3.1 Pro / GPT-5.4 (low или medium thinking)
+
+---
+
+## Some specifications
+
+Search and read in:
+- `/home/u2re-dev/U2RE.space/modules/projects/uniform.ts/src/newer/` (internal)
+- `/home/u2re-dev/U2RE.space/runtime/cwsp/endpoint/` (network)
