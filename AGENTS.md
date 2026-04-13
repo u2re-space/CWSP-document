@@ -66,3 +66,12 @@ You have access to a persistent note storage system via the `pantry` MCP tools.
 - `details`: full context for a future agent with no prior knowledge
 
 Do not skip either step. Notes are how context survives across sessions.
+
+---
+
+## Выбор модели (Model Selection)
+
+- **Анализ архитектуры**: Claude 4.6 (Sonnet / Opus) / GPT-5.4 + max thinking
+- **Баги, тесты, доработки**: Claude 4.5 Haiku / Gemini 3 Flash / GPT-5.3-codex-spark (для экономии токенов и времени на простых задачах)
+- **Архитектура, план**: Claude 4.6 (Sonnet / Opus) / Gemini 3.1 Pro / GPT-5.4
+- **Документации или спецификации**: Claude 4.6 (Sonnet / Opus) / Gemini 3.1 Pro / GPT-5.4 (low или medium thinking)
