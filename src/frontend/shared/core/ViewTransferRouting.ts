@@ -1,4 +1,4 @@
-import { sendMessage, enqueuePendingMessage, type UnifiedMessage } from "@rs-com/core/UnifiedMessaging";
+import { sendProtocolMessage, enqueuePendingMessage, type UnifiedMessage } from "@rs-com/core/UnifiedMessaging";
 import { summarizeForLog } from "@rs-com/core/LogSanitizer";
 import { viewBroadcastChannelName } from "@rs-com/config/Names";
 
@@ -192,7 +192,14 @@ export const dispatchViewTransfer = async (
         }
     }
 
-    const deliveredNow = await sendMessage(message);
+    const deliveredNow = await sendProtocolMessage({
+        ...message,
+        purpose: ["deliver", "mail"],
+        protocol: "window",
+        op: resolved.hint?.action === "open" ? "invoke" : "deliver",
+        srcChannel: message.source,
+        dstChannel: resolved.destination,
+    });
     const delivered = deliveredNow || queuedAsPending;
     console.log("[ViewTransfer] Message delivery status:", {
         deliveredNow,

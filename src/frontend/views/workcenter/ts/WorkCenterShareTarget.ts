@@ -140,7 +140,15 @@ export class WorkCenterShareTarget {
             };
 
             // Handle files/images from share target
-            const incomingFiles = Array.isArray(inputData.files) ? inputData.files : [];
+            const attachmentFiles = Array.isArray(inputData.attachments)
+                ? inputData.attachments
+                    .map((entry: any) => entry?.data)
+                    .filter((entry: unknown) => entry instanceof File || entry instanceof Blob)
+                : [];
+            const incomingFiles = [
+                ...(Array.isArray(inputData.files) ? inputData.files : []),
+                ...attachmentFiles
+            ];
             if (incomingFiles.length > 0) {
                 for (const file of inputData.files) {
                     const normalized = await normalizeIncomingFile(file);

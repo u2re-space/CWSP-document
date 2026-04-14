@@ -36,6 +36,8 @@ export type SectionConfig = {
 };
 
 export type CoreMode = "native" | "endpoint";
+export type CoreSocketProtocol = "auto" | "http" | "https";
+export type CoreSocketTransportMode = "plaintext" | "secure";
 
 export type RemoteTarget = {
     id: string;
@@ -126,6 +128,11 @@ const defaultSpeechLanguage = (): SpeechRecognitionLanguage => {
 /** Capacitor / embedded WebView shell — mirrors CWSAndroid-style toggles and AirPad transport defaults. Native IPC: {@code shared/native/cws-bridge.ts} + {@code CwsBridge} plugin. */
 export type ShellSettings = {
     /**
+     * Prefer the native Kotlin websocket runtime on CWSAndroid.
+     * When enabled, web Socket.IO background maintenance should stay off.
+     */
+    preferNativeWebsocket?: boolean;
+    /**
      * When true, CrossWord keeps a **Socket.IO** connection to the hub (cwsp / endpoint) in the background,
      * not only when the AirPad view is open — enables clipboard coordinator and realtime ops from any shell (PWA, CRX, Capacitor).
      * Connection uses {@link AppSettings.core.endpointUrl}.
@@ -181,6 +188,26 @@ export type AppSettings = {
          * WebView `fetch` still follows platform certificate rules unless the shell applies this.
          */
         allowInsecureTls?: boolean;
+        network?: {
+            listenPortHttps?: number;
+            listenPortHttp?: number;
+            bridgeEnabled?: boolean;
+            reconnectMs?: number;
+            destinations?: string[];
+        };
+        socket?: {
+            protocol?: CoreSocketProtocol;
+            routeTarget?: string;
+            transportMode?: CoreSocketTransportMode;
+            transportSecret?: string;
+            signingSecret?: string;
+        };
+        interop?: {
+            ipcProtocol?: "uniform" | "legacy";
+            platformInterop?: boolean;
+            preferNativeIpc?: boolean;
+            preferNativeWebsocket?: boolean;
+        };
         /** HTTPS :8443 and HTTP :8080 admin/control entry points for the CWS server. */
         admin?: {
             httpsOrigin?: string;
@@ -280,6 +307,26 @@ export const DEFAULT_SETTINGS: AppSettings = {
         appClientId: "",
         useCoreIdentityForAirPad: true,
         allowInsecureTls: false,
+        network: {
+            listenPortHttps: 8443,
+            listenPortHttp: 8080,
+            bridgeEnabled: true,
+            reconnectMs: 3000,
+            destinations: []
+        },
+        socket: {
+            protocol: "auto",
+            routeTarget: "",
+            transportMode: "plaintext",
+            transportSecret: "",
+            signingSecret: ""
+        },
+        interop: {
+            ipcProtocol: "uniform",
+            platformInterop: true,
+            preferNativeIpc: true,
+            preferNativeWebsocket: true
+        },
         admin: {
             httpsOrigin: "https://localhost:8443",
             httpOrigin: "http://localhost:8080",
@@ -293,7 +340,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
         }
     },
     shell: {
-        maintainHubSocketConnection: false,
+        preferNativeWebsocket: true,
+        maintainHubSocketConnection: true,
         enableRemoteClipboardBridge: true,
         applyRemoteClipboardToDevice: true,
         pushLocalClipboardToLan: false,

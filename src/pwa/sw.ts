@@ -723,10 +723,65 @@ const openClipboardDB = async (): Promise<IDBDatabase> => {
 
 // Broadcast helpers for cross-context communication
 // These send messages to the frontend via BroadcastChannel
+const toCanonicalSwBroadcastEnvelope = (channel: string, message: unknown): unknown => {
+    if (!message || typeof message !== 'object') {
+        const id = crypto.randomUUID();
+        return {
+            id,
+            uuid: id,
+            source: 'service-worker',
+            sender: 'service-worker',
+            destination: channel,
+            destinations: [channel],
+            protocol: 'service-worker:http',
+            op: 'notify',
+            what: 'sw:broadcast',
+            type: 'sw:broadcast',
+            payload: message,
+            data: message,
+            timestamp: Date.now(),
+            ids: { byId: 'service-worker', from: 'service-worker', sender: 'service-worker', destinations: [channel] },
+            flags: { canonicalV2: true },
+        };
+    }
+    const base = message as Record<string, unknown>;
+    const id = typeof base.id === 'string' && base.id.trim() ? base.id.trim() : crypto.randomUUID();
+    const sender = typeof base.sender === 'string' && base.sender.trim()
+        ? base.sender.trim()
+        : (typeof base.source === 'string' && base.source.trim() ? base.source.trim() : 'service-worker');
+    const op = typeof base.op === 'string' && base.op.trim()
+        ? base.op.trim()
+        : (typeof base.type === 'string' && String(base.type).startsWith('request:')
+            ? 'request'
+            : typeof base.type === 'string' && String(base.type).startsWith('response:')
+              ? 'response'
+              : 'notify');
+    return {
+        ...base,
+        id,
+        uuid: typeof base.uuid === 'string' && base.uuid.trim() ? base.uuid.trim() : id,
+        source: typeof base.source === 'string' && base.source.trim() ? base.source.trim() : sender,
+        sender,
+        destination: typeof base.destination === 'string' && base.destination.trim() ? base.destination.trim() : channel,
+        destinations: Array.isArray(base.destinations) && base.destinations.length ? base.destinations : [channel],
+        protocol: typeof base.protocol === 'string' && base.protocol.trim() ? base.protocol.trim() : 'service-worker:http',
+        op,
+        what: typeof base.what === 'string' && base.what.trim() ? base.what.trim() : String(base.type || 'sw:broadcast'),
+        type: typeof base.type === 'string' && base.type.trim() ? base.type.trim() : String(base.what || 'sw:broadcast'),
+        payload: base.payload ?? base.data ?? base,
+        data: base.data ?? base.payload ?? base,
+        timestamp: Number(base.timestamp || 0) > 0 ? Number(base.timestamp) : Date.now(),
+        ids: (base.ids && typeof base.ids === 'object')
+            ? base.ids
+            : { byId: sender, from: sender, sender, destinations: Array.isArray(base.destinations) ? base.destinations : [channel] },
+        flags: (base.flags && typeof base.flags === 'object') ? base.flags : { canonicalV2: true },
+    };
+};
+
 const broadcast = (channel: string, message: unknown): void => {
     try {
         const bc = new BroadcastChannel(channel);
-        bc.postMessage(message);
+        bc.postMessage(toCanonicalSwBroadcastEnvelope(channel, message));
         bc.close();
     } catch (e) { console.warn(`[SW] Broadcast to ${channel} failed:`, e); }
 };

@@ -140,8 +140,14 @@ let shellPushLocalClipboard = false;
 let shellClipboardPushIntervalMs = 2000;
 let shellClipboardBroadcastTargets = "";
 let shellMaintainHubSocket = false;
+let shellPreferNativeWebsocket = true;
 let shellNativeSmsEnabled = true;
 let shellNativeContactsEnabled = true;
+let coreSocketProtocol: RemoteProtocol = "auto";
+let coreSocketRouteTarget = "";
+let coreSocketTransportMode: AirpadTransportMode = "plaintext";
+let coreSocketTransportSecret = "";
+let coreSocketSigningSecret = "";
 
 export let remoteHost = "";
 
@@ -217,6 +223,8 @@ const endpointUrlToAirpadConnectHost = (endpointUrl: string): string => {
 export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
     const core = settings.core;
     const shell = settings.shell;
+    const socket = core?.socket;
+    const interop = core?.interop;
     coreIdentityBridgeUserId = (core?.userId || "").trim();
     coreIdentityBridgeUserKey = (core?.userKey || "").trim();
     coreIdentityUseForAirpad = (core?.useCoreIdentityForAirPad ?? true) !== false;
@@ -228,8 +236,14 @@ export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
         Number.isFinite(intervalRaw) && intervalRaw >= 800 ? Math.min(Math.round(intervalRaw), 60000) : 2000;
     shellClipboardBroadcastTargets = (shell?.clipboardBroadcastTargets || "").trim();
     shellMaintainHubSocket = Boolean(shell?.maintainHubSocketConnection);
+    shellPreferNativeWebsocket = (shell?.preferNativeWebsocket ?? interop?.preferNativeWebsocket ?? true) !== false;
     shellNativeSmsEnabled = (shell?.enableNativeSms ?? true) !== false;
     shellNativeContactsEnabled = (shell?.enableNativeContacts ?? true) !== false;
+    coreSocketProtocol = socket?.protocol === "http" || socket?.protocol === "https" ? socket.protocol : "auto";
+    coreSocketRouteTarget = (socket?.routeTarget || "").trim();
+    coreSocketTransportMode = socket?.transportMode === "secure" ? "secure" : "plaintext";
+    coreSocketTransportSecret = (socket?.transportSecret || "").trim();
+    coreSocketSigningSecret = (socket?.signingSecret || "").trim();
 
     const input: AirpadRemoteConfigInput = {};
     if (core?.endpointUrl?.trim()) {
@@ -245,6 +259,7 @@ export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
             applyRemoteClipboard: shellApplyRemoteToDevice,
             pushLocalClipboard: shellPushLocalClipboard,
             maintainHubSocket: shellMaintainHubSocket,
+            preferNativeWebsocket: shellPreferNativeWebsocket,
             sms: shellNativeSmsEnabled,
             contacts: shellNativeContactsEnabled
         };
@@ -292,6 +307,10 @@ export function isMaintainHubSocketConnectionEnabled(): boolean {
     return shellMaintainHubSocket === true;
 }
 
+export function isPreferNativeWebsocketEnabled(): boolean {
+    return shellPreferNativeWebsocket !== false;
+}
+
 /** Reserved for native integration (CWSAndroid-style). */
 export function isShellNativeSmsEnabled(): boolean {
     return shellNativeSmsEnabled !== false;
@@ -313,15 +332,15 @@ export function setRemoteHost(host: string): void {
 }
 
 export function getRemoteProtocol(): RemoteProtocol {
-    return 'auto';
+    return coreSocketProtocol;
 }
 
 export function getRemoteRouteTarget(): string {
-    return "";
+    return coreSocketRouteTarget;
 }
 
 export function getAirPadTransportMode(): AirpadTransportMode {
-    return "plaintext";
+    return coreSocketTransportMode;
 }
 
 export function getAirPadAuthToken(): string {
@@ -353,11 +372,11 @@ export function setAirPadPeerInstanceId(id: string): void {
 }
 
 export function getAirPadTransportSecret(): string {
-    return "";
+    return coreSocketTransportSecret;
 }
 
 export function getAirPadSigningSecret(): string {
-    return "";
+    return coreSocketSigningSecret;
 }
 
 // Направление и выбор осей (подбирается под телефон)

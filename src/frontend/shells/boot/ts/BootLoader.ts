@@ -35,6 +35,7 @@ import { isEnabledView, pickEnabledView } from "../../../shared/routing/views";
 import { initializeLayers } from "../../../shared/routing/layer-manager";
 import { loadStyleSystem } from "../../../shared/styles";
 import { initCwsNativeBridge } from "../../../shared/native/cws-bridge";
+import { applyHubSocketFromSettings } from "../../../shared/transport/hub-socket-boot";
 
 // ============================================================================
 // BOOT TYPES
@@ -238,6 +239,9 @@ export class BootLoader {
                 }),
                 this.loadStyles(config.styleSystem)
             ]);
+            if (persistedSettings) {
+                void applyHubSocketFromSettings(persistedSettings).catch(() => undefined);
+            }
             const persistedTheme = this.resolveThemeFromSettings(persistedSettings);
             
             // Phase 2: Initialize Shell

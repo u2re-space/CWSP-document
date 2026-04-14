@@ -1,9 +1,15 @@
 /**
  * Unified CWSP bridge: Capacitor WebView / CWSAndroid (Kotlin) ↔ TypeScript.
- * Native implementation: `runtime/cwsp/plugins/capacitor-cws-bridge/android` (@CapacitorPlugin name CwsBridge).
+ * Native implementation: `runtime/CWSAndroid/plugins/capacitor-cws-bridge/android` (@CapacitorPlugin name CwsBridge).
  */
 import type { PluginListenerHandle } from "@capacitor/core";
 import { registerPlugin, WebPlugin } from "@capacitor/core";
+import {
+    createProtocolEnvelope,
+    isProtocolEnvelope,
+    normalizeProtocolEnvelope,
+    type ProtocolMessage as UniformProtocolEnvelope
+} from "../core/UnifiedMessaging";
 
 export interface CwsShellInfo {
     shell: string;
@@ -16,11 +22,24 @@ export interface CwsBridgeInvokeResult {
     ok: boolean;
     channel: string;
     echo: Record<string, unknown>;
+    appSettings?: Record<string, unknown>;
+    nativeSettings?: Record<string, unknown> | string;
+    envelope?: UniformProtocolEnvelope<Record<string, unknown>>;
 }
+
+export type CwsNativeIpcInput = {
+    channel?: string;
+    payload?: Record<string, unknown>;
+    envelope?: UniformProtocolEnvelope<Record<string, unknown>>;
+};
 
 export interface CwsBridgePluginContract {
     getShellInfo(): Promise<CwsShellInfo>;
-    invoke(options: { channel: string; payload?: Record<string, unknown> }): Promise<CwsBridgeInvokeResult>;
+    invoke(options: {
+        channel: string;
+        payload?: Record<string, unknown>;
+        envelope?: UniformProtocolEnvelope<Record<string, unknown>>;
+    }): Promise<CwsBridgeInvokeResult>;
     addListener(
         eventName: "nativeMessage",
         listenerFunc: (event: { payload?: Record<string, unknown> }) => void
@@ -38,8 +57,18 @@ class CwsBridgeWeb extends WebPlugin implements CwsBridgePluginContract {
         };
     }
 
-    async invoke(options: { channel: string; payload?: Record<string, unknown> }): Promise<CwsBridgeInvokeResult> {
-        return { ok: true, channel: options.channel, echo: { ...(options.payload ?? {}) } };
+    async invoke(options: {
+        channel: string;
+        payload?: Record<string, unknown>;
+        envelope?: UniformProtocolEnvelope<Record<string, unknown>>;
+    }): Promise<CwsBridgeInvokeResult> {
+        const envelope = normalizeBridgeEnvelope(options.channel, options.payload, options.envelope);
+        return {
+            ok: true,
+            channel: options.channel,
+            echo: { ...(options.payload ?? {}) },
+            envelope
+        };
     }
 }
 
@@ -50,10 +79,65 @@ export const CwsBridge = registerPlugin<CwsBridgePluginContract>("CwsBridge", {
 declare global {
     interface Window {
         __CWS_SHELL_INFO__?: CwsShellInfo;
+        electronBridge?: {
+            setThemeColor?: (color: string, symbolColor?: string) => void;
+            getShellInfo?: () => Promise<CwsShellInfo>;
+            invoke?: (input: {
+                channel?: string;
+                payload?: Record<string, unknown>;
+                envelope?: UniformProtocolEnvelope<Record<string, unknown>>;
+            }) => Promise<CwsBridgeInvokeResult>;
+        };
     }
 }
 
 let bridgeInitDone = false;
+
+const normalizeBridgeEnvelope = (
+    channel: string,
+    payload?: Record<string, unknown>,
+    envelope?: UniformProtocolEnvelope<Record<string, unknown>>
+): UniformProtocolEnvelope<Record<string, unknown>> => {
+    if (envelope && isProtocolEnvelope(envelope)) {
+        return normalizeProtocolEnvelope(envelope);
+    }
+    return createProtocolEnvelope<Record<string, unknown>>({
+        purpose: "invoke",
+        protocol: "service",
+        type: "invoke",
+        op: "invoke",
+        path: ["cws-bridge", channel],
+        source: "webview",
+        destination: "native",
+        srcChannel: "webview",
+        dstChannel: "native",
+        payload: payload ?? {},
+        data: payload ?? {}
+    });
+};
+
+const normalizeInvokeResultEnvelope = (
+    channel: string,
+    payload: Record<string, unknown>,
+    result: CwsBridgeInvokeResult
+): UniformProtocolEnvelope<Record<string, unknown>> => {
+    if (result?.envelope && isProtocolEnvelope(result.envelope)) {
+        return normalizeProtocolEnvelope(result.envelope);
+    }
+    return createProtocolEnvelope<Record<string, unknown>>({
+        purpose: "invoke",
+        protocol: "service",
+        type: result.ok ? "response" : "ack",
+        op: "invoke",
+        path: ["cws-bridge", channel],
+        source: "native",
+        destination: "webview",
+        srcChannel: "native",
+        dstChannel: "webview",
+        payload: payload,
+        data: payload
+    });
+};
 
 /** Best-effort: resolves shell metadata and subscribes to {@code nativeMessage} → {@code cws-native-message} on window. */
 export async function initCwsNativeBridge(): Promise<CwsShellInfo | null> {
@@ -61,6 +145,18 @@ export async function initCwsNativeBridge(): Promise<CwsShellInfo | null> {
         return typeof globalThis.window !== "undefined" ? globalThis.window.__CWS_SHELL_INFO__ ?? null : null;
     }
     bridgeInitDone = true;
+    const electronInfoFn = globalThis.window?.electronBridge?.getShellInfo;
+    if (typeof electronInfoFn === "function") {
+        try {
+            const info = await electronInfoFn();
+            if (typeof globalThis.window !== "undefined") {
+                globalThis.window.__CWS_SHELL_INFO__ = info;
+            }
+            return info;
+        } catch {
+            /* fallback to capacitor/web plugin */
+        }
+    }
     try {
         const info = await CwsBridge.getShellInfo();
         if (typeof globalThis.window !== "undefined") {
@@ -68,7 +164,27 @@ export async function initCwsNativeBridge(): Promise<CwsShellInfo | null> {
         }
         try {
             await CwsBridge.addListener("nativeMessage", (event) => {
-                globalThis.dispatchEvent(new CustomEvent("cws-native-message", { detail: event }));
+                const payload = (event && typeof event.payload === "object" && event.payload != null)
+                    ? (event.payload as Record<string, unknown>)
+                    : {};
+                const envelopeRaw = payload?.envelope;
+                const envelope = (
+                    envelopeRaw && typeof envelopeRaw === "object" && isProtocolEnvelope(envelopeRaw)
+                )
+                    ? normalizeProtocolEnvelope(envelopeRaw as UniformProtocolEnvelope<Record<string, unknown>>)
+                    : createProtocolEnvelope<Record<string, unknown>>({
+                        purpose: "mail",
+                        protocol: "service",
+                        type: "act",
+                        op: "deliver",
+                        source: "native",
+                        destination: "webview",
+                        srcChannel: "native",
+                        dstChannel: "webview",
+                        payload,
+                        data: payload
+                    });
+                globalThis.dispatchEvent(new CustomEvent("cws-native-message", { detail: { event, envelope, payload } }));
             });
         } catch {
             /* no native bridge */
@@ -88,10 +204,88 @@ export const isCapacitorCwsNativeShell = (): boolean => {
     }
 };
 
+export const isElectronCwsNativeShell = (): boolean => {
+    try {
+        return Boolean(globalThis.window?.electronBridge?.invoke);
+    } catch {
+        return false;
+    }
+};
+
+export const isCwsNativeIpcAvailable = (): boolean => {
+    if (isElectronCwsNativeShell()) return true;
+    if (!isCapacitorCwsNativeShell()) return false;
+    try {
+        const shell = globalThis.window?.__CWS_SHELL_INFO__;
+        return Boolean(shell?.native);
+    } catch {
+        return true;
+    }
+};
+
 /** Opaque channel → Kotlin/Compose (override {@code CwsBridgePlugin.invoke} in CWSAndroid for real routing). */
 export async function invokeCwsNative(
     channel: string,
     payload?: Record<string, unknown>
 ): Promise<CwsBridgeInvokeResult> {
-    return CwsBridge.invoke({ channel, payload });
+    const envelope = normalizeBridgeEnvelope(channel, payload);
+    const result = await CwsBridge.invoke({ channel, payload, envelope });
+    return {
+        ...result,
+        envelope: normalizeInvokeResultEnvelope(channel, payload ?? {}, result)
+    };
+}
+
+/**
+ * Canonical IPC invoker for frontend modules:
+ * - Uses CWSAndroid native bridge envelope transport when available
+ * - Falls back to web plugin-compatible invoke otherwise
+ */
+export async function invokeCwsPlatformIPC(input: CwsNativeIpcInput): Promise<CwsBridgeInvokeResult> {
+    const channel = (input.channel || "").trim()
+        || (Array.isArray(input.envelope?.path) && input.envelope?.path.length
+            ? String(input.envelope.path[input.envelope.path.length - 1] || "").trim()
+            : "")
+        || "default";
+    const payload = (input.payload && typeof input.payload === "object") ? input.payload : {};
+    const envelope = normalizeBridgeEnvelope(channel, payload, input.envelope);
+    const electronInvoke = globalThis.window?.electronBridge?.invoke;
+    if (typeof electronInvoke === "function") {
+        const result = await electronInvoke({ channel, payload, envelope });
+        return {
+            ...result,
+            envelope: normalizeInvokeResultEnvelope(channel, payload, result)
+        };
+    }
+    if (!isCwsNativeIpcAvailable()) {
+        const result = await CwsBridge.invoke({ channel, payload, envelope });
+        return {
+            ...result,
+            envelope: normalizeInvokeResultEnvelope(channel, payload, result)
+        };
+    }
+    const result = await CwsBridge.invoke({ channel, payload, envelope });
+    return {
+        ...result,
+        envelope: normalizeInvokeResultEnvelope(channel, payload, result)
+    };
+}
+
+export async function getNativeUnifiedSettings(): Promise<Record<string, unknown> | null> {
+    try {
+        const result = await invokeCwsPlatformIPC({ channel: "settings:get" });
+        if (!result?.ok) return null;
+        return result.appSettings && typeof result.appSettings === "object" ? result.appSettings : null;
+    } catch {
+        return null;
+    }
+}
+
+export async function patchNativeUnifiedSettings(appSettings: Record<string, unknown>): Promise<boolean> {
+    try {
+        const result = await invokeCwsPlatformIPC({ channel: "settings:patch", payload: { appSettings } });
+        return Boolean(result?.ok);
+    } catch {
+        return false;
+    }
 }

@@ -35,6 +35,9 @@ export default async function frontend(
     options: ShellOptions = {}
 ): Promise<void> {
     const { mountShellApp } = await import("../../../shared/routing/channel-unknown");
+    void import("../../../shared/transport/hub-socket-boot")
+        .then((m) => m.bootHubSocketFromStoredSettings())
+        .catch(() => undefined);
 
     // Check for markdown content in URL parameters (from launch queue or direct links)
     const urlParams = new URLSearchParams(globalThis.location.search);

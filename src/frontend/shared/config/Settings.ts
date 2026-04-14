@@ -19,6 +19,85 @@ export const STORE = 'settings';
 type WebDavCreateClient = (remoteURL: string, options?: Record<string, unknown>) => any;
 let createWebDavClient: WebDavCreateClient | null = null;
 
+const mergeAppSettingsShape = (base: AppSettings, patch: Partial<AppSettings> | null | undefined): AppSettings => {
+    if (!patch || typeof patch !== "object") return base;
+    return {
+        ...base,
+        ...patch,
+        core: {
+            ...(base.core || {}),
+            ...(patch.core || {}),
+            network: {
+                ...(base.core?.network || {}),
+                ...(patch.core?.network || {})
+            },
+            socket: {
+                ...(base.core?.socket || {}),
+                ...(patch.core?.socket || {})
+            },
+            interop: {
+                ...(base.core?.interop || {}),
+                ...(patch.core?.interop || {})
+            },
+            ops: {
+                ...(base.core?.ops || {}),
+                ...(patch.core?.ops || {})
+            },
+            admin: {
+                ...(base.core?.admin || {}),
+                ...(patch.core?.admin || {})
+            }
+        },
+        ai: {
+            ...(base.ai || {}),
+            ...(patch.ai || {}),
+            mcp: patch.ai?.mcp ?? base.ai?.mcp ?? [],
+            customInstructions: patch.ai?.customInstructions ?? base.ai?.customInstructions ?? [],
+            activeInstructionId: patch.ai?.activeInstructionId ?? base.ai?.activeInstructionId ?? ""
+        },
+        webdav: {
+            ...(base.webdav || {}),
+            ...(patch.webdav || {})
+        },
+        timeline: {
+            ...(base.timeline || {}),
+            ...(patch.timeline || {})
+        },
+        appearance: {
+            ...(base.appearance || {}),
+            ...(patch.appearance || {}),
+            markdown: {
+                ...(base.appearance?.markdown || {}),
+                ...(patch.appearance?.markdown || {}),
+                page: {
+                    ...(base.appearance?.markdown?.page || {}),
+                    ...(patch.appearance?.markdown?.page || {})
+                },
+                modules: {
+                    ...(base.appearance?.markdown?.modules || {}),
+                    ...(patch.appearance?.markdown?.modules || {})
+                },
+                plugins: {
+                    ...(base.appearance?.markdown?.plugins || {}),
+                    ...(patch.appearance?.markdown?.plugins || {})
+                }
+            }
+        },
+        speech: {
+            ...(base.speech || {}),
+            ...(patch.speech || {})
+        },
+        grid: {
+            ...(base.grid || {}),
+            ...(patch.grid || {})
+        },
+        shell: {
+            ...(base.shell || {}),
+            ...(patch.shell || {})
+        }
+    };
+};
+
 const getWebDavCreateClient = async (): Promise<WebDavCreateClient | null> => {
     if (createWebDavClient != null) return createWebDavClient;
     /*try {
@@ -181,10 +260,22 @@ export const loadSettings = async (): Promise<AppSettings> => {
         console.log("[Settings] loadSettings - raw type:", typeof raw, "stored type:", typeof stored);
 
         if (stored && typeof stored === "object") {
-            const result = {
+            let result = {
                 core: {
                     ...DEFAULT_SETTINGS.core,
                     ...(stored as any)?.core,
+                    network: {
+                        ...(DEFAULT_SETTINGS.core?.network || {}),
+                        ...((stored as any)?.core?.network || {})
+                    },
+                    socket: {
+                        ...(DEFAULT_SETTINGS.core?.socket || {}),
+                        ...((stored as any)?.core?.socket || {})
+                    },
+                    interop: {
+                        ...(DEFAULT_SETTINGS.core?.interop || {}),
+                        ...((stored as any)?.core?.interop || {})
+                    },
                     ops: {
                         ...(DEFAULT_SETTINGS.core?.ops || {}),
                         ...((stored as any)?.core?.ops || {})
@@ -230,13 +321,29 @@ export const loadSettings = async (): Promise<AppSettings> => {
                 }
             };
 
+            // CWSAndroid bridge may expose canonical native settings projection.
+            try {
+                const { getNativeUnifiedSettings, isCwsNativeIpcAvailable } = await import("../native/cws-bridge");
+                if (isCwsNativeIpcAvailable()) {
+                    const nativeSettings = await getNativeUnifiedSettings();
+                    if (nativeSettings && typeof nativeSettings === "object") {
+                        result = mergeAppSettingsShape(
+                            result as AppSettings,
+                            nativeSettings as Partial<AppSettings>
+                        );
+                    }
+                }
+            } catch {
+                // bridge optional in web / extension contexts
+            }
+
             console.log("[Settings] loadSettings result:", {
                 hasApiKey: !!result.ai?.apiKey,
                 instructionCount: result.ai?.customInstructions?.length || 0,
                 activeInstructionId: result.ai?.activeInstructionId || "(none)"
             });
 
-            return result;
+            return result as AppSettings;
         }
 
         console.log("[Settings] loadSettings - no stored data, returning defaults");
@@ -282,6 +389,21 @@ export const saveSettings = async (settings: AppSettings) => {
             ...(DEFAULT_SETTINGS.core || {}),
             ...(current.core || {}),
             ...(settings.core || {}),
+            network: {
+                ...(DEFAULT_SETTINGS.core?.network || {}),
+                ...(current.core?.network || {}),
+                ...(settings.core?.network || {})
+            },
+            socket: {
+                ...(DEFAULT_SETTINGS.core?.socket || {}),
+                ...(current.core?.socket || {}),
+                ...(settings.core?.socket || {})
+            },
+            interop: {
+                ...(DEFAULT_SETTINGS.core?.interop || {}),
+                ...(current.core?.interop || {}),
+                ...(settings.core?.interop || {})
+            },
             ops: {
                 ...(DEFAULT_SETTINGS.core?.ops || {}),
                 ...(current.core?.ops || {}),
@@ -353,6 +475,14 @@ export const saveSettings = async (settings: AppSettings) => {
         }
     };
     await idbPutSettings(merged);
+    try {
+        const { patchNativeUnifiedSettings, isCwsNativeIpcAvailable } = await import("../native/cws-bridge");
+        if (isCwsNativeIpcAvailable()) {
+            void patchNativeUnifiedSettings(merged as unknown as Record<string, unknown>);
+        }
+    } catch {
+        // bridge optional
+    }
     updateWebDavSettings(merged)?.catch?.(console.warn.bind(console));
     return merged;
 };

@@ -14,6 +14,33 @@ export type SwUnifiedMessage = {
     contentType?: string;
     data: unknown;
     metadata?: Record<string, unknown>;
+    purpose?: ("invoke" | "mail" | "attach" | "deliver" | "defer")[];
+    protocol?: string;
+    redirect?: boolean;
+    flags?: Record<string, unknown>;
+    op?: string;
+    sender?: string;
+    destinations?: string[];
+    ids?: Record<string, unknown>;
+    urls?: string[];
+    tokens?: string[];
+    toRoles?: string[];
+    status?: number;
+    results?: unknown;
+    timestamp?: number;
+    uuid?: string;
+    srcChannel?: string;
+    dstChannel?: string | string[];
+};
+
+const inferCanonicalOp = (type: string, explicit?: string): string => {
+    const op = String(explicit || "").trim().toLowerCase();
+    if (op) return op;
+    const normalizedType = String(type || "").trim().toLowerCase();
+    if (normalizedType.startsWith("request:")) return "request";
+    if (normalizedType.startsWith("response:")) return "response";
+    if (normalizedType.startsWith("notify:")) return "notify";
+    return "request";
 };
 
 const CHANNEL_BY_DESTINATION: Record<string, string> = {
@@ -36,18 +63,55 @@ async function postToBroadcast(name: string, message: SwUnifiedMessage): Promise
     }
 }
 
+function toSwProtocolEnvelope(
+    message: Omit<SwUnifiedMessage, "id" | "source"> & { id?: string; source?: string }
+): SwUnifiedMessage {
+    const source = message.source ?? "crx-service-worker";
+    const id = message.id?.trim() || crypto.randomUUID();
+    const destination = String(message.destination ?? "").trim() || undefined;
+    const destinations = destination ? [destination] : [];
+    const op = inferCanonicalOp(String(message.type || ""), message.op);
+    const now = Date.now();
+
+    return {
+        ...message,
+        id,
+        uuid: id,
+        source,
+        sender: message.sender ?? source,
+        srcChannel: source,
+        destination,
+        destinations,
+        dstChannel: destination,
+        purpose: Array.isArray(message.purpose) && message.purpose.length > 0 ? message.purpose : ["mail"],
+        protocol: message.protocol ?? "service-worker:http",
+        redirect: Boolean(message.redirect),
+        flags: message.flags ?? {},
+        op,
+        ids: message.ids ?? {
+            byId: source,
+            from: source,
+            sender: source,
+            destinations,
+        },
+        urls: message.urls ?? [],
+        tokens: message.tokens ?? [],
+        toRoles: message.toRoles ?? [],
+        timestamp: Number(message.timestamp ?? now),
+        metadata: {
+            timestamp: now,
+            ...(message.metadata ?? {})
+        }
+    };
+}
+
 export const unifiedMessaging = {
     async sendMessage(message: Omit<SwUnifiedMessage, "id" | "source"> & { id?: string; source?: string }): Promise<boolean> {
-        const dest = String(message.destination ?? "").trim();
+        const envelope = toSwProtocolEnvelope(message);
+        const dest = String(envelope.destination ?? "").trim();
         const channelName = CHANNEL_BY_DESTINATION[dest];
         if (!channelName) return false;
 
-        const full: SwUnifiedMessage = {
-            ...message,
-            id: message.id?.trim() || crypto.randomUUID(),
-            source: message.source ?? "crx-service-worker",
-        };
-
-        return postToBroadcast(channelName, full);
+        return postToBroadcast(channelName, envelope);
     },
 };

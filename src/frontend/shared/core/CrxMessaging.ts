@@ -27,6 +27,15 @@ export interface CrxMessage {
     tabId?: number;
     frameId?: number;
     data: any;
+    purpose?: ('invoke' | 'mail' | 'attach' | 'deliver' | 'defer')[];
+    protocol?: string;
+    redirect?: boolean;
+    flags?: Record<string, unknown>;
+    op?: string;
+    timestamp?: number;
+    uuid?: string;
+    srcChannel?: string;
+    dstChannel?: string | string[];
     metadata?: {
         timestamp?: number;
         correlationId?: string;
@@ -227,10 +236,19 @@ export class CrxRuntimeChannel implements CrxOptimizedWorkerChannelLike {
 
             const message: CrxMessage = {
                 id: messageId,
+                uuid: messageId,
                 type: `request:${method}`,
                 source: this.context,
                 target: this.target,
                 data: args.length === 1 ? args[0] : args,
+                purpose: ['invoke', 'mail'],
+                protocol: 'chrome',
+                redirect: false,
+                flags: {},
+                op: 'invoke',
+                timestamp: Date.now(),
+                srcChannel: this.context,
+                dstChannel: this.target,
                 metadata: { timestamp: Date.now() }
             };
 

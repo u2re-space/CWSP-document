@@ -10,7 +10,7 @@ import { loadAsAdopted, removeAdopted } from "fest/dom";
 import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@shells/types";
 import type { BaseViewOptions } from "@views/types";
 import { getString, setString } from "@rs-core/storage";
-import { sendMessage } from "@rs-com/core/UnifiedMessaging";
+import { sendViewProtocolMessage } from "@rs-com/core/UniformViewTransport";
 import {
     addSpeedDialItem,
     ensureSpeedDialMeta,
@@ -301,13 +301,13 @@ export class ExplorerView implements View {
             });
 
             try {
-                const sent = await sendMessage({
+                const sent = await sendViewProtocolMessage({
                     type: "content-view",
                     source: "explorer",
                     destination: "viewer",
                     contentType: file.type || "text/plain",
+                    attachments: [{ data: file, source: "explorer-viewer-open" }],
                     data: {
-                        file,
                         filename: file.name,
                         path: sourcePath,
                         source: sourcePath
@@ -352,13 +352,13 @@ export class ExplorerView implements View {
                 });
             }
 
-            const sent = await sendMessage({
+            const sent = await sendViewProtocolMessage({
                 type: "content-share",
                 source: "explorer",
                 destination: "workcenter",
                 contentType: file.type || "application/octet-stream",
+                attachments: [{ data: file, source: "explorer-workcenter-attach" }],
                 data: {
-                    file,
                     filename: file.name,
                     path: sourcePath,
                     source: "explorer-attach",
@@ -516,13 +516,13 @@ export class ExplorerView implements View {
             const firstTextLike = files.find((file) => isTextLikeFile(file));
             if (firstTextLike) {
                 requestOpenView({ viewId: "viewer", target: "window" });
-                const sent = await sendMessage({
+                const sent = await sendViewProtocolMessage({
                     type: "content-view",
                     source: "explorer-fallback",
                     destination: "viewer",
                     contentType: firstTextLike.type || "text/plain",
+                    attachments: [{ data: firstTextLike, source: "explorer-fallback" }],
                     data: {
-                        file: firstTextLike,
                         filename: firstTextLike.name,
                         source: "explorer-fallback"
                     }

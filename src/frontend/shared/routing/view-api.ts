@@ -5,6 +5,7 @@
  */
 
 import { viewBroadcastChannelName } from "@rs-com/config/Names";
+import { createProtocolEnvelope, sendProtocolMessage } from "@rs-com/core/UnifiedMessaging";
 
 export type ViewPostChannelPayload = {
     type: "view-post";
@@ -33,8 +34,10 @@ export type ViewOpenRequest = {
     channel?: string;
     /** Attached data assets from another process */
     attachments?: Array<{
+        hash?: string;
         name: string;
-        type: string;
+        type?: string;
+        mimeType?: string;
         size: number;
         data: File | Blob | string;
         source?: string;
@@ -54,6 +57,38 @@ export function postViewChannelPayload(viewId: string, payload: unknown): void {
     } catch (e) {
         console.warn("[view-api] Broadcast to view channel failed:", e);
     }
+}
+
+export async function postInterViewMessage(input: {
+    source: string;
+    destination: string;
+    type: string;
+    data?: Record<string, unknown>;
+    contentType?: string;
+    purpose?: ("invoke" | "mail" | "attach" | "deliver" | "defer")[];
+    op?: string;
+    metadata?: Record<string, unknown>;
+}): Promise<boolean> {
+    const envelope = createProtocolEnvelope({
+        type: input.type,
+        source: input.source,
+        destination: input.destination,
+        contentType: input.contentType,
+        data: input.data || {},
+        purpose: input.purpose || ["deliver", "mail"],
+        op: input.op || "deliver",
+        protocol: "window",
+        srcChannel: input.source,
+        dstChannel: input.destination,
+        metadata: input.metadata || {}
+    });
+
+    postViewChannelPayload(input.destination, {
+        type: "view-transfer",
+        message: envelope
+    } satisfies ViewTransferChannelPayload);
+
+    return sendProtocolMessage(envelope);
 }
 
 /**

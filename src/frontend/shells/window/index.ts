@@ -22,6 +22,7 @@ import { isEnabledView } from "@shared/routing/views";
 import style from "./index.scss?inline";
 import type { WindowFrameElement } from "/frontend/views";
 import { subscribeViewChannel, postViewChannelPayload } from "@rs-com/routing/view-api";
+import { normalizeIpcAttachments, sendViewProtocolMessage, type ViewAttachmentInput } from "@rs-com/core/UniformViewTransport";
 import "./components/WindowFrame";
 
 // ============================================================================
@@ -55,6 +56,25 @@ interface ProcessAttachment {
     data: File | Blob | string;
     source?: string;
 }
+
+const destinationForView = (viewId: ViewId): string => {
+    if (viewId === "workcenter") return "workcenter";
+    if (viewId === "viewer") return "viewer";
+    if (viewId === "explorer") return "explorer";
+    if (viewId === "editor") return "editor";
+    if (viewId === "settings") return "settings";
+    if (viewId === "history") return "history";
+    if (viewId === "airpad") return "airpad";
+    if (viewId === "print") return "print";
+    return "home";
+};
+
+const protocolTypeForDestination = (destination: string): string => {
+    if (destination === "workcenter") return "content-attach";
+    if (destination === "viewer") return "content-view";
+    if (destination === "explorer") return "content-explorer";
+    return "content-share";
+};
 
 /**
  * Per-process messaging channel.
@@ -338,8 +358,10 @@ export class WindowShell extends ShellBase {
                     type: a.type,
                     size: a.size,
                     source: a.source,
+                    data: a.data,
                 })),
             });
+            void this.relayAttachmentsToView(proc, openParams.attachments, "open-view");
         }
 
         return pid;
@@ -375,6 +397,46 @@ export class WindowShell extends ShellBase {
                 data: a.data,
             })),
         });
+        void this.relayAttachmentsToView(proc, attachments, "programmatic-attach");
+    }
+
+    private async relayAttachmentsToView(
+        proc: WindowProcess,
+        attachments: ProcessAttachment[],
+        source: string
+    ): Promise<void> {
+        if (!attachments.length) return;
+        const normalized = await normalizeIpcAttachments(
+            attachments.map((entry) => ({ data: entry.data, source: entry.source || source })) as ViewAttachmentInput[],
+            source
+        );
+        if (!normalized.length) return;
+
+        const destination = destinationForView(proc.viewId);
+        const type = protocolTypeForDestination(destination);
+        const first = normalized[0];
+        const sent = await sendViewProtocolMessage({
+            type,
+            source: `window-shell:${proc.pid}`,
+            destination,
+            contentType: first?.mimeType || "application/octet-stream",
+            attachments: normalized.map((entry) => ({ data: entry.data, source: entry.source })),
+            data: {
+                path: proc.openParams.query?.path || proc.openParams.query?.src || "/",
+                filename: first?.name,
+                action: destination === "explorer" ? "save" : undefined,
+                originView: proc.viewId,
+                pid: proc.pid
+            },
+            metadata: {
+                processId: proc.processId,
+                shell: "window",
+                from: source
+            }
+        });
+        if (!sent) {
+            console.warn(`[window] Failed to relay attachments to ${destination}`);
+        }
     }
 
     // ========================================================================
@@ -1057,7 +1119,7 @@ export class WindowShell extends ShellBase {
             proc.frame.classList.remove("is-drop-target");
         });
 
-        body.addEventListener("drop", (e) => {
+        body.addEventListener("drop", async (e) => {
             const event = e as DragEvent;
             event.preventDefault();
             proc.frame.classList.remove("is-drop-target");
@@ -1129,6 +1191,7 @@ export class WindowShell extends ShellBase {
                     viewId: proc.viewId,
                     attachments,
                 });
+                await this.relayAttachmentsToView(proc, attachments, "drop");
             }
         });
     }

@@ -109,15 +109,28 @@ type NetworkFetchResponse = {
 };
 
 type CoordinatorPacket = {
-    op?: "ask" | "act" | "resolve" | "result" | "error";
+    op?: "ask" | "act" | "resolve" | "result" | "error" | "signal" | "request" | "response" | "redirect" | "notify";
     what?: string;
+    type?: string;
+    purpose?: string;
+    protocol?: string;
     payload?: any;
     nodes?: string[];
+    destinations?: string[];
     uuid?: string;
     result?: any;
+    results?: any;
     error?: any;
     byId?: string;
     from?: string;
+    sender?: string;
+    ids?: Record<string, unknown> | string[];
+    urls?: string[];
+    tokens?: string[];
+    toRoles?: string[];
+    flags?: Record<string, unknown>;
+    status?: number;
+    redirect?: boolean;
     token?: string;
     timestamp?: number;
     [key: string]: unknown;
@@ -137,6 +150,40 @@ const coordinatorPending = new Map<string, {
     reject: (error: any) => void;
     timeoutId: ReturnType<typeof globalThis.setTimeout>;
 }>();
+const queuedCoordinatorActs: CoordinatorPacket[] = [];
+const MAX_QUEUED_COORDINATOR_ACTS = 128;
+
+const flushQueuedCoordinatorActs = (): void => {
+    if (!socket?.connected) return;
+    while (queuedCoordinatorActs.length > 0) {
+        const packet = queuedCoordinatorActs.shift();
+        if (!packet) continue;
+        emitCoordinatorPacket(packet);
+    }
+};
+
+const ensureCoordinatorSocketConnected = async (timeoutMs = 7000): Promise<boolean> => {
+    if (socket?.connected) return true;
+    connectWS();
+    return await new Promise<boolean>((resolve) => {
+        let done = false;
+        const finish = (value: boolean) => {
+            if (done) return;
+            done = true;
+            try {
+                off?.();
+            } catch {
+                // ignore
+            }
+            globalThis.clearTimeout(timeoutId);
+            resolve(value);
+        };
+        const off = onWSConnectionChange((connected) => {
+            if (connected) finish(true);
+        });
+        const timeoutId = globalThis.setTimeout(() => finish(Boolean(socket?.connected)), timeoutMs);
+    });
+};
 
 export function getWS(): Socket | null {
     return socket;
@@ -242,6 +289,28 @@ function safeJson(value: unknown): string {
     }
 }
 
+const extractClipboardText = (value: any): string => {
+    if (typeof value === "string") return value;
+    if (!value || typeof value !== "object") return "";
+    if (typeof value.text === "string") return value.text;
+    if (typeof value.content === "string") return value.content;
+    if (typeof value.data === "string") return value.data;
+    if (typeof value.result === "string") return value.result;
+    return "";
+};
+
+const inferPacketPurpose = (what: string): string => {
+    const normalized = String(what || "").trim().toLowerCase();
+    if (normalized.startsWith("clipboard:")) return "clipboard";
+    if (normalized.startsWith("mouse:")) return "mouse";
+    if (normalized.startsWith("keyboard:")) return "input";
+    if (normalized.startsWith("airpad:")) return "airpad";
+    if (normalized.startsWith("sms:")) return "sms";
+    if (normalized.startsWith("contacts:")) return "contact";
+    if (normalized.startsWith("notification:") || normalized.startsWith("notifications:")) return "general";
+    return "general";
+};
+
 const describeError = (error: unknown): string => {
     if (!error) return String(error);
     if (typeof error === "string") return error;
@@ -345,27 +414,85 @@ const isCoordinatorPacket = (value: unknown): value is CoordinatorPacket => {
     );
 };
 
+const mapFrameOpToRuntimeOp = (value: CoordinatorPacket["op"]): CoordinatorPacket["op"] => {
+    if (value === "request") return "ask";
+    if (value === "response") return "result";
+    if (value === "signal" || value === "notify" || value === "redirect") return "act";
+    return value;
+};
+
+const mapRuntimeOpToFrameOp = (value: CoordinatorPacket["op"]): CoordinatorPacket["op"] => {
+    if (value === "ask") return "request";
+    if (value === "result" || value === "resolve") return "response";
+    return value;
+};
+
+const toCanonicalCoordinatorPacket = (packet: CoordinatorPacket): CoordinatorPacket => {
+    const clientId = getClientId();
+    const authToken = getAuthToken();
+    const sender = String(packet.sender || packet.byId || packet.from || clientId || "").trim() || undefined;
+    const from = String(packet.from || sender || "").trim() || undefined;
+    const byId = String(packet.byId || sender || "").trim() || undefined;
+    const destinations = Array.isArray(packet.destinations) && packet.destinations.length
+        ? packet.destinations
+        : Array.isArray(packet.nodes)
+          ? packet.nodes
+          : getCoordinatorNodes();
+    const uuid = typeof packet.uuid === "string" && packet.uuid.trim()
+        ? packet.uuid.trim()
+        : nextPacketId();
+    const now = Date.now();
+    return {
+        ...packet,
+        op: mapRuntimeOpToFrameOp(packet.op),
+        type: String(packet.type || packet.what || "").trim() || packet.what,
+        protocol: String(packet.protocol || "ws").trim() || "ws",
+        purpose: String(packet.purpose || inferPacketPurpose(String(packet.what || packet.type || ""))).trim() || "general",
+        sender,
+        byId,
+        from,
+        nodes: destinations,
+        destinations,
+        ids: typeof packet.ids === "object" && packet.ids != null
+            ? packet.ids
+            : {
+                byId,
+                from,
+                sender,
+                destinations,
+            },
+        urls: Array.isArray(packet.urls) && packet.urls.length ? packet.urls : [getRemoteHost()],
+        tokens: Array.isArray(packet.tokens) && packet.tokens.length ? packet.tokens : (authToken ? [authToken] : []),
+        token: packet.token || authToken || undefined,
+        flags: packet.flags || { canonicalV2: true },
+        uuid,
+        timestamp: Number(packet.timestamp || 0) > 0 ? Number(packet.timestamp) : now,
+    };
+};
+
 const handleCoordinatorPacket = async (packet: CoordinatorPacket): Promise<void> => {
+    const op = mapFrameOpToRuntimeOp(packet.op);
+    const what = (packet.what || packet.type || "").trim();
     const uuid = typeof packet.uuid === "string" ? packet.uuid : "";
     if (uuid && coordinatorPending.has(uuid)) {
         const pending = coordinatorPending.get(uuid);
         if (pending) {
             clearTimeout(pending.timeoutId);
             coordinatorPending.delete(uuid);
-            if (packet.op === "error" || packet.error !== undefined) {
+            if (op === "error" || packet.error !== undefined) {
                 pending.reject(packet.error ?? { ok: false, error: "Unknown coordinator error" });
             } else {
-                pending.resolve(packet.result);
+                pending.resolve(packet.result ?? packet.results);
             }
         }
         return;
     }
 
-    if (packet.op === "ask" && packet.what === "clipboard:get") {
+    if (op === "ask" && what === "clipboard:get") {
         try {
             const text = await readClipboardTextFromDevice();
             emitCoordinatorPacket({
-                ...buildCoordinatorPacket("result", packet.what, null, {
+                ...buildCoordinatorPacket("result", what, null, {
                     uuid,
                     nodes: packet.from ? [packet.from] : undefined
                 }),
@@ -373,7 +500,7 @@ const handleCoordinatorPacket = async (packet: CoordinatorPacket): Promise<void>
             });
         } catch (error: any) {
             emitCoordinatorPacket({
-                ...buildCoordinatorPacket("error", packet.what, null, {
+                ...buildCoordinatorPacket("error", what, null, {
                     uuid,
                     nodes: packet.from ? [packet.from] : undefined
                 }),
@@ -383,16 +510,16 @@ const handleCoordinatorPacket = async (packet: CoordinatorPacket): Promise<void>
         return;
     }
 
-    if (packet.what === "clipboard:update") {
-        const clipboardPayload = packet.result ?? packet.payload;
-        const text = typeof clipboardPayload?.text === "string" ? clipboardPayload.text : "";
+    if (what === "clipboard:update") {
+        const clipboardPayload = packet.result ?? packet.results ?? packet.payload;
+        const text = extractClipboardText(clipboardPayload);
         void applyIncomingClipboardText(text, { source: clipboardPayload?.source });
     }
 };
 
 const emitCoordinatorPacket = (packet: CoordinatorPacket): boolean => {
     if (!socket || !socket.connected) return false;
-    socket.emit("data", packet);
+    socket.emit("data", toCanonicalCoordinatorPacket(packet));
     return true;
 };
 
@@ -405,13 +532,27 @@ const buildCoordinatorPacket = (
     const clientId = getClientId();
     const authToken = getAuthToken();
     return {
-        op,
+        op: mapRuntimeOpToFrameOp(op),
         what,
+        type: what,
+        purpose: inferPacketPurpose(what),
+        protocol: "ws",
         payload,
         nodes: options.nodes ?? getCoordinatorNodes(),
+        destinations: options.nodes ?? getCoordinatorNodes(),
         uuid: options.uuid,
+        sender: clientId,
         byId: clientId,
         from: clientId,
+        ids: {
+            byId: clientId,
+            from: clientId,
+            sender: clientId,
+            destinations: options.nodes ?? getCoordinatorNodes(),
+        },
+        urls: [getRemoteHost()],
+        tokens: authToken ? [authToken] : [],
+        flags: { canonicalV2: true },
         token: authToken || undefined,
         timestamp: Date.now()
     };
@@ -690,42 +831,53 @@ async function tryRequestLocalNetworkPermission(origin: string, host: string): P
 }
 
 export function sendCoordinatorAct(what: string, payload: any, nodes?: string[]): boolean {
-    return emitCoordinatorPacket(buildCoordinatorPacket("act", what, payload, { nodes }));
+    const packet = buildCoordinatorPacket("act", what, payload, { nodes });
+    if (emitCoordinatorPacket(packet)) {
+        return true;
+    }
+    if (queuedCoordinatorActs.length >= MAX_QUEUED_COORDINATOR_ACTS) {
+        queuedCoordinatorActs.shift();
+    }
+    queuedCoordinatorActs.push(packet);
+    connectWS();
+    return true;
 }
 
 export function sendCoordinatorAsk(what: string, payload: any, nodes?: string[]): Promise<any> {
     return new Promise((resolve, reject) => {
-        if (!socket || !socket.connected) {
-            reject({ ok: false, error: "WS not connected" });
-            return;
-        }
-
-        const uuid = nextPacketId();
-        const timeoutId = globalThis.setTimeout(() => {
-            coordinatorPending.delete(uuid);
-            reject({ ok: false, error: `Timeout waiting for ${what}` });
-        }, AIRPAD_COORDINATOR_TIMEOUT_MS);
-
-        coordinatorPending.set(uuid, { resolve, reject, timeoutId });
-        emitCoordinatorPacket(buildCoordinatorPacket("ask", what, payload, { nodes, uuid }));
+        void (async () => {
+            const connected = await ensureCoordinatorSocketConnected();
+            if (!connected || !socket?.connected) {
+                reject({ ok: false, error: "WS not connected" });
+                return;
+            }
+            const uuid = nextPacketId();
+            const timeoutId = globalThis.setTimeout(() => {
+                coordinatorPending.delete(uuid);
+                reject({ ok: false, error: `Timeout waiting for ${what}` });
+            }, AIRPAD_COORDINATOR_TIMEOUT_MS);
+            coordinatorPending.set(uuid, { resolve, reject, timeoutId });
+            emitCoordinatorPacket(buildCoordinatorPacket("ask", what, payload, { nodes, uuid }));
+        })();
     });
 }
 
 export function sendCoordinatorRequest(what: string, payload: any, nodes?: string[]): Promise<any> {
     return new Promise((resolve, reject) => {
-        if (!socket || !socket.connected) {
-            reject({ ok: false, error: "WS not connected" });
-            return;
-        }
-
-        const uuid = nextPacketId();
-        const timeoutId = globalThis.setTimeout(() => {
-            coordinatorPending.delete(uuid);
-            reject({ ok: false, error: `Timeout waiting for ${what}` });
-        }, AIRPAD_COORDINATOR_TIMEOUT_MS);
-
-        coordinatorPending.set(uuid, { resolve, reject, timeoutId });
-        emitCoordinatorPacket(buildCoordinatorPacket("act", what, payload, { nodes, uuid }));
+        void (async () => {
+            const connected = await ensureCoordinatorSocketConnected();
+            if (!connected || !socket?.connected) {
+                reject({ ok: false, error: "WS not connected" });
+                return;
+            }
+            const uuid = nextPacketId();
+            const timeoutId = globalThis.setTimeout(() => {
+                coordinatorPending.delete(uuid);
+                reject({ ok: false, error: `Timeout waiting for ${what}` });
+            }, AIRPAD_COORDINATOR_TIMEOUT_MS);
+            coordinatorPending.set(uuid, { resolve, reject, timeoutId });
+            emitCoordinatorPacket(buildCoordinatorPacket("act", what, payload, { nodes, uuid }));
+        })();
     });
 }
 
@@ -775,6 +927,9 @@ function setWsStatusTlsHostnameHint(hostname: string) {
 
 function setWsStatus(connected: boolean) {
     wsConnected = connected;
+    if (connected) {
+        flushQueuedCoordinatorActs();
+    }
     const wsStatusEl = getWsStatusEl();
     if (wsStatusEl) {
         wsStatusEl.classList.remove(WS_STATUS_TLS_HINT_CLASS);
@@ -1217,7 +1372,7 @@ export function connectWS() {
         clientId: string,
         peerInstanceId: string,
         engine: EngineLike | undefined,
-        onEngineClose: (code?: number, reason?: unknown) => void,
+        onEngineClose: (...args: unknown[]) => void,
         onEngineError: (error: unknown) => void
     ) => {
         socket = probeSocket;
@@ -1316,7 +1471,7 @@ export function connectWS() {
 
         socket.on("clipboard:update", async (msg: any) => {
             const decoded = await unwrapIncomingPayload(msg);
-            const text = typeof decoded?.text === "string" ? decoded.text : "";
+            const text = extractClipboardText(decoded);
             void applyIncomingClipboardText(text, { source: decoded?.source });
         });
         socket.on("data", async (packet: any) => {
@@ -1373,7 +1528,7 @@ export function connectWS() {
                 url: string,
                 hs: ReturnType<typeof buildHandshakeForCandidate>,
                 engine: EngineLike | undefined,
-                oec: (code?: number, reason?: unknown) => void,
+                oec: (...args: unknown[]) => void,
                 oee: (error: unknown) => void
             ) => {
                 if (settled) return;
@@ -1437,7 +1592,9 @@ export function connectWS() {
                     forceNew: true
                 });
                 const engine = (probeSocket as any).io?.engine as EngineLike | undefined;
-                const onEngineClose = (code?: number, reason?: unknown) => {
+                const onEngineClose = (...args: unknown[]) => {
+                    const code = typeof args[0] === "number" ? args[0] : undefined;
+                    const reason = args.length > 1 ? args[1] : undefined;
                     logWsState(
                         "engine-close",
                         `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} ` +

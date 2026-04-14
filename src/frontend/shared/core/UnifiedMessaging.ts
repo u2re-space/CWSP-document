@@ -6,8 +6,13 @@
 import {
     UnifiedMessagingManager,
     getUnifiedMessaging as getBaseMessaging,
-    sendMessage as baseSendMessage,
+    createProtocolEnvelope,
+    isProtocolEnvelope,
+    normalizeProtocolEnvelope,
     type UnifiedMessage,
+    type ProtocolMessage,
+    type CreateEnvelopeInput,
+    type UniformProtocolName,
     type MessageHandler,
     type WorkerChannelConfig,
     type PipelineConfig,
@@ -26,6 +31,9 @@ import { resolveAssociation, resolveAssociationPipeline } from './ContentAssocia
 // Re-export types for consumers
 export type {
     UnifiedMessage,
+    ProtocolMessage,
+    CreateEnvelopeInput,
+    UniformProtocolName,
     MessageHandler,
     WorkerChannelConfig,
     PipelineConfig,
@@ -91,6 +99,22 @@ export function sendMessage(message: Omit<UnifiedMessage, 'id' | 'source'> & { s
         source: message.source ?? 'unified-messaging'
     } as UnifiedMessage);
 }
+
+export function sendProtocolMessage(
+    message: Omit<CreateEnvelopeInput, 'source'> & { source?: string; protocol?: UniformProtocolName }
+): Promise<boolean> {
+    const envelope = createProtocolEnvelope({
+        ...message,
+        source: message.source ?? 'crossword-unified-messaging',
+        protocol: message.protocol ?? 'window',
+        purpose: message.purpose ?? 'mail',
+        srcChannel: message.srcChannel ?? (message.source ?? 'crossword-unified-messaging'),
+        dstChannel: message.dstChannel ?? message.destination
+    });
+    return unifiedMessaging.sendMessage(envelope as UnifiedMessage);
+}
+
+export { createProtocolEnvelope, isProtocolEnvelope, normalizeProtocolEnvelope };
 
 /**
  * Register a handler using the app-configured manager

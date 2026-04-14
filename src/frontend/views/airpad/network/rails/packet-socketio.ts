@@ -67,6 +67,64 @@ const toCoordinatorAction = (intent: AirPadIntent): { what: string; payload: any
     }
 };
 
+const toSpecAirpadAction = (action: { what: string; payload: any }): { what: string; payload: any } => {
+    if (action.what.startsWith("mouse:")) {
+        return {
+            what: "airpad:mouse",
+            payload: {
+                op: action.what,
+                params: [action.what],
+                data: action.payload
+            }
+        };
+    }
+    if (action.what.startsWith("keyboard:")) {
+        return {
+            what: "airpad:keyboard",
+            payload: {
+                op: action.what,
+                params: [action.what],
+                data: action.payload
+            }
+        };
+    }
+    return action;
+};
+
+const sendKeyboardTapCompat = async (key: string, modifier?: string[]): Promise<void> => {
+    const payload = { op: "keyboard:tap", params: ["keyboard:tap"], data: { key, modifier: modifier || [] } };
+    try {
+        await sendCoordinatorRequest("airpad:keyboard", payload);
+    } catch {
+        await sendCoordinatorRequest("keyboard:tap", { key, modifier: modifier || [] });
+    }
+};
+
+const requestClipboardReadCompat = async (): Promise<string> => {
+    try {
+        const text = await sendCoordinatorRequest("airpad:clipboard:read", {
+            op: "airpad:clipboard:read",
+            params: ["airpad:clipboard:read"]
+        });
+        return typeof text === "string" ? text : String(text || "");
+    } catch {
+        const text = await sendCoordinatorRequest("clipboard:get", {});
+        return typeof text === "string" ? text : String(text || "");
+    }
+};
+
+const requestClipboardWriteCompat = async (text: string): Promise<void> => {
+    try {
+        await sendCoordinatorRequest("airpad:clipboard:write", {
+            op: "airpad:clipboard:write",
+            params: ["airpad:clipboard:write"],
+            data: { text }
+        });
+    } catch {
+        await sendCoordinatorRequest("clipboard:update", { text });
+    }
+};
+
 export const initPacketSocketIoRail = (button: HTMLElement | null): void => {
     initWebSocket(button);
 };
@@ -97,7 +155,8 @@ export const sendPacketSocketIoIntent = (intent: AirPadIntent): void => {
     }
     const action = toCoordinatorAction(intent);
     if (!action) return;
-    sendCoordinatorAct(action.what, action.payload);
+    const specAction = toSpecAirpadAction(action);
+    sendCoordinatorAct(specAction.what, specAction.payload);
 };
 
 export const sendPacketSocketIoBinary = (buffer: ArrayBuffer | Uint8Array): void => {
@@ -126,8 +185,8 @@ export const requestPacketSocketIoClipboardRead = async (): Promise<AirPadClipbo
         return { ok: false, error: "Remote clipboard bridge disabled in Settings → Server → Embedded shell." };
     }
     try {
-        const text = await sendCoordinatorRequest("clipboard:get", {});
-        return { ok: true, text: typeof text === "string" ? text : String(text || "") };
+        const text = await requestClipboardReadCompat();
+        return { ok: true, text };
     } catch (error: any) {
         return { ok: false, error: error?.error || error?.message || String(error) };
     }
@@ -138,7 +197,7 @@ export const requestPacketSocketIoClipboardCopy = async (): Promise<AirPadClipbo
         return { ok: false, error: "Remote clipboard bridge disabled in Settings → Server → Embedded shell." };
     }
     try {
-        await sendCoordinatorRequest("keyboard:tap", { key: "c", modifier: ["control"] });
+        await sendKeyboardTapCompat("c", ["control"]);
         await sleep(60);
         return await requestPacketSocketIoClipboardRead();
     } catch (error: any) {
@@ -151,7 +210,7 @@ export const requestPacketSocketIoClipboardCut = async (): Promise<AirPadClipboa
         return { ok: false, error: "Remote clipboard bridge disabled in Settings → Server → Embedded shell." };
     }
     try {
-        await sendCoordinatorRequest("keyboard:tap", { key: "x", modifier: ["control"] });
+        await sendKeyboardTapCompat("x", ["control"]);
         await sleep(60);
         return await requestPacketSocketIoClipboardRead();
     } catch (error: any) {
@@ -164,9 +223,9 @@ export const requestPacketSocketIoClipboardPaste = async (text: string): Promise
         return { ok: false, error: "Remote clipboard bridge disabled in Settings → Server → Embedded shell." };
     }
     try {
-        await sendCoordinatorRequest("clipboard:update", { text });
+        await requestClipboardWriteCompat(text);
         await sleep(20);
-        await sendCoordinatorRequest("keyboard:tap", { key: "v", modifier: ["control"] });
+        await sendKeyboardTapCompat("v", ["control"]);
         return { ok: true };
     } catch (error: any) {
         return { ok: false, error: error?.error || error?.message || String(error) };

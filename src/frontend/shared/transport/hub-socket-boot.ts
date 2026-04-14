@@ -8,8 +8,10 @@ import { loadSettings } from "../config/Settings";
 import {
     applyAirpadRuntimeFromAppSettings,
     getRemoteHost,
-    isMaintainHubSocketConnectionEnabled
+    isMaintainHubSocketConnectionEnabled,
+    isPreferNativeWebsocketEnabled
 } from "../../views/airpad/config/config";
+import { isCapacitorCwsNativeShell } from "../native/cws-bridge";
 
 /**
  * Load stored settings, apply AirPad / shell runtime, then connect or disconnect the hub socket.
@@ -24,6 +26,10 @@ export async function bootHubSocketFromStoredSettings(): Promise<void> {
  */
 export async function applyHubSocketFromSettings(settings: AppSettings): Promise<void> {
     applyAirpadRuntimeFromAppSettings(settings);
+
+    if (isCapacitorCwsNativeShell() && isPreferNativeWebsocketEnabled()) {
+        return;
+    }
 
     if (!isMaintainHubSocketConnectionEnabled()) {
         // Do not disconnect: user may still use a manual AirPad "WS" connection.
