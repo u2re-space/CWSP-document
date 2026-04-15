@@ -58,6 +58,7 @@ const AIRPAD_PROBE_IO_TIMEOUT_MS = 4800;
 const AIRPAD_PROBE_HARD_CAP_MS = AIRPAD_PROBE_IO_TIMEOUT_MS + 800;
 /** Try this many candidates in parallel; first success wins. */
 const AIRPAD_CANDIDATE_PARALLEL = 3;
+const AIRPAD_VERBOSE_QUERY_KEY = "CWS_AIRPAD_VERBOSE_QUERY";
 /** Coordinator ask/act wait — was 12s, tighter for snappier UI. */
 const AIRPAD_COORDINATOR_TIMEOUT_MS = 8000;
 const AIRPAD_CONNECTION_TYPE = "exchanger-initiator";
@@ -75,6 +76,21 @@ const isChromiumExtensionRuntime = (): boolean => {
     } catch {
         return false;
     }
+};
+
+const shouldUseVerboseAirpadQuery = (): boolean => {
+    try {
+        const local = String(globalThis?.localStorage?.getItem?.(AIRPAD_VERBOSE_QUERY_KEY) || "")
+            .trim()
+            .toLowerCase();
+        if (["1", "true", "yes", "on"].includes(local)) return true;
+    } catch {
+        // Ignore localStorage access issues in restricted contexts.
+    }
+    const runtimeFlag = String((globalThis as any)?.[AIRPAD_VERBOSE_QUERY_KEY] || "")
+        .trim()
+        .toLowerCase();
+    return ["1", "true", "yes", "on"].includes(runtimeFlag);
 };
 
 type WSConnectionHandler = (connected: boolean) => void;
@@ -114,6 +130,7 @@ type CoordinatorPacket = {
     type?: string;
     purpose?: string;
     protocol?: string;
+    transport?: string;
     payload?: any;
     nodes?: string[];
     destinations?: string[];
@@ -134,6 +151,16 @@ type CoordinatorPacket = {
     token?: string;
     timestamp?: number;
     [key: string]: unknown;
+};
+
+const FRAME_PROTOCOL_SOCKET = "socket";
+const LEGACY_SOCKET_TRANSPORT = "ws";
+
+const normalizeCoordinatorProtocol = (value: unknown): string => {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) return FRAME_PROTOCOL_SOCKET;
+    if (raw === "ws" || raw === "wss" || raw === "socket.io" || raw === "socketio") return FRAME_PROTOCOL_SOCKET;
+    return raw;
 };
 
 const textEncoder = new TextEncoder();
@@ -446,7 +473,8 @@ const toCanonicalCoordinatorPacket = (packet: CoordinatorPacket): CoordinatorPac
         ...packet,
         op: mapRuntimeOpToFrameOp(packet.op),
         type: String(packet.type || packet.what || "").trim() || packet.what,
-        protocol: String(packet.protocol || "ws").trim() || "ws",
+        protocol: normalizeCoordinatorProtocol(packet.protocol),
+        transport: String(packet.transport || LEGACY_SOCKET_TRANSPORT).trim() || LEGACY_SOCKET_TRANSPORT,
         purpose: String(packet.purpose || inferPacketPurpose(String(packet.what || packet.type || ""))).trim() || "general",
         sender,
         byId,
@@ -536,7 +564,8 @@ const buildCoordinatorPacket = (
         what,
         type: what,
         purpose: inferPacketPurpose(what),
-        protocol: "ws",
+        protocol: FRAME_PROTOCOL_SOCKET,
+        transport: LEGACY_SOCKET_TRANSPORT,
         payload,
         nodes: options.nodes ?? getCoordinatorNodes(),
         destinations: options.nodes ?? getCoordinatorNodes(),
@@ -1329,35 +1358,25 @@ export function connectWS() {
         }
 
         const queryParams: Record<string, string> = {};
-        const cleanedClientId = clientId.trim();
-        if (authToken) {
-            queryParams.token = authToken;
-            queryParams.airpadToken = authToken;
-        }
-        if (cleanedClientId) {
-            queryParams.clientId = cleanedClientId;
-            queryParams.__airpad_src = cleanedClientId;
-            queryParams.__airpad_client = cleanedClientId;
-        }
         if (peerInstanceId) {
             queryParams.peerInstanceId = peerInstanceId;
             queryParams.deviceInstanceId = peerInstanceId;
         }
-        queryParams.__airpad_hop = candidate.host || remoteHost || "unknown";
-        queryParams.__airpad_host = candidate.host || remoteHost || "";
-        queryParams.__airpad_target = targetHost || "";
         queryParams.connectionType = AIRPAD_CONNECTION_TYPE;
         queryParams.archetype = AIRPAD_ARCHETYPE;
         queryParams.__airpad_via = !isSameAsTargetHost() ? "tunnel" : candidate.source || "unknown";
         queryParams.__airpad_endpoint = isSameAsTargetHost() ? "1" : "0";
-        queryParams.__airpad_target_port = targetPort;
-        queryParams.__airpad_via_port = candidate.port || "";
-        queryParams.__airpad_protocol = candidate.protocol || "https";
         if (resolvedRouteTarget) {
             queryParams.__airpad_route = resolvedRouteTarget;
-            if (!routeTarget) {
-                queryParams.__airpad_route_target = targetHost || "";
-            }
+            queryParams.__airpad_route_target = routeTarget || targetHost || resolvedRouteTarget;
+        }
+        if (shouldUseVerboseAirpadQuery()) {
+            queryParams.__airpad_hop = candidate.host || remoteHost || "unknown";
+            queryParams.__airpad_host = candidate.host || remoteHost || "";
+            queryParams.__airpad_target = targetHost || "";
+            queryParams.__airpad_target_port = targetPort;
+            queryParams.__airpad_via_port = candidate.port || "";
+            queryParams.__airpad_protocol = candidate.protocol || "https";
         }
 
         return { url, authToken, clientId, peerInstanceId, handshakeAuth, queryParams };

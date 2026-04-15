@@ -724,6 +724,8 @@ const openClipboardDB = async (): Promise<IDBDatabase> => {
 // Broadcast helpers for cross-context communication
 // These send messages to the frontend via BroadcastChannel
 const toCanonicalSwBroadcastEnvelope = (channel: string, message: unknown): unknown => {
+    const canonicalProtocol = "worker";
+    const legacyTransport = "service-worker:http";
     if (!message || typeof message !== 'object') {
         const id = crypto.randomUUID();
         return {
@@ -733,7 +735,8 @@ const toCanonicalSwBroadcastEnvelope = (channel: string, message: unknown): unkn
             sender: 'service-worker',
             destination: channel,
             destinations: [channel],
-            protocol: 'service-worker:http',
+            protocol: canonicalProtocol,
+            transport: legacyTransport,
             op: 'notify',
             what: 'sw:broadcast',
             type: 'sw:broadcast',
@@ -764,7 +767,8 @@ const toCanonicalSwBroadcastEnvelope = (channel: string, message: unknown): unkn
         sender,
         destination: typeof base.destination === 'string' && base.destination.trim() ? base.destination.trim() : channel,
         destinations: Array.isArray(base.destinations) && base.destinations.length ? base.destinations : [channel],
-        protocol: typeof base.protocol === 'string' && base.protocol.trim() ? base.protocol.trim() : 'service-worker:http',
+        protocol: typeof base.protocol === 'string' && base.protocol.trim() ? base.protocol.trim() : canonicalProtocol,
+        transport: typeof base.transport === 'string' && base.transport.trim() ? base.transport.trim() : legacyTransport,
         op,
         what: typeof base.what === 'string' && base.what.trim() ? base.what.trim() : String(base.type || 'sw:broadcast'),
         type: typeof base.type === 'string' && base.type.trim() ? base.type.trim() : String(base.what || 'sw:broadcast'),
@@ -1351,7 +1355,7 @@ registerRoute(
     new NetworkOnly({
         fetchOptions: {
             cache: 'no-store',
-            credentials: 'omit',
+            credentials: 'same-origin',
         }
     })
 );

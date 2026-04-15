@@ -193,7 +193,7 @@ When the task is relevant, also inspect these paths:
 
 - **Analysis / architecture / planning:** Claude Opus 4.6, GPT 5.4 (`high` or `xhigh`), Gemini 3.1 Pro
 - **Coding / implementation / refactoring:** GPT-5.4 (`low` or `medium`), Claude 4.6 Sonnet, Gemini 3.1 Pro
-- **Edits / fixes / refinements:** GPT-5.3-codex-spark, GPT-5.4 (`instant`, `none`, or `minimal` reasoning), Claude 4.5 Haiku, Gemini 3 Flash
+- **Edits / fixes / refinements:** `GPT-5.3-codex-spark`, GPT-5.4 (`instant`, `none`, or `minimal` reasoning), Claude 4.5 Haiku, Gemini 3 Flash
 - **Documentation / specs:** GPT-5.4 (`low` or `medium`), Claude 4.6 Sonnet, Gemini 3.1 Pro
 - **Recognition / scanning / images:** GPT-5.4 (`low`, `instant`, `none`, or `minimal`), Claude 4.6 Sonnet, Gemini 3.1 Pro, or Gemini 3 Flash
 

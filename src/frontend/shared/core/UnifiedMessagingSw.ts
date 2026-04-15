@@ -16,6 +16,7 @@ export type SwUnifiedMessage = {
     metadata?: Record<string, unknown>;
     purpose?: ("invoke" | "mail" | "attach" | "deliver" | "defer")[];
     protocol?: string;
+    transport?: string;
     redirect?: boolean;
     flags?: Record<string, unknown>;
     op?: string;
@@ -32,6 +33,9 @@ export type SwUnifiedMessage = {
     srcChannel?: string;
     dstChannel?: string | string[];
 };
+
+const SW_CANONICAL_PROTOCOL = "worker";
+const SW_LEGACY_TRANSPORT = "service-worker:http";
 
 const inferCanonicalOp = (type: string, explicit?: string): string => {
     const op = String(explicit || "").trim().toLowerCase();
@@ -84,7 +88,8 @@ function toSwProtocolEnvelope(
         destinations,
         dstChannel: destination,
         purpose: Array.isArray(message.purpose) && message.purpose.length > 0 ? message.purpose : ["mail"],
-        protocol: message.protocol ?? "service-worker:http",
+        protocol: message.protocol ?? SW_CANONICAL_PROTOCOL,
+        transport: message.transport ?? SW_LEGACY_TRANSPORT,
         redirect: Boolean(message.redirect),
         flags: message.flags ?? {},
         op,

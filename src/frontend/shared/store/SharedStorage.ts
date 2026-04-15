@@ -30,7 +30,10 @@ export class SharedStorage {
     }
 
     doRequest(url: string, method: string, body?: any) {
-        return fetch(url, { method, body: body ? JSOX.stringify(body as any) as string : undefined, headers: { "Content-Type": "application/json", "Authorization": `Bearer ${this.apiKey}` } });
+        const normalizedMethod = ((method || "GET").trim().toUpperCase() || "GET");
+        const serializedBody = body ? JSOX.stringify(body as any) as string : undefined;
+        const finalMethod = normalizedMethod === "GET" && serializedBody ? "POST" : normalizedMethod;
+        return fetch(url, { method: finalMethod, body: finalMethod === "GET" || finalMethod === "HEAD" ? undefined : serializedBody, headers: { "Content-Type": "application/json", "Authorization": `Bearer ${this.apiKey}` } });
     }
 
     async get(key: string) {
