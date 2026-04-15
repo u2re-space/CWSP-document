@@ -1,4 +1,17 @@
 /// <reference lib="webworker" />
+/**
+ * CrossWord service worker.
+ *
+ * Responsibilities:
+ * - Workbox caching and offline navigation
+ * - share-target ingestion and cache staging
+ * - background broadcast/notification helpers
+ * - lightweight content-association rules that decide how incoming share or
+ *   background payloads should be handled before the window app is ready
+ *
+ * AI-READ: this is the worker-side complement to `frontend/pwa/sw-handling.ts`.
+ * Keep worker-safe assumptions here; DOM/window-only logic belongs on the page side.
+ */
 import "./sw-preamble";
 import { registerRoute, setCatchHandler, setDefaultHandler } from 'workbox-routing'
 import { CacheFirst, NetworkFirst, StaleWhileRevalidate, NetworkOnly } from 'workbox-strategies'
@@ -141,7 +154,11 @@ function checkSWAssociationConditions(conditions: SWAssociationCondition[], cont
 }
 
 /**
- * Resolve content association for service worker processing
+ * Pick the highest-priority worker action for a piece of incoming content.
+ *
+ * WHY: share-target, launch-queue, push, and background-sync payloads all
+ * enter through different browser events but should be normalized through one
+ * decision table before handlers run.
  */
 function resolveSWContentAssociation(
     contentType: string,
@@ -159,9 +176,7 @@ function resolveSWContentAssociation(
     return matches.length > 0 ? matches[0] : null;
 }
 
-/**
- * Process content based on association rules
- */
+/** Execute the worker action resolved by `resolveSWContentAssociation()`. */
 async function processContentWithAssociation(
     contentType: string,
     context: SWContentContext,
@@ -1322,7 +1337,8 @@ registerRoute(
 );
 
 // Never cache/proxy local-network control channels.
-// This avoids SW interference with PNA/LNA handshakes and Socket.IO transports.
+// WHY: connection bugs here often look like "socket transport failed" even when
+// the real issue is the service worker intercepting probe/control traffic.
 registerRoute(
     ({ url }) => {
         const host = url?.hostname || '';

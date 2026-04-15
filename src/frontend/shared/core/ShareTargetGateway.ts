@@ -1,3 +1,11 @@
+/**
+ * Helpers for moving share-target payloads between the service worker, Cache
+ * Storage, and the foreground app.
+ *
+ * WHY: share-target launches often happen before the main app is ready. These
+ * helpers persist the payload in browser-managed caches so the UI can consume
+ * it later without depending on a live in-memory handoff.
+ */
 import { API_ENDPOINTS } from "@rs-com/config/Names";
 
 export const SHARE_CACHE_NAME = "share-target-data";
@@ -28,6 +36,7 @@ export type SwCachedContentItem = {
 const hasCaches = (): boolean =>
     typeof window !== "undefined" && "caches" in window;
 
+/** Persist the last share-target payload so the app can recover it after navigation or cold start. */
 export const storeShareTargetPayloadToCache = async (payload: { files: File[]; meta?: Record<string, unknown> }): Promise<boolean> => {
     if (!hasCaches()) return false;
 
@@ -85,6 +94,10 @@ export const storeShareTargetPayloadToCache = async (payload: { files: File[]; m
     }
 };
 
+/**
+ * Rehydrate the cached share-target payload and optionally clear the consumed
+ * cache entries so they are not replayed on the next app load.
+ */
 export const consumeCachedShareTargetPayload = async (opts: { clear?: boolean } = {}): Promise<CachedShareTargetPayload | null> => {
     const clear = opts.clear !== false;
     if (!hasCaches()) return null;
@@ -127,6 +140,7 @@ export const consumeCachedShareTargetPayload = async (opts: { clear?: boolean } 
     }
 };
 
+/** Read the service worker's advertised cached content entries through the HTTP bridge. */
 export const fetchSwCachedEntries = async (): Promise<SwCachedContentItem[]> => {
     try {
         const response = await fetch(API_ENDPOINTS.SW_CONTENT_AVAILABLE);
@@ -157,6 +171,7 @@ export const fetchSwCachedEntries = async (): Promise<SwCachedContentItem[]> => 
     }
 };
 
+/** Fetch share-target files exposed by the service worker-side manifest endpoint. */
 export const fetchCachedShareFiles = async (cacheKey = "latest"): Promise<File[]> => {
     try {
         const response = await fetch(`/share-target-files?cacheKey=${encodeURIComponent(cacheKey)}`);

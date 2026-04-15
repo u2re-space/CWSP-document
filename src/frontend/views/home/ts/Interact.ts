@@ -1,3 +1,10 @@
+/**
+ * Grid/tile interaction helpers for the home/orient workspace.
+ *
+ * This module centralizes draggable tile behavior, CSS custom-property based
+ * animation state, and cell reflection logic so the home view can keep its
+ * layout deterministic across HMR, resize, and drag/drop interactions.
+ */
 import { RAFBehavior, orientOf, setStyleProperty, resolveGridCellFromClientPoint } from "fest/dom";
 import { makeObjectAssignable, observe, affected, numberRef } from "fest/object";
 import { makeShiftTrigger, LongPressHandler, clampCell, bindDraggable } from "fest/lure";
@@ -44,7 +51,7 @@ const registeredCSSProperties = new Set<string>();
 // NO axis swapping by orientation — that was the root bug.
 const depAxis = (axis: "x" | "y"): "c" | "r" => axis === "x" ? "c" : "r";
 
-// WAAPI keyframes for one axis of the settle animation.
+/** WAAPI keyframes for one axis of the settle animation. */
 export const animationSequence = (dragCoord = 0, axis: "x" | "y" = "x") => {
     const drag = "--drag-" + axis;
     const csDrag = "--cs-drag-" + axis;
@@ -55,7 +62,7 @@ export const animationSequence = (dragCoord = 0, axis: "x" | "y" = "x") => {
     ];
 };
 
-// Single-axis settle animation (kept for external consumers).
+/** Run the single-axis settle animation used after a drag interaction finishes. */
 export const doAnimate = async (
     newItem: HTMLElement,
     axis: "x" | "y" = "x",
@@ -88,7 +95,7 @@ export const doAnimate = async (
     return animation;
 };
 
-// Apply cell redirect and reflect on element styles.
+/** Apply redirected grid coordinates back onto the element's style-driven layout state. */
 export const reflectCell = async (newItem: HTMLElement, pArgs: GridArgsType, _withAnimate = false): Promise<void> => {
     const layout: [number, number] = [
         (pArgs?.layout as any)?.columns || pArgs?.layout?.[0] || 4,

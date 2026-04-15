@@ -1,4 +1,10 @@
-// PWA clipboard and service worker communication
+/**
+ * Window-side PWA integration helpers.
+ *
+ * This module bridges the main app with the service worker, share-target cache,
+ * launch-queue API, and broadcast-based clipboard/share flows. It exists on the
+ * page side, while `src/pwa/sw.ts` owns the worker-side behavior.
+ */
 import { initPWAClipboard } from "./pwa-copy";
 import { showToast } from "@fl-ui/items/overlay/Toast";
 import { ensureServiceWorkerRegistered } from "./sw-url";
@@ -17,6 +23,7 @@ import { waitForIngressPipelineSlot } from "@rs-frontend/shared/policies/ingress
 // CSS INJECTION
 // ============================================================================
 
+/** Ensure the production app CSS bundle is present when the app boots outside extension pages. */
 export const ensureAppCss = () => {
     // App is built as a JS module; make sure extracted CSS is loaded in production.
     // Skip extension pages: they have their own HTML entrypoints and CSS injection.
@@ -222,6 +229,7 @@ export const waitForServiceWorker = async (): Promise<ServiceWorkerRegistration 
 
 let _receiversCleanup: (() => void) | null = null;
 
+/** Initialize one-time clipboard/share receivers used by the window-side PWA bridge. */
 export const initReceivers = () => {
     if (_receiversCleanup) return;
     _receiversCleanup = initPWAClipboard();
@@ -452,8 +460,8 @@ const extractShareContent = (shareData: ShareDataInput): { content: string | nul
 };
 
 /**
- * Process share target data with AI - broadcasts results to PWA clipboard handlers
- * This is called when SW didn't process (or failed), or for server-side fallback
+ * Process share payloads on the page side when the service worker either did
+ * not process them or only delivered metadata.
  */
 export const processShareTargetData = async (shareData: ShareDataInput, skipIfEmpty = false): Promise<boolean> => {
     console.log("[ShareTarget] Processing shared data:", {
@@ -730,7 +738,12 @@ const tryServerSideProcessing = async (shareData: ShareDataInput): Promise<boole
 };
 
 /**
- * Handle share target data from various sources
+ * Consume share-target payloads from URL params, cache recovery, session
+ * storage, launch flows, and BroadcastChannel notifications.
+ *
+ * INVARIANT: this function favors routing content into the normal transfer/view
+ * pipeline first, and only falls back to local processing when delivery cannot
+ * be staged or routed.
  */
 export const handleShareTarget = () => {
     const params = new URLSearchParams(globalThis?.location?.search);
@@ -999,8 +1012,11 @@ declare global {
 }
 
 /**
- * Set up launchQueue consumer for PWA file launches and share-target
- * This handles direct file launches when the PWA is opened with files
+ * Register the browser Launch Queue consumer used for direct file-open flows.
+ *
+ * WHY: launched files can arrive before the destination view is mounted, so the
+ * handler stages them in cache first and then routes them into the normal
+ * transfer pipeline.
  */
 export const setupLaunchQueueConsumer = async () => {
     if (!('launchQueue' in globalThis)) {
@@ -1228,8 +1244,8 @@ export const setupLaunchQueueConsumer = async () => {
 // ============================================================================
 
 /**
- * Check for pending share data from server-side share target handler
- * This handles cases where the service worker wasn't active during share
+ * Recover pending share payloads staged by server-side handlers when no worker
+ * was active to own the original share request.
  */
 export const checkPendingShareData = async () => {
     try {

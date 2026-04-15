@@ -1,4 +1,10 @@
-// Rectangle selection overlay for CRX-Snip
+/**
+ * Rectangle-selection overlay used by the CRX snipping flow.
+ *
+ * It installs a full-page overlay inside the content script, captures a drag
+ * rectangle, and resolves that selection back to the caller via a small
+ * promise-based API.
+ */
 export class RectSelector {
     private overlay: HTMLElement | null = null;
     private selectionBox: HTMLElement | null = null;
@@ -12,6 +18,7 @@ export class RectSelector {
         this.createOverlay();
     }
 
+    /** Create the transient overlay DOM used while the user is selecting a region. */
     private createOverlay(): void {
         // Create main overlay
         this.overlay = document.createElement('div');
@@ -152,7 +159,7 @@ export class RectSelector {
         this.isSelecting = false;
     }
 
-    // Public API
+    /** Start a one-shot rectangle selection session and resolve with the chosen area or `null`. */
     selectArea(): Promise<{ x: number; y: number; width: number; height: number } | null> {
         return new Promise((resolve, reject) => {
             this.onSelect = (rect) => resolve(rect);
@@ -167,7 +174,7 @@ export class RectSelector {
     }
 }
 
-// Global function for content script injection
+/** Global function injected for other CRX flows that need to trigger snip selection. */
 declare global {
     interface Window {
         crxSnipSelectRect?: () => Promise<{ x: number; y: number; width: number; height: number } | null>;

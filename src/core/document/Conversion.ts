@@ -1,3 +1,9 @@
+/**
+ * Clipboard/document conversion helpers for web content and math markup.
+ *
+ * This module converts between HTML, Markdown, MathML, and LaTeX, with optional
+ * translation and AI-assisted fallback behavior for some richer sources.
+ */
 import { escapeML, bySelector, serialize, extractFromAnnotation, getContainerFromTextSelection } from './DocTools';
 import { deAlphaChannel } from '@rs-core/workers/ImageProcess';
 import { writeText, writeHTML } from '@rs-core/modules/Clipboard';
@@ -107,8 +113,8 @@ const getMarkedParser = async (): Promise<(input: string) => Promise<string>> =>
     return markedParserPromise;
 };
 
-// convert markdown text to html
-export const convertToHtml = async (input: string): Promise<string> => { // convert markdown text to html
+/** Convert markdown-like text into HTML while preserving already-HTML input. */
+export const convertToHtml = async (input: string): Promise<string> => {
     const original = escapeML(input);
     // if already html, don't convert
     if (input?.trim()?.startsWith?.("<") && input?.trim()?.endsWith?.(">")) {
@@ -125,7 +131,7 @@ export const convertToHtml = async (input: string): Promise<string> => { // conv
     return (input?.normalize?.()?.trim?.() || input?.trim?.() || input);
 };
 
-// convert html DOM to markdown
+/** Convert HTML into Markdown using the lazy turndown bridge. */
 export const convertToMarkdown = async (input: string): Promise<string> => {
     const original = escapeML(input);
     try {
@@ -139,7 +145,7 @@ export const convertToMarkdown = async (input: string): Promise<string> => {
     return (input?.normalize?.()?.trim?.() || input?.trim?.() || input);
 };
 
-// copy html DOM as markdown (with optional translation)
+/** Copy the selected/target HTML content as Markdown, optionally translating the final text. */
 export const copyAsMarkdown = async (target: HTMLElement, options?: CopyOptions) => {
     const container = getContainerFromTextSelection(target);
     let markdown = await convertToMarkdown(container?.innerHTML || container?.outerHTML || "");
@@ -154,7 +160,7 @@ export const copyAsMarkdown = async (target: HTMLElement, options?: CopyOptions)
     return text;
 }
 
-// copy markdown text as html (with optional translation)
+/** Copy text content as HTML, using Markdown rendering when the source is plain text. */
 export const copyAsHTML = async (target: HTMLElement, options?: CopyOptions) => {
     const container = getContainerFromTextSelection(target);
     let sourceText = container?.innerText || "";
@@ -170,7 +176,7 @@ export const copyAsHTML = async (target: HTMLElement, options?: CopyOptions) => 
     return text;
 }
 
-//
+/** Ensure inline math is wrapped in `$...$` when the source omitted delimiters. */
 const $wrap$ = (katex: string) => {
     if (katex?.startsWith?.("$") && katex?.endsWith?.("$")) {
         return katex;
@@ -178,8 +184,10 @@ const $wrap$ = (katex: string) => {
     return "$" + katex + "$";
 }
 
-// copy mathml DOM as tex (with optional translation for surrounding text)
-// TODO! support AI recognition and conversion (from images)
+/**
+ * Copy MathML/math-rich DOM as LaTeX, falling back through several embedded
+ * metadata sources and optional image recognition when necessary.
+ */
 export const copyAsTeX = async (target: HTMLElement, _options?: CopyOptions) => {
     const math = bySelector(target, "math");
     const mjax = bySelector(target, "[data-mathml]");
@@ -188,10 +196,8 @@ export const copyAsTeX = async (target: HTMLElement, _options?: CopyOptions) => 
     const img = bySelector(target, ".mwe-math-fallback-image-inline[alt], .mwe-math-fallback-image-display[alt]");
     const forRecognition: any = bySelector(target, "img:is([src],[srcset]), picture:has(img)");
 
-    //
     let LaTeX = img?.getAttribute("alt") || getSelection()?.toString?.() || "";
 
-    //
     try {
         if (!LaTeX) { const ml = expr?.getAttribute("data-expr") || ""; LaTeX = (ml ? escapeML(ml) : LaTeX) || LaTeX; }
         if (!LaTeX) { const ml = orig?.getAttribute("data-original") || ""; LaTeX = (ml ? escapeML(ml) : LaTeX) || LaTeX; }

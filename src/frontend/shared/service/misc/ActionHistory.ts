@@ -1,3 +1,9 @@
+/**
+ * Persistent action/execution history for recognition and processing flows.
+ *
+ * This store tracks what input arrived from which source, which rule/action was
+ * applied, and whether the execution eventually succeeded or failed.
+ */
 export interface ActionContext {
     source: 'workcenter' | 'share-target' | 'launch-queue' | 'chrome-extension' | 'service-worker';
     sessionId?: string;
@@ -83,6 +89,7 @@ export interface ActionHistoryState {
     };
 }
 
+/** In-memory history store with optional browser persistence and lightweight filtering. */
 export class ActionHistoryStore {
     private state: ActionHistoryState;
     private storageKey = 'rs-action-history';
@@ -98,9 +105,7 @@ export class ActionHistoryStore {
         this.loadHistory();
     }
 
-    /**
-     * Add a new action entry
-     */
+    /** Insert a new entry at the front of the timeline and enforce the retention limit. */
     addEntry(entry: Omit<ActionEntry, 'id' | 'timestamp'>): ActionEntry {
         const fullEntry: ActionEntry = {
             ...entry,
@@ -136,9 +141,7 @@ export class ActionHistoryStore {
         return this.state.entries.find(entry => entry.id === id);
     }
 
-    /**
-     * Get filtered entries
-     */
+    /** Return entries matching the supplied filters without mutating store state. */
     getEntries(filters?: Partial<ActionHistoryState['filters']>): ActionEntry[] {
         let entries = [...this.state.entries];
 
@@ -196,9 +199,7 @@ export class ActionHistoryStore {
         Object.assign(this.state.filters, filters);
     }
 
-    /**
-     * Get statistics
-     */
+    /** Summarize history health and distribution by source/action. */
     getStats() {
         const entries = this.state.entries;
         const total = entries.length;

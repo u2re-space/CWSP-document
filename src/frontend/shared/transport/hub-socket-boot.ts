@@ -27,6 +27,8 @@ export async function bootHubSocketFromStoredSettings(): Promise<void> {
 export async function applyHubSocketFromSettings(settings: AppSettings): Promise<void> {
     applyAirpadRuntimeFromAppSettings(settings);
 
+    // WHY: native shells can own the socket lifecycle themselves, so the web
+    // hub should stand down when the user prefers native websocket transport.
     if (isCapacitorCwsNativeShell() && isPreferNativeWebsocketEnabled()) {
         return;
     }

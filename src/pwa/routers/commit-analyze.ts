@@ -1,3 +1,10 @@
+/**
+ * Service-worker route handler for commit/analyze requests.
+ *
+ * This router accepts mixed share/file/text inputs, tries the backend shortcut
+ * when available, and otherwise performs worker-side detection plus entity
+ * extraction before broadcasting results back into the app pipeline.
+ */
 import { registerRoute } from "workbox-routing";
 import { controlChannel, detectInputType, tryToTimeout, callBackendIfAvailable, getActiveCustomInstruction } from "./shared";
 import { detectEntityTypeByJSON } from "@rs-com/template/EntityUtils";
@@ -74,7 +81,7 @@ const storeClipboardOperation = async (operation: any): Promise<void> => {
     }
 };
 
-//
+/** Analyze an incoming request payload and queue any recognized entities/results for downstream consumers. */
 export const commitAnalyze = (e: any): Promise<any[] | void> => {
     return Promise.try(async () => {
         const fd = await e.request.formData()?.catch?.(console.warn.bind(console));

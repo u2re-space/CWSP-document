@@ -139,7 +139,13 @@ const normalizeInvokeResultEnvelope = (
     });
 };
 
-/** Best-effort: resolves shell metadata and subscribes to {@code nativeMessage} → {@code cws-native-message} on window. */
+/**
+ * Initialize the native bridge surface and normalize inbound native messages.
+ *
+ * AI-READ: this is the TypeScript side of the WebView/native boundary, so it
+ * is one of the first places to inspect when networking works natively but not
+ * through the web shell or vice versa.
+ */
 export async function initCwsNativeBridge(): Promise<CwsShellInfo | null> {
     if (bridgeInitDone) {
         return typeof globalThis.window !== "undefined" ? globalThis.window.__CWS_SHELL_INFO__ ?? null : null;
@@ -195,6 +201,7 @@ export async function initCwsNativeBridge(): Promise<CwsShellInfo | null> {
     }
 }
 
+/** Detect the Capacitor/CWSAndroid shell where native networking may replace browser transport rules. */
 export const isCapacitorCwsNativeShell = (): boolean => {
     try {
         const c = (globalThis as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
@@ -204,6 +211,7 @@ export const isCapacitorCwsNativeShell = (): boolean => {
     }
 };
 
+/** Detect the Electron shell, which uses its own invoke bridge instead of Capacitor plugins. */
 export const isElectronCwsNativeShell = (): boolean => {
     try {
         return Boolean(globalThis.window?.electronBridge?.invoke);
@@ -212,6 +220,7 @@ export const isElectronCwsNativeShell = (): boolean => {
     }
 };
 
+/** Report whether frontend code can rely on native IPC instead of web-only fallbacks. */
 export const isCwsNativeIpcAvailable = (): boolean => {
     if (isElectronCwsNativeShell()) return true;
     if (!isCapacitorCwsNativeShell()) return false;
@@ -281,6 +290,7 @@ export async function getNativeUnifiedSettings(): Promise<Record<string, unknown
     }
 }
 
+/** Patch native-side settings through the same bridge used by transport/runtime configuration. */
 export async function patchNativeUnifiedSettings(appSettings: Record<string, unknown>): Promise<boolean> {
     try {
         const result = await invokeCwsPlatformIPC({ channel: "settings:patch", payload: { appSettings } });

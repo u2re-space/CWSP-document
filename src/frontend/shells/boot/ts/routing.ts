@@ -18,6 +18,12 @@
  * - `/print` → Print view
  * 
  * Shell is configured separately (via preferences), not encoded in URL pathname.
+ *
+ * WHY: the pathname tracks the requested view, while shell choice is treated as
+ * local UI state that can vary by device/viewport without changing deep links.
+ * NOTE: the `POST /{view}` route is part of the app's internal messaging path,
+ * so service-worker/network debugging often crosses this file even though it is
+ * not a socket transport module by itself.
  */
 
 import type { ShellId, ViewId, Shell } from "../../types";
@@ -301,7 +307,12 @@ export function getSavedShellPreference(): ShellId | null {
 }
 
 /**
- * Load sub-app using the new shell boot system
+ * Resolve the shell/view pair to mount and return a lazy mount entrypoint.
+ *
+ * AI-READ: this function does not mount immediately. It chooses the canonical
+ * shell, normalizes legacy aliases, picks a default view for that shell, and
+ * returns a loader object that the outer app entry can mount into the chosen
+ * shell layer.
  */
 export const loadSubAppWithShell = async (
     shellId?: ShellId,
@@ -406,7 +417,8 @@ export function resolvePathToView(pathname: string): ViewId | null {
 }
 
 /**
- * Create boot config from URL
+ * Create the boot configuration that BootLoader expects from current URL and
+ * saved shell preference state.
  */
 export function createBootConfigFromUrl(): BootConfig {
     const shell = normalizeShellPreference(getSavedShellPreference() || "minimal");

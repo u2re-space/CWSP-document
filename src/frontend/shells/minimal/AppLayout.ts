@@ -1,3 +1,10 @@
+/**
+ * Minimal-shell layout controller.
+ *
+ * This module bridges hash/view state, the tabbed sidebar container, and the
+ * home wallpaper/speed-dial content. It is responsible for preventing recursive
+ * close/setView loops while keeping shell navigation in sync with history.
+ */
 import { observe, propRef, affected } from "fest/object";
 import { H, C } from "fest/lure";
 import { navigate, historyState } from "fest/lure";
@@ -11,6 +18,7 @@ let skipCreateNewView = false;
 let isClosingView = false;
 let closingViewKey = "";
 
+/** Close one tab/view safely, avoiding recursive close handling for the same logical view. */
 export const onClose = (tabName: string, currentView: any, existsViews: Map<string, any>, closingView?: string) => {
     const viewKey = tabName?.replace?.(/^#/, "") || closingView?.replace?.(/^#/, "");
 
@@ -55,6 +63,10 @@ export const onClose = (tabName: string, currentView: any, existsViews: Map<stri
 const $defaultView = (location?.hash?.replace?.(/^#/, "") || "home");
 export const $comment$ = document.createComment("");
 export const $toolbar$ = document.createComment("");
+/**
+ * Create the minimal-shell application layout and keep its current tab synced
+ * with view history plus dynamically created views.
+ */
 export const AppLayout = (currentView: any, existsViews: Map<string, any>, makeView: (key: string) => any, sidebar: HTMLElement) => {
     const rPair = observe([document.createComment(""), document.createComment("")])
 
@@ -105,7 +117,6 @@ export const AppLayout = (currentView: any, existsViews: Map<string, any>, makeV
     (sidebar as any).setView = setView;
     (sidebar as any).skipCreateNewView = (value: boolean = false) => { skipCreateNewView = value; };
 
-    //
     // Initialize current view
     scheduleFrame(() => {
         if (currentView && !currentView?.value?.replace?.(/^#/, "")) {
@@ -119,7 +130,8 @@ export const AppLayout = (currentView: any, existsViews: Map<string, any>, makeV
         }));
     });
 
-    // TODO: add support for async loading views (Object.TS, LUR.E)
+    // TODO(shell-layout/async-view-loading): support explicit async view loading
+    // hooks once the newer Object.TS/LUR.E integration becomes the canonical path.
     const $layout = H`<ui-tabbed-with-sidebar on:tab-changed=${(ev) => {
         const $homeView = "home";//(location.hash?.replace?.(/^#/, "") || "home");
         const newTab = (ev?.newTab?.replace?.(/^#/, "") || $homeView)?.replace?.(/^#/, "");

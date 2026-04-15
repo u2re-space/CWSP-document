@@ -1,7 +1,15 @@
+/**
+ * Custom element wrapper used by the markdown/viewer surface.
+ *
+ * It creates the shadow-shell that toggles between rendered prose and raw
+ * source output while keeping the light-DOM render targets stable for the rest
+ * of the viewer pipeline.
+ */
 import { H } from "fest/lure";
 
 const FRAME_TAG = "cw-markdown-view-frame";
 
+/** Build the shadow-panel structure that hosts the raw and rendered viewer slots. */
 export function createMarkdownViewFrame(): HTMLElement {
     return H`
         <div class="view-viewer__content" data-viewer-content>
@@ -15,6 +23,7 @@ export function createMarkdownViewFrame(): HTMLElement {
     ` as HTMLElement;
 }
 
+/** Lightweight host element for viewer content that can switch between raw and prose modes. */
 export class MarkdownViewFrameElement extends HTMLElement {
     ensureReady(): this {
         const self = this as HTMLElement & { dataset: DOMStringMap };
@@ -119,6 +128,7 @@ export class MarkdownViewFrameElement extends HTMLElement {
     }
 }
 
+/** Define the viewer frame element once and return its tag name for callers. */
 export function ensureMarkdownViewFrame(): string {
     if (!customElements.get(FRAME_TAG)) {
         customElements.define(FRAME_TAG, MarkdownViewFrameElement);

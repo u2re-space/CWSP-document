@@ -3,6 +3,10 @@
  *
  * Central registry for shell and view components.
  * Supports lazy loading and caching.
+ *
+ * AI-READ: this file is the canonical runtime map from logical shell/view ids
+ * to lazy import targets. Boot, routing, and shell code depend on these
+ * registrations staying consistent with feature flags and compatibility aliases.
  */
 
 import type {
@@ -53,9 +57,7 @@ import { ensureViewElementDefined, getViewElementTagName } from "@fl-ui/items/Ba
 // SHELL REGISTRY
 // ============================================================================
 
-/**
- * Registry for shell components
- */
+/** Registry for shell modules plus the single live shell instances cached at runtime. */
 class ShellRegistryClass {
     private shells = new Map<ShellId, ShellRegistration>();
     private loadedShells = new Map<ShellId, Shell>();
@@ -141,7 +143,10 @@ export const ShellRegistry = new ShellRegistryClass();
 // ============================================================================
 
 /**
- * Registry for view components
+ * Registry for lazily loaded views.
+ *
+ * INVARIANT: only one live view instance is kept per `ViewId`, because receive
+ * channels and shell-owned DOM roots assume stable identity.
  */
 class ViewRegistryClass {
     private resolveViewFactory(module: Record<string, unknown>): ViewFactory | null {
@@ -288,9 +293,7 @@ export const ViewRegistry = new ViewRegistryClass();
 // DEFAULT REGISTRATIONS
 // ============================================================================
 
-/**
- * Register default shells
- */
+/** Register the built-in shell modules that the boot/routing layer can request. */
 export function registerDefaultShells(): void {
     // Raw shell (minimal, no frames)
     ShellRegistry.register({
@@ -345,9 +348,7 @@ export function registerDefaultShells(): void {
     });
 }
 
-/**
- * Register default views
- */
+/** Register the built-in views that are enabled by current feature flags. */
 export function registerDefaultViews(): void {
     if (VIEW_ENABLED_VIEWER) {
         ViewRegistry.register({
@@ -472,7 +473,7 @@ export function getDefaultBootConfig(): BootConfig {
 }
 
 /**
- * Initialize registries with default shells and views
+ * Populate both registries during boot before any shell or view is resolved.
  */
 export function initializeRegistries(): void {
     registerDefaultShells();

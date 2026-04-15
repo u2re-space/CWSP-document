@@ -1,6 +1,10 @@
-// =========================
-// Main entry point
-// =========================
+/**
+ * AirPad frontend entrypoint.
+ *
+ * This module owns the mount/unmount lifecycle for the AirPad view, including
+ * DOM replacement, transient controller wiring, cross-tab config sync, and the
+ * teardown path required for shell remounts.
+ */
 
 //
 import stylesheet from "./main.scss?inline";
@@ -34,6 +38,14 @@ let airpadInitToken = 0;
 let airpadInitAbort: AbortController | null = null;
 let airpadCrossTabUnsub: (() => void) | null = null;
 
+/**
+ * Release every side effect created by `mountAirpad()`.
+ *
+ * WHY: AirPad can be mounted repeatedly by different shells or navigation
+ * flows. The view keeps process-local listeners and UI overlays, so remounting
+ * without explicit cleanup would duplicate handlers and leave stale state
+ * attached to the previous DOM tree.
+ */
 export function unmountAirpadRuntime(): void {
     teardownKeyboardDismissListeners();
     airpadInitToken += 1;
@@ -50,10 +62,12 @@ export function unmountAirpadRuntime(): void {
     stopRelativeOrientation();
 }
 
-// =========================
-// Mount function for routing system
-// =========================
-
+/**
+ * Build the AirPad DOM and hand control to the async runtime initializer.
+ *
+ * INVARIANT: each mount gets a fresh abort signal and token so slow async work
+ * from an older mount cannot finish against a newer DOM instance.
+ */
 export default async function mountAirpad(mountElement: HTMLElement): Promise<void> {
     console.log("[Airpad] Mounting airpad app...");
     airpadInitToken += 1;
@@ -141,10 +155,13 @@ export default async function mountAirpad(mountElement: HTMLElement): Promise<vo
     await initAirpadApp(currentInitToken, initSignal, appContainer);
 }
 
-// =========================
-// Internal initialization
-// =========================
-
+/**
+ * Wire controllers, UI components, and runtime services after the DOM exists.
+ *
+ * AI-READ: this function assumes the markup inserted by `mountAirpad()` is now
+ * stable in the document. Querying or binding before `waitForDomPaint()` can
+ * miss nodes in some shell/layout combinations.
+ */
 async function initAirpadApp(initToken: number | undefined, signal: AbortSignal, domMountRoot?: HTMLElement): Promise<void> {
     const root = domMountRoot;
     if (!root) {
@@ -171,6 +188,7 @@ async function initAirpadApp(initToken: number | undefined, signal: AbortSignal,
         signal.addEventListener("abort", off, { once: true });
     };
 
+    /** Reset all motion-calibration state so the next gesture starts from a clean baseline. */
     function resetMotionRuntime() {
         resetMotionAccum();
         resetMotionBaseline();
@@ -206,6 +224,10 @@ async function initAirpadApp(initToken: number | undefined, signal: AbortSignal,
         } //@ts-ignore
     });
 
+    /**
+     * Collapse hint groups on tighter screens so the control surface remains
+     * usable without hiding the hints entirely.
+     */
     function initAdaptiveHintPanel() {
         const hintRoot = byId("hintPanel");
         if (!hintRoot) return;

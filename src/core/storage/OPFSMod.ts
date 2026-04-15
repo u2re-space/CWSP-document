@@ -1,5 +1,10 @@
-// Рекурсивное преобразование JSON-файлов в OPFS по пользовательской функции.
-// Требует Chromium-браузер с поддержкой OPFS: navigator.storage.getDirectory()
+/**
+ * Recursive JSON transformation helper for OPFS directories.
+ *
+ * WHY: bulk migrations and cleanup tasks often need to walk an existing OPFS
+ * subtree, parse each JSON/JSOX file, transform the data, and write back only
+ * when the normalized output actually changed.
+ */
 
 /**
  * @typedef {Object} OpfsModifyOptions
@@ -17,7 +22,6 @@
 import { JSOX } from "jsox";
 
 
-//
 interface OpfsModifyOptions {
     dirPath: string;
     transform: (data: any, ctx: { path: string, name: string, fullPath: string }) => any | Promise<any>;
@@ -27,7 +31,10 @@ interface OpfsModifyOptions {
     prettyStable?: boolean;
 }
 
-//
+/**
+ * Walk a directory tree inside OPFS, apply a transform to every JSON-like file,
+ * and optionally perform a dry run without writing changes.
+ */
 export async function opfsModifyJson(options: OpfsModifyOptions) {
     const {
         dirPath,
@@ -141,7 +148,7 @@ async function getDirByPath(rootDirHandle, path) {
     return dir;
 }
 
-// Асинхронный генератор для рекурсивного обхода
+/** Async generator for recursively walking an OPFS directory tree. */
 async function* walk(dirHandle, basePath = '') {
     for await (const [name, handle] of dirHandle.entries()) {
         const fullPath = basePath ? `${basePath}/${name}` : name;
@@ -158,7 +165,7 @@ function serializeJSON(obj, { indent = 2, prettyStable = true } = {}) {
     return JSON.stringify(obj as any, replacer, indent) + '\n';
 }
 
-// Стабильная сортировка ключей для детерминированного вывода
+/** Stable key ordering for deterministic JSON output and smaller diffs. */
 function stableReplacer(key, value) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
         const out = {};

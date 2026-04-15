@@ -1,3 +1,10 @@
+/**
+ * High-level app filesystem helpers for OPFS/user-scope content workflows.
+ *
+ * This module sits above the lower-level write helpers and exposes the
+ * convenience operations used by share-target flows, recognition/analyze
+ * pipelines, markdown/json persistence, and timeline/entity storage.
+ */
 import { BASE64_PREFIX, convertImageToJPEG, DEFAULT_ENTITY_TYPE, MAX_BASE64_SIZE } from "@rs-core/workers/ImageProcess";
 import { dumpAndClear } from "@rs-com/store/IDBQueue";
 import { detectEntityTypeByJSON } from "@rs-com/template/EntityUtils";
@@ -108,7 +115,7 @@ export const writeFileSmart = async (
     return promised;
 };*/
 
-//
+/** Write every provided file into the target directory using the canonical smart-write helper. */
 export const writeFilesToDir = async (dir: string, files: File[] | FileList) => {
     const items = Array.from(files as any as File[]);
     for (const file of items) {
@@ -119,13 +126,13 @@ export const writeFilesToDir = async (dir: string, files: File[] | FileList) => 
     return items.length;
 }
 
-//
+/** Read a markdown-capable file handle into text, returning an empty string for missing content. */
 export const getMarkDownFromFile = async (handle: any) => {
     const markdown = await handle?.getFile?.();
     return await markdown?.text?.() || "";
 }
 
-//
+/** Parse the first file handle as JSON/JSOX and return `null` when the handle is missing. */
 export const getJSONFromFile = async (handle: any) => {
     if (Array.isArray(handle)) handle = handle?.[0];
     if (!handle) return null;
@@ -138,7 +145,7 @@ export const hasCriteriaInText = async (text: string, criteria: string[]) => {
     return criteria?.some?.(async (criterion) => text?.includes?.(criterion));
 }
 
-//
+/** Read every JSON file from a directory-like handle or path. */
 export const readJSONs = async (dir: any | null) => {
     const { getDirectoryHandle } = await getLureFs();
     const dirHandle = typeof dir === "string" ? await getDirectoryHandle(null, dir) : dir;
@@ -187,7 +194,7 @@ export const suitableDirsByEntityTypes = (entityTypes: string[]) => {
     });
 }
 
-//
+/** Persist JSON-like entities using the repo's entity-id and directory conventions. */
 export const writeJSON = async (data: any | any[], dir: any | null = null) => {
     if (!data) return;
     const writeOne = async (obj: any, index = 0) => {
@@ -212,7 +219,7 @@ export const writeJSON = async (data: any | any[], dir: any | null = null) => {
     return results;
 }
 
-//
+/** Persist markdown content into the requested path or a default docs/preferences location. */
 export const writeMarkDown = async (data: any, path: any | null = null) => {
     if (!data) return; path = path?.trim?.();
     let filename = (`${Date.now()}`?.toString?.()?.toLowerCase?.()?.replace?.(/\s+/g, '-')?.replace?.(/[^a-z0-9_\-+#&]/g, '-')?.trim?.() || `${Date.now()}`) + ".md";
@@ -235,7 +242,10 @@ export interface shareTargetFormData {
     file?: File | Blob;
 }
 
-//
+/**
+ * Normalize an incoming shared item into the handler contract used by commit,
+ * analyze, and recognition pipelines.
+ */
 export const handleDataByType = async (item: File | string | Blob, handler: (payload: shareTargetFormData) => Promise<void>) => {
     if (typeof item === 'string') {
         if (item?.startsWith?.("data:image/") && item?.includes?.(";base64,")) {

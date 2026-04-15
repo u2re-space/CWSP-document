@@ -1,3 +1,9 @@
+/**
+ * Action catalog and execution helpers used by shortcut tiles and entity views.
+ *
+ * This module connects UI-level action ids with concrete browser, storage,
+ * clipboard, recognition, and navigation behaviors.
+ */
 import type { EntityDescriptor } from "@rs-core/utils/Types";
 import { generateNewPlan } from "@rs-core/workers/AskToPlan";
 import { triggerDebugTaskGeneration } from "@rs-core/utils/DebugTaskGenerator";
@@ -79,6 +85,7 @@ try {
 */
 
 //
+/** Visual icon mapping for action ids rendered by shortcut and entity UIs. */
 export const iconsPerAction = new Map<string, string>([
     ["bluetooth-enable-acceptance", "bluetooth"],
     ["bluetooth-share-clipboard", "bluetooth"],
@@ -106,6 +113,7 @@ export const iconsPerAction = new Map<string, string>([
 ]);
 
 //
+/** Color accents for actions whose intent should be distinguishable at a glance. */
 export const actionColors = new Map<string, string>([
     ["share-clipboard", "red"],
     ["bluetooth-enable-acceptance", "blue"],
@@ -128,6 +136,7 @@ export const actionColors = new Map<string, string>([
 ]);
 
 //
+/** Human-facing labels derived from action ids and optional entity metadata. */
 export const labelsPerAction = new Map<string, (entityDesc: EntityDescriptor) => string>([
     ["bluetooth-enable-acceptance", () => "Enable Bluetooth acceptance"],
     ["bluetooth-share-clipboard", () => "Paste data into Bluetooth"],
@@ -153,7 +162,7 @@ export const labelsPerAction = new Map<string, (entityDesc: EntityDescriptor) =>
     ["open-view", (entityDesc: EntityDescriptor | any) => `Open ${entityDesc?.label || "view"}`]
 ]);
 
-// Unified clipboard copy with fallbacks
+/** Unified clipboard copy helper with API/fallback handling. */
 const copyTextToClipboard = async (text: string) => {
     if (!text?.length) throw new Error("empty");
     const result = await writeText(text);
@@ -176,7 +185,7 @@ const ensureHashNavigation = (view: string, viewMaker?: any, props?: any) => {
     }
 };
 
-//
+/** Use the Web Share API when the current browser/runtime supports the supplied payload. */
 export const clientShare = async (data: any) => {
     if (navigator?.canShare) {
         return navigator?.canShare?.(data) ? navigator?.share?.(data) : false;
@@ -216,7 +225,7 @@ Promise.try(async () => {
 
 
 
-//
+/** Start speech recognition and return the final recognized text when available. */
 export const recordSpeechRecognition = async (userInputHoldUntilStop: boolean = true) => {
     // @ts-ignore
     const recognition = typeof SpeechRecognition != "undefined" ? new SpeechRecognition() : null;
@@ -430,7 +439,8 @@ export const actionRegistry = new Map<string, (entityItem: EntityInterface<any, 
         //
         if (!href) { showError("Link is missing"); return; }
 
-        // TODO: detect origin of the link and open in the same tab if same origin
+        // TODO(actions/open-link): refine same-origin detection for routes that
+        // should reuse the current tab instead of always opening a new context.
         const target = isSameOrigin(href) ? "_self" : "_blank";
         try {
             window?.open?.(href, target, "noopener,noreferrer");
@@ -649,7 +659,8 @@ export const actionRegistry = new Map<string, (entityItem: EntityInterface<any, 
 
     //
     ["snip-and-recognize", async () => {
-        // TODO! implement chrome functionality here...
+        // TODO(actions/snip-and-recognize): connect this shortcut to the CRX
+        // rectangle/snipping flow instead of leaving the placeholder error.
         showError("Snip and analyze is not implemented yet");
         return false;
     }]

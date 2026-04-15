@@ -1,3 +1,10 @@
+/**
+ * UI-facing filesystem operations.
+ *
+ * These helpers connect browser picker/clipboard/drop interactions with the
+ * higher-level storage and recognition pipelines so views do not have to know
+ * about OPFS handles or import-heavy recognition modules directly.
+ */
 import { getDirectoryHandle, handleIncomingEntries } from "fest/lure";
 import { handleDataTransferFiles, postCommitAnalyze, postCommitRecognize, writeFilesToDir } from "@rs-core/storage/FileSystem";
 import { sanitizeFileName, writeFileSmart } from "@rs-core/storage/WriteFileSmart-v2";
@@ -20,7 +27,7 @@ const getClipboardRw = async () => {
     return clipboardRw;
 };
 
-//
+/** Bind drag-and-drop ingestion for a directory target and emit a local `dir-dropped` event on success. */
 export const bindDropToDir = (host: HTMLElement, dir: string) => {
     const onDragOver = (ev: DragEvent) => {
         ev.preventDefault();
@@ -46,7 +53,7 @@ export const bindDropToDir = (host: HTMLElement, dir: string) => {
     };
 }
 
-//
+/** Open a native file picker and write the selected files into the target directory. */
 export const openPickerAndWrite = async (dir: string, accept = "*/*", multiple = true) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -64,7 +71,7 @@ export const openPickerAndWrite = async (dir: string, accept = "*/*", multiple =
     return result;
 }
 
-//
+/** Open a picker and route the selected files into the recognition pipeline. */
 export const openPickerAndRecognize = async (dir: string, accept = "*/*", multiple = true) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -82,7 +89,7 @@ export const openPickerAndRecognize = async (dir: string, accept = "*/*", multip
     return result;
 }
 
-//
+/** Open a picker and route the selected files into the analyze pipeline. */
 export const openPickerAndAnalyze = async (dir: string, accept = "*/*", multiple = true) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -100,7 +107,7 @@ export const openPickerAndAnalyze = async (dir: string, accept = "*/*", multiple
     return result;
 }
 
-//
+/** Download a file that already exists in OPFS by path. */
 export const downloadByPath = async (path: string, suggestedName?: string) => {
     const lastSlash = path.lastIndexOf('/');
     const dir = path.slice(0, Math.max(0, lastSlash + 1));
@@ -116,7 +123,7 @@ export const downloadByPath = async (path: string, suggestedName?: string) => {
 
 
 
-//
+/** Try recognition first for non-markdown inputs, then persist the recognized result into the target directory. */
 export const writeWithTryRecognize = async (dir: string, file: File) => {
     if (file?.name?.endsWith?.(".md") || file?.type?.includes?.("markdown")) {
         return writeFileSmart(null, dir, file, { sanitize: true });
@@ -130,7 +137,7 @@ export const writeWithTryRecognize = async (dir: string, file: File) => {
     }
 }
 
-//
+/** Recognize clipboard content and write the recognized text back to the clipboard. */
 export const pasteIntoClipboardWithRecognize = async () => {
     try {
         const analyzeRecognizeUnified = await getAnalyzeRecognizeUnified();

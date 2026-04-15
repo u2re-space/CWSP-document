@@ -1,6 +1,15 @@
-// =========================
-// Socket.IO Transport
-// =========================
+/**
+ * AirPad/remote transport hub for the frontend.
+ *
+ * This module owns the client-side Socket.IO connection, secure-envelope
+ * wrapping, coordinator ask/act flows, clipboard bridging, and the candidate
+ * probing logic used to discover a reachable CWSP endpoint from web, PWA, or
+ * extension contexts.
+ *
+ * AI-READ: this file is a compatibility layer, not only a raw websocket
+ * wrapper. It preserves behavior for several runtimes whose network
+ * restrictions differ, especially Chromium extension pages versus normal tabs.
+ */
 
 import { io, Socket } from 'socket.io-client';
 import { log, getWsStatusEl } from '../../views/airpad/utils/utils';
@@ -212,14 +221,22 @@ const ensureCoordinatorSocketConnected = async (timeoutMs = 7000): Promise<boole
     });
 };
 
+/** Return the current live Socket.IO instance, if any. */
 export function getWS(): Socket | null {
     return socket;
 }
 
+/** Report whether the primary transport socket is currently connected. */
 export function isWSConnected(): boolean {
     return wsConnected;
 }
 
+/**
+ * Subscribe to transport connectivity updates.
+ *
+ * WHY: several AirPad UI widgets and retry flows need a shared source of truth
+ * without directly depending on the socket object.
+ */
 export function onWSConnectionChange(handler: WSConnectionHandler): () => void {
     wsConnectionHandlers.add(handler);
     try {
@@ -545,12 +562,14 @@ const handleCoordinatorPacket = async (packet: CoordinatorPacket): Promise<void>
     }
 };
 
+/** Emit one already-built coordinator packet if the live socket is ready. */
 const emitCoordinatorPacket = (packet: CoordinatorPacket): boolean => {
     if (!socket || !socket.connected) return false;
     socket.emit("data", toCanonicalCoordinatorPacket(packet));
     return true;
 };
 
+/** Normalize the frontend's higher-level action/request inputs into the shared coordinator packet shape. */
 const buildCoordinatorPacket = (
     op: NonNullable<CoordinatorPacket["op"]>,
     what: string,
@@ -835,6 +854,12 @@ const handleServerNetworkFetchRequest = async (request: NetworkFetchRequest): Pr
     }
 };
 
+/**
+ * Best-effort Chrome Local Network Access warm-up for private-IP targets.
+ *
+ * WHY: probing `/lna-probe` early makes permission/PNA failures visible before
+ * the heavier Socket.IO candidate rotation starts reporting generic timeouts.
+ */
 async function tryRequestLocalNetworkPermission(origin: string, host: string): Promise<void> {
     if (!origin || !host) return;
     if (!isPrivateOrLocalTarget(host)) return;
@@ -859,6 +884,12 @@ async function tryRequestLocalNetworkPermission(origin: string, host: string): P
     }
 }
 
+/**
+ * Fire-and-forget coordinator action.
+ *
+ * NOTE: acts are queued briefly while the socket is reconnecting so clipboard
+ * and UI actions do not disappear during short transport flaps.
+ */
 export function sendCoordinatorAct(what: string, payload: any, nodes?: string[]): boolean {
     const packet = buildCoordinatorPacket("act", what, payload, { nodes });
     if (emitCoordinatorPacket(packet)) {
@@ -872,6 +903,7 @@ export function sendCoordinatorAct(what: string, payload: any, nodes?: string[])
     return true;
 }
 
+/** Send a request/response-style coordinator ask and wait for one correlated reply. */
 export function sendCoordinatorAsk(what: string, payload: any, nodes?: string[]): Promise<any> {
     return new Promise((resolve, reject) => {
         void (async () => {
@@ -891,6 +923,7 @@ export function sendCoordinatorAsk(what: string, payload: any, nodes?: string[])
     });
 }
 
+/** Legacy request helper that currently routes through the same transport path as `act`. */
 export function sendCoordinatorRequest(what: string, payload: any, nodes?: string[]): Promise<any> {
     return new Promise((resolve, reject) => {
         void (async () => {
@@ -1005,6 +1038,13 @@ function handleServerMessage(msg: any) {
     }
 }
 
+/**
+ * Probe candidate origins and establish the primary Socket.IO transport.
+ *
+ * AI-READ: this function is intentionally large because it combines UI-state
+ * updates, candidate generation, PNA/LNA warm-up, TLS hints, and reconnect
+ * behavior for browser tabs, extensions, and native shells.
+ */
 export function connectWS() {
     if (isConnecting) return;
     if (socket && (socket.connected || (socket as any).connecting)) return;
@@ -1758,6 +1798,7 @@ export function connectWS() {
     })();
 }
 
+/** Stop probe sockets, tear down the primary transport, and mark the disconnect as user-requested. */
 export function disconnectWS() {
     stopClipboardPushLoop();
     connectAttemptId += 1;
@@ -1780,6 +1821,7 @@ export function disconnectWS() {
     setWsStatus(false);
 }
 
+/** Bind the optional connect button UI to the shared transport lifecycle. */
 export function initWebSocket(btnConnect: HTMLElement | null) {
     btnEl = btnConnect;
     updateButtonLabel();

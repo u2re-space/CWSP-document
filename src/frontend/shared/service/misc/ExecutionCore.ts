@@ -1,3 +1,10 @@
+/**
+ * Rule-based execution engine for recognition and post-processing flows.
+ *
+ * It selects the best rule for a given input/context pair, records execution
+ * history, runs the processor, and optionally propagates clipboard/broadcast
+ * side effects after success.
+ */
 import { processDataWithInstruction } from '@rs-com/service/service/RecognizeData';
 import { toBase64 } from '@rs-com/service/model/GPT-Responses';
 import { actionHistory, type ActionEntry, type ActionContext, type ActionInput, type ActionResult } from './ActionHistory';
@@ -25,6 +32,7 @@ export interface ExecutionOptions {
     processingFormat?: "markdown" | "html" | "json" | "text" | "typescript" | "javascript" | "python" | "java" | "cpp" | "csharp" | "php" | "ruby" | "go" | "rust" | "xml" | "yaml" | "css" | "scss";
 }
 
+/** Main rule engine shared by workcenter, share-target, launch-queue, and CRX flows. */
 export class ExecutionCore {
     private rules: ExecutionRule[] = [];
     private ruleSets: Map<string, ExecutionRule[]> = new Map();
@@ -36,23 +44,20 @@ export class ExecutionCore {
         });
     }
 
-    /**
-     * Register a new execution rule
-     */
+    /** Register one execution rule and keep rules sorted by descending priority. */
     registerRule(rule: ExecutionRule): void {
         this.rules.push(rule);
         this.rules.sort((a, b) => b.priority - a.priority); // Higher priority first
     }
 
-    /**
-     * Register a rule set
-     */
+    /** Register a named rule subset for callers that want to restrict matching. */
     registerRuleSet(name: string, rules: ExecutionRule[]): void {
         this.ruleSets.set(name, rules);
     }
 
     /**
-     * Execute an action based on input and context
+     * Resolve the best rule for this request, execute it, and mirror the result
+     * into action history plus any configured follow-up side effects.
      */
     async execute(input: ActionInput, context: ActionContext, options: ExecutionOptions = {}): Promise<ActionResult> {
         const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

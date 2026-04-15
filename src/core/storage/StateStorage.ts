@@ -1,3 +1,10 @@
+/**
+ * Persistent UI/workspace state for the home speed-dial surface.
+ *
+ * This module owns the default shortcut catalog, conversion between persisted
+ * storage records and reactive UI state, and the metadata registry that keeps
+ * richer shortcut configuration separate from the compact visible item list.
+ */
 import { makeObjectAssignable, observe, stringRef, safe } from "fest/object";
 import { makeUIState } from "fest/lure/extension/core/UIState";
 import { JSOX } from "jsox";
@@ -29,6 +36,7 @@ export interface SpeedDialPersistedItem {
 
 type SpeedDialRecord = Omit<SpeedDialPersistedItem, "meta">;
 
+/** Reactive runtime representation used directly by the UI layer. */
 export interface SpeedDialItem {
     id: string;
     cell: ReturnType<typeof observe>;
@@ -37,6 +45,7 @@ export interface SpeedDialItem {
     action: string;
 }
 
+/** Built-in navigation shortcuts exposed by the home/workspace launcher. */
 export const NAVIGATION_SHORTCUTS = [
     { view: "home", label: "Home", icon: "house-line" },
     { view: "task", label: "Plan", icon: "calendar-dots" },
@@ -171,6 +180,7 @@ const createMetaState = (meta: SpeedDialItemMeta = {}) => {
     }));
 };
 
+/** Reactive metadata state stored separately from the visible grid entries. */
 export type SpeedDialMetaEntry = ReturnType<typeof createMetaState>;
 export type SpeedDialMetaRegistry = Map<string, SpeedDialMetaEntry>;
 

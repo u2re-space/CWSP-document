@@ -1,3 +1,9 @@
+/**
+ * Desktop-style window frame web component.
+ *
+ * It exposes a title bar, window action events, and drag/resize behavior for
+ * shells that render views inside movable process-like windows.
+ */
 import { defineElement, property, H } from "fest/lure";
 import { preloadStyle } from "fest/dom";
 import { UIElement } from "@fl-ui/base/UIElement";
@@ -7,6 +13,7 @@ import styles from "./WindowFrame.scss?inline";
 const styled = preloadStyle(styles);
 
 @defineElement("cw-window-frame-v2")
+/** Window shell frame element with built-in drag/resize interaction. */
 export class WindowFrameV2 extends UIElement {
     @property({ source: "attr", name: "data-title" }) windowTitle: string = "Window";
     @property({ source: "attr", name: "data-pid" }) windowPid: string = "";
@@ -56,6 +63,7 @@ export class WindowFrameV2 extends UIElement {
         if (this.pidEl) this.pidEl.textContent = pid ? `#${pid}` : "";
     }
 
+    /** Wire title-bar dragging while clamping movement to the visible parent stage. */
     private initDrag(frame: HTMLElement, handle: HTMLElement): void {
         handle.addEventListener("pointerdown", (event: PointerEvent) => {
             const target = event.target as HTMLElement | null;
@@ -120,6 +128,7 @@ export class WindowFrameV2 extends UIElement {
         });
     }
 
+    /** Wire corner-resize interaction while preserving minimum and stage-bounded size. */
     private initResize(frame: HTMLElement, handle: HTMLElement): void {
         handle.addEventListener("pointerdown", (event: PointerEvent) => {
             event.preventDefault();

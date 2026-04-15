@@ -1,3 +1,10 @@
+/**
+ * DOM composition layer for the Work Center view.
+ *
+ * This class assembles the visual shell around attachments, prompts, results,
+ * and history submodules so the higher-level controller can coordinate one
+ * unified AI workspace without hardcoding markup in every collaborator.
+ */
 import { H } from "fest/lure";
 import type { WorkCenterState, WorkCenterDependencies } from "./WorkCenterState";
 import type { WorkCenterResults } from "./WorkCenterResults";
@@ -5,6 +12,7 @@ import type { WorkCenterAttachments } from "./WorkCenterAttachments";
 import type { WorkCenterPrompts } from "./WorkCenterPrompts";
 import type { WorkCenterHistory } from "./WorkCenterHistory";
 
+/** View-composition facade for the Work Center feature. */
 export class WorkCenterUI {
     private container: HTMLElement | null = null;
     private deps: WorkCenterDependencies;
@@ -39,6 +47,7 @@ export class WorkCenterUI {
         return this.container;
     }
 
+    /** Render the top-level Work Center layout and wire child modules to the new container. */
     renderWorkCenterView(state: WorkCenterState): HTMLElement {
         const container = H`<div class="workcenter-view">
       <div class="workcenter-header">
@@ -135,6 +144,7 @@ export class WorkCenterUI {
         return container;
     }
 
+    /** Synchronize child widgets after the root container has been created or replaced. */
     private initializeUI(state: WorkCenterState): void {
         // Setup drop zone functionality for attachments
         this.attachments.setupDropZone(state);
