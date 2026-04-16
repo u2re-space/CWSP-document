@@ -46,6 +46,8 @@ export const RuntimeSection: SectionConfig = {
             fields: [
                 { path: "core.userId", label: "User ID", type: "text", placeholder: "device-123" },
                 { path: "core.userKey", label: "User Key", type: "password", placeholder: "generated key" },
+                { path: "core.socket.selfId", label: "AirPad Self ID", type: "text", placeholder: "L-192.168.0.110" },
+                { path: "core.socket.routeTarget", label: "AirPad Route Target", type: "text", placeholder: "L-192.168.0.110" },
                 {
                     path: "core.encrypt",
                     label: "Encrypt stored files",

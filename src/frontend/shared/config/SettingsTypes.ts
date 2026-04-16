@@ -198,6 +198,8 @@ export type AppSettings = {
         socket?: {
             protocol?: CoreSocketProtocol;
             routeTarget?: string;
+            /** Optional AirPad self/client id override; when empty AirPad reuses `core.userId`. */
+            selfId?: string;
             transportMode?: CoreSocketTransportMode;
             transportSecret?: string;
             signingSecret?: string;
@@ -317,6 +319,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
         socket: {
             protocol: "auto",
             routeTarget: "",
+            selfId: "",
             transportMode: "plaintext",
             transportSecret: "",
             signingSecret: ""

@@ -12,6 +12,8 @@ const STORAGE_KEY = 'airpad.remote.connection.v1';
 interface StoredRemoteConfig {
     host?: string;
     authToken?: string;
+    routeTarget?: string;
+    clientId?: string;
     /** Stable per-browser tab/install; separates concurrent devices sharing the same clientId/token. */
     peerInstanceId?: string;
 }
@@ -104,6 +106,8 @@ function persistRemoteConfig(): void {
         globalThis?.localStorage?.setItem?.(STORAGE_KEY, JSON.stringify({
             host: remoteHost,
             authToken: remoteConfig.authToken,
+            routeTarget: remoteConfig.routeTarget,
+            clientId: remoteConfig.clientId,
             peerInstanceId: remoteConfig.peerInstanceId,
         }));
     } catch {
@@ -122,9 +126,13 @@ const createPeerInstanceId = (): string => {
 
 const remoteConfig: {
     authToken: string;
+    routeTarget: string;
+    clientId: string;
     peerInstanceId: string;
 } = {
     authToken: "",
+    routeTarget: "",
+    clientId: "",
     peerInstanceId: "",
 };
 
@@ -145,6 +153,7 @@ let shellNativeSmsEnabled = true;
 let shellNativeContactsEnabled = true;
 let coreSocketProtocol: RemoteProtocol = "auto";
 let coreSocketRouteTarget = "";
+let coreSocketSelfId = "";
 let coreSocketTransportMode: AirpadTransportMode = "plaintext";
 let coreSocketTransportSecret = "";
 let coreSocketSigningSecret = "";
@@ -158,6 +167,8 @@ function hydrateFromStored(stored: MigratedRemoteConfig): void {
     const locHost = typeof location !== "undefined" ? (location.hostname || "") : "";
     remoteHost = (stored.host || locHost || "").trim();
     remoteConfig.authToken = stored.authToken || "";
+    remoteConfig.routeTarget = toTrimmedString((stored as StoredRemoteConfig).routeTarget);
+    remoteConfig.clientId = toTrimmedString((stored as StoredRemoteConfig).clientId);
     const storedPeer = toTrimmedString((stored as StoredRemoteConfig).peerInstanceId);
     if (storedPeer) {
         remoteConfig.peerInstanceId = storedPeer;
@@ -195,6 +206,8 @@ export function attachAirpadCrossTabConfigSync(): () => void {
 export type AirpadRemoteConfigInput = {
     host?: string;
     authToken?: string;
+    routeTarget?: string;
+    clientId?: string;
 };
 
 export function applyAirpadRemoteConfig(input: AirpadRemoteConfigInput): void {
@@ -203,6 +216,12 @@ export function applyAirpadRemoteConfig(input: AirpadRemoteConfigInput): void {
     }
     if (input.authToken !== undefined) {
         remoteConfig.authToken = input.authToken || "";
+    }
+    if (input.routeTarget !== undefined) {
+        remoteConfig.routeTarget = (input.routeTarget || "").trim();
+    }
+    if (input.clientId !== undefined) {
+        remoteConfig.clientId = (input.clientId || "").trim();
     }
     persistRemoteConfig();
 }
@@ -241,6 +260,7 @@ export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
     shellNativeContactsEnabled = (shell?.enableNativeContacts ?? true) !== false;
     coreSocketProtocol = socket?.protocol === "http" || socket?.protocol === "https" ? socket.protocol : "auto";
     coreSocketRouteTarget = (socket?.routeTarget || "").trim();
+    coreSocketSelfId = (socket?.selfId || "").trim();
     coreSocketTransportMode = socket?.transportMode === "secure" ? "secure" : "plaintext";
     coreSocketTransportSecret = (socket?.transportSecret || "").trim();
     coreSocketSigningSecret = (socket?.signingSecret || "").trim();
@@ -336,6 +356,7 @@ export function getRemoteProtocol(): RemoteProtocol {
 }
 
 export function getRemoteRouteTarget(): string {
+    if (remoteConfig.routeTarget.trim()) return remoteConfig.routeTarget.trim();
     return coreSocketRouteTarget;
 }
 
@@ -356,8 +377,20 @@ export function setAirPadAuthToken(token: string): void {
 }
 
 export function getAirPadClientId(): string {
+    if (remoteConfig.clientId.trim()) return remoteConfig.clientId.trim();
+    if (coreSocketSelfId.trim()) return coreSocketSelfId.trim();
     if (coreIdentityUseForAirpad && coreIdentityBridgeUserId.trim()) return coreIdentityBridgeUserId.trim();
     return readGlobalAirpadValue(["AIRPAD_CLIENT_ID", "AIRPAD_CLIENT"]);
+}
+
+export function setAirPadClientId(clientId: string): void {
+    remoteConfig.clientId = (clientId || "").trim();
+    persistRemoteConfig();
+}
+
+export function setRemoteRouteTarget(routeTarget: string): void {
+    remoteConfig.routeTarget = (routeTarget || "").trim();
+    persistRemoteConfig();
 }
 
 export function getAirPadPeerInstanceId(): string {

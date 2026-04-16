@@ -5,6 +5,8 @@
 import {
     getRemoteHost,
     getAirPadAuthToken,
+    getRemoteRouteTarget,
+    getAirPadClientId,
     applyAirpadRemoteConfig,
 } from '../config/config';
 import { reconnectAirPadSessionAfterConfigChange } from '../network/session';
@@ -58,6 +60,14 @@ export function createConfigUI(): HTMLElement {
                     <strong>Routing / identifiers</strong>
                 </div>
                 <div class="config-group">
+                    <label for="airpadRouteTarget">Remote target ID (for bridge mode):</label>
+                    <input type="text" id="airpadRouteTarget" />
+                </div>
+                <div class="config-group">
+                    <label for="airpadClientId">Airpad self ID / Client ID:</label>
+                    <input type="text" id="airpadClientId" />
+                </div>
+                <div class="config-group">
                     <label for="airpadAuthToken">Airpad Auth Token:</label>
                     <input type="text" id="airpadAuthToken" />
                 </div>
@@ -72,10 +82,14 @@ export function createConfigUI(): HTMLElement {
 
     // Add event listeners
     const hostInput = overlay.querySelector('#remoteHost') as HTMLInputElement;
+    const routeTargetInput = overlay.querySelector('#airpadRouteTarget') as HTMLInputElement;
+    const clientIdInput = overlay.querySelector('#airpadClientId') as HTMLInputElement;
     const authTokenInput = overlay.querySelector('#airpadAuthToken') as HTMLInputElement;
     const saveButton = overlay.querySelector('#saveConfig') as HTMLButtonElement;
     const cancelButton = overlay.querySelector('#cancelConfig') as HTMLButtonElement;
     hostInput.value = getRemoteHost();
+    routeTargetInput.value = getRemoteRouteTarget();
+    clientIdInput.value = getAirPadClientId();
     authTokenInput.value = getAirPadAuthToken();
 
     const closeOverlay = () => {
@@ -87,6 +101,8 @@ export function createConfigUI(): HTMLElement {
     saveButton.addEventListener('click', () => {
         applyAirpadRemoteConfig({
             host: hostInput.value,
+            routeTarget: routeTargetInput.value,
+            clientId: clientIdInput.value,
             authToken: authTokenInput.value,
         });
         reconnectAirPadSessionAfterConfigChange({ delayMs: 100 });
@@ -126,8 +142,12 @@ export function showConfigUI(): void {
         host.appendChild(overlay);
     } else {
         const hostInput = overlay.querySelector('#remoteHost') as HTMLInputElement | null;
+        const routeTargetInput = overlay.querySelector('#airpadRouteTarget') as HTMLInputElement | null;
+        const clientIdInput = overlay.querySelector('#airpadClientId') as HTMLInputElement | null;
         const authTokenInput = overlay.querySelector('#airpadAuthToken') as HTMLInputElement | null;
         if (hostInput) hostInput.value = getRemoteHost();
+        if (routeTargetInput) routeTargetInput.value = getRemoteRouteTarget();
+        if (clientIdInput) clientIdInput.value = getAirPadClientId();
         if (authTokenInput) authTokenInput.value = getAirPadAuthToken();
     }
     syncAirpadConfigOverlayShellTheme(overlay, doc);
