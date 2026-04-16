@@ -74,10 +74,7 @@ export const isViewPostApiPath = (pathname: string): ViewPostApiSegment | null =
 };
 
 export const viewBroadcastChannelName = (viewId: string): string => {
-    const id = String(viewId || '')
-        .toLowerCase()
-        .replace(/[^a-z0-9-]/g, '')
-        .replace(/^-+|-+$/g, '');
+    const id = normalizeViewId(viewId);
     return `rs-view-${id || 'app'}`;
 };
 
@@ -309,14 +306,122 @@ export const CONTENT_CONTEXTS = {
 export const DESTINATIONS = {
     WORKCENTER: 'workcenter',
     CLIPBOARD: 'clipboard',
+    VIEWER: 'viewer',
     MARKDOWN_VIEWER: 'markdown-viewer',
     SETTINGS: 'settings',
     HISTORY: 'history',
+    EXPLORER: 'explorer',
     FILE_EXPLORER: 'file-explorer',
+    PRINT: 'print',
     PRINT_VIEWER: 'print-viewer',
+    EDITOR: 'editor',
+    AIRPAD: 'airpad',
+    HOME: 'home',
     BASIC_APP: 'basic-app',
     MAIN_APP: 'main-app'
 } as const;
+
+export const CANONICAL_VIEW_IDS = [
+    'viewer',
+    'workcenter',
+    'explorer',
+    'editor',
+    'settings',
+    'history',
+    'home',
+    'airpad',
+    'print'
+] as const;
+
+export type CanonicalViewId = (typeof CANONICAL_VIEW_IDS)[number];
+
+/**
+ * COMPAT: legacy shells still emit `markdown-viewer`, `file-explorer`, and
+ * `basic-*` destinations. Keep alias resolution centralized here so transports,
+ * views, and workers can agree on one canonical target vocabulary.
+ */
+export const DESTINATION_ALIASES: Record<string, readonly string[]> = {
+    viewer: [DESTINATIONS.VIEWER, DESTINATIONS.MARKDOWN_VIEWER, COMPONENTS.BASIC_VIEWER],
+    workcenter: [DESTINATIONS.WORKCENTER, COMPONENTS.BASIC_WORKCENTER, COMPONENTS.WORKCENTER_CORE],
+    explorer: [DESTINATIONS.EXPLORER, DESTINATIONS.FILE_EXPLORER, COMPONENTS.BASIC_EXPLORER],
+    editor: [DESTINATIONS.EDITOR, COMPONENTS.MARKDOWN_EDITOR, COMPONENTS.RICH_EDITOR],
+    settings: [DESTINATIONS.SETTINGS, BROADCAST_CHANNELS.SETTINGS_CHANNEL, COMPONENTS.BASIC_SETTINGS],
+    history: [DESTINATIONS.HISTORY, BROADCAST_CHANNELS.HISTORY_CHANNEL, COMPONENTS.BASIC_HISTORY],
+    print: [DESTINATIONS.PRINT, DESTINATIONS.PRINT_VIEWER, COMPONENTS.BASIC_PRINT],
+    airpad: [DESTINATIONS.AIRPAD],
+    home: [DESTINATIONS.HOME],
+    clipboard: [DESTINATIONS.CLIPBOARD],
+    "basic-app": [DESTINATIONS.BASIC_APP],
+    "main-app": [DESTINATIONS.MAIN_APP]
+} as const;
+
+const DESTINATION_LOOKUP = Object.entries(DESTINATION_ALIASES).reduce<Record<string, string>>((out, [canonical, aliases]) => {
+    out[canonical] = canonical;
+    for (const alias of aliases) {
+        out[String(alias).toLowerCase()] = canonical;
+    }
+    return out;
+}, {});
+
+export const normalizeDestination = (value: string | null | undefined): string => {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return '';
+    return DESTINATION_LOOKUP[raw] || raw;
+};
+
+export const getDestinationAliases = (value: string | null | undefined): string[] => {
+    const canonical = normalizeDestination(value);
+    if (!canonical) return [];
+    return [...new Set([canonical, ...(DESTINATION_ALIASES[canonical] || [])])];
+};
+
+export const matchesDestination = (candidate: string | null | undefined, expected: string | null | undefined): boolean =>
+    Boolean(normalizeDestination(candidate) && normalizeDestination(candidate) === normalizeDestination(expected));
+
+export const normalizeViewId = (value: string | null | undefined): CanonicalViewId => {
+    const canonical = normalizeDestination(value);
+    if ((CANONICAL_VIEW_IDS as readonly string[]).includes(canonical)) {
+        return canonical as CanonicalViewId;
+    }
+    return 'viewer';
+};
+
+export const getBroadcastChannelForDestination = (value: string | null | undefined): string | null => {
+    switch (normalizeDestination(value)) {
+        case 'viewer':
+            return BROADCAST_CHANNELS.MARKDOWN_VIEWER;
+        case 'workcenter':
+            return BROADCAST_CHANNELS.WORK_CENTER;
+        case 'explorer':
+            return BROADCAST_CHANNELS.FILE_EXPLORER;
+        case 'settings':
+            return BROADCAST_CHANNELS.SETTINGS;
+        case 'history':
+            return BROADCAST_CHANNELS.HISTORY_VIEWER;
+        case 'print':
+            return BROADCAST_CHANNELS.PRINT_VIEWER;
+        case 'clipboard':
+            return BROADCAST_CHANNELS.CLIPBOARD;
+        case 'main-app':
+            return BROADCAST_CHANNELS.MAIN_APP;
+        case 'basic-app':
+            return BROADCAST_CHANNELS.MINIMAL_APP;
+        default:
+            return null;
+    }
+};
+
+export const createDestinationChannelMappings = (): Record<string, string> => {
+    const mappings: Record<string, string> = {};
+    for (const canonical of Object.keys(DESTINATION_ALIASES)) {
+        const channel = getBroadcastChannelForDestination(canonical);
+        if (!channel) continue;
+        for (const alias of getDestinationAliases(canonical)) {
+            mappings[alias] = channel;
+        }
+    }
+    return mappings;
+};
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -326,18 +431,9 @@ export const DESTINATIONS = {
  * Get broadcast channel name by component
  */
 export function getChannelForComponent(component: string): string {
-    const channelMap: Record<string, string> = {
-        [COMPONENTS.WORK_CENTER]: BROADCAST_CHANNELS.WORK_CENTER,
-        [COMPONENTS.MARKDOWN_VIEWER]: BROADCAST_CHANNELS.MARKDOWN_VIEWER,
-        [COMPONENTS.SETTINGS]: BROADCAST_CHANNELS.SETTINGS,
-        [COMPONENTS.FILE_EXPLORER]: BROADCAST_CHANNELS.FILE_EXPLORER,
-        [COMPONENTS.WORKCENTER_CORE]: BROADCAST_CHANNELS.SHARE_TARGET,
-        [COMPONENTS.BASIC_WORKCENTER]: BROADCAST_CHANNELS.SHARE_TARGET,
-        'minimal-app': BROADCAST_CHANNELS.MINIMAL_APP,
-        'main-app': BROADCAST_CHANNELS.MAIN_APP
-    };
-
-    return channelMap[component] || BROADCAST_CHANNELS.GENERAL;
+    return getBroadcastChannelForDestination(component)
+        || getBroadcastChannelForDestination(normalizeDestination(component))
+        || BROADCAST_CHANNELS.GENERAL;
 }
 
 /**
@@ -427,3 +523,6 @@ export const VIEW_ROUTE_MAP: Record<string, string> = {
     editor: ROUTE_HASHES.MARKDOWN_EDITOR,
     home: '#home'
 } as const;
+
+export const getRouteForView = (viewId: string | null | undefined): string =>
+    VIEW_ROUTE_MAP[normalizeViewId(viewId)] || ROUTE_HASHES.MARKDOWN_VIEWER;

@@ -16,7 +16,7 @@ import type { ContentContext, ContentType } from "@rs-com/core/UnifiedAIConfig";
 // Import file handling components that are always needed
 import { createFileHandler } from "@rs-core/storage/FileHandling";
 import { createTemplateManager } from "@rs-core/modules/TemplateManager";
-import { BROADCAST_CHANNELS } from "@rs-com/config/Names";
+import { BROADCAST_CHANNELS, getBroadcastChannelForDestination } from "@rs-com/config/Names";
 import { loadAsAdopted } from "fest/dom";
 import { clearIconCaches, clearIconCache, testIconRacing, reinitializeRegistry, debugIconSystem } from "fest/icon";
 import type { AppSettings } from "@rs-com/config/SettingsTypes";
@@ -1376,7 +1376,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
             });
 
             // Listen for file explorer messages
-            const fileExplorerChannel = new BroadcastChannel('file-explorer');
+            const fileExplorerChannel = new BroadcastChannel(getBroadcastChannelForDestination('explorer') || 'file-explorer');
             fileExplorerChannel.addEventListener("message", (event) => {
                 const message = event.data;
                 console.log('[FileExplorer] Received message:', message);
@@ -1436,7 +1436,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
             });
 
             // Listen for print viewer messages
-            const printViewerChannel = new BroadcastChannel('print-viewer');
+            const printViewerChannel = new BroadcastChannel(getBroadcastChannelForDestination('print') || 'print-viewer');
             printViewerChannel.addEventListener("message", (event) => {
                 const message = event.data;
                 console.log('[PrintViewer] Received message:', message);

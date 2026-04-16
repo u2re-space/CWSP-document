@@ -8,6 +8,7 @@ import {
     createChromeExtensionRuntimeChannel,
     type ChromeExtensionRuntimeChannel,
 } from "./crx-extension-channels";
+import { createInteropEnvelope, type InteropEnvelope } from "./UniformInterop";
 
 /** Subset of fest/uniform OptimizedWorkerChannel used by CrxRuntimeChannel */
 interface CrxOptimizedWorkerChannelLike {
@@ -19,28 +20,18 @@ interface CrxOptimizedWorkerChannelLike {
 // CHROME EXTENSION MESSAGING INTERFACES
 // ============================================================================
 
-export interface CrxMessage {
-    id: string;
-    type: string;
-    source: 'content-script' | 'popup' | 'background' | 'service-worker' | 'offscreen';
-    target?: 'content-script' | 'popup' | 'background' | 'service-worker' | 'offscreen';
+export type CrxMessageContext = 'content-script' | 'popup' | 'background' | 'service-worker' | 'offscreen';
+
+export interface CrxMessage extends InteropEnvelope<unknown> {
+    source: CrxMessageContext;
+    target?: CrxMessageContext;
     tabId?: number;
     frameId?: number;
-    data: any;
-    purpose?: ('invoke' | 'mail' | 'attach' | 'deliver' | 'defer')[];
-    protocol?: string;
-    redirect?: boolean;
-    flags?: Record<string, unknown>;
-    op?: string;
-    timestamp?: number;
-    uuid?: string;
-    srcChannel?: string;
-    dstChannel?: string | string[];
-    metadata?: {
+    metadata: {
         timestamp?: number;
         correlationId?: string;
         priority?: 'low' | 'normal' | 'high';
-        [key: string]: any;
+        [key: string]: unknown;
     };
 }
 
@@ -48,7 +39,7 @@ export interface CrxMessage {
 // CHROME EXTENSION CONTEXT DETECTION
 // ============================================================================
 
-export const getCrxContext = (): CrxMessage['source'] => {
+export const getCrxContext = (): CrxMessageContext => {
     // Detect execution context in Chrome extension
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
         if (typeof document !== 'undefined' && document.contentType) {
@@ -234,15 +225,16 @@ export class CrxRuntimeChannel implements CrxOptimizedWorkerChannelLike {
 
             this.pendingRequests.set(messageId, { resolve, reject, timeout: timeoutHandle });
 
-            const message: CrxMessage = {
+            const message = createInteropEnvelope({
                 id: messageId,
-                uuid: messageId,
                 type: `request:${method}`,
                 source: this.context,
                 target: this.target,
+                destination: this.target,
                 data: args.length === 1 ? args[0] : args,
                 purpose: ['invoke', 'mail'],
                 protocol: 'chrome',
+                transport: 'chrome-runtime',
                 redirect: false,
                 flags: {},
                 op: 'invoke',
@@ -250,7 +242,7 @@ export class CrxRuntimeChannel implements CrxOptimizedWorkerChannelLike {
                 srcChannel: this.context,
                 dstChannel: this.target,
                 metadata: { timestamp: Date.now() }
-            };
+            }) as CrxMessage;
 
             // Use callback version of sendMessage to properly handle responses
             chrome.runtime.sendMessage(message, (response) => {
@@ -336,11 +328,14 @@ export class CrxUnifiedMessaging {
      * Send message via Chrome runtime
      */
     async sendRuntimeMessage(message: Omit<CrxMessage, 'id' | 'source'>): Promise<any> {
-        const fullMessage: CrxMessage = {
-            id: `crx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        const fullMessage = createInteropEnvelope({
+            id: `crx_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
             source: this.context,
+            protocol: 'chrome',
+            transport: 'chrome-runtime',
+            srcChannel: this.context,
             ...message
-        };
+        }) as CrxMessage;
 
         return this.runtimeChannel?.request?.( 'sendMessage', [fullMessage]);
     }
@@ -362,12 +357,18 @@ export class CrxUnifiedMessaging {
         }
 
         return new Promise((resolve, reject) => {
-            chrome.tabs.sendMessage(tabId, {
+            const fullMessage = createInteropEnvelope({
                 ...message,
                 id: `crx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 source: this.context,
+                destination: message.destination ?? message.target,
+                target: message.target,
+                protocol: message.protocol ?? 'chrome',
+                transport: message.transport ?? 'chrome-tabs',
+                srcChannel: this.context,
                 tabId
-            }, (response) => {
+            }) as CrxMessage;
+            chrome.tabs.sendMessage(tabId, fullMessage, (response) => {
                 if (chrome.runtime.lastError) {
                     reject(new Error(chrome.runtime.lastError.message));
                 } else {

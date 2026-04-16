@@ -18,7 +18,7 @@ import {
     type ServiceChannelId,
     type ChannelMessage 
 } from "@rs-com/core/ServiceChannels";
-import { BROADCAST_CHANNELS, MESSAGE_TYPES } from "@rs-com/config/Names";
+import { BROADCAST_CHANNELS, MESSAGE_TYPES, getDestinationAliases, matchesDestination, normalizeViewId } from "@rs-com/config/Names";
 import {
     registerHandler,
     unregisterHandler,
@@ -27,7 +27,9 @@ import {
     type UnifiedMessage
 } from "@rs-com/core/UnifiedMessaging";
 import { fetchSwCachedEntries } from "@rs-com/core/ShareTargetGateway";
+import { toUnifiedInteropMessage } from "../core/UniformInterop";
 import { inferViewDestination, mapUnifiedMessageToView } from "./view-message-routing";
+import { subscribeViewChannel } from "./view-api";
 
 /**
  * Creates a channel-connected view by mixing channel functionality into an existing view.
@@ -299,6 +301,12 @@ export interface ViewReceiveBindingOptions {
     componentId?: string;
 }
 
+const deliverUnifiedMessageToView = async (view: View, message: UnifiedMessage): Promise<void> => {
+    const mapped = mapUnifiedMessageToView(view, message);
+    if (!mapped) return;
+    await view.handleMessage?.(mapped);
+};
+
 export function bindViewReceiveChannel(
     view: View,
     options: ViewReceiveBindingOptions = {}
@@ -309,27 +317,62 @@ export function bindViewReceiveChannel(
 
     const destination = options.destination || inferViewDestination(String(view.id || ""));
     const componentId = options.componentId || `view:${view.id}`;
+    const receiveDestinations = getDestinationAliases(destination);
 
     const handler = {
-        canHandle: (message) => message.destination === destination,
+        canHandle: (message) => matchesDestination(message.destination, destination),
         handle: async (message) => {
-            const mapped = mapUnifiedMessageToView(view, message as UnifiedMessage);
-            if (!mapped) return;
-            await view.handleMessage?.(mapped);
+            await deliverUnifiedMessageToView(view, message as UnifiedMessage);
         }
     };
 
-    registerComponent(componentId, destination);
-    registerHandler(destination, handler as any);
+    const pendingSeen = new Set<string>();
+    for (const alias of receiveDestinations) {
+        const aliasComponentId = `${componentId}:${alias}`;
+        registerComponent(aliasComponentId, alias);
+        registerHandler(alias, handler as any);
 
-    const pending = initializeComponent(componentId);
-    if (pending.length > 0) {
-        for (const message of pending) {
-            void handler.handle(message);
+        const pending = initializeComponent(aliasComponentId);
+        if (pending.length > 0) {
+            for (const message of pending) {
+                if (pendingSeen.has(message.id)) continue;
+                pendingSeen.add(message.id);
+                void handler.handle(message);
+            }
         }
     }
 
+    const viewChannelCleanup = subscribeViewChannel(normalizeViewId(destination), (event) => {
+        const payload = event.data;
+        if (!payload || typeof payload !== "object") return;
+
+        if (payload.type === "view-transfer" && payload.message && typeof payload.message === "object") {
+            void deliverUnifiedMessageToView(view, toUnifiedInteropMessage(payload.message as Record<string, unknown>) as UnifiedMessage);
+            return;
+        }
+
+        if (payload.type === "view-post") {
+            const viewId = normalizeViewId(payload.viewId);
+            if (viewId !== normalizeViewId(String(view.id || destination))) return;
+            void view.handleMessage?.({
+                type: "view-post",
+                data: {
+                    bodyText: String(payload.bodyText || ""),
+                    contentType: String(payload.contentType || ""),
+                    viewId
+                },
+                metadata: {
+                    source: "view-channel",
+                    destination: viewId
+                }
+            });
+        }
+    });
+
     return () => {
-        unregisterHandler(destination, handler as any);
+        for (const alias of receiveDestinations) {
+            unregisterHandler(alias, handler as any);
+        }
+        viewChannelCleanup();
     };
 }

@@ -1,6 +1,6 @@
 /**
  * Device clipboard I/O: prefers Capacitor on cwsp Android, else Web Clipboard API.
- * Used for LAN clipboard sync (CWSAndroid-style) from Socket.IO / coordinator.
+ * Used for LAN clipboard sync (CWSAndroid-style) from WebSocket / coordinator.
  */
 
 const isCapacitorNative = (): boolean => {

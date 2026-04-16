@@ -125,31 +125,31 @@ const requestClipboardWriteCompat = async (text: string): Promise<void> => {
     }
 };
 
-export const initPacketSocketIoRail = (button: HTMLElement | null): void => {
+export const initPacketWsRail = (button: HTMLElement | null): void => {
     initWebSocket(button);
 };
 
-export const connectPacketSocketIoRail = (): void => {
+export const connectPacketWsRail = (): void => {
     connectWS();
 };
 
-export const disconnectPacketSocketIoRail = (): void => {
+export const disconnectPacketWsRail = (): void => {
     disconnectWS();
 };
 
-export const isPacketSocketIoRailConnected = (): boolean => {
+export const isPacketWsRailConnected = (): boolean => {
     return isWSConnected();
 };
 
-export const onPacketSocketIoRailConnectionChange = (handler: (connected: boolean) => void): (() => void) => {
+export const onPacketWsRailConnectionChange = (handler: (connected: boolean) => void): (() => void) => {
     return onWSConnectionChange(handler);
 };
 
-export const onPacketSocketIoClipboardUpdate = (handler: (text: string, meta?: { source?: string }) => void): (() => void) => {
+export const onPacketWsClipboardUpdate = (handler: (text: string, meta?: { source?: string }) => void): (() => void) => {
     return onServerClipboardUpdate(handler);
 };
 
-export const sendPacketSocketIoIntent = (intent: AirPadIntent): void => {
+export const sendPacketWsIntent = (intent: AirPadIntent): void => {
     if (intent.type === "gesture.swipe") {
         return;
     }
@@ -159,7 +159,7 @@ export const sendPacketSocketIoIntent = (intent: AirPadIntent): void => {
     sendCoordinatorAct(specAction.what, specAction.payload);
 };
 
-export const sendPacketSocketIoBinary = (buffer: ArrayBuffer | Uint8Array): void => {
+export const sendPacketWsBinary = (buffer: ArrayBuffer | Uint8Array): void => {
     const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
     if (bytes.byteLength < 6) return;
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -167,10 +167,10 @@ export const sendPacketSocketIoBinary = (buffer: ArrayBuffer | Uint8Array): void
     if (type !== 6) return;
     const codePoint = view.getUint32(0, true);
     const flags = view.getUint8(5);
-    sendPacketSocketIoIntent({ type: "keyboard.binary", codePoint, flags });
+    sendPacketWsIntent({ type: "keyboard.binary", codePoint, flags });
 };
 
-export const createPacketSocketIoKeyboardMessage = (codePoint: number, flags = 0): ArrayBuffer => {
+export const createPacketWsKeyboardMessage = (codePoint: number, flags = 0): ArrayBuffer => {
     const buffer = new ArrayBuffer(8);
     const view = new DataView(buffer);
     view.setUint32(0, codePoint, true);
@@ -180,7 +180,7 @@ export const createPacketSocketIoKeyboardMessage = (codePoint: number, flags = 0
     return buffer;
 };
 
-export const requestPacketSocketIoClipboardRead = async (): Promise<AirPadClipboardResult> => {
+export const requestPacketWsClipboardRead = async (): Promise<AirPadClipboardResult> => {
     if (!isShellRemoteClipboardBridgeEnabled()) {
         return { ok: false, error: "Remote clipboard bridge disabled in Settings → Server → Embedded shell." };
     }
@@ -192,33 +192,33 @@ export const requestPacketSocketIoClipboardRead = async (): Promise<AirPadClipbo
     }
 };
 
-export const requestPacketSocketIoClipboardCopy = async (): Promise<AirPadClipboardResult> => {
+export const requestPacketWsClipboardCopy = async (): Promise<AirPadClipboardResult> => {
     if (!isShellRemoteClipboardBridgeEnabled()) {
         return { ok: false, error: "Remote clipboard bridge disabled in Settings → Server → Embedded shell." };
     }
     try {
         await sendKeyboardTapCompat("c", ["control"]);
         await sleep(60);
-        return await requestPacketSocketIoClipboardRead();
+        return await requestPacketWsClipboardRead();
     } catch (error: any) {
         return { ok: false, error: error?.error || error?.message || String(error) };
     }
 };
 
-export const requestPacketSocketIoClipboardCut = async (): Promise<AirPadClipboardResult> => {
+export const requestPacketWsClipboardCut = async (): Promise<AirPadClipboardResult> => {
     if (!isShellRemoteClipboardBridgeEnabled()) {
         return { ok: false, error: "Remote clipboard bridge disabled in Settings → Server → Embedded shell." };
     }
     try {
         await sendKeyboardTapCompat("x", ["control"]);
         await sleep(60);
-        return await requestPacketSocketIoClipboardRead();
+        return await requestPacketWsClipboardRead();
     } catch (error: any) {
         return { ok: false, error: error?.error || error?.message || String(error) };
     }
 };
 
-export const requestPacketSocketIoClipboardPaste = async (text: string): Promise<AirPadClipboardResult> => {
+export const requestPacketWsClipboardPaste = async (text: string): Promise<AirPadClipboardResult> => {
     if (!isShellRemoteClipboardBridgeEnabled()) {
         return { ok: false, error: "Remote clipboard bridge disabled in Settings → Server → Embedded shell." };
     }

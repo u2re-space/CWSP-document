@@ -27,7 +27,7 @@ export const disconnectAirPadSession = (): void => {
 };
 
 /**
- * After changing host/secrets/mode: drop Socket.IO, clear AES/HMAC caches, then connect again.
+ * After changing host/secrets/mode: drop WebSocket, clear AES/HMAC caches, then connect again.
  * Mirrors legacy "Save & Reconnect" behavior.
  */
 export function reconnectAirPadSessionAfterConfigChange(options?: { delayMs?: number }): void {

@@ -1,5 +1,6 @@
 import type { View } from "../../shells/types";
 import type { UnifiedMessage } from "@rs-com/core/UnifiedMessaging";
+import { normalizeViewId } from "@rs-com/config/Names";
 
 const VIEW_MESSAGE_FALLBACKS: Record<string, string[]> = {
     viewer: ["content-view", "content-load", "markdown-content"],
@@ -14,15 +15,7 @@ const VIEW_MESSAGE_FALLBACKS: Record<string, string[]> = {
 };
 
 export const inferViewDestination = (viewId: string): string => {
-    if (viewId === "viewer") return "viewer";
-    if (viewId === "workcenter") return "workcenter";
-    if (viewId === "explorer") return "explorer";
-    if (viewId === "editor") return "editor";
-    if (viewId === "settings") return "settings";
-    if (viewId === "history") return "history";
-    if (viewId === "print") return "print";
-    if (viewId === "airpad") return "airpad";
-    return viewId || "viewer";
+    return normalizeViewId(viewId);
 };
 
 const selectMessageTypeForView = (view: View, incomingType: string): string | null => {

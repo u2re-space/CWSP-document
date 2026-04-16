@@ -5,6 +5,7 @@ import { H } from "fest/lure";
 import { loadSettings, saveSettings } from "@rs-com/config/Settings";
 import { BUILTIN_AI_MODELS, type AppSettings, type CoreMode, type MCPConfig } from "@rs-com/config/SettingsTypes";
 import { openAdminDoorFromCore, resolveAdminDoorUrls } from "@rs-com/config/admin-doors";
+import { sendMessage } from "@rs-com/core/UnifiedMessaging";
 import { applyTheme } from "@rs-core/utils/Theme";
 import { setString, StorageKeys } from "@rs-core/storage";
 import { navigateToView } from "@shells/boot";
@@ -79,6 +80,15 @@ const parseFloatInRange = (value: string | undefined, fallback: number, min: num
     const parsed = Number.parseFloat((value || "").trim());
     if (!Number.isFinite(parsed)) return fallback;
     return Math.max(min, Math.min(max, parsed));
+};
+const readTrimmedControlValue = (
+    control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null | undefined,
+    fallback = ""
+): string => {
+    return control ? control.value.trim() : fallback;
+};
+const readCheckboxValue = (control: HTMLInputElement | null | undefined, fallback: boolean): boolean => {
+    return control ? Boolean(control.checked) : fallback;
 };
 
 export const createSettingsView = (opts: SettingsViewOptions) => {
@@ -385,99 +395,58 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     </section>
 
     <section class="card settings-tab-panel" data-tab-panel="server">
-      <h3>Server &amp; admin</h3>
+      <h3>Server</h3>
       <p class="field-hint" style="margin: 0 0 0.75rem; opacity: 0.88; font-size: 0.9em;">
-        Endpoint, admin doors (HTTPS :8443, HTTP :8080), and <strong>associated identity</strong> for cwsp / endpoint env
-        (<code>CWS_ASSOCIATED_ID</code> / <code>CWS_ASSOCIATED_TOKEN</code>).
-        When enabled below, the same User ID / User key can back AirPad transport if its overlay fields are empty.
-        On <strong>Android (Capacitor cwsp)</strong>, cleartext HTTP to LAN may need <code>&lt;domain&gt;</code> rows in
-        <code>resources/android/network_security_config.xml</code> (re-run <code>cap:patch:android-net</code> after <code>cap sync</code>).
-        <strong>ADB WebView debug:</strong> run task <code>cwsp: adb forward WebView devtools (9222)</code>, then attach with
-        <code>CWSP Android WebView (attach :9222)</code> (device default <code>192.168.0.196:5555</code>, override <code>CWS_ADB_DEVICE</code>).
+        Keep your main CWSP connection, device identity, and AirPad defaults here.
+        The AirPad popup now only overrides the quick "where to connect" value.
       </p>
+      <h4>Main connection</h4>
       <label class="field">
-        <span>Core mode</span>
-        <select class="form-select" data-field="core.mode">
-          <option value="native">Native / offline-first</option>
-          <option value="endpoint">Endpoint (backend sync)</option>
-        </select>
+        <span>Server URL</span>
+        <input class="form-input" type="url" inputmode="url" autocomplete="off" placeholder="https://192.168.0.200:8443" data-field="core.endpointUrl" />
       </label>
       <label class="field">
-        <span>Endpoint base URL</span>
-        <input class="form-input" type="url" inputmode="url" autocomplete="off" placeholder="https://host:6065 or http://localhost:6065" data-field="core.endpointUrl" />
+        <span>This device ID</span>
+        <input class="form-input" type="text" autocomplete="off" data-field="core.userId" placeholder="L-192.168.0.196" />
       </label>
       <label class="field">
-        <span>Associated client ID (User ID)</span>
-        <input class="form-input" type="text" autocomplete="off" data-field="core.userId" placeholder="CWS_ASSOCIATED_ID / bridge client" />
-      </label>
-      <label class="field">
-        <span>Associated token (User key)</span>
-        <input class="form-input" type="password" autocomplete="off" data-field="core.userKey" placeholder="CWS_ASSOCIATED_TOKEN" />
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="core.useCoreIdentityForAirPad" />
-        <span>Use these for AirPad when overlay Client ID / token are empty</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="core.preferBackendSync" />
-        <span>Prefer backend sync when in endpoint mode</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="core.encrypt" />
-        <span>Encrypt transport to endpoint (when supported)</span>
-      </label>
-      <label class="field">
-        <span>Application client ID</span>
-        <input class="form-input" type="text" autocomplete="off" placeholder="Optional instance id for this install (cwsp, PWA, …)" data-field="core.appClientId" />
+        <span>Connection token</span>
+        <input class="form-input" type="password" autocomplete="off" data-field="core.userKey" placeholder="n3v3rm1nd" />
       </label>
       <label class="field checkbox form-checkbox">
         <input type="checkbox" data-field="core.allowInsecureTls" />
-        <span>Allow insecure / self-signed TLS (native shells only; browsers ignore this for fetch)</span>
+        <span>Allow self-signed / insecure TLS</span>
       </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="core.ops.allowUnencrypted" />
-        <span>Allow unencrypted HTTP targets in operations (advanced)</span>
-      </label>
-      <h4>Admin doors</h4>
-      <label class="field">
-        <span>Admin HTTPS origin</span>
-        <input class="form-input" type="url" inputmode="url" autocomplete="off" placeholder="https://localhost:8443" data-field="core.admin.httpsOrigin" />
-      </label>
-      <label class="field">
-        <span>Admin HTTP origin</span>
-        <input class="form-input" type="url" inputmode="url" autocomplete="off" placeholder="http://localhost:8080" data-field="core.admin.httpOrigin" />
-      </label>
-      <label class="field">
-        <span>Admin path</span>
-        <input class="form-input" type="text" autocomplete="off" placeholder="/" data-field="core.admin.path" />
-      </label>
-      <div class="mcp-actions" style="flex-wrap: wrap; gap: 0.5rem;">
-        <button class="btn primary" type="button" data-action="open-admin-https">Open admin (HTTPS)</button>
-        <button class="btn" type="button" data-action="open-admin-http">Open admin (HTTP)</button>
-        <button class="btn" type="button" data-action="copy-admin-https">Copy HTTPS URL</button>
-        <button class="btn" type="button" data-action="copy-admin-http">Copy HTTP URL</button>
-      </div>
-      <p class="mcp-empty-note" data-admin-preview style="margin-top: 0.75rem; word-break: break-all;"></p>
-      <h4>Embedded shell (Capacitor / WebView)</h4>
-      <p class="field-hint" style="margin: 0 0 0.75rem; opacity: 0.88; font-size: 0.9em;">
-        Defaults for AirPad hub/tunnel and coordinator features (aligned with CWSAndroid-style toggles). Clipboard gate applies to web AirPad coordinator calls; SMS/contacts are stored for future native bridges.
-        Server routing for who receives clipboard (e.g. <code>L-192.168.0.110</code> → <code>L-192.168.0.196</code>) uses cwsp <code>clients.json</code> (<code>modules.clipboard</code> <code>shareTo</code> / <code>acceptFrom</code>) or HTTPS POST <code>/clipboard</code> with <code>targets</code>, same as CWSAndroid.
+
+      <h4>AirPad defaults</h4>
+      <p class="field-hint" style="margin: 0 0 0.75rem; opacity: 0.82; font-size: 0.9em;">
+        Use these as your saved defaults. The AirPad popup can still temporarily switch the target ID or URL:port.
       </p>
       <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.maintainHubSocketConnection" />
-        <span>Keep hub Socket.IO connected in background (cwsp / endpoint; clipboard + coordinator without opening AirPad)</span>
+        <input type="checkbox" data-field="core.useCoreIdentityForAirPad" />
+        <span>Use this device ID and token for AirPad</span>
       </label>
+      <label class="field">
+        <span>AirPad target device ID (optional)</span>
+        <input class="form-input" type="text" autocomplete="off" data-field="core.socket.routeTarget" placeholder="L-192.168.0.110" />
+      </label>
+      <label class="field">
+        <span>AirPad self ID override (optional)</span>
+        <input class="form-input" type="text" autocomplete="off" data-field="core.socket.selfId" placeholder="Leave empty to reuse This device ID" />
+      </label>
+
+      <h4>Clipboard Sync</h4>
       <label class="field checkbox form-checkbox">
         <input type="checkbox" data-field="shell.enableRemoteClipboardBridge" />
-        <span>Enable remote clipboard bridge (coordinator / server clipboard)</span>
+        <span>Enable clipboard synchronization</span>
       </label>
       <label class="field checkbox form-checkbox">
         <input type="checkbox" data-field="shell.applyRemoteClipboardToDevice" />
-        <span>Apply incoming remote clipboard to this device (Web or Capacitor <code>@capacitor/clipboard</code>)</span>
+        <span>Apply incoming clipboard to this device</span>
       </label>
       <label class="field checkbox form-checkbox">
         <input type="checkbox" data-field="shell.pushLocalClipboardToLan" />
-        <span>Push local clipboard to LAN peers (polls; uses targets below)</span>
+        <span>Push local clipboard to target device</span>
       </label>
       <label class="field">
         <span>Clipboard push interval (ms)</span>
@@ -486,18 +455,6 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
       <label class="field">
         <span>Clipboard broadcast targets (optional)</span>
         <input class="form-input" type="text" autocomplete="off" data-field="shell.clipboardBroadcastTargets" placeholder="L-192.168.0.196, L-192.168.0.208 — overrides route target if set" />
-      </label>
-      <div class="mcp-actions" style="flex-wrap: wrap; gap: 0.5rem;">
-        <button class="btn" type="button" data-action="open-native-app-settings">Open app settings (Android / iOS)</button>
-        <button class="btn" type="button" data-action="open-native-notification-settings">Notification settings (native)</button>
-      </div>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.enableNativeSms" />
-        <span>Allow native SMS bridge (shell must implement)</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.enableNativeContacts" />
-        <span>Allow native contacts bridge (shell must implement)</span>
       </label>
     </section>
 
@@ -613,6 +570,8 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     const coreAdminHttp = field('[data-field="core.admin.httpOrigin"]') as HTMLInputElement | null;
     const coreAdminPath = field('[data-field="core.admin.path"]') as HTMLInputElement | null;
     const coreUseCoreIdentityAirpad = field('[data-field="core.useCoreIdentityForAirPad"]') as HTMLInputElement | null;
+    const coreSocketRouteTarget = field('[data-field="core.socket.routeTarget"]') as HTMLInputElement | null;
+    const coreSocketSelfId = field('[data-field="core.socket.selfId"]') as HTMLInputElement | null;
     const shellMaintainHubSocket = field('[data-field="shell.maintainHubSocketConnection"]') as HTMLInputElement | null;
     const shellClipboard = field('[data-field="shell.enableRemoteClipboardBridge"]') as HTMLInputElement | null;
     const shellApplyRemoteDevice = field('[data-field="shell.applyRemoteClipboardToDevice"]') as HTMLInputElement | null;
@@ -729,15 +688,17 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         try {
             setString(StorageKeys.EXPLORER_PATH, path);
             navigateToView("explorer");
-            const channel = new BroadcastChannel("file-explorer");
-            channel.postMessage({
+            void sendMessage({
                 type: "content-explorer",
+                destination: "explorer",
                 data: {
                     action: "view",
                     path
+                },
+                metadata: {
+                    source: "settings"
                 }
             });
-            channel.close();
             setNote(`Explorer: ${path}`);
         } catch (error) {
             console.warn("[Settings] Failed to open explorer path:", error);
@@ -877,6 +838,8 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
             if (coreEncrypt) coreEncrypt.checked = Boolean(s?.core?.encrypt);
             if (coreAppClientId) coreAppClientId.value = (s?.core?.appClientId || "").trim();
             if (coreUseCoreIdentityAirpad) coreUseCoreIdentityAirpad.checked = (s?.core?.useCoreIdentityForAirPad ?? true) !== false;
+            if (coreSocketRouteTarget) coreSocketRouteTarget.value = (s?.core?.socket?.routeTarget || "").trim();
+            if (coreSocketSelfId) coreSocketSelfId.value = (s?.core?.socket?.selfId || "").trim();
             if (coreAllowInsecureTls) coreAllowInsecureTls.checked = Boolean(s?.core?.allowInsecureTls);
             if (coreOpsAllowUnencrypted) coreOpsAllowUnencrypted.checked = Boolean(s?.core?.ops?.allowUnencrypted);
             if (coreAdminHttps) coreAdminHttps.value = (s?.core?.admin?.httpsOrigin || "").trim();
@@ -1056,40 +1019,45 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                 },
                 core: {
                     ...current.core,
-                    ntpEnabled: Boolean(ntpEnabled?.checked),
-                    mode: ((coreMode?.value as CoreMode) || "native") as CoreMode,
-                    endpointUrl: coreEndpointUrl?.value?.trim() || "",
-                    userId: coreUserId?.value?.trim() || "",
-                    userKey: coreUserKey?.value?.trim() || "",
-                    encrypt: Boolean(coreEncrypt?.checked),
-                    preferBackendSync: (corePreferBackendSync?.checked ?? true) !== false,
-                    appClientId: coreAppClientId?.value?.trim() || "",
-                    allowInsecureTls: Boolean(coreAllowInsecureTls?.checked),
-                    useCoreIdentityForAirPad: (coreUseCoreIdentityAirpad?.checked ?? true) !== false,
+                    ntpEnabled: readCheckboxValue(ntpEnabled, Boolean(current.core?.ntpEnabled)),
+                    mode: (readTrimmedControlValue(coreMode, (current.core?.mode || "native") as string) || "native") as CoreMode,
+                    endpointUrl: readTrimmedControlValue(coreEndpointUrl, current.core?.endpointUrl || ""),
+                    userId: readTrimmedControlValue(coreUserId, current.core?.userId || ""),
+                    userKey: readTrimmedControlValue(coreUserKey, current.core?.userKey || ""),
+                    encrypt: readCheckboxValue(coreEncrypt, Boolean(current.core?.encrypt)),
+                    preferBackendSync: readCheckboxValue(corePreferBackendSync, (current.core?.preferBackendSync ?? true) !== false),
+                    appClientId: readTrimmedControlValue(coreAppClientId, current.core?.appClientId || ""),
+                    allowInsecureTls: readCheckboxValue(coreAllowInsecureTls, Boolean(current.core?.allowInsecureTls)),
+                    useCoreIdentityForAirPad: readCheckboxValue(coreUseCoreIdentityAirpad, (current.core?.useCoreIdentityForAirPad ?? true) !== false),
+                    socket: {
+                        ...(current.core?.socket || {}),
+                        routeTarget: readTrimmedControlValue(coreSocketRouteTarget, current.core?.socket?.routeTarget || ""),
+                        selfId: readTrimmedControlValue(coreSocketSelfId, current.core?.socket?.selfId || ""),
+                    },
                     admin: {
                         ...(current.core?.admin || {}),
-                        httpsOrigin: coreAdminHttps?.value?.trim() || "",
-                        httpOrigin: coreAdminHttp?.value?.trim() || "",
-                        path: coreAdminPath?.value?.trim() || "/",
+                        httpsOrigin: readTrimmedControlValue(coreAdminHttps, current.core?.admin?.httpsOrigin || ""),
+                        httpOrigin: readTrimmedControlValue(coreAdminHttp, current.core?.admin?.httpOrigin || ""),
+                        path: readTrimmedControlValue(coreAdminPath, current.core?.admin?.path || "/") || "/",
                     },
                     ops: {
                         ...(current.core?.ops || {}),
-                        allowUnencrypted: Boolean(coreOpsAllowUnencrypted?.checked),
+                        allowUnencrypted: readCheckboxValue(coreOpsAllowUnencrypted, Boolean(current.core?.ops?.allowUnencrypted)),
                     },
                 },
                 shell: {
                     ...(current.shell || {}),
-                    maintainHubSocketConnection: Boolean(shellMaintainHubSocket?.checked),
-                    enableRemoteClipboardBridge: (shellClipboard?.checked ?? true) !== false,
-                    applyRemoteClipboardToDevice: (shellApplyRemoteDevice?.checked ?? true) !== false,
-                    pushLocalClipboardToLan: Boolean(shellPushClipboard?.checked),
+                    maintainHubSocketConnection: readCheckboxValue(shellMaintainHubSocket, Boolean(current.shell?.maintainHubSocketConnection)),
+                    enableRemoteClipboardBridge: readCheckboxValue(shellClipboard, (current.shell?.enableRemoteClipboardBridge ?? true) !== false),
+                    applyRemoteClipboardToDevice: readCheckboxValue(shellApplyRemoteDevice, (current.shell?.applyRemoteClipboardToDevice ?? true) !== false),
+                    pushLocalClipboardToLan: readCheckboxValue(shellPushClipboard, Boolean(current.shell?.pushLocalClipboardToLan)),
                     clipboardPushIntervalMs: Math.max(
                         800,
-                        Math.min(60000, parseNumberOrDefault(shellClipboardPushMs?.value, 2000))
+                        Math.min(60000, parseNumberOrDefault(shellClipboardPushMs?.value, current.shell?.clipboardPushIntervalMs ?? 2000))
                     ),
-                    clipboardBroadcastTargets: shellClipboardTargets?.value?.trim() || "",
-                    enableNativeSms: (shellSms?.checked ?? true) !== false,
-                    enableNativeContacts: (shellContacts?.checked ?? true) !== false,
+                    clipboardBroadcastTargets: readTrimmedControlValue(shellClipboardTargets, current.shell?.clipboardBroadcastTargets || ""),
+                    enableNativeSms: readCheckboxValue(shellSms, (current.shell?.enableNativeSms ?? true) !== false),
+                    enableNativeContacts: readCheckboxValue(shellContacts, (current.shell?.enableNativeContacts ?? true) !== false),
                 },
                 appearance: {
                     theme: (theme?.value as any) || "auto",

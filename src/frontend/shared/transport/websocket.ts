@@ -1,7 +1,7 @@
 /**
  * AirPad/remote transport hub for the frontend.
  *
- * This module owns the client-side Socket.IO connection, secure-envelope
+ * This module owns the client-side WebSocket connection, secure-envelope
  * wrapping, coordinator ask/act flows, clipboard bridging, and the candidate
  * probing logic used to discover a reachable CWSP endpoint from web, PWA, or
  * extension contexts.
@@ -11,7 +11,7 @@
  * restrictions differ, especially Chromium extension pages versus normal tabs.
  */
 
-import { io, Socket } from 'socket.io-client';
+import { io, Socket } from './native-socket';
 import { log, getWsStatusEl } from '../../views/airpad/utils/utils';
 import {
     getRemoteHost,
@@ -61,7 +61,7 @@ const localNetworkPermissionProbeDone = new Set<string>();
 // Keep retrying across NAT/Wi-Fi transitions; 0 means unlimited retries.
 const AUTO_RECONNECT_MAX_ATTEMPTS = 0;
 const AUTO_RECONNECT_BASE_DELAY_MS = 800;
-/** Socket.IO handshake timeout per candidate (dead hosts fail faster). */
+/** WebSocket handshake timeout per candidate (dead hosts fail faster). */
 const AIRPAD_PROBE_IO_TIMEOUT_MS = 4800;
 /** Wall-clock cap per probe if connect_error is slow to fire. */
 const AIRPAD_PROBE_HARD_CAP_MS = AIRPAD_PROBE_IO_TIMEOUT_MS + 800;
@@ -221,7 +221,7 @@ const ensureCoordinatorSocketConnected = async (timeoutMs = 7000): Promise<boole
     });
 };
 
-/** Return the current live Socket.IO instance, if any. */
+/** Return the current live WebSocket instance, if any. */
 export function getWS(): Socket | null {
     return socket;
 }
@@ -858,7 +858,7 @@ const handleServerNetworkFetchRequest = async (request: NetworkFetchRequest): Pr
  * Best-effort Chrome Local Network Access warm-up for private-IP targets.
  *
  * WHY: probing `/lna-probe` early makes permission/PNA failures visible before
- * the heavier Socket.IO candidate rotation starts reporting generic timeouts.
+ * the heavier WebSocket candidate rotation starts reporting generic timeouts.
  */
 async function tryRequestLocalNetworkPermission(origin: string, host: string): Promise<void> {
     if (!origin || !host) return;
@@ -1039,7 +1039,7 @@ function handleServerMessage(msg: any) {
 }
 
 /**
- * Probe candidate origins and establish the primary Socket.IO transport.
+ * Probe candidate origins and establish the primary WebSocket transport.
  *
  * AI-READ: this function is intentionally large because it combines UI-state
  * updates, candidate generation, PNA/LNA warm-up, TLS hints, and reconnect
@@ -1136,7 +1136,7 @@ export function connectWS() {
         )
     );
     if (location.protocol === 'https:' && remoteProtocol === 'http' && !isCapacitorNativeShell()) {
-        log('Socket.IO error: browser blocks ws/http from https page (mixed content). Open Airpad via http:// or use valid HTTPS cert on endpoint.');
+        log('WebSocket error: browser blocks ws/http from https page (mixed content). Open Airpad via http:// or use valid HTTPS cert on endpoint.');
         isConnecting = false;
         setWsStatus(false);
         updateButtonLabel();
@@ -1480,7 +1480,7 @@ export function connectWS() {
             if (shouldRotateCandidateOnDisconnect(reason)) {
                 rotateCandidate();
                 if (lastWsCandidates.length > 1) {
-                    log(`Socket.IO disconnect reason "${reason || "unknown"}", trying next candidate on reconnect`);
+                    log(`WebSocket disconnect reason "${reason || "unknown"}", trying next candidate on reconnect`);
                 }
             }
 
@@ -1506,7 +1506,7 @@ export function connectWS() {
 
         socket.on("hello-ack", (data: any) => {
             if (data?.id) {
-                log(`Socket.IO hello ack: ${String(data.id)}`);
+                log(`WebSocket hello ack: ${String(data.id)}`);
             }
         });
 
@@ -1814,7 +1814,7 @@ export function disconnectWS() {
         updateButtonLabel();
         return;
     }
-    log('Disconnecting Socket.IO...');
+    log('Disconnecting WebSocket...');
     socket.disconnect();
     socket = null;
     (window as any).__socket = null;

@@ -13,6 +13,7 @@ import { BROADCAST_CHANNELS } from "@rs-com/config/Names";
 import { loadSettings } from "@rs-com/config/Settings";
 import { summarizeForLog } from "@rs-com/core/LogSanitizer";
 import {
+    buildShareDataFromCachedPayload,
     consumeCachedShareTargetPayload as consumeCachedShareTargetPayloadFromGateway,
     storeShareTargetPayloadToCache as storeShareTargetPayloadToCacheGateway,
     type CachedShareTargetPayload
@@ -252,6 +253,7 @@ interface ShareDataInput {
     aiEnabled?: boolean;
     results?: any[];
     source?: string;
+    hint?: ViewTransferHint;
 }
 
 const inferShareContentType = (shareData: ShareDataInput): "markdown" | "text" | "image" | "file" | "url" | "other" => {
@@ -325,6 +327,18 @@ const shouldForceWorkCenterAttachment = async (shareData: ShareDataInput): Promi
     } catch {
         return false;
     }
+};
+
+const extractTransferHint = (shareData: ShareDataInput): ViewTransferHint | undefined => {
+    const hint = shareData?.hint;
+    if (!hint || typeof hint !== "object") return undefined;
+    return hint;
+};
+
+const hydrateTransferPayloadFromCache = async (opts: { clear?: boolean } = {}): Promise<ShareDataInput | null> => {
+    const cachedPayload = await consumeCachedShareTargetPayload(opts);
+    if (!cachedPayload) return null;
+    return buildShareDataFromCachedPayload(cachedPayload) as ShareDataInput;
 };
 
 const routeToTransferView = async (
@@ -783,7 +797,7 @@ export const handleShareTarget = () => {
 
         if (content || type === 'file') {
             console.log("[ShareTarget] Processing from URL params");
-            routeToTransferView(shareFromParams, "share-target", undefined, true).catch((error) => {
+            routeToTransferView(shareFromParams, "share-target", extractTransferHint(shareFromParams), true).catch((error) => {
                 console.warn("[ShareTarget] Route transfer failed, falling back to processing:", error);
                 processShareTargetData(shareFromParams, true);
             });
@@ -804,14 +818,11 @@ export const handleShareTarget = () => {
                         // Hydrate real files for metadata-only cached payloads.
                         if ((data.fileCount ?? 0) > 0 && !data.files?.length) {
                             try {
-                                const cachedPayload = await consumeCachedShareTargetPayload({ clear: false });
-                                const cachedFiles = cachedPayload?.files || [];
-                                if (cachedFiles.length > 0) {
+                                const cachedTransferPayload = await hydrateTransferPayloadFromCache({ clear: false });
+                                if (cachedTransferPayload) {
                                     transferPayload = {
-                                        ...data,
-                                        files: cachedFiles,
-                                        fileCount: cachedFiles.length,
-                                        imageCount: cachedFiles.filter((f) => (f?.type || "").toLowerCase().startsWith("image/")).length
+                                        ...cachedTransferPayload,
+                                        ...data
                                     };
                                 }
                             } catch (cacheError) {
@@ -820,7 +831,7 @@ export const handleShareTarget = () => {
                         }
 
                         console.log("[ShareTarget] Retrieved cached data:", summarizeForLog(transferPayload));
-                        const delivered = await routeToTransferView(transferPayload, "share-target", undefined, true);
+                        const delivered = await routeToTransferView(transferPayload, "share-target", extractTransferHint(transferPayload), true);
                         if (!delivered) {
                             await processShareTargetData(transferPayload, true);
                         }
@@ -847,7 +858,7 @@ export const handleShareTarget = () => {
             const shareData = JSON.parse(pendingData) as ShareDataInput;
             console.log("[ShareTarget] Found pending share in sessionStorage:", summarizeForLog(shareData));
             routedFromSessionPending = true;
-            routeToTransferView(shareData, "pending", undefined, true).catch((error) => {
+            routeToTransferView(shareData, "pending", extractTransferHint(shareData), true).catch((error) => {
                 console.warn("[ShareTarget] Pending transfer routing failed:", error);
             });
         }
@@ -886,12 +897,12 @@ export const handleShareTarget = () => {
                 if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > 5 * 60 * 1000) return;
 
                 const transferPayload: ShareDataInput = {
-                    title: typeof meta?.title === "string" ? meta.title : undefined,
-                    text: typeof meta?.text === "string" ? meta.text : undefined,
-                    url: typeof meta?.url === "string" ? meta.url : undefined,
-                    files,
+                    ...(buildShareDataFromCachedPayload({
+                        meta: meta as any,
+                        files,
+                        fileMeta: cachedPayload?.fileMeta || []
+                    }) as ShareDataInput),
                     fileCount: files.length || expectedFileCount,
-                    imageCount: Number(meta?.imageCount || 0),
                     timestamp,
                     source: "cached-bootstrap"
                 };
@@ -914,7 +925,7 @@ export const handleShareTarget = () => {
                     ageMs
                 }));
 
-                const delivered = await routeToTransferView(transferPayload, "pending", undefined, true);
+                const delivered = await routeToTransferView(transferPayload, "pending", extractTransferHint(transferPayload), true);
                 const hasBinaryPayload = Array.isArray(transferPayload.files) && transferPayload.files.length > 0;
                 if (delivered && !hasBinaryPayload) {
                     await consumeCachedShareTargetPayload({ clear: true }).catch(() => null);
@@ -949,16 +960,13 @@ export const handleShareTarget = () => {
                 // If SW only sent metadata counters, hydrate real files from cache so they can be attached.
                 if ((msgData.fileCount ?? 0) > 0 && !msgData.files?.length) {
                     try {
-                        const cachedPayload = await consumeCachedShareTargetPayload({ clear: false });
-                        const cachedFiles = cachedPayload?.files || [];
-                        if (cachedFiles.length > 0) {
+                        const cachedTransferPayload = await hydrateTransferPayloadFromCache({ clear: false });
+                        if (cachedTransferPayload) {
                             transferPayload = {
-                                ...msgData,
-                                files: cachedFiles,
-                                fileCount: cachedFiles.length,
-                                imageCount: cachedFiles.filter((f) => (f?.type || "").toLowerCase().startsWith("image/")).length
+                                ...cachedTransferPayload,
+                                ...msgData
                             };
-                            showToast({ message: `Received ${cachedFiles.length} shared file(s)`, kind: "info" });
+                            showToast({ message: `Received ${cachedTransferPayload.files?.length || msgData.fileCount || 0} shared file(s)`, kind: "info" });
                         }
                     } catch (cacheError) {
                         console.warn("[ShareTarget] Failed to hydrate cached share files:", cacheError);
@@ -973,7 +981,7 @@ export const handleShareTarget = () => {
                     (transferPayload.fileCount ?? 0) > 0
                 ) {
                     console.log("[ShareTarget] Processing broadcasted share data");
-                    const delivered = await routeToTransferView(transferPayload, "share-target", undefined, true);
+                    const delivered = await routeToTransferView(transferPayload, "share-target", extractTransferHint(transferPayload), true);
                     if (!delivered) {
                         await processShareTargetData(transferPayload, true);
                     }
@@ -1131,39 +1139,35 @@ export const setupLaunchQueueConsumer = async () => {
                 }
 
                 if (files.length > 0) {
-                    // Always stage launch-queue files in cache first so they survive
-                    // route transitions/reloads while views are still mounting.
+                    const hint: ViewTransferHint | undefined = (hasMarkdownFile && files.length === 1)
+                        ? { destination: "viewer", action: "open", filename: files[0]?.name }
+                        : undefined;
+
+                    // INVARIANT: launch-queue files stage into the same cache-backed
+                    // ingress pipeline as share-target, then the normal share-target
+                    // consumer performs the eventual routing and optional processing.
                     const staged = await storeShareTargetPayloadToCache({
                         files,
-                        meta: { timestamp: Date.now(), source: 'launch-queue' }
+                        meta: {
+                            timestamp: Date.now(),
+                            source: 'launch-queue',
+                            route: 'launch-queue',
+                            hint,
+                            fileCount: files.length,
+                            imageCount: files?.filter?.(f => f.type.startsWith('image/')).length,
+                        }
                     });
                     if (!staged) {
                         console.warn('[LaunchQueue] Failed to pre-stage files to cache');
                     }
 
-                    // Create share data object compatible with existing processing
-                    const shareData = {
-                        files,
+                    console.log('[LaunchQueue] Staged launch queue payload:', {
                         fileCount: files.length,
-                        timestamp: Date.now(),
-                        // Determine if there are images for AI processing
                         imageCount: files?.filter?.(f => f.type.startsWith('image/')).length,
-                        // Check for markdown files
-                        markdownCount: files?.filter?.(f => f.type === 'text/markdown' || f.name.toLowerCase().endsWith('.md')).length,
-                        // Mark as launch queue origin for debugging
-                        source: 'launch-queue'
-                    };
-
-                    console.log('[LaunchQueue] Created share data:', {
-                        fileCount: shareData.fileCount,
-                        imageCount: shareData.imageCount,
                         fileTypes: files?.map?.(f => ({ name: f.name, type: f.type, size: f.size })),
-                        source: shareData.source
+                        source: 'launch-queue',
+                        staged
                     });
-
-                    const hint: ViewTransferHint | undefined = (hasMarkdownFile && files.length === 1)
-                        ? { destination: "viewer", action: "open", filename: files[0]?.name }
-                        : undefined;
 
                     // Show immediate feedback that files were received
                     showToast({
@@ -1171,57 +1175,17 @@ export const setupLaunchQueueConsumer = async () => {
                         kind: 'info'
                     });
 
-                    try {
-                        const delivered = await routeToTransferView(shareData, "launch-queue", hint, true);
-                        if (!delivered) {
-                            console.warn('[LaunchQueue] Share target processing returned false');
-                            showToast({
-                                message: `Received ${files.length} file(s); delivery is pending`,
-                                kind: 'warning'
-                            });
-                        } else {
-                            console.log('[LaunchQueue] Transfer routed successfully');
-                        }
-
-                        // Parity with share-target: launched images can auto-process and copy
-                        // when auto shared processing is enabled and API key is available.
-                        try {
-                            const settings = await loadSettings().catch(() => null);
-                            const auto = (settings?.ai?.autoProcessShared ?? true) !== false;
-                            const hasKey = Boolean(settings?.ai?.apiKey?.trim?.());
-                            const hasImages = (shareData.imageCount || 0) > 0;
-
-                            if (auto && hasKey && hasImages) {
-                                showToast({
-                                    message: `Processing ${shareData.imageCount} launched image(s)...`,
-                                    kind: 'info'
-                                });
-
-                                // Non-blocking: routing/attachment already happened.
-                                void processShareTargetData({
-                                    ...shareData,
-                                    source: 'launch-queue'
-                                }, false).catch((processingError) => {
-                                    console.warn('[LaunchQueue] Auto image processing failed:', processingError);
-                                });
-                            }
-                        } catch (settingsError) {
-                            console.warn('[LaunchQueue] Failed to evaluate auto-processing settings:', settingsError);
-                        }
-                    } catch (error) {
-                        console.error('[LaunchQueue] Failed to route launch queue files:', error);
-                        if (staged) {
-                            const url = new URL(globalThis?.location?.href);
-                            url.pathname = '/share-target';
-                            url.searchParams.set('shared', '1');
-                            url.hash = '';
-                            globalThis.location.href = url.toString();
-                        } else {
-                            showToast({
-                                message: `Failed to process ${files.length} launched file(s)`,
-                                kind: 'error'
-                            });
-                        }
+                    if (staged) {
+                        const url = new URL(globalThis?.location?.href);
+                        url.pathname = '/share-target';
+                        url.searchParams.set('shared', '1');
+                        url.hash = '';
+                        globalThis.location.href = url.toString();
+                    } else {
+                        showToast({
+                            message: `Failed to stage ${files.length} launched file(s)`,
+                            kind: 'error'
+                        });
                     }
                 }
 

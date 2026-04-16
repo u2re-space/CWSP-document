@@ -21,6 +21,7 @@ import {
     parseFormDataFromRequest,
     buildShareData,
     cacheShareData,
+    categorizeFiles,
     getAIProcessingConfig,
     logShareDataSummary,
     hasProcessableContent,
@@ -2442,7 +2443,7 @@ self.addEventListener?.('launchqueue', async (event: any) => {
             hasFilesIterator: typeof launchQueue?.files?.[Symbol.asyncIterator] === 'function'
         }));
 
-        // Process launch queue files
+        const files: File[] = [];
         for await (const fileHandle of launchQueue.files) {
             try {
                 console.log('[LaunchQueue] Processing file:', fileHandle.name);
@@ -2454,18 +2455,43 @@ self.addEventListener?.('launchqueue', async (event: any) => {
                     type: file?.type,
                     size: file?.size
                 }));
-                const content = {
-                    files: [file],
-                    timestamp: Date.now(),
-                    source: 'launch-queue'
-                };
-
-                // Process through association system
-                await processContentWithAssociation('files', 'launch-queue', content, event);
+                files.push(file);
 
             } catch (error) {
                 console.error('[LaunchQueue] Failed to process file:', error);
             }
+        }
+
+        if (files.length <= 0) return;
+
+        const categorized = categorizeFiles(files);
+        const shareData: ShareData = {
+            title: '',
+            text: '',
+            url: '',
+            files,
+            imageFiles: categorized.imageFiles,
+            textFiles: categorized.textFiles,
+            otherFiles: categorized.otherFiles,
+            timestamp: Date.now()
+        };
+
+        await cacheShareData(shareData);
+        notifyShareReceived?.({
+            timestamp: shareData.timestamp,
+            fileCount: shareData.files.length,
+            imageCount: shareData.imageFiles.length,
+            source: 'launch-queue',
+            route: 'launch-queue'
+        });
+        sendToast(`Received ${shareData.files.length} launched file(s)`, 'info');
+
+        const targetUrl = '/share-target?shared=1';
+        const clientsList = await (self as any).clients?.matchAll?.({ type: 'window', includeUncontrolled: true }) || [];
+        if (clientsList.length > 0) {
+            await clientsList[0].focus?.();
+        } else {
+            await (self as any).clients?.openWindow?.(targetUrl);
         }
 
     } catch (error) {

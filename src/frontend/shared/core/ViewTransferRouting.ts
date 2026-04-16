@@ -1,6 +1,6 @@
 import { sendProtocolMessage, enqueuePendingMessage, type UnifiedMessage } from "@rs-com/core/UnifiedMessaging";
 import { summarizeForLog } from "@rs-com/core/LogSanitizer";
-import { viewBroadcastChannelName } from "@rs-com/config/Names";
+import { normalizeDestination, viewBroadcastChannelName } from "@rs-com/config/Names";
 
 export type ViewTransferSource = "share-target" | "launch-queue" | "pending" | "clipboard";
 
@@ -109,7 +109,7 @@ export const resolveViewTransfer = (payload: ViewTransferPayload): ViewTransferR
     };
 
     const resolved: ViewTransferResolved = {
-        destination,
+        destination: normalizeDestination(destination) as ViewTransferDestination,
         routePath: `/${destination}`,
         messageType,
         contentType,
@@ -157,7 +157,7 @@ export const dispatchViewTransfer = async (
     const message: UnifiedMessage = {
         id: crypto.randomUUID(),
         type: resolved.messageType,
-        destination: resolved.destination,
+        destination: normalizeDestination(resolved.destination),
         contentType: resolved.contentType,
         data: resolved.data,
         metadata: resolved.metadata,
@@ -198,7 +198,7 @@ export const dispatchViewTransfer = async (
         protocol: "window",
         op: resolved.hint?.action === "open" ? "invoke" : "deliver",
         srcChannel: message.source,
-        dstChannel: resolved.destination,
+        dstChannel: normalizeDestination(resolved.destination),
     });
     const delivered = deliveredNow || queuedAsPending;
     console.log("[ViewTransfer] Message delivery status:", {

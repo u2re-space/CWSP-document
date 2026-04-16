@@ -222,11 +222,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         return true;
     }
 
-    if (msg?.type === "crx-user-fs-bridge") {
+    if (msg?.type === "crx-user-fs-bridge" || msg?.type === "request:crx-user-fs-bridge") {
         (async () => {
             try {
-                const action = String(msg?.action || "").trim();
-                const path = String(msg?.path || "").trim();
+                const bridgeData = (msg?.data && typeof msg.data === "object") ? msg.data : msg;
+                const action = String(bridgeData?.action || "").trim();
+                const path = String(bridgeData?.path || "").trim();
                 if (action === "list") {
                     sendResponse(await listUserFsDirectory(path));
                     return;

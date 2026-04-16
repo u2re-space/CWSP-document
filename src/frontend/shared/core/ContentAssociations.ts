@@ -5,12 +5,9 @@ import {
 } from "./UnifiedAIConfig";
 
 export type AssociationDestination =
-    | "basic-viewer"
-    | "basic-workcenter"
-    | "basic-explorer"
-    | "markdown-viewer"
+    | "viewer"
     | "workcenter"
-    | "file-explorer"
+    | "explorer"
     | "unknown";
 
 export type AssociationIntent = {
@@ -66,9 +63,9 @@ const coerceOverrideFactors = (factors: string[] | undefined): AssociationOverri
 
 const pickExplicitDestination = (factors: AssociationOverrideFactor[]): AssociationDestination | null => {
     // Explicit routing overrides everything else (compat behavior).
-    if (factors.includes("explicit-explorer")) return "basic-explorer";
-    if (factors.includes("explicit-workcenter")) return "basic-workcenter";
-    if (factors.includes("explicit-viewer")) return "basic-viewer";
+    if (factors.includes("explicit-explorer")) return "explorer";
+    if (factors.includes("explicit-workcenter")) return "workcenter";
+    if (factors.includes("explicit-viewer")) return "viewer";
     return null;
 };
 
@@ -79,16 +76,16 @@ const defaultDestinationForType = (normalizedContentType: string): AssociationDe
         case CONTENT_TYPES.MARKDOWN:
         case CONTENT_TYPES.HTML:
         case CONTENT_TYPES.JSON:
-            return "basic-viewer";
+            return "viewer";
         case CONTENT_TYPES.URL:
             // URLs are often processed/recognized; prefer workcenter.
-            return "basic-workcenter";
+            return "workcenter";
         case CONTENT_TYPES.IMAGE:
         case CONTENT_TYPES.PDF:
         case CONTENT_TYPES.FILE:
         case CONTENT_TYPES.OTHER:
         default:
-            return "basic-workcenter";
+            return "workcenter";
     }
 };
 
@@ -131,9 +128,9 @@ export function resolveAssociationPipeline(intent: AssociationIntent): Associati
     const pipeline: AssociationDestination[] = [];
 
     // Allow explicit multi-targeting (composite behavior).
-    if (factors.includes("explicit-explorer")) pipeline.push("basic-explorer");
-    if (factors.includes("explicit-workcenter")) pipeline.push("basic-workcenter");
-    if (factors.includes("explicit-viewer")) pipeline.push("basic-viewer");
+    if (factors.includes("explicit-explorer")) pipeline.push("explorer");
+    if (factors.includes("explicit-workcenter")) pipeline.push("workcenter");
+    if (factors.includes("explicit-viewer")) pipeline.push("viewer");
 
     // If no explicit fan-out, default to primary only.
     if (pipeline.length === 0) {
@@ -141,8 +138,8 @@ export function resolveAssociationPipeline(intent: AssociationIntent): Associati
     }
 
     // Force attachment/processing can add workcenter as a secondary sink even when viewing.
-    if ((factors.includes("force-attachment") || factors.includes("force-processing")) && !pipeline.includes("basic-workcenter")) {
-        pipeline.push("basic-workcenter");
+    if ((factors.includes("force-attachment") || factors.includes("force-processing")) && !pipeline.includes("workcenter")) {
+        pipeline.push("workcenter");
     }
 
     // De-duplicate while preserving order.

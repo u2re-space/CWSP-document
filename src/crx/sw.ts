@@ -27,6 +27,7 @@ import {
     CRX_EXTRACT_CSS_INSTRUCTION,
 } from "../com/core/BuiltInAI";
 import { unifiedMessaging } from "../com/core/UnifiedMessagingSw";
+import { createInteropEnvelope } from "../com/core/UniformInterop";
 import { isUserScopePath } from "fest/core";
 
 // ---------------------------------------------------------------------------
@@ -142,11 +143,23 @@ const requestUserFsViaActiveTab = async (payload: { action: "list" | "read-file"
     if (!active?.tabId || active.tabId < 0) {
         throw new Error("No active tab available for /user bridge");
     }
-    return chrome.tabs.sendMessage(active.tabId, {
-        type: "crx-user-fs-bridge",
-        action: payload.action,
-        path: payload.path
-    });
+    return chrome.tabs.sendMessage(active.tabId, createInteropEnvelope({
+        type: "request:crx-user-fs-bridge",
+        source: "service-worker",
+        destination: "content-script",
+        target: "content-script",
+        protocol: "chrome",
+        transport: "chrome-tabs",
+        purpose: ["invoke", "mail"],
+        op: "invoke",
+        data: {
+            action: payload.action,
+            path: payload.path
+        },
+        metadata: {
+            bridge: "user-fs"
+        }
+    }));
 };
 
 // ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@
  * - Dev (no SW): Vite middleware returns devRelay JSON; this module posts to rs-view-* locally.
  */
 
-import { viewBroadcastChannelName } from "@rs-com/config/Names";
+import { normalizeDestination, normalizeViewId, viewBroadcastChannelName } from "@rs-com/config/Names";
 import { createProtocolEnvelope, sendProtocolMessage } from "@rs-com/core/UnifiedMessaging";
 
 export type ViewPostChannelPayload = {
@@ -51,7 +51,7 @@ export type ViewOpenRequest = {
 export function postViewChannelPayload(viewId: string, payload: unknown): void {
     if (typeof BroadcastChannel === "undefined") return;
     try {
-        const bc = new BroadcastChannel(viewBroadcastChannelName(viewId));
+        const bc = new BroadcastChannel(viewBroadcastChannelName(normalizeViewId(viewId)));
         bc.postMessage(payload);
         bc.close();
     } catch (e) {
@@ -69,21 +69,22 @@ export async function postInterViewMessage(input: {
     op?: string;
     metadata?: Record<string, unknown>;
 }): Promise<boolean> {
+    const destination = normalizeDestination(input.destination) || normalizeViewId(input.destination);
     const envelope = createProtocolEnvelope({
         type: input.type,
         source: input.source,
-        destination: input.destination,
+        destination,
         contentType: input.contentType,
         data: input.data || {},
         purpose: input.purpose || ["deliver", "mail"],
         op: input.op || "deliver",
         protocol: "window",
         srcChannel: input.source,
-        dstChannel: input.destination,
+        dstChannel: destination,
         metadata: input.metadata || {}
     });
 
-    postViewChannelPayload(input.destination, {
+    postViewChannelPayload(destination, {
         type: "view-transfer",
         message: envelope
     } satisfies ViewTransferChannelPayload);
@@ -99,7 +100,7 @@ export async function postViewApi(
     body: BodyInit,
     init: RequestInit = {}
 ): Promise<Response> {
-    const id = String(viewId || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+    const id = normalizeViewId(String(viewId || "").replace(/^\/+|\/+$/g, "").toLowerCase());
     const res = await fetch(`/${id}`, {
         method: "POST",
         credentials: "same-origin",
@@ -137,7 +138,7 @@ export function subscribeViewChannel(
 ): () => void {
     if (typeof BroadcastChannel === "undefined") return () => {};
 
-    const bc = new BroadcastChannel(viewBroadcastChannelName(viewId));
+    const bc = new BroadcastChannel(viewBroadcastChannelName(normalizeViewId(viewId)));
     bc.addEventListener("message", handler);
     return () => {
         bc.removeEventListener("message", handler);

@@ -63,7 +63,6 @@
         "prettier": ">=3.8.1",
         "quill": "^2.0.0-beta.2",
         "sass": ">=1.97.3",
-        "socket.io-client": ">=4.8.3",
         "temml": ">=0.11.12",
         "turndown": ">=7.2.1",
         "typescript": ">=6.0.0-beta",

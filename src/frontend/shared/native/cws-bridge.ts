@@ -10,6 +10,7 @@ import {
     normalizeProtocolEnvelope,
     type ProtocolMessage as UniformProtocolEnvelope
 } from "../core/UnifiedMessaging";
+import { createInteropEnvelope } from "../core/UniformInterop";
 
 export interface CwsShellInfo {
     shell: string;
@@ -101,18 +102,22 @@ const normalizeBridgeEnvelope = (
     if (envelope && isProtocolEnvelope(envelope)) {
         return normalizeProtocolEnvelope(envelope);
     }
-    return createProtocolEnvelope<Record<string, unknown>>({
+    const interop = createInteropEnvelope<Record<string, unknown>>({
         purpose: "invoke",
         protocol: "service",
+        transport: "service-worker",
         type: "invoke",
         op: "invoke",
-        path: ["cws-bridge", channel],
         source: "webview",
         destination: "native",
         srcChannel: "webview",
         dstChannel: "native",
         payload: payload ?? {},
         data: payload ?? {}
+    });
+    return createProtocolEnvelope<Record<string, unknown>>({
+        ...interop,
+        path: ["cws-bridge", channel]
     });
 };
 
@@ -124,18 +129,22 @@ const normalizeInvokeResultEnvelope = (
     if (result?.envelope && isProtocolEnvelope(result.envelope)) {
         return normalizeProtocolEnvelope(result.envelope);
     }
-    return createProtocolEnvelope<Record<string, unknown>>({
+    const interop = createInteropEnvelope<Record<string, unknown>>({
         purpose: "invoke",
         protocol: "service",
+        transport: "service-worker",
         type: result.ok ? "response" : "ack",
         op: "invoke",
-        path: ["cws-bridge", channel],
         source: "native",
         destination: "webview",
         srcChannel: "native",
         dstChannel: "webview",
-        payload: payload,
+        payload,
         data: payload
+    });
+    return createProtocolEnvelope<Record<string, unknown>>({
+        ...interop,
+        path: ["cws-bridge", channel]
     });
 };
 
@@ -178,9 +187,10 @@ export async function initCwsNativeBridge(): Promise<CwsShellInfo | null> {
                     envelopeRaw && typeof envelopeRaw === "object" && isProtocolEnvelope(envelopeRaw)
                 )
                     ? normalizeProtocolEnvelope(envelopeRaw as UniformProtocolEnvelope<Record<string, unknown>>)
-                    : createProtocolEnvelope<Record<string, unknown>>({
+                    : createProtocolEnvelope<Record<string, unknown>>(createInteropEnvelope<Record<string, unknown>>({
                         purpose: "mail",
                         protocol: "service",
+                        transport: "service-worker",
                         type: "act",
                         op: "deliver",
                         source: "native",
@@ -189,7 +199,7 @@ export async function initCwsNativeBridge(): Promise<CwsShellInfo | null> {
                         dstChannel: "webview",
                         payload,
                         data: payload
-                    });
+                    }));
                 globalThis.dispatchEvent(new CustomEvent("cws-native-message", { detail: { event, envelope, payload } }));
             });
         } catch {

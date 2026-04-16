@@ -10,6 +10,15 @@ export type AirpadTransportMode = "plaintext" | "secure";
 const STORAGE_KEY = 'airpad.remote.connection.v1';
 
 interface StoredRemoteConfig {
+    /** Raw quick-connect field text as entered in the AirPad popup. */
+    quickConnectValue?: string;
+    /** Routed relay / endpoint origin, e.g. https://192.168.0.200:8443/ */
+    endpointUrl?: string;
+    /** Direct AirPad / endpoint origin, e.g. https://192.168.0.110:8443/ */
+    directUrl?: string;
+    /** Logical destination peer id, e.g. L-192.168.0.110 */
+    destinationId?: string;
+    /** Legacy combined transport host field retained for migration only. */
     host?: string;
     authToken?: string;
     routeTarget?: string;
@@ -41,6 +50,40 @@ const appendPort = (value: string, port: string): string => {
     if (!portTrimmed) return valueTrimmed;
     if (hasExplicitPort(valueTrimmed)) return valueTrimmed;
     return `${valueTrimmed}:${portTrimmed}`;
+};
+
+const normalizeOriginUrl = (value: unknown): string => {
+    const trimmed = toTrimmedString(value);
+    if (!trimmed) return "";
+    try {
+        const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+        return `${url.protocol}//${url.host}/`;
+    } catch {
+        return trimmed;
+    }
+};
+
+const looksLikeConnectUrl = (value: string): boolean => {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return true;
+    if (trimmed.startsWith("localhost")) return true;
+    if (trimmed.includes("/")) return true;
+    if (/^\[[0-9a-f:]+\](?::\d{1,5})?$/i.test(trimmed)) return true;
+    if (/^\d{1,3}(?:\.\d{1,3}){3}(?::\d{1,5})?$/.test(trimmed)) return true;
+    if (/^[^.\s:]+:\d{1,5}$/.test(trimmed)) return true;
+    if (/^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d{1,5})?$/i.test(trimmed)) return true;
+    return false;
+};
+
+const joinUniqueUrls = (...values: Array<string | undefined>): string => {
+    return Array.from(
+        new Set(
+            values
+                .map((entry) => normalizeOriginUrl(entry))
+                .filter(Boolean)
+        )
+    ).join(", ");
 };
 
 function loadStoredRemoteConfig(): MigratedRemoteConfig {
@@ -104,9 +147,11 @@ const readGlobalAirpadValue = (keys: string[]): string => {
 function persistRemoteConfig(): void {
     try {
         globalThis?.localStorage?.setItem?.(STORAGE_KEY, JSON.stringify({
-            host: remoteHost,
+            quickConnectValue: remoteConfig.quickConnectValue,
+            endpointUrl: remoteConfig.endpointUrl,
+            directUrl: remoteConfig.directUrl,
+            destinationId: remoteConfig.destinationId,
             authToken: remoteConfig.authToken,
-            routeTarget: remoteConfig.routeTarget,
             clientId: remoteConfig.clientId,
             peerInstanceId: remoteConfig.peerInstanceId,
         }));
@@ -121,17 +166,24 @@ const createPeerInstanceId = (): string => {
 };
 
 // Remote connection settings.
-// remoteHost describes where to establish the Socket.IO transport (Connect URL).
-// remoteRouteTarget is optional and describes which peer/device to route to by default (Remote Host field).
+// endpointUrl describes the routed relay / endpoint origin used for proxied sessions.
+// directUrl describes the direct AirPad target origin used when bypassing the relay.
+// destinationId is optional and describes which peer/device to route to by default.
 
 const remoteConfig: {
+    quickConnectValue: string;
+    endpointUrl: string;
+    directUrl: string;
     authToken: string;
-    routeTarget: string;
+    destinationId: string;
     clientId: string;
     peerInstanceId: string;
 } = {
+    quickConnectValue: "",
+    endpointUrl: "",
+    directUrl: "",
     authToken: "",
-    routeTarget: "",
+    destinationId: "",
     clientId: "",
     peerInstanceId: "",
 };
@@ -160,14 +212,35 @@ let coreSocketSigningSecret = "";
 
 export let remoteHost = "";
 
+const refreshRemoteHost = (): void => {
+    // WHY: the one-field AirPad quick-connect UI now maps URL input to `directUrl`,
+    // so try that override before the durable Server-tab endpoint URL.
+    remoteHost = joinUniqueUrls(remoteConfig.directUrl, remoteConfig.endpointUrl);
+};
+
 /**
  * Apply settings from a stored blob (localStorage shape). Safe to call on tab focus / storage events.
  */
 function hydrateFromStored(stored: MigratedRemoteConfig): void {
-    const locHost = typeof location !== "undefined" ? (location.hostname || "") : "";
-    remoteHost = (stored.host || locHost || "").trim();
+    const legacyHost = toTrimmedString((stored as StoredRemoteConfig).host);
+    const legacyRouteTarget = toTrimmedString((stored as StoredRemoteConfig).routeTarget);
+    const endpointUrl =
+        normalizeOriginUrl((stored as StoredRemoteConfig).endpointUrl) ||
+        (legacyRouteTarget ? normalizeOriginUrl(legacyHost) : "");
+    const directUrl =
+        normalizeOriginUrl((stored as StoredRemoteConfig).directUrl) ||
+        (!legacyRouteTarget ? normalizeOriginUrl(legacyHost) : "");
+    const quickConnectValue = toTrimmedString((stored as StoredRemoteConfig).quickConnectValue);
+    remoteConfig.endpointUrl = endpointUrl;
+    remoteConfig.directUrl = directUrl;
     remoteConfig.authToken = stored.authToken || "";
-    remoteConfig.routeTarget = toTrimmedString((stored as StoredRemoteConfig).routeTarget);
+    remoteConfig.destinationId =
+        toTrimmedString((stored as StoredRemoteConfig).destinationId) ||
+        legacyRouteTarget;
+    remoteConfig.quickConnectValue =
+        quickConnectValue ||
+        remoteConfig.destinationId ||
+        remoteConfig.directUrl;
     remoteConfig.clientId = toTrimmedString((stored as StoredRemoteConfig).clientId);
     const storedPeer = toTrimmedString((stored as StoredRemoteConfig).peerInstanceId);
     if (storedPeer) {
@@ -175,6 +248,7 @@ function hydrateFromStored(stored: MigratedRemoteConfig): void {
     } else if (!remoteConfig.peerInstanceId) {
         remoteConfig.peerInstanceId = createPeerInstanceId();
     }
+    refreshRemoteHost();
 }
 
 const stored = loadStoredRemoteConfig();
@@ -204,26 +278,41 @@ export function attachAirpadCrossTabConfigSync(): () => void {
 
 /** Batch apply from the configuration UI (single persist + optional credential invalidation). */
 export type AirpadRemoteConfigInput = {
+    endpointUrl?: string;
+    directUrl?: string;
+    destinationId?: string;
+    /** Legacy combined connect host field; maps to endpointUrl for compatibility. */
     host?: string;
     authToken?: string;
+    /** Legacy routed destination field; maps to destinationId for compatibility. */
     routeTarget?: string;
     clientId?: string;
 };
 
-export function applyAirpadRemoteConfig(input: AirpadRemoteConfigInput): void {
-    if (input.host !== undefined) {
-        remoteHost = (input.host || "").trim();
+export function applyAirpadRemoteConfig(input: AirpadRemoteConfigInput, options?: { persist?: boolean }): void {
+    if (input.endpointUrl !== undefined) {
+        remoteConfig.endpointUrl = normalizeOriginUrl(input.endpointUrl);
+    } else if (input.host !== undefined) {
+        remoteConfig.endpointUrl = normalizeOriginUrl(input.host);
+    }
+    if (input.directUrl !== undefined) {
+        remoteConfig.directUrl = normalizeOriginUrl(input.directUrl);
     }
     if (input.authToken !== undefined) {
         remoteConfig.authToken = input.authToken || "";
     }
-    if (input.routeTarget !== undefined) {
-        remoteConfig.routeTarget = (input.routeTarget || "").trim();
+    if (input.destinationId !== undefined) {
+        remoteConfig.destinationId = (input.destinationId || "").trim();
+    } else if (input.routeTarget !== undefined) {
+        remoteConfig.destinationId = (input.routeTarget || "").trim();
     }
     if (input.clientId !== undefined) {
         remoteConfig.clientId = (input.clientId || "").trim();
     }
-    persistRemoteConfig();
+    refreshRemoteHost();
+    if (options?.persist !== false) {
+        persistRemoteConfig();
+    }
 }
 
 const endpointUrlToAirpadConnectHost = (endpointUrl: string): string => {
@@ -268,10 +357,10 @@ export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
     const input: AirpadRemoteConfigInput = {};
     if (core?.endpointUrl?.trim()) {
         const origin = endpointUrlToAirpadConnectHost(core.endpointUrl.trim());
-        if (origin) input.host = origin;
+        if (origin) input.endpointUrl = origin;
     }
     if (Object.keys(input).length) {
-        applyAirpadRemoteConfig(input);
+        applyAirpadRemoteConfig(input, { persist: false });
     }
     try {
         (globalThis as unknown as { __CWS_SHELL_FEATURES__?: Record<string, boolean> }).__CWS_SHELL_FEATURES__ = {
@@ -322,7 +411,7 @@ export function getClipboardBroadcastTargetNodes(): string[] {
     return [];
 }
 
-/** Background Socket.IO to cwsp / endpoint hub (any shell, not only AirPad view). */
+/** Background WebSocket to cwsp / endpoint hub (any shell, not only AirPad view). */
 export function isMaintainHubSocketConnectionEnabled(): boolean {
     return shellMaintainHubSocket === true;
 }
@@ -346,8 +435,57 @@ export function getRemoteHost(): string {
     return remoteHost;
 }
 
+export function getAirPadEndpointUrl(): string {
+    if (remoteConfig.endpointUrl.trim()) return remoteConfig.endpointUrl.trim();
+    return normalizeOriginUrl(readGlobalAirpadValue(["AIRPAD_ENDPOINT_URL"]));
+}
+
+export function getAirPadDirectTargetUrl(): string {
+    return remoteConfig.directUrl.trim();
+}
+
+/**
+ * Quick-connect value shown in the AirPad popup.
+ *
+ * INVARIANT: the popup only exposes one field now, so prefer an explicit target
+ * device id first, otherwise show the current direct/url target.
+ */
+export function getAirPadQuickConnectTarget(): string {
+    if (remoteConfig.quickConnectValue.trim()) return remoteConfig.quickConnectValue.trim();
+    if (remoteConfig.destinationId.trim()) return remoteConfig.destinationId.trim();
+    if (remoteConfig.directUrl.trim()) return remoteConfig.directUrl.trim();
+    if (coreSocketRouteTarget.trim()) return coreSocketRouteTarget.trim();
+    return getAirPadEndpointUrl();
+}
+
+/**
+ * Quick-connect accepts either a target device id (routed through the Server-tab
+ * endpoint URL) or a direct URL/host:port override.
+ */
+export function setAirPadQuickConnectTarget(value: string): void {
+    const trimmed = toTrimmedString(value);
+    remoteConfig.quickConnectValue = trimmed;
+    if (!trimmed) {
+        remoteConfig.directUrl = "";
+        remoteConfig.destinationId = "";
+        refreshRemoteHost();
+        persistRemoteConfig();
+        return;
+    }
+    if (looksLikeConnectUrl(trimmed)) {
+        remoteConfig.directUrl = normalizeOriginUrl(trimmed);
+        remoteConfig.destinationId = "";
+    } else {
+        remoteConfig.destinationId = trimmed;
+        remoteConfig.directUrl = "";
+    }
+    refreshRemoteHost();
+    persistRemoteConfig();
+}
+
 export function setRemoteHost(host: string): void {
-    remoteHost = (host || '').trim();
+    remoteConfig.endpointUrl = normalizeOriginUrl(host);
+    refreshRemoteHost();
     persistRemoteConfig();
 }
 
@@ -356,8 +494,12 @@ export function getRemoteProtocol(): RemoteProtocol {
 }
 
 export function getRemoteRouteTarget(): string {
-    if (remoteConfig.routeTarget.trim()) return remoteConfig.routeTarget.trim();
+    if (remoteConfig.destinationId.trim()) return remoteConfig.destinationId.trim();
     return coreSocketRouteTarget;
+}
+
+export function getAirPadDestinationId(): string {
+    return getRemoteRouteTarget();
 }
 
 export function getAirPadTransportMode(): AirpadTransportMode {
@@ -365,9 +507,9 @@ export function getAirPadTransportMode(): AirpadTransportMode {
 }
 
 export function getAirPadAuthToken(): string {
+    if (coreIdentityUseForAirpad && coreIdentityBridgeUserKey.trim()) return coreIdentityBridgeUserKey.trim();
     const local = (remoteConfig.authToken || "").trim();
     if (local) return local;
-    if (coreIdentityUseForAirpad && coreIdentityBridgeUserKey.trim()) return coreIdentityBridgeUserKey.trim();
     return readGlobalAirpadValue(["AIRPAD_AUTH_TOKEN", "AIRPAD_TOKEN"]);
 }
 
@@ -377,9 +519,9 @@ export function setAirPadAuthToken(token: string): void {
 }
 
 export function getAirPadClientId(): string {
-    if (remoteConfig.clientId.trim()) return remoteConfig.clientId.trim();
     if (coreSocketSelfId.trim()) return coreSocketSelfId.trim();
     if (coreIdentityUseForAirpad && coreIdentityBridgeUserId.trim()) return coreIdentityBridgeUserId.trim();
+    if (remoteConfig.clientId.trim()) return remoteConfig.clientId.trim();
     return readGlobalAirpadValue(["AIRPAD_CLIENT_ID", "AIRPAD_CLIENT"]);
 }
 
@@ -389,7 +531,7 @@ export function setAirPadClientId(clientId: string): void {
 }
 
 export function setRemoteRouteTarget(routeTarget: string): void {
-    remoteConfig.routeTarget = (routeTarget || "").trim();
+    remoteConfig.destinationId = (routeTarget || "").trim();
     persistRemoteConfig();
 }
 

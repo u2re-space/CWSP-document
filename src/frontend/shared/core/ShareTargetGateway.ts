@@ -21,8 +21,20 @@ export type CachedShareFileMeta = {
     lastModified?: number;
 };
 
+export type CachedShareTargetMeta = Record<string, unknown> & {
+    source?: string;
+    route?: string;
+    timestamp?: number;
+    title?: string;
+    text?: string;
+    url?: string;
+    sharedUrl?: string;
+    fileCount?: number;
+    imageCount?: number;
+};
+
 export type CachedShareTargetPayload = {
-    meta: unknown;
+    meta: CachedShareTargetMeta;
     files: File[];
     fileMeta: CachedShareFileMeta[];
 };
@@ -34,7 +46,7 @@ export type SwCachedContentItem = {
 };
 
 const hasCaches = (): boolean =>
-    typeof window !== "undefined" && "caches" in window;
+    typeof globalThis !== "undefined" && "caches" in globalThis;
 
 /** Persist the last share-target payload so the app can recover it after navigation or cold start. */
 export const storeShareTargetPayloadToCache = async (payload: { files: File[]; meta?: Record<string, unknown> }): Promise<boolean> => {
@@ -50,9 +62,13 @@ export const storeShareTargetPayloadToCache = async (payload: { files: File[]; m
         await cache.put(
             SHARE_CACHE_KEY,
             new Response(JSON.stringify({
+                ...meta,
                 title: meta?.title,
                 text: meta?.text,
                 url: meta?.url,
+                sharedUrl: meta?.sharedUrl,
+                source: meta?.source || "share-target",
+                route: meta?.route || meta?.source || "share-target",
                 timestamp,
                 fileCount: files.length,
                 imageCount: files.filter((f) => (f?.type || "").toLowerCase().startsWith("image/")).length
@@ -133,11 +149,34 @@ export const consumeCachedShareTargetPayload = async (opts: { clear?: boolean } 
             }
         }
 
-        return { meta, files, fileMeta };
+        return { meta: (meta || {}) as CachedShareTargetMeta, files, fileMeta };
     } catch (error) {
         console.warn("[ShareTargetGateway] Failed to consume cached payload:", error);
         return null;
     }
+};
+
+/**
+ * Convert the staged cache payload back into a share/launch transfer object that
+ * the foreground pipeline can route without caring whether the ingress was
+ * share-target, launch-queue, or another staged producer.
+ */
+export const buildShareDataFromCachedPayload = (payload: CachedShareTargetPayload): Record<string, unknown> => {
+    const meta = payload?.meta || {};
+    const files = Array.isArray(payload?.files) ? payload.files : [];
+    return {
+        ...meta,
+        title: typeof meta.title === "string" ? meta.title : undefined,
+        text: typeof meta.text === "string" ? meta.text : undefined,
+        url: typeof meta.url === "string" ? meta.url : undefined,
+        sharedUrl: typeof meta.sharedUrl === "string" ? meta.sharedUrl : undefined,
+        source: typeof meta.source === "string" ? meta.source : "share-target",
+        route: typeof meta.route === "string" ? meta.route : (typeof meta.source === "string" ? meta.source : "share-target"),
+        timestamp: Number(meta.timestamp || Date.now()),
+        files,
+        fileCount: files.length || Number(meta.fileCount || 0),
+        imageCount: Number(meta.imageCount || files.filter((file) => (file?.type || "").toLowerCase().startsWith("image/")).length)
+    };
 };
 
 /** Read the service worker's advertised cached content entries through the HTTP bridge. */

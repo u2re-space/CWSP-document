@@ -257,6 +257,7 @@ export function setupVirtualKeyboardAPIHandlers() {
     const TEXT_STREAM_SOFT_LIMIT = 12000;
     const TEXT_STREAM_HARD_LIMIT = 120000;
     let streamToken = 0;
+    const toUnicodeUnits = (text: string): string[] => Array.from(String(text || ""));
     const sendTextChunked = (text: string, dedupeKey?: string) => {
         const raw = String(text || "");
         if (!raw) {
@@ -268,12 +269,12 @@ export function setupVirtualKeyboardAPIHandlers() {
             return;
         }
 
-        let safe = raw;
-        if (safe.length > TEXT_STREAM_HARD_LIMIT) {
-            safe = safe.slice(0, TEXT_STREAM_HARD_LIMIT);
+        let safeUnits = toUnicodeUnits(raw);
+        if (safeUnits.length > TEXT_STREAM_HARD_LIMIT) {
+            safeUnits = safeUnits.slice(0, TEXT_STREAM_HARD_LIMIT);
             log(`[AirPad] Input truncated to ${TEXT_STREAM_HARD_LIMIT} chars to avoid UI freeze.`);
-        } else if (safe.length > TEXT_STREAM_SOFT_LIMIT) {
-            log(`[AirPad] Streaming large input (${safe.length} chars) in chunks.`);
+        } else if (safeUnits.length > TEXT_STREAM_SOFT_LIMIT) {
+            log(`[AirPad] Streaming large input (${safeUnits.length} chars) in chunks.`);
         }
 
         const token = ++streamToken;
@@ -281,12 +282,12 @@ export function setupVirtualKeyboardAPIHandlers() {
         const pump = () => {
             if (token !== streamToken) return;
             if (!isRemoteKeyboardEnabled()) return;
-            const end = Math.min(index + TEXT_STREAM_CHUNK_SIZE, safe.length);
+            const end = Math.min(index + TEXT_STREAM_CHUNK_SIZE, safeUnits.length);
             for (let i = index; i < end; i++) {
-                sendKeyboardChar(safe[i]!);
+                sendKeyboardChar(safeUnits[i]!);
             }
             index = end;
-            if (index < safe.length) {
+            if (index < safeUnits.length) {
                 globalThis.setTimeout(pump, 0);
                 return;
             }
@@ -304,24 +305,24 @@ export function setupVirtualKeyboardAPIHandlers() {
             onDone?.();
             return;
         }
-        let safe = raw;
-        if (safe.length > TEXT_STREAM_HARD_LIMIT) {
-            safe = safe.slice(0, TEXT_STREAM_HARD_LIMIT);
+        let safeUnits = toUnicodeUnits(raw);
+        if (safeUnits.length > TEXT_STREAM_HARD_LIMIT) {
+            safeUnits = safeUnits.slice(0, TEXT_STREAM_HARD_LIMIT);
             log(`[AirPad] Composition text truncated to ${TEXT_STREAM_HARD_LIMIT} chars to avoid UI freeze.`);
-        } else if (safe.length > TEXT_STREAM_SOFT_LIMIT) {
-            log(`[AirPad] Streaming large composition input (${safe.length} chars) in chunks.`);
+        } else if (safeUnits.length > TEXT_STREAM_SOFT_LIMIT) {
+            log(`[AirPad] Streaming large composition input (${safeUnits.length} chars) in chunks.`);
         }
         const gen = compositionPumpGen;
         let index = 0;
         const pump = () => {
             if (gen !== compositionPumpGen) return;
             if (!isRemoteKeyboardEnabled()) return;
-            const end = Math.min(index + TEXT_STREAM_CHUNK_SIZE, safe.length);
+            const end = Math.min(index + TEXT_STREAM_CHUNK_SIZE, safeUnits.length);
             for (let i = index; i < end; i++) {
-                sendKeyboardChar(safe[i]!);
+                sendKeyboardChar(safeUnits[i]!);
             }
             index = end;
-            if (index < safe.length) {
+            if (index < safeUnits.length) {
                 globalThis.setTimeout(pump, 0);
                 return;
             }
@@ -619,7 +620,7 @@ export function setupVirtualKeyboardAPIHandlers() {
             }
         } else if (lastCompositionText.startsWith(currentText)) {
             // Characters were deleted (backspace during composition)
-            const deletedCount = lastCompositionText.length - currentText.length;
+            const deletedCount = toUnicodeUnits(lastCompositionText).length - toUnicodeUnits(currentText).length;
             if (DEBUG_KEYBOARD_INPUT) console.log('[Composition] deleted chars:', deletedCount);
             if (deletedCount <= COMPOSITION_INLINE_MAX) {
                 for (let i = 0; i < deletedCount; i++) {
@@ -632,8 +633,9 @@ export function setupVirtualKeyboardAPIHandlers() {
         } else {
             // Complete replacement (autocorrect, word selection)
             if (DEBUG_KEYBOARD_INPUT) console.log('[Composition] replacement detected');
-            const bs = lastCompositionText.length;
-            if (bs <= COMPOSITION_INLINE_MAX && currentText.length <= COMPOSITION_INLINE_MAX) {
+            const bs = toUnicodeUnits(lastCompositionText).length;
+            const nextLength = toUnicodeUnits(currentText).length;
+            if (bs <= COMPOSITION_INLINE_MAX && nextLength <= COMPOSITION_INLINE_MAX) {
                 for (let i = 0; i < bs; i++) {
                     sendKeyboardChar('\b');
                 }
@@ -669,8 +671,9 @@ export function setupVirtualKeyboardAPIHandlers() {
         };
 
         if (finalText !== lastCompositionText) {
-            const bs = lastCompositionText.length;
-            if (bs <= COMPOSITION_INLINE_MAX && finalText.length <= COMPOSITION_INLINE_MAX) {
+            const bs = toUnicodeUnits(lastCompositionText).length;
+            const finalLength = toUnicodeUnits(finalText).length;
+            if (bs <= COMPOSITION_INLINE_MAX && finalLength <= COMPOSITION_INLINE_MAX) {
                 for (let i = 0; i < bs; i++) {
                     sendKeyboardChar('\b');
                 }

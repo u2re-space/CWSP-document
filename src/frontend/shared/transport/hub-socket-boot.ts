@@ -1,5 +1,5 @@
 /**
- * Unified hub transport: Socket.IO to cwsp / endpoint (same stack as AirPad), optional background connection.
+ * Unified hub transport: WebSocket to cwsp / endpoint (same stack as AirPad), optional background connection.
  * Used from main PWA boot, Settings save, and CRX shells so clipboard coordinator works outside the AirPad view.
  */
 

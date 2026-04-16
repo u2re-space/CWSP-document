@@ -1,33 +1,33 @@
 import {
-    connectPacketSocketIoRail,
-    createPacketSocketIoKeyboardMessage,
-    disconnectPacketSocketIoRail,
-    initPacketSocketIoRail,
-    isPacketSocketIoRailConnected,
-    onPacketSocketIoClipboardUpdate,
-    onPacketSocketIoRailConnectionChange,
-    requestPacketSocketIoClipboardCopy,
-    requestPacketSocketIoClipboardCut,
-    requestPacketSocketIoClipboardPaste,
-    requestPacketSocketIoClipboardRead,
-    sendPacketSocketIoBinary,
-    sendPacketSocketIoIntent
-} from "../rails/packet-socketio";
+    connectPacketWsRail,
+    createPacketWsKeyboardMessage,
+    disconnectPacketWsRail,
+    initPacketWsRail,
+    isPacketWsRailConnected,
+    onPacketWsClipboardUpdate,
+    onPacketWsRailConnectionChange,
+    requestPacketWsClipboardCopy,
+    requestPacketWsClipboardCut,
+    requestPacketWsClipboardPaste,
+    requestPacketWsClipboardRead,
+    sendPacketWsBinary,
+    sendPacketWsIntent
+} from "../rails/packet-ws";
 import { onVoiceResult } from "@shared/transport/websocket";
 
 export const airpadTransport = {
-    init: initPacketSocketIoRail,
-    connect: connectPacketSocketIoRail,
-    disconnect: disconnectPacketSocketIoRail,
-    isConnected: isPacketSocketIoRailConnected,
-    onConnectionChange: onPacketSocketIoRailConnectionChange,
-    onClipboardUpdate: onPacketSocketIoClipboardUpdate,
+    init: initPacketWsRail,
+    connect: connectPacketWsRail,
+    disconnect: disconnectPacketWsRail,
+    isConnected: isPacketWsRailConnected,
+    onConnectionChange: onPacketWsRailConnectionChange,
+    onClipboardUpdate: onPacketWsClipboardUpdate,
     onVoiceResult,
-    sendIntent: sendPacketSocketIoIntent,
-    sendBinary: sendPacketSocketIoBinary,
-    createKeyboardMessage: createPacketSocketIoKeyboardMessage,
-    requestClipboardRead: requestPacketSocketIoClipboardRead,
-    requestClipboardCopy: requestPacketSocketIoClipboardCopy,
-    requestClipboardCut: requestPacketSocketIoClipboardCut,
-    requestClipboardPaste: requestPacketSocketIoClipboardPaste
+    sendIntent: sendPacketWsIntent,
+    sendBinary: sendPacketWsBinary,
+    createKeyboardMessage: createPacketWsKeyboardMessage,
+    requestClipboardRead: requestPacketWsClipboardRead,
+    requestClipboardCopy: requestPacketWsClipboardCopy,
+    requestClipboardCut: requestPacketWsClipboardCut,
+    requestClipboardPaste: requestPacketWsClipboardPaste
 };

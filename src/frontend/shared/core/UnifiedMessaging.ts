@@ -24,9 +24,13 @@ import {
     BROADCAST_CHANNELS,
     CONTENT_TYPES,
     DESTINATIONS,
+    createDestinationChannelMappings,
+    getDestinationAliases,
+    normalizeDestination,
 } from '@rs-com/config/Names';
 
 import { resolveAssociation, resolveAssociationPipeline } from './ContentAssociations';
+import { createInteropEnvelope, toUnifiedInteropMessage } from "./UniformInterop";
 
 // Re-export types for consumers
 export type {
@@ -46,12 +50,9 @@ export type {
 // ============================================================================
 
 const APP_CHANNEL_MAPPINGS: Record<string, string> = {
+    ...createDestinationChannelMappings(),
     [DESTINATIONS.WORKCENTER]: BROADCAST_CHANNELS.WORK_CENTER,
     [DESTINATIONS.CLIPBOARD]: BROADCAST_CHANNELS.CLIPBOARD,
-    [DESTINATIONS.MARKDOWN_VIEWER]: BROADCAST_CHANNELS.MARKDOWN_VIEWER,
-    [DESTINATIONS.SETTINGS]: BROADCAST_CHANNELS.SETTINGS,
-    [DESTINATIONS.FILE_EXPLORER]: BROADCAST_CHANNELS.FILE_EXPLORER,
-    [DESTINATIONS.PRINT_VIEWER]: BROADCAST_CHANNELS.PRINT_VIEWER
 };
 
 // ============================================================================
@@ -94,22 +95,40 @@ export const unifiedMessaging = getUnifiedMessaging();
  * Send a message using the app-configured manager
  */
 export function sendMessage(message: Omit<UnifiedMessage, 'id' | 'source'> & { source?: string }): Promise<boolean> {
-    return unifiedMessaging.sendMessage({
+    return unifiedMessaging.sendMessage(toUnifiedInteropMessage({
         ...message,
         source: message.source ?? 'unified-messaging'
-    } as UnifiedMessage);
+    }) as UnifiedMessage);
 }
 
 export function sendProtocolMessage(
     message: Omit<CreateEnvelopeInput, 'source'> & { source?: string; protocol?: UniformProtocolName }
 ): Promise<boolean> {
-    const envelope = createProtocolEnvelope({
+    const interop = createInteropEnvelope({
         ...message,
         source: message.source ?? 'crossword-unified-messaging',
         protocol: message.protocol ?? 'window',
         purpose: message.purpose ?? 'mail',
         srcChannel: message.srcChannel ?? (message.source ?? 'crossword-unified-messaging'),
         dstChannel: message.dstChannel ?? message.destination
+    });
+    const envelope = createProtocolEnvelope({
+        ...interop,
+        source: interop.source,
+        destination: interop.destination,
+        data: interop.data,
+        payload: interop.payload,
+        metadata: interop.metadata,
+        protocol: interop.protocol as UniformProtocolName,
+        purpose: interop.purpose,
+        srcChannel: interop.srcChannel,
+        dstChannel: interop.dstChannel,
+        redirect: interop.redirect,
+        flags: interop.flags,
+        op: interop.op,
+        timestamp: interop.timestamp,
+        result: interop.result,
+        error: interop.error ? String(interop.error) : undefined
     });
     return unifiedMessaging.sendMessage(envelope as UnifiedMessage);
 }
@@ -120,11 +139,19 @@ export { createProtocolEnvelope, isProtocolEnvelope, normalizeProtocolEnvelope }
  * Register a handler using the app-configured manager
  */
 export function registerHandler(destination: string, handler: MessageHandler): void {
-    unifiedMessaging.registerHandler(destination, handler);
+    const aliases = getDestinationAliases(destination);
+    const names = aliases.length > 0 ? aliases : [normalizeDestination(destination) || destination];
+    for (const name of names) {
+        unifiedMessaging.registerHandler(name, handler as any);
+    }
 }
 
 export function unregisterHandler(destination: string, handler: MessageHandler): void {
-    unifiedMessaging.unregisterHandler(destination, handler);
+    const aliases = getDestinationAliases(destination);
+    const names = aliases.length > 0 ? aliases : [normalizeDestination(destination) || destination];
+    for (const name of names) {
+        unifiedMessaging.unregisterHandler(name, handler as any);
+    }
 }
 
 /**
@@ -180,17 +207,17 @@ export function initializeComponent(componentId: string): UnifiedMessage[] {
 }
 
 export function hasPendingMessages(destination: string): boolean {
-    return unifiedMessaging.hasPendingMessages(destination);
+    return unifiedMessaging.hasPendingMessages(normalizeDestination(destination) || destination);
 }
 
 export function enqueuePendingMessage(destination: string, message: UnifiedMessage): void {
-    const dest = String(destination ?? '').trim();
+    const dest = normalizeDestination(destination) || String(destination ?? '').trim();
     if (!dest || !message) return;
     unifiedMessaging.enqueuePendingMessage(dest, message);
 }
 
 export function registerComponent(componentId: string, destination: string): void {
-    unifiedMessaging.registerComponent(componentId, destination);
+    unifiedMessaging.registerComponent(componentId, normalizeDestination(destination) || destination);
 }
 
 // ============================================================================
@@ -199,23 +226,24 @@ export function registerComponent(componentId: string, destination: string): voi
 
 export function processInitialContent(content: Record<string, unknown>): Promise<void> {
     const contentType = String(content?.contentType ?? content?.type ?? CONTENT_TYPES.OTHER);
+    const contentMetadata = (content?.metadata ?? {}) as Record<string, unknown>;
     const resolved = resolveAssociationPipeline({
         contentType,
         context: content?.context as string | undefined,
         processingSource: content?.processingSource as string | undefined,
-        overrideFactors: (content?.overrideFactors ?? content?.metadata?.overrideFactors) as string[] | undefined
+        overrideFactors: (content?.overrideFactors ?? contentMetadata.overrideFactors) as string[] | undefined
     });
 
     const payload = content?.content ?? content?.data ?? content;
-    const meta = (content?.metadata ?? {}) as Record<string, unknown>;
+    const meta = contentMetadata;
 
     const source = String(content?.source ?? meta?.source ?? 'content-association');
     const tasks = resolved.pipeline.map((dest) => {
-        if (dest === "basic-viewer") {
+        if (dest === DESTINATIONS.VIEWER) {
             return sendMessage({
                 type: 'content-view',
                 source,
-                destination: 'basic-viewer',
+                destination: DESTINATIONS.VIEWER,
                 contentType: resolved.normalizedContentType,
                 data: {
                     content: (payload as Record<string, unknown>)?.text ?? (payload as Record<string, unknown>)?.content ?? payload,
@@ -231,11 +259,11 @@ export function processInitialContent(content: Record<string, unknown>): Promise
             });
         }
 
-        if (dest === "basic-explorer") {
+        if (dest === DESTINATIONS.EXPLORER) {
             return sendMessage({
                 type: 'content-explorer',
                 source,
-                destination: 'basic-explorer',
+                destination: DESTINATIONS.EXPLORER,
                 contentType: resolved.normalizedContentType,
                 data: {
                     action: 'save',
@@ -254,7 +282,7 @@ export function processInitialContent(content: Record<string, unknown>): Promise
         return sendMessage({
             type: 'content-share',
             source,
-            destination: 'basic-workcenter',
+            destination: DESTINATIONS.WORKCENTER,
             contentType: resolved.normalizedContentType,
             data: payload,
             metadata: {
@@ -292,11 +320,11 @@ export function createMessageWithOverrides(
         id: crypto.randomUUID(),
         type,
         source,
-        destination: resolved.destination === "basic-viewer"
-            ? 'basic-viewer'
-            : resolved.destination === "basic-explorer"
-                ? 'basic-explorer'
-                : 'basic-workcenter',
+        destination: resolved.destination === DESTINATIONS.VIEWER
+            ? DESTINATIONS.VIEWER
+            : resolved.destination === DESTINATIONS.EXPLORER
+                ? DESTINATIONS.EXPLORER
+                : DESTINATIONS.WORKCENTER,
         contentType,
         data,
         metadata: {
