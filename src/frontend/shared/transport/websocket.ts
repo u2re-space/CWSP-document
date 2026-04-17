@@ -18,6 +18,7 @@ import {
     getRemoteProtocol,
     getRemoteRouteTarget,
     getAirPadAuthToken,
+    getAssociatedClientToken,
     getAirPadTransportMode,
     getAirPadTransportSecret,
     getAirPadSigningSecret,
@@ -158,6 +159,8 @@ type CoordinatorPacket = {
     status?: number;
     redirect?: boolean;
     token?: string;
+    userKey?: string;
+    airpadToken?: string;
     timestamp?: number;
     [key: string]: unknown;
 };
@@ -431,7 +434,8 @@ const shouldRotateCandidateOnDisconnect = (reason?: string): boolean => {
 const getSecret = (): string => (getAirPadTransportSecret() || "").trim();
 const getSigningSecret = (): string => (getAirPadSigningSecret() || "").trim();
 const getClientId = (): string => (getAirPadClientId() || "").trim() || "airpad-client";
-const getAuthToken = (): string => (getAirPadAuthToken() || "").trim();
+const getClientToken = (): string => (getAssociatedClientToken() || "").trim();
+const getControlAuthToken = (): string => (getAirPadAuthToken() || "").trim();
 const parseNodeList = (value: string): string[] => {
     return Array.from(new Set(
         value
@@ -473,7 +477,8 @@ const mapRuntimeOpToFrameOp = (value: CoordinatorPacket["op"]): CoordinatorPacke
 
 const toCanonicalCoordinatorPacket = (packet: CoordinatorPacket): CoordinatorPacket => {
     const clientId = getClientId();
-    const authToken = getAuthToken();
+    const clientToken = getClientToken();
+    const airpadToken = getControlAuthToken();
     const sender = String(packet.sender || packet.byId || packet.from || clientId || "").trim() || undefined;
     const from = String(packet.from || sender || "").trim() || undefined;
     const byId = String(packet.byId || sender || "").trim() || undefined;
@@ -507,8 +512,14 @@ const toCanonicalCoordinatorPacket = (packet: CoordinatorPacket): CoordinatorPac
                 destinations,
             },
         urls: Array.isArray(packet.urls) && packet.urls.length ? packet.urls : [getRemoteHost()],
-        tokens: Array.isArray(packet.tokens) && packet.tokens.length ? packet.tokens : (authToken ? [authToken] : []),
-        token: packet.token || authToken || undefined,
+        tokens: Array.isArray(packet.tokens) && packet.tokens.length ? packet.tokens : (clientToken ? [clientToken] : []),
+        token: packet.token || clientToken || undefined,
+        userKey: typeof packet.userKey === "string" && packet.userKey.trim()
+            ? packet.userKey
+            : clientToken || undefined,
+        airpadToken: typeof packet.airpadToken === "string" && packet.airpadToken.trim()
+            ? packet.airpadToken
+            : airpadToken || undefined,
         flags: packet.flags || { canonicalV2: true },
         uuid,
         timestamp: Number(packet.timestamp || 0) > 0 ? Number(packet.timestamp) : now,
@@ -577,7 +588,8 @@ const buildCoordinatorPacket = (
     options: { nodes?: string[]; uuid?: string } = {}
 ): CoordinatorPacket => {
     const clientId = getClientId();
-    const authToken = getAuthToken();
+    const clientToken = getClientToken();
+    const airpadToken = getControlAuthToken();
     return {
         op: mapRuntimeOpToFrameOp(op),
         what,
@@ -599,9 +611,11 @@ const buildCoordinatorPacket = (
             destinations: options.nodes ?? getCoordinatorNodes(),
         },
         urls: [getRemoteHost()],
-        tokens: authToken ? [authToken] : [],
+        tokens: clientToken ? [clientToken] : [],
         flags: { canonicalV2: true },
-        token: authToken || undefined,
+        token: clientToken || undefined,
+        userKey: clientToken || undefined,
+        airpadToken: airpadToken || undefined,
         timestamp: Date.now()
     };
 };
@@ -1381,13 +1395,17 @@ export function connectWS() {
 
     const buildHandshakeForCandidate = (candidate: WSConnectCandidate) => {
         const url = candidate.url;
-        const authToken = getAuthToken();
+        const clientToken = getClientToken();
+        const airpadToken = getControlAuthToken();
         const clientId = getClientId();
         const peerInstanceId = getAirPadPeerInstanceId().trim();
         const handshakeAuth: Record<string, string> = {};
-        if (authToken) {
-            handshakeAuth.token = authToken;
-            handshakeAuth.airpadToken = authToken;
+        if (clientToken) {
+            handshakeAuth.token = clientToken;
+            handshakeAuth.userKey = clientToken;
+        }
+        if (airpadToken) {
+            handshakeAuth.airpadToken = airpadToken;
         }
         if (clientId) {
             handshakeAuth.clientId = clientId;
@@ -1419,7 +1437,7 @@ export function connectWS() {
             queryParams.__airpad_protocol = candidate.protocol || "https";
         }
 
-        return { url, authToken, clientId, peerInstanceId, handshakeAuth, queryParams };
+        return { url, clientToken, airpadToken, clientId, peerInstanceId, handshakeAuth, queryParams };
     };
 
     const finalizeConnectedSocket = (
@@ -1427,7 +1445,8 @@ export function connectWS() {
         candidate: WSConnectCandidate,
         index: number,
         url: string,
-        authToken: string,
+        clientToken: string,
+        airpadToken: string,
         clientId: string,
         peerInstanceId: string,
         engine: EngineLike | undefined,
@@ -1448,7 +1467,9 @@ export function connectWS() {
             byId: clientId,
             from: clientId,
             peerInstanceId: peerInstanceId || undefined,
-            token: authToken || undefined,
+            token: clientToken || undefined,
+            userKey: clientToken || undefined,
+            airpadToken: airpadToken || undefined,
             nodes: getCoordinatorNodes()
         });
 
@@ -1550,7 +1571,9 @@ export function connectWS() {
             }
         });
 
-        (window as any).__socket = socket;
+        if (typeof window !== "undefined") {
+            (window as any).__socket = socket;
+        }
     };
 
     const probeBatch = (startIndex: number, round: number): Promise<boolean> =>
@@ -1608,7 +1631,7 @@ export function connectWS() {
                 }
                 clearProbeTimer(winner);
                 activeProbeSockets.delete(winner);
-                finalizeConnectedSocket(winner, candidate, index, url, hs.authToken, hs.clientId, hs.peerInstanceId, engine, oec, oee);
+                finalizeConnectedSocket(winner, candidate, index, url, hs.clientToken, hs.airpadToken, hs.clientId, hs.peerInstanceId, engine, oec, oee);
                 resolve(true);
             };
 
@@ -1817,7 +1840,9 @@ export function disconnectWS() {
     log('Disconnecting WebSocket...');
     socket.disconnect();
     socket = null;
-    (window as any).__socket = null;
+    if (typeof window !== "undefined") {
+        (window as any).__socket = null;
+    }
     setWsStatus(false);
 }
 

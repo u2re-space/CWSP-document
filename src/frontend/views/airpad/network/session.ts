@@ -1,6 +1,5 @@
 import type { AirPadClipboardResult, AirPadIntent } from "./intents";
-import { airpadTransport } from "./transport";
-import { invalidateAirpadTransportCredentials } from "../credential-cache-bridge";
+import { airPadNetworkCoordinator } from "./coordinator";
 
 export type AirPadSessionRail = "canonical-session";
 export type AirPadVoiceMessage = {
@@ -15,15 +14,15 @@ const ACTIVE_RAIL: AirPadSessionRail = "canonical-session";
 export const getAirPadSessionRail = (): AirPadSessionRail => ACTIVE_RAIL;
 
 export const initAirPadSessionTransport = (button: HTMLElement | null): void => {
-    airpadTransport.init(button);
+    airPadNetworkCoordinator.init(button);
 };
 
 export const connectAirPadSession = (): void => {
-    airpadTransport.connect();
+    airPadNetworkCoordinator.connect();
 };
 
 export const disconnectAirPadSession = (): void => {
-    airpadTransport.disconnect();
+    airPadNetworkCoordinator.disconnect();
 };
 
 /**
@@ -31,61 +30,52 @@ export const disconnectAirPadSession = (): void => {
  * Mirrors legacy "Save & Reconnect" behavior.
  */
 export function reconnectAirPadSessionAfterConfigChange(options?: { delayMs?: number }): void {
-    airpadTransport.disconnect();
-    invalidateAirpadTransportCredentials();
-    const delayMs = options?.delayMs ?? 80;
-    globalThis.setTimeout(() => {
-        try {
-            airpadTransport.connect();
-        } catch (e) {
-            console.warn("[AirPad] reconnect after config failed:", e);
-        }
-    }, delayMs);
+    airPadNetworkCoordinator.reconnectAfterConfigChange(options);
 }
 
 export const isAirPadSessionConnected = (): boolean => {
-    return airpadTransport.isConnected();
+    return airPadNetworkCoordinator.isConnected();
 };
 export const onAirPadSessionConnectionChange = (handler: (connected: boolean) => void): (() => void) => {
-    return airpadTransport.onConnectionChange(handler);
+    return airPadNetworkCoordinator.onConnectionChange(handler);
 };
 
 export const onAirPadRemoteClipboardUpdate = (handler: (text: string, meta?: { source?: string }) => void): (() => void) => {
-    return airpadTransport.onClipboardUpdate(handler);
+    return airPadNetworkCoordinator.onServerClipboardUpdate(handler);
 };
 
 export const onAirPadVoiceMessage = (handler: (message: AirPadVoiceMessage) => void): (() => void) => {
-    return airpadTransport.onVoiceResult(handler);
+    return airPadNetworkCoordinator.onVoiceMessage(handler as unknown as (message: unknown) => void);
 };
 
 export const sendAirPadIntent = (intent: AirPadIntent): void => {
-    airpadTransport.sendIntent(intent);
+    airPadNetworkCoordinator.sendAirPadIntent(intent);
 };
 
 export const sendAirPadKeyboardChar = (char: string): void => {
-    sendAirPadIntent({ type: "keyboard.char", char });
+    airPadNetworkCoordinator.sendAirPadKeyboardChar(char);
 };
 
 export const createAirPadKeyboardMessage = (codePoint: number, flags = 0): ArrayBuffer => {
-    return airpadTransport.createKeyboardMessage(codePoint, flags);
+    return airPadNetworkCoordinator.createAirPadKeyboardMessage(codePoint, flags);
 };
 
 export const sendAirPadBinaryMessage = (buffer: ArrayBuffer | Uint8Array): void => {
-    airpadTransport.sendBinary(buffer);
+    airPadNetworkCoordinator.sendAirPadBinaryMessage(buffer);
 };
 
 export const requestAirPadClipboardRead = async (): Promise<AirPadClipboardResult> => {
-    return airpadTransport.requestClipboardRead();
+    return airPadNetworkCoordinator.requestClipboardRead();
 };
 
 export const requestAirPadClipboardCopy = async (): Promise<AirPadClipboardResult> => {
-    return airpadTransport.requestClipboardCopy();
+    return airPadNetworkCoordinator.requestClipboardCopy();
 };
 
 export const requestAirPadClipboardCut = async (): Promise<AirPadClipboardResult> => {
-    return airpadTransport.requestClipboardCut();
+    return airPadNetworkCoordinator.requestClipboardCut();
 };
 
 export const requestAirPadClipboardPaste = async (text: string): Promise<AirPadClipboardResult> => {
-    return airpadTransport.requestClipboardPaste(text);
+    return airPadNetworkCoordinator.requestClipboardPaste(text);
 };

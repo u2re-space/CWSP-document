@@ -418,6 +418,24 @@ const routeToTransferView = async (
     }
 
     if (!silentRoute && currentPath !== resolved.routePath) {
+        // WHY: when the payload is already delivered (or safely staged in the
+        // pending inbox), reuse the current shell instead of bouncing through a
+        // hard reload. This keeps markdown/viewer launches on the same surface.
+        if (delivered) {
+            try {
+                const { bootLoader } = await import("../shells/boot/ts/BootLoader");
+                const shell = bootLoader.getShell();
+                const supportsSingletonViewReuse = shell && !["window", "tabbed", "environment"].includes(shell.id);
+                if (supportsSingletonViewReuse && shell.getElement?.()?.isConnected) {
+                    await shell.navigate(resolved.destination);
+                    console.log("[ViewTransfer] Routed through live shell:", resolved.routePath);
+                    return delivered;
+                }
+            } catch (error) {
+                console.warn("[ViewTransfer] Live shell routing failed, falling back to hard navigation:", error);
+            }
+        }
+
         const nextUrl = new URL(globalThis?.location?.href);
         nextUrl.pathname = resolved.routePath;
         nextUrl.search = "";
@@ -1142,6 +1160,8 @@ export const setupLaunchQueueConsumer = async () => {
                     const hint: ViewTransferHint | undefined = (hasMarkdownFile && files.length === 1)
                         ? { destination: "viewer", action: "open", filename: files[0]?.name }
                         : undefined;
+                    const timestamp = Date.now();
+                    const imageCount = files?.filter?.(f => f.type.startsWith('image/')).length;
 
                     // INVARIANT: launch-queue files stage into the same cache-backed
                     // ingress pipeline as share-target, then the normal share-target
@@ -1149,12 +1169,12 @@ export const setupLaunchQueueConsumer = async () => {
                     const staged = await storeShareTargetPayloadToCache({
                         files,
                         meta: {
-                            timestamp: Date.now(),
+                            timestamp,
                             source: 'launch-queue',
                             route: 'launch-queue',
                             hint,
                             fileCount: files.length,
-                            imageCount: files?.filter?.(f => f.type.startsWith('image/')).length,
+                            imageCount,
                         }
                     });
                     if (!staged) {
@@ -1163,7 +1183,7 @@ export const setupLaunchQueueConsumer = async () => {
 
                     console.log('[LaunchQueue] Staged launch queue payload:', {
                         fileCount: files.length,
-                        imageCount: files?.filter?.(f => f.type.startsWith('image/')).length,
+                        imageCount,
                         fileTypes: files?.map?.(f => ({ name: f.name, type: f.type, size: f.size })),
                         source: 'launch-queue',
                         staged
@@ -1176,11 +1196,23 @@ export const setupLaunchQueueConsumer = async () => {
                     });
 
                     if (staged) {
-                        const url = new URL(globalThis?.location?.href);
-                        url.pathname = '/share-target';
-                        url.searchParams.set('shared', '1');
-                        url.hash = '';
-                        globalThis.location.href = url.toString();
+                        const delivered = await routeToTransferView({
+                            title: files[0]?.name,
+                            files,
+                            fileCount: files.length,
+                            imageCount,
+                            timestamp,
+                            source: 'launch-queue',
+                            hint,
+                        }, 'launch-queue', hint, true);
+
+                        if (!delivered) {
+                            const url = new URL(globalThis?.location?.href);
+                            url.pathname = '/share-target';
+                            url.searchParams.set('shared', '1');
+                            url.hash = '';
+                            globalThis.location.href = url.toString();
+                        }
                     } else {
                         showToast({
                             message: `Failed to stage ${files.length} launched file(s)`,

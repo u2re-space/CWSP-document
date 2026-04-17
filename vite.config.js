@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { crx } from "@crxjs/vite-plugin";
 import { loadEnv } from "vite";
 
-import { assetFileNames as distAssetFileNames, chunkFileNames as distChunkFileNames, manualChunks as distManualChunks } from "./shared/vite-chunk-placement.mjs";
+import { assetFileNames as distAssetFileNames, chunkFileNames as distChunkFileNames } from "./shared/vite-chunk-placement.mjs";
 
 /**
  * CRX MV3 only: keep service-worker-adjacent deps out of `com/app.js`.
@@ -14,52 +14,15 @@ import { assetFileNames as distAssetFileNames, chunkFileNames as distChunkFileNa
  * Many config/service files are hardlinked under `src/frontend/shared/**`; match both trees.
  */
 const CRX_SW_SHARED_CHUNK = "crx-sw-shared";
-const CRX_SW_LIB_MARKERS = [
-    "/src/com/config/",
-    "/src/frontend/shared/config/",
-    "/src/core/document/AIResponseParser",
-    "/src/core/utils/Runtime",
-    "/src/core/constants/data-paths",
-    "/src/core/storage/FileSystem",
-    "/src/com/template/EntityId",
-    "/src/com/template/EntityUtils",
-    "/src/frontend/shared/template/EntityId",
-    "/src/frontend/shared/template/EntityUtils",
-    "/src/com/store/IDBQueue",
-    "/src/frontend/shared/store/IDBQueue",
-    "/src/com/service/instructions/core",
-    "/src/frontend/shared/service/instructions/core",
-    "/src/com/service/instructions/templates",
-    "/src/frontend/shared/service/instructions/templates",
-    "/src/com/service/instructions/utils",
-    "/src/frontend/shared/service/instructions/utils",
-    "/src/com/service/instructions/AIInstructions",
-    "/src/frontend/shared/service/instructions/AIInstructions",
-    "/src/com/service/model/GPT-Config",
-    "/src/frontend/shared/service/model/GPT-Config",
-];
-
-function crxSwSharedManualChunks(id) {
-    const p = String(id).split("\\").join("/");
-    for (const m of CRX_SW_LIB_MARKERS) {
-        if (p.includes(m)) return CRX_SW_SHARED_CHUNK;
-    }
-    if (p.includes("node_modules")) {
-        if (p.includes("jsox") || /[/\\]jsox[/\\]/.test(p)) return CRX_SW_SHARED_CHUNK;
-        if (p.includes("@toon-format") || p.includes("/toon-format/")) return CRX_SW_SHARED_CHUNK;
-    }
-    if (p.includes("/modules/projects/core.ts/")) return CRX_SW_SHARED_CHUNK;
-    return undefined;
-}
-
-const createCrxManualChunks = (id) => crxSwSharedManualChunks(id) ?? distManualChunks(id);
 
 /** Rolldown (Vite 8) uses `output.codeSplitting.groups`; `manualChunks` alone may not isolate chunks. */
 const CRX_SW_SHARED_CHUNK_TEST =
     /\/modules\/projects\/core\.ts\/|\/node_modules\/jsox\/|\/node_modules\/@toon-format\/|\/src\/com\/config\/|\/src\/frontend\/shared\/config\/|\/src\/core\/document\/AIResponseParser|\/src\/core\/utils\/Runtime|\/src\/core\/constants\/data-paths|\/src\/core\/storage\/FileSystem|\/src\/(?:com\/template|frontend\/shared\/template)\/Entity(?:Id|Utils)|\/src\/(?:com\/store|frontend\/shared\/store)\/IDBQueue|\/src\/(?:com\/service|frontend\/shared\/service)\/instructions\/(?:core|templates|utils|AIInstructions)|\/src\/(?:com\/service|frontend\/shared\/service)\/model\/GPT-Config/;
 
-const crxSharedOutputChunks = {
-    manualChunks: createCrxManualChunks,
+const crxRollupOutputChunks = {
+    minifyInternalExports: false,
+};
+const crxRolldownOutputChunks = {
     minifyInternalExports: false,
 };
 
@@ -263,7 +226,8 @@ const createCrxConfig = (mode) => {
     };
 
     //
-    const crxOutput = objectAssign({}, baseOutput, {
+const { manualChunks: _ignoredCrxManualChunks, ...crxOutputBase } = baseOutput;
+const crxOutput = objectAssign({}, crxOutputBase, {
         dir: resolve(__dirname, "./dist-crx"),
         entryFileNames: "app/[name].js",
         chunkFileNames: crxChunkFileNames,
@@ -327,7 +291,7 @@ const createCrxConfig = (mode) => {
                 input: crxInputs,
                 output: {
                     ...crxOutput,
-                    ...crxSharedOutputChunks,
+                    ...crxRollupOutputChunks,
                 }
             },
             // Vite 8 + Rolldown: chunk placement from `rollupOptions.output` may be ignored; mirror here so
@@ -338,7 +302,7 @@ const createCrxConfig = (mode) => {
                 input: crxInputs,
                 output: {
                     ...crxOutput,
-                    ...crxSharedOutputChunks,
+                    ...crxRolldownOutputChunks,
                     ...crxRolldownCodeSplitting,
                 },
             },
@@ -379,6 +343,13 @@ export default async ({ mode } = {}) => {
             minify: false,
             cssMinify: false,
             terserOptions: undefined,
+            // NOTE: Fastify imports `/apps/cw/index.js` directly; keep library-style JS output
+            // but override the emitted filename from `crossword.js` to `index.js`.
+            lib: {
+                ...(baseConfig.build?.lib ?? {}),
+                entry: resolve(__dirname, './src/index.ts'),
+                fileName: "index",
+            },
             rollupOptions: {
                 ...baseConfig.build?.rollupOptions,
                 input: {

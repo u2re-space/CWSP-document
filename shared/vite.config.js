@@ -6,6 +6,7 @@ import {
     chunkFileNames as distChunkFileNames,
     manualChunks as distManualChunks,
     relocateWorkerBundleAssetsPlugin,
+    rolldownCodeSplittingGroups,
 } from "./vite-chunk-placement.mjs";
 
 //
@@ -15,8 +16,31 @@ import postcssConfig from "../postcss.config.js";
 //
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { VitePWA } from 'vite-plugin-pwa'
-import { searchForWorkspaceRoot } from "vite";
+import { createLogger, searchForWorkspaceRoot } from "vite";
 import { ViteMcp } from 'vite-plugin-mcp';
+
+const viteLogger = createLogger();
+const VITE_NOISY_WARNING_PATTERNS = [
+    "[INEFFECTIVE_DYNAMIC_IMPORT]",
+    "manualChunks option is ignored because the codeSplitting option is specified.",
+    "Both `rollupOptions` and `rolldownOptions` were specified by \"crx:content-scripts\" plugin.",
+    "`esbuild` option was specified by \"crx:content-scripts\" plugin.",
+    "`esbuild` option was specified by \"crx:web-accessible-resources\" plugin.",
+    "inlineDynamicImports option is deprecated",
+    "`inlineDynamicImports` option is deprecated",
+];
+
+const isIgnorableViteWarning = (warning) => {
+    const message = String(warning?.message || warning || "");
+    return VITE_NOISY_WARNING_PATTERNS.some((pattern) => message.includes(pattern));
+};
+
+const isIgnorableRollupWarning = (warning) => {
+    if (warning?.code === "INEFFECTIVE_DYNAMIC_IMPORT") {
+        return true;
+    }
+    return isIgnorableViteWarning(warning);
+};
 
 /**
  * Drop stale `node_modules/.vite/deps` when old KaTeX pre-bundles linger (missing `katex-*.js` on disk
@@ -457,6 +481,10 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             // Rolldown accepts false | "always" (Rollup also allowed true).
             propertyReadSideEffects: "always",
         },
+        onwarn: (warning, defaultHandler) => {
+            if (isIgnorableRollupWarning(warning)) return;
+            defaultHandler(warning);
+        },
         input: resolve(__dirname, './src/index.ts'),
         output: {
             globals: {},
@@ -638,6 +666,24 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             ]
         },
         rollupOptions,
+        rolldownOptions: {
+            checks: {
+                pluginTimings: false,
+            },
+            onwarn: (warning, defaultHandler) => {
+                if (isIgnorableRollupWarning(warning)) return;
+                defaultHandler(warning);
+            },
+            // NOTE: Vite 8 uses Rolldown for production builds. Mirror output naming here so
+            // chunk placement rules (`views/`, `shells/`, `com/`, `core/`, `chunks/`, etc.)
+            // are applied consistently instead of collapsing scripts into the dist root.
+            output: {
+                ...rollupOptions.output,
+                codeSplitting: {
+                    groups: rolldownCodeSplittingGroups,
+                },
+            },
+        },
         terserOptions,
         name: NAME,
         lib: {
@@ -656,7 +702,16 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
         /** Keep Vite cache inside the app; avoids workspace-root .vite clashes when cwd differs. */
         cacheDir: resolve(__dirname, "node_modules/.vite"),
         rollupOptions, plugins, resolve: $resolve, build, css, optimizeDeps, server, worker: {format: 'es'},
-        define: { 'process.env': {} }
+        define: { 'process.env': {} },
+        customLogger: {
+            warn: (message, options) => {
+                if (!isIgnorableViteWarning(message)) {
+                    viteLogger.warn(message, options);
+                }
+            },
+            info: (...args) => viteLogger.info(...args),
+            error: (...args) => viteLogger.error(...args),
+        },
     };
 }
 

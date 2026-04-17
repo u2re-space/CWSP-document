@@ -17,12 +17,11 @@ const hostFromEndpointUrl = (endpointUrl: string | undefined): string | null => 
     }
 };
 
-/**
- * Resolves HTTPS (default :8443) and HTTP (default :8080) admin/control URLs for the CWS / cwsp endpoint.
- * When `core.admin.*` is empty, uses `endpointUrl` hostname with standard ports, then localhost.
- */
-export function resolveAdminDoorUrls(core: AppSettings["core"] | undefined): { https: string; http: string } {
-    const path = normalizeAdminPath(core?.admin?.path);
+const resolveControlDoorUrls = (
+    core: AppSettings["core"] | undefined,
+    pathOverride?: string
+): { https: string; http: string } => {
+    const path = normalizeAdminPath(pathOverride ?? core?.admin?.path);
     let httpsOrigin = (core?.admin?.httpsOrigin || "").trim();
     let httpOrigin = (core?.admin?.httpOrigin || "").trim();
     const host = hostFromEndpointUrl(core?.endpointUrl);
@@ -40,6 +39,18 @@ export function resolveAdminDoorUrls(core: AppSettings["core"] | undefined): { h
     };
 
     return { https: join(httpsOrigin), http: join(httpOrigin) };
+};
+
+/**
+ * Resolves HTTPS (default :8443) and HTTP (default :8080) admin/control URLs for the CWS / cwsp endpoint.
+ * When `core.admin.*` is empty, uses `endpointUrl` hostname with standard ports, then localhost.
+ */
+export function resolveAdminDoorUrls(core: AppSettings["core"] | undefined): { https: string; http: string } {
+    return resolveControlDoorUrls(core);
+}
+
+export function resolveDevicesDoorUrls(core: AppSettings["core"] | undefined): { https: string; http: string } {
+    return resolveControlDoorUrls(core, "/devices");
 }
 
 export function openAdminDoorUrl(url: string, target = "_blank"): void {
@@ -55,5 +66,13 @@ export function openAdminDoorFromCore(
     protocol: "https" | "http"
 ): void {
     const urls = resolveAdminDoorUrls(core);
+    openAdminDoorUrl(protocol === "https" ? urls.https : urls.http);
+}
+
+export function openDevicesDoorFromCore(
+    core: AppSettings["core"] | undefined,
+    protocol: "https" | "http"
+): void {
+    const urls = resolveDevicesDoorUrls(core);
     openAdminDoorUrl(protocol === "https" ? urls.https : urls.http);
 }

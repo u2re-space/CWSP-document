@@ -34,9 +34,68 @@ const FEST_DIR_TO_IMPORT = {
     "uniform.ts": "uniform",
 };
 
+const FEST_MERGED_INTO_COM_APP = new Set(["lure", "fl-ui"]);
+const CORE_STATIC_LURE_MARKERS = [
+    "/src/core/index.ts",
+    "/src/core/storage/FileOps.ts",
+    "/src/core/utils/Actions.ts",
+    "/src/core/storage/StateStorage.ts",
+    "/src/core/document/Parser.ts",
+    "/src/core/document/markdown.ts",
+    "/src/core/document/index.ts",
+];
+const COM_SERVICE_CORE_PREFIXES = [
+    "/src/core/constants/data-paths",
+    "/src/core/storage/WriteFileSmart-v2",
+    "/src/core/storage/FileSystem",
+    "/src/core/storage/OPFSMod",
+    "/src/core/document/AIResponseParser",
+    "/src/core/utils/Runtime",
+];
+const comCoreUiMirrored = (base) => [`/src/com/core/${base}.`, `/src/frontend/shared/core/${base}.`];
+const COM_CORE_UI_ONLY = [
+    ...comCoreUiMirrored("UnifiedMessaging"),
+    ...comCoreUiMirrored("ViewTransferRouting"),
+    ...comCoreUiMirrored("AppCommunicator"),
+    ...comCoreUiMirrored("LogSanitizer"),
+    ...comCoreUiMirrored("ServiceChannels"),
+    ...comCoreUiMirrored("UniformChannelManager"),
+    ...comCoreUiMirrored("MessageQueue"),
+];
+
 const norm = (id) => String(id).split("\\").join("/");
 
 const stripExt = (p) => p.replace(/\.[cm]?[tj]sx?$/i, "");
+
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Rolldown (Vite 8) does not reliably honor `manualChunks` for chunk isolation.
+ * These groups mirror the existing `manualChunks()` intent for Rolldown builds so
+ * output stays structured. `lure` and `fl-ui` intentionally remain merged into
+ * `com/app.js` to avoid circular-init / TDZ regressions.
+ */
+export const rolldownCodeSplittingGroups = [
+    {
+        name: "fest-polyfill",
+        test: /\/shared\/fest\/polyfill\//,
+        priority: 100,
+    },
+    {
+        name: "fest-object",
+        test: /\/modules\/projects\/object\.ts\/|\/shared\/fest\/object\/|\/object\.ts\/src\//,
+        priority: 120,
+    },
+    ...Object.entries(FEST_DIR_TO_IMPORT)
+        .filter(([, key]) => key !== "object" && !FEST_MERGED_INTO_COM_APP.has(key))
+        .map(([dir, key]) => ({
+            name: `fest-${key}`,
+            test: new RegExp(
+                `\\/modules\\/projects\\/${escapeRegExp(dir)}\\/|\\/shared\\/fest\\/${escapeRegExp(key)}\\/`,
+            ),
+            priority: 105,
+        })),
+];
 
 /** Core and com must stay together for stable init order. */
 const CORE_CHUNK_NAME = "com-app";
@@ -93,15 +152,7 @@ export function manualChunks(id) {
     if (p.includes("/src/frontend/shared/config/")) return "com-service";
 
     // Shared settings + OPFS helpers used by the MV3 service worker — keep out of `com-app` (lure/fl-ui/DOM merge).
-    const comServiceCorePrefixes = [
-        "/src/core/constants/data-paths",
-        "/src/core/storage/WriteFileSmart-v2",
-        "/src/core/storage/FileSystem",
-        "/src/core/storage/OPFSMod",
-        "/src/core/document/AIResponseParser",
-        "/src/core/utils/Runtime",
-    ];
-    for (const prefix of comServiceCorePrefixes) {
+    for (const prefix of COM_SERVICE_CORE_PREFIXES) {
         if (p.includes(prefix)) return "com-service";
     }
     if (p.includes("/src/core/time/")) return "com-service";
@@ -113,17 +164,8 @@ export function manualChunks(id) {
     // if that chunk static-imports `com/app.js` (lure/customElements), registration fails. Default CrossWord
     // `src/core/` → `com-service`; only files that statically depend on `fest/lure` (same TDZ island as lur.e)
     // stay in `com-app`.
-    const coreStaticLureMarkers = [
-        "/src/core/index.ts",
-        "/src/core/storage/FileOps.ts",
-        "/src/core/utils/Actions.ts",
-        "/src/core/storage/StateStorage.ts",
-        "/src/core/document/Parser.ts",
-        "/src/core/document/markdown.ts",
-        "/src/core/document/index.ts",
-    ];
     if (p.includes("/src/core/") && !p.includes("/object.ts/src/core/")) {
-        for (const mark of coreStaticLureMarkers) {
+        for (const mark of CORE_STATIC_LURE_MARKERS) {
             if (p.includes(mark)) return CORE_CHUNK_NAME;
         }
         return "com-service";
@@ -135,17 +177,7 @@ export function manualChunks(id) {
     // UI-heavy `com/core` modules mirrored under `frontend/shared/core` must land in `com-app`, not `com-service`.
     // This block MUST run before the blanket `frontend/shared/core` → `com-service` rule below.
     // Use `/${base}.` so `UnifiedMessaging` does not match `UnifiedMessagingSw.ts` (prefix collision).
-    const comCoreUiMirrored = (base) => [`/src/com/core/${base}.`, `/src/frontend/shared/core/${base}.`];
-    const comCoreUiOnly = [
-        ...comCoreUiMirrored("UnifiedMessaging"),
-        ...comCoreUiMirrored("ViewTransferRouting"),
-        ...comCoreUiMirrored("AppCommunicator"),
-        ...comCoreUiMirrored("LogSanitizer"),
-        ...comCoreUiMirrored("ServiceChannels"),
-        ...comCoreUiMirrored("UniformChannelManager"),
-        ...comCoreUiMirrored("MessageQueue"),
-    ];
-    for (const mark of comCoreUiOnly) {
+    for (const mark of COM_CORE_UI_ONLY) {
         if (p.includes(mark)) return CORE_CHUNK_NAME;
     }
     if (p.includes("/src/frontend/shared/core/")) return "com-service";

@@ -171,7 +171,8 @@ export type AppSettings = {
          */
         userId?: string;
         /**
-         * Associated auth token — env: CWS_ASSOCIATED_TOKEN.
+         * Associated client token used to identify this device to the endpoint.
+         * Env: CWS_ASSOCIATED_TOKEN.
          */
         userKey?: string;
         encrypt?: boolean;
@@ -180,7 +181,8 @@ export type AppSettings = {
         /** Instance id for cwsp / offline / multi-device (distinct from Airpad peer clientId). */
         appClientId?: string;
         /**
-         * When true and AirPad’s own Client ID / token fields are empty, use {@link userId} / {@link userKey}.
+         * When true and AirPad’s own client-id field is empty, reuse {@link userId}.
+         * NOTE: AirPad control auth is configured separately via {@link socket.airpadAuthToken}.
          */
         useCoreIdentityForAirPad?: boolean;
         /**
@@ -200,6 +202,10 @@ export type AppSettings = {
             routeTarget?: string;
             /** Optional AirPad self/client id override; when empty AirPad reuses `core.userId`. */
             selfId?: string;
+            /**
+             * Optional AirPad/control auth token. This is not the same as the associated client token.
+             */
+            airpadAuthToken?: string;
             transportMode?: CoreSocketTransportMode;
             transportSecret?: string;
             signingSecret?: string;
@@ -320,6 +326,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
             protocol: "auto",
             routeTarget: "",
             selfId: "",
+            airpadAuthToken: "",
             transportMode: "plaintext",
             transportSecret: "",
             signingSecret: ""

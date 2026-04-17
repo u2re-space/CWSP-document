@@ -188,7 +188,7 @@ const remoteConfig: {
     peerInstanceId: "",
 };
 
-/** IndexedDB “Server” tab: userId/userKey as fallbacks for AirPad when local client/token empty (CWS_ASSOCIATED_*). */
+/** IndexedDB “Server” tab: userId fallback for AirPad client identity (CWS_ASSOCIATED_*). */
 let coreIdentityBridgeUserId = "";
 let coreIdentityBridgeUserKey = "";
 let coreIdentityUseForAirpad = true;
@@ -206,6 +206,7 @@ let shellNativeContactsEnabled = true;
 let coreSocketProtocol: RemoteProtocol = "auto";
 let coreSocketRouteTarget = "";
 let coreSocketSelfId = "";
+let coreSocketAirpadAuthToken = "";
 let coreSocketTransportMode: AirpadTransportMode = "plaintext";
 let coreSocketTransportSecret = "";
 let coreSocketSigningSecret = "";
@@ -350,6 +351,7 @@ export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
     coreSocketProtocol = socket?.protocol === "http" || socket?.protocol === "https" ? socket.protocol : "auto";
     coreSocketRouteTarget = (socket?.routeTarget || "").trim();
     coreSocketSelfId = (socket?.selfId || "").trim();
+    coreSocketAirpadAuthToken = (socket?.airpadAuthToken || "").trim();
     coreSocketTransportMode = socket?.transportMode === "secure" ? "secure" : "plaintext";
     coreSocketTransportSecret = (socket?.transportSecret || "").trim();
     coreSocketSigningSecret = (socket?.signingSecret || "").trim();
@@ -507,10 +509,16 @@ export function getAirPadTransportMode(): AirpadTransportMode {
 }
 
 export function getAirPadAuthToken(): string {
-    if (coreIdentityUseForAirpad && coreIdentityBridgeUserKey.trim()) return coreIdentityBridgeUserKey.trim();
     const local = (remoteConfig.authToken || "").trim();
     if (local) return local;
-    return readGlobalAirpadValue(["AIRPAD_AUTH_TOKEN", "AIRPAD_TOKEN"]);
+    if (coreSocketAirpadAuthToken.trim()) return coreSocketAirpadAuthToken.trim();
+    return readGlobalAirpadValue([
+        "AIRPAD_AUTH_TOKEN",
+        "AIRPAD_TOKEN",
+        "CWS_AUTH_TOKEN",
+        "HUB_AUTH_TOKEN",
+        "MASTER_AUTH_TOKEN"
+    ]);
 }
 
 export function setAirPadAuthToken(token: string): void {
@@ -523,6 +531,10 @@ export function getAirPadClientId(): string {
     if (coreIdentityUseForAirpad && coreIdentityBridgeUserId.trim()) return coreIdentityBridgeUserId.trim();
     if (remoteConfig.clientId.trim()) return remoteConfig.clientId.trim();
     return readGlobalAirpadValue(["AIRPAD_CLIENT_ID", "AIRPAD_CLIENT"]);
+}
+
+export function getAssociatedClientToken(): string {
+    return coreIdentityBridgeUserKey.trim();
 }
 
 export function setAirPadClientId(clientId: string): void {

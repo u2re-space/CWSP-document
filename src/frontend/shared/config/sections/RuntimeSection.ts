@@ -44,8 +44,9 @@ export const RuntimeSection: SectionConfig = {
             label: "Endpoint access",
             description: "Credentials for shared endpoint mode.",
             fields: [
-                { path: "core.userId", label: "User ID", type: "text", placeholder: "device-123" },
-                { path: "core.userKey", label: "User Key", type: "password", placeholder: "generated key" },
+                { path: "core.userId", label: "Client ID", type: "text", placeholder: "device-123" },
+                { path: "core.userKey", label: "Client Token", type: "password", placeholder: "generated key" },
+                { path: "core.socket.airpadAuthToken", label: "AirPad Auth Token", type: "password", placeholder: "optional control token; may match endpoint auth" },
                 { path: "core.socket.selfId", label: "AirPad Self ID", type: "text", placeholder: "L-192.168.0.110" },
                 { path: "core.socket.routeTarget", label: "AirPad Route Target", type: "text", placeholder: "L-192.168.0.110" },
                 {

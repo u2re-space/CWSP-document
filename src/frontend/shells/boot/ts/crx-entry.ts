@@ -16,6 +16,7 @@ import { ViewRegistry } from "../../../shared/routing/registry";
 import { initializeLayers } from "../../../shared/routing/layer-manager";
 import { ensureAppLayers } from "../../environment/app-layers";
 import { pickEnabledView } from "../../../shared/routing/views";
+import { getCrxNetworkCoordinator } from "../../../../crx/network/Coordinator";
 
 // ============================================================================
 // TYPES
@@ -67,9 +68,7 @@ export default async function crxFrontend(
     // CRX pages can bypass main index entry, so initialize layers here too.
     initializeLayers();
 
-    void import("../../../shared/transport/hub-socket-boot")
-        .then((m) => m.bootHubSocketFromStoredSettings())
-        .catch(() => undefined);
+    void getCrxNetworkCoordinator().startFromStoredSettings().catch(() => undefined);
 
     // Same grid shell layer as PWA (`content-row` / `content-column`); ShellBase.mount
     // positions cw-shell-* on those named lines — mounting directly on #app had no lines.

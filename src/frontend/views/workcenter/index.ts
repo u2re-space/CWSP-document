@@ -22,6 +22,22 @@ export interface WorkCenterOptions extends BaseViewOptions {
     onFilesChange?: (files: File[]) => void;
 }
 
+type WorkCenterMessageData = {
+    file?: File;
+    files?: File[];
+    text?: string;
+    content?: string;
+    url?: string;
+    filename?: string;
+    source?: string;
+};
+
+type WorkCenterInboundMessage = {
+    type?: string;
+    contentType?: string;
+    data?: WorkCenterMessageData;
+};
+
 // @ts-ignore
 @defineElement("cw-workcenter-view")
 export class WorkCenterView extends BaseElement implements View {
@@ -40,7 +56,7 @@ export class WorkCenterView extends BaseElement implements View {
     private resultObserver: MutationObserver | null = null;
     private _sheet: CSSStyleSheet | null = null;
     private readonly autoFileFingerprints = new Set<string>();
-    private pendingMessages: unknown[] = [];
+    private pendingMessages: WorkCenterInboundMessage[] = [];
 
     lifecycle: ViewLifecycle = {
         onMount: () => this.onMount(),
@@ -118,6 +134,82 @@ export class WorkCenterView extends BaseElement implements View {
         return null;
     }
 
+    private normalizeInitialDataMessage(initialData: unknown): WorkCenterInboundMessage | null {
+        if (!initialData) return null;
+
+        if (typeof initialData === "string") {
+            return {
+                type: "content-share",
+                contentType: "text",
+                data: {
+                    text: initialData,
+                    content: initialData
+                }
+            };
+        }
+
+        if (initialData instanceof File) {
+            return {
+                type: "content-share",
+                contentType: initialData.type || "application/octet-stream",
+                data: {
+                    file: initialData,
+                    filename: initialData.name
+                }
+            };
+        }
+
+        if (Array.isArray(initialData)) {
+            const files = initialData.filter((entry): entry is File => entry instanceof File);
+            if (files.length > 0) {
+                return {
+                    type: "content-share",
+                    contentType: files[0]?.type || "application/octet-stream",
+                    data: {
+                        file: files[0],
+                        files,
+                        filename: files[0]?.name
+                    }
+                };
+            }
+            return null;
+        }
+
+        if (typeof initialData !== "object") return null;
+
+        const record = initialData as Record<string, unknown>;
+        const nestedData = (record.data && typeof record.data === "object")
+            ? (record.data as Record<string, unknown>)
+            : record;
+        const files = Array.isArray(nestedData.files)
+            ? nestedData.files.filter((entry): entry is File => entry instanceof File)
+            : undefined;
+        const file = nestedData.file instanceof File ? nestedData.file : files?.[0];
+        const text = typeof nestedData.text === "string" ? nestedData.text : undefined;
+        const content = typeof nestedData.content === "string" ? nestedData.content : undefined;
+        const url = typeof nestedData.url === "string" ? nestedData.url : undefined;
+        const filename = typeof nestedData.filename === "string" ? nestedData.filename : file?.name;
+        const source = typeof nestedData.source === "string" ? nestedData.source : undefined;
+
+        if (!file && !(files?.length) && !text && !content && !url) return null;
+
+        return {
+            type: typeof record.type === "string" ? record.type : "content-share",
+            contentType: typeof record.contentType === "string"
+                ? record.contentType
+                : (file?.type || "text"),
+            data: {
+                file,
+                files,
+                text,
+                content,
+                url,
+                filename,
+                source
+            }
+        };
+    }
+
     addFiles(files: File[]): void {
         const state = this.manager?.getState();
         if (!state || files.length === 0) return;
@@ -151,25 +243,17 @@ export class WorkCenterView extends BaseElement implements View {
     }
 
     async handleMessage(message: unknown): Promise<void> {
-        const msg = message as {
-            type?: string;
-            contentType?: string;
-            data?: { file?: File; files?: File[]; text?: string; content?: string; url?: string };
-        };
+        const msg = message as WorkCenterInboundMessage;
 
         if (!this.manager) {
             if (this.pendingMessages.length >= 64) this.pendingMessages.shift();
-            this.pendingMessages.push(message);
+            this.pendingMessages.push(msg);
             return;
         }
         await this.handleMessageWithManager(msg);
     }
 
-    private async handleMessageWithManager(msg: {
-        type?: string;
-        contentType?: string;
-        data?: { file?: File; files?: File[]; text?: string; content?: string; url?: string };
-    }): Promise<void> {
+    private async handleMessageWithManager(msg: WorkCenterInboundMessage): Promise<void> {
         if (!this.manager) return;
 
         if (msg.type === "share-target-input" || msg.type === "share-target-result" || msg.type === "ai-result" || msg.type === "content-share") {
@@ -200,11 +284,7 @@ export class WorkCenterView extends BaseElement implements View {
         if (!this.manager || this.pendingMessages.length === 0) return;
         const queue = this.pendingMessages.splice(0, this.pendingMessages.length);
         for (const message of queue) {
-            const msg = message as {
-                type?: string;
-                contentType?: string;
-                data?: { file?: File; files?: File[]; text?: string; content?: string; url?: string };
-            };
+            const msg = message as WorkCenterInboundMessage;
             await this.handleMessageWithManager(msg);
         }
     }
@@ -218,6 +298,11 @@ export class WorkCenterView extends BaseElement implements View {
         }
         if (typeof this.options.initialPrompt === "string" && this.options.initialPrompt.trim()) {
             state.currentPrompt = this.options.initialPrompt;
+        }
+
+        const initialMessage = this.normalizeInitialDataMessage(this.options.initialData);
+        if (initialMessage) {
+            this.pendingMessages.unshift(initialMessage);
         }
     }
 

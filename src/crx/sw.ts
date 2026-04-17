@@ -29,12 +29,17 @@ import {
 import { unifiedMessaging } from "../com/core/UnifiedMessagingSw";
 import { createInteropEnvelope } from "../com/core/UniformInterop";
 import { isUserScopePath } from "fest/core";
+import { getCrxNetworkCoordinator } from "./network/Coordinator";
 
 // ---------------------------------------------------------------------------
 // Environment detection
 // ---------------------------------------------------------------------------
 
 const isInCrxEnvironment = crxMessaging.isCrxEnvironment();
+
+if (isInCrxEnvironment) {
+    void getCrxNetworkCoordinator().startFromStoredSettings().catch(() => undefined);
+}
 
 // ---------------------------------------------------------------------------
 // Broadcast helpers

@@ -20,6 +20,7 @@ import { createViewState } from "@views/types";
 import { writeText as writeClipboardText } from "@rs-core/modules/Clipboard";
 import { loadSettings } from "@rs-com/config/Settings";
 import type { MarkdownExtensionRule } from "@rs-com/config/SettingsTypes";
+import { requestOpenView } from "@rs-frontend/shared/routing/view-api";
 
 // Import fest/fl-ui (e.g. shared markdown utilities elsewhere)
 import "fest/icon";
@@ -1274,8 +1275,6 @@ export class ViewerView extends BaseElement implements View {
             return;
         }
 
-        await Promise.resolve(this.shellContext?.navigate("workcenter"));
-
         const filename = this.options.filename || `viewer-${Date.now()}.md`;
         const payload = {
             text: content,
@@ -1283,6 +1282,31 @@ export class ViewerView extends BaseElement implements View {
             filename,
             source: "viewer-attach"
         };
+        const initialMessage = {
+            type: "content-share",
+            contentType: "markdown",
+            data: payload
+        };
+
+        if (this.shellContext && ["window", "tabbed", "environment"].includes(this.shellContext.shellId)) {
+            try {
+                // WHY: window-like shells create fresh per-process view instances, so
+                // attach data must travel with the open request instead of going
+                // through the singleton registry instance.
+                requestOpenView({
+                    viewId: "workcenter",
+                    target: "window",
+                    body: initialMessage,
+                    contentType: "application/json"
+                });
+                this.showMessage("Content attached to Work Center");
+                return;
+            } catch (error) {
+                console.warn("[Viewer] windowed workcenter attach failed:", error);
+            }
+        }
+
+        await Promise.resolve(this.shellContext?.navigate("workcenter"));
 
         try {
             const { ViewRegistry } = await import("@rs-frontend/shared/routing/registry");
@@ -1290,11 +1314,7 @@ export class ViewerView extends BaseElement implements View {
                 ViewRegistry.getLoaded("workcenter") ||
                 await ViewRegistry.load("workcenter", { shellContext: this.shellContext });
             if (workcenter?.handleMessage) {
-                await workcenter.handleMessage({
-                    type: "content-share",
-                    contentType: "markdown",
-                    data: payload
-                });
+                await workcenter.handleMessage(initialMessage);
                 this.showMessage("Content attached to Work Center");
                 return;
             }
