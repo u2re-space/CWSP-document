@@ -13,10 +13,89 @@ import {
 } from "../../views/airpad/config/config";
 import { isCapacitorCwsNativeShell } from "../native/cws-bridge";
 
+/** After this long in the background, force a full reconnect (zombie TCP / suspended workers). */
+const PWA_STALE_BACKGROUND_MS = 12_000;
+
+let hubLifecycleRecoveryInstalled = false;
+let lastDocumentHiddenAt = 0;
+
+function shouldRunHubRecovery(): boolean {
+    if (isCapacitorCwsNativeShell() && isPreferNativeWebsocketEnabled()) return false;
+    if (!isMaintainHubSocketConnectionEnabled()) return false;
+    if (!getRemoteHost().trim()) return false;
+    return true;
+}
+
+/**
+ * PWA / mobile: restore hub ↔ endpoint after suspend, offline, or bfcache restore.
+ * Requires Settings → maintain hub socket + a remote host (same rules as {@link applyHubSocketFromSettings}).
+ */
+export function installAirpadHubLifecycleRecovery(): void {
+    if (hubLifecycleRecoveryInstalled || typeof window === "undefined" || typeof document === "undefined") {
+        return;
+    }
+    hubLifecycleRecoveryInstalled = true;
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "hidden") return;
+        lastDocumentHiddenAt = Date.now();
+    });
+
+    const schedule = (fn: () => void) => {
+        globalThis.setTimeout(fn, 280);
+    };
+
+    const recoverAfterVisibility = () => {
+        if (!shouldRunHubRecovery()) return;
+        void (async () => {
+            const {
+                connectWS,
+                getWS,
+                initWebSocket,
+                isWSConnected,
+                reconnectTransportAfterLifecycleResume
+            } = await import("./websocket");
+            initWebSocket(null);
+            const live = Boolean(getWS()?.connected);
+            const stale =
+                lastDocumentHiddenAt > 0 && Date.now() - lastDocumentHiddenAt >= PWA_STALE_BACKGROUND_MS;
+            if (stale && (live || isWSConnected())) {
+                reconnectTransportAfterLifecycleResume("visibility");
+                return;
+            }
+            if (!live && !isWSConnected()) {
+                connectWS();
+            }
+        })();
+    };
+
+    const recoverAfterNetworkOrRestore = (reason: string) => {
+        if (!shouldRunHubRecovery()) return;
+        void (async () => {
+            const { initWebSocket, reconnectTransportAfterLifecycleResume } = await import("./websocket");
+            initWebSocket(null);
+            reconnectTransportAfterLifecycleResume(reason);
+        })();
+    };
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "visible") return;
+        schedule(recoverAfterVisibility);
+    });
+
+    window.addEventListener("online", () => schedule(() => recoverAfterNetworkOrRestore("online")));
+
+    window.addEventListener("pageshow", (ev) => {
+        if (!(ev as PageTransitionEvent).persisted) return;
+        schedule(() => recoverAfterNetworkOrRestore("bfcache"));
+    });
+}
+
 /**
  * Load stored settings, apply AirPad / shell runtime, then connect or disconnect the hub socket.
  */
 export async function bootHubSocketFromStoredSettings(): Promise<void> {
+    installAirpadHubLifecycleRecovery();
     const settings = await loadSettings();
     await applyHubSocketFromSettings(settings);
 }

@@ -1054,6 +1054,44 @@ function handleServerMessage(msg: any) {
 }
 
 /**
+ * Tear down the hub transport and immediately run a fresh {@link connectWS} probe.
+ * Used when the PWA returns from background / bfcache: OS often kills WebSockets while
+ * Socket.IO still reports `connected` until a failed send, so a soft resume reconnect
+ * restores endpoint clipboard/coordinator without requiring a manual WS tap.
+ */
+export function reconnectTransportAfterLifecycleResume(reason: string): void {
+    if (typeof window === "undefined") return;
+    logWsState("lifecycle-reconnect", reason);
+    stopClipboardPushLoop();
+    connectAttemptId += 1;
+    manualDisconnectRequested = false;
+    for (const [uuid, pending] of coordinatorPending.entries()) {
+        clearTimeout(pending.timeoutId);
+        pending.reject({ ok: false, error: `Disconnected before response for ${uuid}` });
+        coordinatorPending.delete(uuid);
+    }
+    for (const probe of [...activeProbeSockets]) {
+        probe.removeAllListeners();
+        probe.close();
+        activeProbeSockets.delete(probe);
+    }
+    isConnecting = false;
+    if (socket) {
+        try {
+            socket.removeAllListeners();
+            socket.disconnect();
+        } catch {
+            /* */
+        }
+    }
+    socket = null;
+    (window as any).__socket = null;
+    setWsStatus(false);
+    autoReconnectAttempts = 0;
+    connectWS();
+}
+
+/**
  * Probe candidate origins and establish the primary WebSocket transport.
  *
  * AI-READ: this function is intentionally large because it combines UI-state

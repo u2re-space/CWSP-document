@@ -16,6 +16,7 @@ import {
     isMaintainHubSocketConnectionEnabled,
     isPreferNativeWebsocketEnabled,
 } from "../../frontend/views/airpad/config/config";
+import { installAirpadHubLifecycleRecovery } from "../../frontend/shared/transport/hub-socket-boot";
 import {
     connectWS,
     disconnectWS,
@@ -54,6 +55,7 @@ const createCoordinator = (): CrxNetworkCoordinator => {
     };
 
     const startFromSettings = async (settings: AppSettings): Promise<void> => {
+        installAirpadHubLifecycleRecovery();
         applyAirpadRuntimeFromAppSettings(settings);
 
         if (shouldSkipConnection()) return;
