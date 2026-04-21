@@ -46,28 +46,28 @@ class CwAirpadAppElement extends HTMLElement {
     }
 
     private renderShell(): void {
-        if (this.contentHost?.isConnected && this.querySelector(".view-airpad")) return;
+        if (this.contentHost?.isConnected && this.querySelector(".view-cwsp")) return;
         this.replaceChildren(
             H`
-            <div class="view-airpad">
-                <div class="view-airpad__content" data-airpad-content>
-                    <div class="view-airpad__loading">
-                        <div class="view-airpad__spinner"></div>
+            <div class="view-cwsp">
+                <div class="view-cwsp__content" data-cwsp-content>
+                    <div class="view-cwsp__loading">
+                        <div class="view-cwsp__spinner"></div>
                         <span>Loading Airpad...</span>
                     </div>
                 </div>
             </div>
         ` as HTMLElement
         );
-        this.contentHost = this.querySelector("[data-airpad-content]") as HTMLElement | null;
+        this.contentHost = this.querySelector("[data-cwsp-content]") as HTMLElement | null;
     }
 
     private renderError(error: unknown): void {
         if (!this.contentHost) return;
         this.contentHost.innerHTML = `
-            <div class="view-airpad__error">
+            <div class="view-cwsp__error">
                 <p>Failed to load Airpad</p>
-                <p class="view-airpad__error-detail">${String(error)}</p>
+                <p class="view-cwsp__error-detail">${String(error)}</p>
                 <button type="button" data-action="retry">Try Again</button>
             </div>
         `;

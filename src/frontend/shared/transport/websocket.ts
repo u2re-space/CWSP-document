@@ -11,6 +11,7 @@
  * restrictions differ, especially Chromium extension pages versus normal tabs.
  */
 
+import { CWSP_ROUTE_QUERY } from '../../../../../../runtime/cwsp/endpoint/shared/cwsp-route-query';
 import { io, Socket } from './native-socket';
 import { log, getWsStatusEl } from '../../views/airpad/utils/utils';
 import {
@@ -1422,19 +1423,19 @@ export function connectWS() {
         }
         queryParams.connectionType = AIRPAD_CONNECTION_TYPE;
         queryParams.archetype = AIRPAD_ARCHETYPE;
-        queryParams.__airpad_via = !isSameAsTargetHost() ? "tunnel" : candidate.source || "unknown";
-        queryParams.__airpad_endpoint = isSameAsTargetHost() ? "1" : "0";
+        queryParams[CWSP_ROUTE_QUERY.via] = !isSameAsTargetHost() ? "tunnel" : candidate.source || "unknown";
+        queryParams[CWSP_ROUTE_QUERY.localEndpoint] = isSameAsTargetHost() ? "1" : "0";
         if (resolvedRouteTarget) {
-            queryParams.__airpad_route = resolvedRouteTarget;
-            queryParams.__airpad_route_target = routeTarget || targetHost || resolvedRouteTarget;
+            queryParams[CWSP_ROUTE_QUERY.route] = resolvedRouteTarget;
+            queryParams[CWSP_ROUTE_QUERY.routeTarget] = routeTarget || targetHost || resolvedRouteTarget;
         }
         if (shouldUseVerboseAirpadQuery()) {
-            queryParams.__airpad_hop = candidate.host || remoteHost || "unknown";
-            queryParams.__airpad_host = candidate.host || remoteHost || "";
-            queryParams.__airpad_target = targetHost || "";
-            queryParams.__airpad_target_port = targetPort;
-            queryParams.__airpad_via_port = candidate.port || "";
-            queryParams.__airpad_protocol = candidate.protocol || "https";
+            queryParams[CWSP_ROUTE_QUERY.hop] = candidate.host || remoteHost || "unknown";
+            queryParams[CWSP_ROUTE_QUERY.host] = candidate.host || remoteHost || "";
+            queryParams[CWSP_ROUTE_QUERY.target] = targetHost || "";
+            queryParams[CWSP_ROUTE_QUERY.targetPort] = targetPort;
+            queryParams[CWSP_ROUTE_QUERY.viaPort] = candidate.port || "";
+            queryParams[CWSP_ROUTE_QUERY.protocol] = candidate.protocol || "https";
         }
 
         return { url, clientToken, airpadToken, clientId, peerInstanceId, handshakeAuth, queryParams };
@@ -1617,9 +1618,9 @@ export function connectWS() {
                 settled = true;
                 won = true;
                 const clearProbeTimer = (s: Socket) => {
-                    const t = (s as unknown as { __airpadProbeTimer?: ReturnType<typeof globalThis.setTimeout> }).__airpadProbeTimer;
+                    const t = (s as unknown as { __cwspProbeTimer?: ReturnType<typeof globalThis.setTimeout> }).__cwspProbeTimer;
                     if (t) globalThis.clearTimeout(t);
-                    delete (s as unknown as { __airpadProbeTimer?: ReturnType<typeof globalThis.setTimeout> }).__airpadProbeTimer;
+                    delete (s as unknown as { __cwspProbeTimer?: ReturnType<typeof globalThis.setTimeout> }).__cwspProbeTimer;
                 };
                 for (const s of [...activeProbeSockets]) {
                     if (s !== winner) {
@@ -1703,7 +1704,7 @@ export function connectWS() {
                     logWsState("connect-failed", `candidate=${index + 1}/${uniqueCandidates.length} candidate_url=${url} reason=probe-hard-timeout`);
                     finishAllDead();
                 }, AIRPAD_PROBE_HARD_CAP_MS);
-                (probeSocket as unknown as { __airpadProbeTimer?: ReturnType<typeof globalThis.setTimeout> }).__airpadProbeTimer =
+                (probeSocket as unknown as { __cwspProbeTimer?: ReturnType<typeof globalThis.setTimeout> }).__cwspProbeTimer =
                     hardTimer;
 
                 probeSocket.on("connect", () => {

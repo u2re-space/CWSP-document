@@ -43,8 +43,8 @@ export function setRemoteKeyboardEnabled(enabled: boolean) {
 }
 
 /**
- * @param mountRoot — node under which Airpad markup was mounted (e.g. `[data-airpad-content]`).
- *   Resolves `.view-airpad` for portal placement; prefers mount root / `getAirpadDomRoot()` over global document queries.
+ * @param mountRoot — node under which Airpad markup was mounted (e.g. `[data-cwsp-content]`).
+ *   Resolves `.view-cwsp` for portal placement; prefers mount root / `getAirpadDomRoot()` over global document queries.
  */
 export function initVirtualKeyboard(mountRoot?: HTMLElement | null) {
     // Initialize VirtualKeyboard API if available
@@ -58,9 +58,9 @@ export function initVirtualKeyboard(mountRoot?: HTMLElement | null) {
     // Mount keyboard inside airpad root so it inherits airpad styles/tokens.
     const scoped = getAirpadDomRoot();
     const container =
-        mountRoot?.closest?.('.view-airpad') ??
+        mountRoot?.closest?.('.view-cwsp') ??
         mountRoot ??
-        scoped?.closest?.('.view-airpad') ??
+        scoped?.closest?.('.view-cwsp') ??
         scoped ??
         document.body;
 

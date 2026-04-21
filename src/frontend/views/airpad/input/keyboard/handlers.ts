@@ -37,7 +37,7 @@ const keyboardContainerUiBound = new WeakSet<Element>();
 /** Outside taps must not close the keyboard when interacting with these regions. */
 const KEYBOARD_STAYS_OPEN_MATCHES = 'input,textarea,select,[contenteditable="true"]';
 const KEYBOARD_STAYS_OPEN_CLOSEST =
-    '.config-overlay, .virtual-keyboard-container, .keyboard-toggle, .view-airpad, .view-airpad button, .view-airpad .big-button, .view-airpad .neighbor-button, .log-overlay.open, .log-panel, .airpad-config-overlay';
+    '.config-overlay, .virtual-keyboard-container, .keyboard-toggle, .view-cwsp, .view-cwsp button, .view-cwsp .big-button, .view-cwsp .neighbor-button, .log-overlay.open, .log-panel, .airpad-config-overlay';
 
 function isKeyboardStayOpenTarget(el: HTMLElement | null | undefined): boolean {
     if (!el) return false;
