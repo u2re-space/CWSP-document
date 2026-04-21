@@ -4,7 +4,9 @@
 
 import {
     getAirPadQuickConnectTarget,
+    getAccessToken,
     setAirPadQuickConnectTarget,
+    setAccessToken,
 } from '../config/config';
 import { reconnectAirPadSessionAfterConfigChange } from '../network/session';
 import { hideKeyboard } from '../input/keyboard/handlers';
@@ -51,10 +53,19 @@ export function createConfigUI(): HTMLElement {
                     <input
                         type="text"
                         id="airpadQuickConnect"
+                        name="airpad-quick-connect"
                         placeholder="L-192.168.0.110 or https://192.168.0.110:8443/"
                     />
+                    <label for="airpadAuthPass"><strong>Auth pass token</strong> (optional):</label>
+                    <input
+                        type="password"
+                        id="airpadAuthPass"
+                        name="airpad-auth-pass"
+                        autocomplete="off"
+                        placeholder="If the remote requires a control token for input/mouse"
+                    />
                     <div class="field-hint">
-                        Enter a target device ID or a URL:port. Device ID, token, and other defaults now live in Settings → Server.
+                        Target device ID or URL:port. Default identity and tokens stay in Settings → Server; set an auth pass here when the peer rejects control without it.
                     </div>
                 </div>
             </div>
@@ -68,10 +79,12 @@ export function createConfigUI(): HTMLElement {
 
     // Add event listeners
     const quickConnectInput = overlay.querySelector('#airpadQuickConnect') as HTMLInputElement;
+    const authPassInput = overlay.querySelector('#airpadAuthPass') as HTMLInputElement;
     const saveButton = overlay.querySelector('#saveConfig') as HTMLButtonElement;
     const cancelButton = overlay.querySelector('#cancelConfig') as HTMLButtonElement;
 
     quickConnectInput.value = getAirPadQuickConnectTarget();
+    authPassInput.value = getAccessToken();
 
     const closeOverlay = () => {
         overlay.classList.remove('flex');
@@ -81,6 +94,7 @@ export function createConfigUI(): HTMLElement {
 
     saveButton.addEventListener('click', () => {
         setAirPadQuickConnectTarget(quickConnectInput.value);
+        setAccessToken(authPassInput.value);
         reconnectAirPadSessionAfterConfigChange({ delayMs: 100 });
         closeOverlay();
     });
@@ -118,7 +132,9 @@ export function showConfigUI(): void {
         host.appendChild(overlay);
     } else {
         const quickConnectInput = overlay.querySelector('#airpadQuickConnect') as HTMLInputElement | null;
+        const authPassInput = overlay.querySelector('#airpadAuthPass') as HTMLInputElement | null;
         if (quickConnectInput) quickConnectInput.value = getAirPadQuickConnectTarget();
+        if (authPassInput) authPassInput.value = getAccessToken();
     }
     syncAirpadConfigOverlayShellTheme(overlay, doc);
     overlay.classList.add('flex');

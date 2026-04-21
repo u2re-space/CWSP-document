@@ -1,10 +1,15 @@
 /**
  * CRX network sub-coordinator.
  *
- * Provides a small, explicit facade for the shared CWSP network transport in
- * all Chrome extension contexts. The coordinator is intentionally thin:
- * it applies shell settings, enforces shell-native fallback rules, and exposes
- * a compact API for act/ask/request packets plus clipboard + connection hooks.
+ * Provides a small facade for the shared CWSP WebSocket transport in Chrome
+ * extension contexts (background / service worker, popup, offscreen, content
+ * scripts via messaging). It applies the same persisted {@link AppSettings} as
+ * the PWA: endpoint URL, identity, optional access token, hub socket toggle,
+ * and clipboard policy. Use this for coordinator `act` / `ask` traffic, remote
+ * clipboard sync, and future AI or automation asks routed through the endpoint.
+ *
+ * Modes such as “frontend as server” or WS reverse-listener are not fully
+ * implemented; the extension typically acts as a normal CWSP client to the hub.
  */
 
 import type { AppSettings } from "../../frontend/shared/config/SettingsTypes";
@@ -41,7 +46,12 @@ export interface CrxNetworkCoordinator {
     getRemoteHost(): string;
     onConnectionChange(handler: ConnectionHandler): () => void;
     onServerClipboardUpdate(handler: NetworkClipboardHandler): () => void;
-    sendCoordinatorAct(what: string, payload: any, nodes?: string[]): boolean;
+    sendCoordinatorAct(
+        what: string,
+        payload: any,
+        nodes?: string[],
+        opts?: { accessToken?: string }
+    ): boolean;
     sendCoordinatorAsk(what: string, payload: any, nodes?: string[]): Promise<any>;
     sendCoordinatorRequest(what: string, payload: any, nodes?: string[]): Promise<any>;
 }
@@ -88,7 +98,8 @@ const createCoordinator = (): CrxNetworkCoordinator => {
 
         onServerClipboardUpdate: (handler: NetworkClipboardHandler) => onServerClipboardUpdate(handler),
 
-        sendCoordinatorAct: (what: string, payload: any, nodes?: string[]) => sendCoordinatorAct(what, payload, nodes),
+        sendCoordinatorAct: (what: string, payload: any, nodes?: string[], opts?: { accessToken?: string }) =>
+            sendCoordinatorAct(what, payload, nodes, opts),
 
         sendCoordinatorAsk: (what: string, payload: any, nodes?: string[]) => sendCoordinatorAsk(what, payload, nodes),
 

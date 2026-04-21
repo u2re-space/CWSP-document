@@ -42,13 +42,28 @@ export const RuntimeSection: SectionConfig = {
         {
             key: "endpoint-access",
             label: "Endpoint access",
-            description: "Credentials for shared endpoint mode.",
+            description:
+                "Credentials for endpoint mode. AirPad peer / route id is optional; access token and allow lists define who may use the hub directly or indirectly.",
             fields: [
-                { path: "core.userId", label: "Client ID", type: "text", placeholder: "device-123" },
-                { path: "core.userKey", label: "Client Token", type: "password", placeholder: "generated key" },
-                { path: "core.socket.airpadAuthToken", label: "AirPad Auth Token", type: "password", placeholder: "optional control token; may match endpoint auth" },
-                { path: "core.socket.selfId", label: "AirPad Self ID", type: "text", placeholder: "L-192.168.0.110" },
-                { path: "core.socket.routeTarget", label: "AirPad Route Target", type: "text", placeholder: "L-192.168.0.110" },
+                { path: "core.userId", label: "Associated device / client ID", type: "text", placeholder: "device-123" },
+                { path: "core.userKey", label: "Client identifier token", type: "password", placeholder: "generated key" },
+                {
+                    path: "core.socket.allowAccessTokenWithoutUserKey",
+                    label: "Allow access token without associated identity token",
+                    type: "select",
+                    options: [
+                        { value: "false", label: "Require client identifier token (default)" },
+                        { value: "true", label: "Optional when access / control token is set (endpoint verifies)" }
+                    ]
+                },
+                {
+                    path: "core.socket.routeTarget",
+                    label: "AirPad peer / route ID (optional)",
+                    type: "text",
+                    placeholder: "Empty OK — e.g. L-192.168.0.110"
+                },
+                { path: "core.socket.accessToken", label: "Access / control token (optional)", type: "password", placeholder: "unified with control/master/hub on wire" },
+                { path: "core.socket.clientAccessToken", label: "Client access token (optional, future)", type: "password", placeholder: "reverse-client / inbound WS" },
                 {
                     path: "core.encrypt",
                     label: "Encrypt stored files",
@@ -65,6 +80,87 @@ export const RuntimeSection: SectionConfig = {
                     options: [
                         { value: "true", label: "Prefer backend" },
                         { value: "false", label: "Use local/WebDAV" }
+                    ]
+                }
+            ]
+        },
+        {
+            key: "clipboard-policy",
+            label: "Clipboard & native data",
+            description:
+                "Inbound allow list (peer ids; optional ID::token stripped for matching), share-target destinations, broadcast targets, and future contacts/SMS bridge toggles.",
+            fields: [
+                {
+                    path: "shell.maintainHubSocketConnection",
+                    label: "Maintain hub WebSocket (CWSP)",
+                    type: "select",
+                    options: [
+                        { value: "true", label: "On" },
+                        { value: "false", label: "Off" }
+                    ]
+                },
+                {
+                    path: "shell.acceptInboundClipboardData",
+                    label: "Accept inbound clipboard",
+                    type: "select",
+                    options: [
+                        { value: "true", label: "Enabled" },
+                        { value: "false", label: "Disabled" }
+                    ]
+                },
+                {
+                    path: "shell.clipboardBroadcastTargets",
+                    label: "Clipboard broadcast targets (optional)",
+                    type: "text",
+                    placeholder: "L-…; L-…::token — empty uses AirPad route"
+                },
+                {
+                    path: "shell.pushLocalClipboardToLan",
+                    label: "Push local clipboard to peers",
+                    type: "select",
+                    options: [
+                        { value: "false", label: "Off" },
+                        { value: "true", label: "On (poll)" }
+                    ]
+                },
+                {
+                    path: "shell.clipboardPushIntervalMs",
+                    label: "Clipboard push interval (ms)",
+                    type: "text",
+                    placeholder: "2000 (800–60000)"
+                },
+                { path: "shell.clipboardInboundAllowIds", label: "Inbound allow list (peer ids)", type: "text", placeholder: "L-…; L-… (empty = any)" },
+                {
+                    path: "shell.accessTokenBypassesClipboardAllowlist",
+                    label: "Access token bypasses allow list",
+                    type: "select",
+                    options: [
+                        { value: "false", label: "No" },
+                        { value: "true", label: "Yes (requires core.socket.accessToken)" }
+                    ]
+                },
+                {
+                    path: "shell.clipboardShareDestinationIds",
+                    label: "Share / quick-send clipboard destinations",
+                    type: "text",
+                    placeholder: "Optional override for share-target style outbound"
+                },
+                {
+                    path: "shell.acceptContactsBridgeData",
+                    label: "Accept contacts bridge data",
+                    type: "select",
+                    options: [
+                        { value: "false", label: "No" },
+                        { value: "true", label: "Yes" }
+                    ]
+                },
+                {
+                    path: "shell.acceptSmsBridgeData",
+                    label: "Accept SMS bridge data",
+                    type: "select",
+                    options: [
+                        { value: "false", label: "No" },
+                        { value: "true", label: "Yes" }
                     ]
                 }
             ]

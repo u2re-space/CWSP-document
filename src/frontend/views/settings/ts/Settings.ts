@@ -397,68 +397,102 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     <section class="card settings-tab-panel" data-tab-panel="server">
       <h3>Server</h3>
       <p class="field-hint" style="margin: 0 0 0.75rem; opacity: 0.88; font-size: 0.9em;">
-        Keep your main CWSP connection, device identity, and AirPad defaults here.
-        The AirPad popup now only overrides the quick "where to connect" value.
+        CWSP endpoint and this device’s identity. A default AirPad peer id or clipboard destination is not required to use the hub: connect with server URL and client id, then optionally set an access / control token and inbound allow lists (peer ids) for who may reach you directly or via relay. Per-destination <code>ID::AccessToken</code> in lists is supported on the wire. “Frontend as server” and WS reverse-listener roles are only partially implemented.
       </p>
-      <h4>Main connection</h4>
+      <h4>Endpoint and identity</h4>
       <label class="field">
         <span>Server URL</span>
         <input class="form-input" type="url" inputmode="url" autocomplete="off" placeholder="https://192.168.0.200:8443" data-field="core.endpointUrl" />
       </label>
       <label class="field">
-        <span>This device ID</span>
+        <span>Associated device / client ID</span>
         <input class="form-input" type="text" autocomplete="off" data-field="core.userId" placeholder="L-192.168.0.196" />
       </label>
       <label class="field">
-        <span>Client token</span>
-        <input class="form-input" type="password" autocomplete="off" data-field="core.userKey" placeholder="n3v3rm1nd" />
+        <span>Client identifier token</span>
+        <input class="form-input" type="password" autocomplete="off" data-field="core.userKey" placeholder="Endpoint-issued key" />
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="core.socket.allowAccessTokenWithoutUserKey" />
+        <span>Allow access / control token without associated client identifier token</span>
       </label>
       <label class="field checkbox form-checkbox">
         <input type="checkbox" data-field="core.allowInsecureTls" />
         <span>Allow self-signed / insecure TLS</span>
       </label>
 
-      <h4>AirPad defaults</h4>
+      <h4>AirPad</h4>
       <p class="field-hint" style="margin: 0 0 0.75rem; opacity: 0.82; font-size: 0.9em;">
-        Use these as your saved defaults. The AirPad popup can still temporarily switch the target ID or URL:port.
+        Defaults for remote control. Peer / route id is optional (leave empty for receive-only or hub-routed sessions). Optional tokens: control token authenticates coordinator acts; client access token is reserved for inbound / reverse-client WebSocket ACL (experimental).
       </p>
       <label class="field checkbox form-checkbox">
         <input type="checkbox" data-field="core.useCoreIdentityForAirPad" />
-        <span>Use this device ID for AirPad</span>
+        <span>Use associated device ID as AirPad client id</span>
       </label>
       <label class="field">
-        <span>AirPad control/auth token (optional)</span>
-        <input class="form-input" type="password" autocomplete="off" data-field="core.socket.airpadAuthToken" placeholder="Optional; may match the endpoint control/master token" />
+        <span>AirPad peer / route ID (optional)</span>
+        <input class="form-input" type="text" autocomplete="off" data-field="core.socket.routeTarget" placeholder="Empty OK — e.g. L-192.168.0.110 when routing to one peer" />
       </label>
       <label class="field">
-        <span>AirPad target device ID (optional)</span>
-        <input class="form-input" type="text" autocomplete="off" data-field="core.socket.routeTarget" placeholder="L-192.168.0.110" />
+        <span>AirPad control auth token (optional)</span>
+        <input class="form-input" type="password" autocomplete="off" data-field="core.socket.accessToken" placeholder="Access / control (peer input routing)" />
       </label>
       <label class="field">
-        <span>AirPad self ID override (optional)</span>
-        <input class="form-input" type="text" autocomplete="off" data-field="core.socket.selfId" placeholder="Leave empty to reuse This device ID" />
+        <span>Client access token (optional, future)</span>
+        <input class="form-input" type="password" autocomplete="off" data-field="core.socket.clientAccessToken" placeholder="Reverse-client / inbound WS ACL (experimental)" />
       </label>
 
-      <h4>Clipboard Sync</h4>
+      <h4>Clipboard (PWA)</h4>
+      <p class="field-hint" style="margin: 0 0 0.75rem; opacity: 0.82; font-size: 0.9em;">
+        Browser limits apply. Default destination ids are not required: use the inbound allow list and optional control token for policy; set explicit broadcast or share lists only when you want outbound fan-out. The Chrome extension reads the same saved settings for clipboard sync and coordinator acts (background / service worker).
+      </p>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="shell.maintainHubSocketConnection" />
+        <span>Maintain background WebSocket to CWSP hub (needed for coordinator clipboard / acts)</span>
+      </label>
       <label class="field checkbox form-checkbox">
         <input type="checkbox" data-field="shell.enableRemoteClipboardBridge" />
-        <span>Enable clipboard synchronization</span>
+        <span>Enable clipboard bridge</span>
+      </label>
+      <label class="field">
+        <span>Clipboard broadcast targets (optional)</span>
+        <input class="form-input" type="text" autocomplete="off" data-field="shell.clipboardBroadcastTargets" placeholder="L-192.168.0.110; L-192.168.0.196::token — empty uses AirPad route / defaults" />
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="shell.pushLocalClipboardToLan" />
+        <span>Push local clipboard to peers (poll)</span>
+      </label>
+      <label class="field">
+        <span>Clipboard push interval (ms)</span>
+        <input class="form-input" type="number" inputmode="numeric" min="800" max="60000" step="100" data-field="shell.clipboardPushIntervalMs" placeholder="2000" />
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="shell.acceptInboundClipboardData" />
+        <span>Accept inbound clipboard data from peers</span>
+      </label>
+      <label class="field">
+        <span>Inbound clipboard allow list (peer ids only; empty = any)</span>
+        <input class="form-input" type="text" autocomplete="off" data-field="shell.clipboardInboundAllowIds" placeholder="L-192.168.0.110; L-192.168.0.196 — suffix ::token ignored for matching" />
+      </label>
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="shell.accessTokenBypassesClipboardAllowlist" />
+        <span>Access token bypasses inbound allow list (endpoint control token)</span>
+      </label>
+      <label class="field">
+        <span>Share / quick-send clipboard destinations (optional)</span>
+        <input class="form-input" type="text" autocomplete="off" data-field="shell.clipboardShareDestinationIds" placeholder="Overrides broadcast for share-target sends; ID::AccessToken allowed" />
       </label>
       <label class="field checkbox form-checkbox">
         <input type="checkbox" data-field="shell.applyRemoteClipboardToDevice" />
         <span>Apply incoming clipboard to this device</span>
       </label>
       <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.pushLocalClipboardToLan" />
-        <span>Push local clipboard to target device</span>
+        <input type="checkbox" data-field="shell.acceptContactsBridgeData" />
+        <span>Allow contacts bridge data (future / native)</span>
       </label>
-      <label class="field">
-        <span>Clipboard push interval (ms)</span>
-        <input class="form-input" type="number" min="800" max="60000" step="100" data-field="shell.clipboardPushIntervalMs" placeholder="2000" />
-      </label>
-      <label class="field">
-        <span>Clipboard broadcast targets (optional)</span>
-        <input class="form-input" type="text" autocomplete="off" data-field="shell.clipboardBroadcastTargets" placeholder="L-192.168.0.196, L-192.168.0.208 — overrides route target if set" />
+      <label class="field checkbox form-checkbox">
+        <input type="checkbox" data-field="shell.acceptSmsBridgeData" />
+        <span>Allow SMS bridge data (future / native)</span>
       </label>
     </section>
 
@@ -574,15 +608,26 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     const coreAdminHttp = field('[data-field="core.admin.httpOrigin"]') as HTMLInputElement | null;
     const coreAdminPath = field('[data-field="core.admin.path"]') as HTMLInputElement | null;
     const coreUseCoreIdentityAirpad = field('[data-field="core.useCoreIdentityForAirPad"]') as HTMLInputElement | null;
-    const coreSocketAirpadAuthToken = field('[data-field="core.socket.airpadAuthToken"]') as HTMLInputElement | null;
+    const coreSocketAccessToken = field('[data-field="core.socket.accessToken"]') as HTMLInputElement | null;
     const coreSocketRouteTarget = field('[data-field="core.socket.routeTarget"]') as HTMLInputElement | null;
-    const coreSocketSelfId = field('[data-field="core.socket.selfId"]') as HTMLInputElement | null;
+    const coreSocketClientAccessToken = field('[data-field="core.socket.clientAccessToken"]') as HTMLInputElement | null;
+    const coreSocketAllowAccessWithoutUserKey = field(
+        '[data-field="core.socket.allowAccessTokenWithoutUserKey"]'
+    ) as HTMLInputElement | null;
     const shellMaintainHubSocket = field('[data-field="shell.maintainHubSocketConnection"]') as HTMLInputElement | null;
+    const shellClipboardBroadcastTargets = field('[data-field="shell.clipboardBroadcastTargets"]') as HTMLInputElement | null;
+    const shellPushLocalClipboard = field('[data-field="shell.pushLocalClipboardToLan"]') as HTMLInputElement | null;
+    const shellClipboardPushIntervalMs = field('[data-field="shell.clipboardPushIntervalMs"]') as HTMLInputElement | null;
     const shellClipboard = field('[data-field="shell.enableRemoteClipboardBridge"]') as HTMLInputElement | null;
+    const shellAcceptInboundClipboard = field('[data-field="shell.acceptInboundClipboardData"]') as HTMLInputElement | null;
+    const shellClipboardInboundAllowIds = field('[data-field="shell.clipboardInboundAllowIds"]') as HTMLInputElement | null;
+    const shellAccessTokenBypassClipboardAllow = field(
+        '[data-field="shell.accessTokenBypassesClipboardAllowlist"]'
+    ) as HTMLInputElement | null;
+    const shellClipboardShareDestIds = field('[data-field="shell.clipboardShareDestinationIds"]') as HTMLInputElement | null;
     const shellApplyRemoteDevice = field('[data-field="shell.applyRemoteClipboardToDevice"]') as HTMLInputElement | null;
-    const shellPushClipboard = field('[data-field="shell.pushLocalClipboardToLan"]') as HTMLInputElement | null;
-    const shellClipboardPushMs = field('[data-field="shell.clipboardPushIntervalMs"]') as HTMLInputElement | null;
-    const shellClipboardTargets = field('[data-field="shell.clipboardBroadcastTargets"]') as HTMLInputElement | null;
+    const shellAcceptContactsBridge = field('[data-field="shell.acceptContactsBridgeData"]') as HTMLInputElement | null;
+    const shellAcceptSmsBridge = field('[data-field="shell.acceptSmsBridgeData"]') as HTMLInputElement | null;
     const shellSms = field('[data-field="shell.enableNativeSms"]') as HTMLInputElement | null;
     const shellContacts = field('[data-field="shell.enableNativeContacts"]') as HTMLInputElement | null;
     const adminPreview = root.querySelector("[data-admin-preview]") as HTMLElement | null;
@@ -674,9 +719,11 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         allowInsecureTls: Boolean(coreAllowInsecureTls?.checked),
         useCoreIdentityForAirPad: (coreUseCoreIdentityAirpad?.checked ?? true) !== false,
         socket: {
-            airpadAuthToken: coreSocketAirpadAuthToken?.value?.trim() || "",
+            accessToken: coreSocketAccessToken?.value?.trim() || "",
             routeTarget: coreSocketRouteTarget?.value?.trim() || "",
-            selfId: coreSocketSelfId?.value?.trim() || "",
+            selfId: "",
+            clientAccessToken: coreSocketClientAccessToken?.value?.trim() || "",
+            allowAccessTokenWithoutUserKey: Boolean(coreSocketAllowAccessWithoutUserKey?.checked),
         },
         admin: {
             httpsOrigin: coreAdminHttps?.value?.trim() || "",
@@ -848,26 +895,62 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
             if (coreEncrypt) coreEncrypt.checked = Boolean(s?.core?.encrypt);
             if (coreAppClientId) coreAppClientId.value = (s?.core?.appClientId || "").trim();
             if (coreUseCoreIdentityAirpad) coreUseCoreIdentityAirpad.checked = (s?.core?.useCoreIdentityForAirPad ?? true) !== false;
-            if (coreSocketAirpadAuthToken) coreSocketAirpadAuthToken.value = (s?.core?.socket?.airpadAuthToken || "").trim();
-            if (coreSocketRouteTarget) coreSocketRouteTarget.value = (s?.core?.socket?.routeTarget || "").trim();
-            if (coreSocketSelfId) coreSocketSelfId.value = (s?.core?.socket?.selfId || "").trim();
+            if (coreSocketAccessToken) {
+                coreSocketAccessToken.value = (
+                    (s?.core?.socket?.accessToken || s?.core?.socket?.airpadAuthToken || "") as string
+                ).trim();
+            }
+            if (coreSocketRouteTarget) {
+                coreSocketRouteTarget.value = (
+                    (s?.core?.socket?.routeTarget || s?.core?.socket?.selfId || "") as string
+                ).trim();
+            }
+            if (coreSocketClientAccessToken) {
+                coreSocketClientAccessToken.value = (s?.core?.socket?.clientAccessToken || "").trim();
+            }
+            if (coreSocketAllowAccessWithoutUserKey) {
+                coreSocketAllowAccessWithoutUserKey.checked =
+                    (s?.core?.socket?.allowAccessTokenWithoutUserKey ?? false) === true;
+            }
             if (coreAllowInsecureTls) coreAllowInsecureTls.checked = Boolean(s?.core?.allowInsecureTls);
             if (coreOpsAllowUnencrypted) coreOpsAllowUnencrypted.checked = Boolean(s?.core?.ops?.allowUnencrypted);
             if (coreAdminHttps) coreAdminHttps.value = (s?.core?.admin?.httpsOrigin || "").trim();
             if (coreAdminHttp) coreAdminHttp.value = (s?.core?.admin?.httpOrigin || "").trim();
             if (coreAdminPath) coreAdminPath.value = (s?.core?.admin?.path || "/").trim() || "/";
             if (shellMaintainHubSocket) shellMaintainHubSocket.checked = Boolean(s?.shell?.maintainHubSocketConnection);
-            if (shellClipboard) shellClipboard.checked = (s?.shell?.enableRemoteClipboardBridge ?? true) !== false;
-            if (shellApplyRemoteDevice) shellApplyRemoteDevice.checked = (s?.shell?.applyRemoteClipboardToDevice ?? true) !== false;
-            if (shellPushClipboard) shellPushClipboard.checked = Boolean(s?.shell?.pushLocalClipboardToLan);
-            if (shellClipboardPushMs) {
-                shellClipboardPushMs.value = String(
-                    s?.shell?.clipboardPushIntervalMs != null && Number.isFinite(Number(s.shell.clipboardPushIntervalMs))
-                        ? s.shell.clipboardPushIntervalMs
-                        : 2000
+            if (shellClipboardBroadcastTargets) {
+                shellClipboardBroadcastTargets.value = (s?.shell?.clipboardBroadcastTargets || "").trim();
+            }
+            if (shellPushLocalClipboard) {
+                shellPushLocalClipboard.checked = Boolean(s?.shell?.pushLocalClipboardToLan);
+            }
+            if (shellClipboardPushIntervalMs) {
+                const iv = Number(s?.shell?.clipboardPushIntervalMs);
+                shellClipboardPushIntervalMs.value = String(
+                    Number.isFinite(iv) && iv >= 800 ? Math.min(Math.round(iv), 60000) : 2000
                 );
             }
-            if (shellClipboardTargets) shellClipboardTargets.value = (s?.shell?.clipboardBroadcastTargets || "").trim();
+            if (shellClipboard) shellClipboard.checked = (s?.shell?.enableRemoteClipboardBridge ?? true) !== false;
+            if (shellAcceptInboundClipboard) {
+                shellAcceptInboundClipboard.checked = (s?.shell?.acceptInboundClipboardData ?? true) !== false;
+            }
+            if (shellClipboardInboundAllowIds) {
+                shellClipboardInboundAllowIds.value = (s?.shell?.clipboardInboundAllowIds || "").trim();
+            }
+            if (shellAccessTokenBypassClipboardAllow) {
+                shellAccessTokenBypassClipboardAllow.checked =
+                    (s?.shell?.accessTokenBypassesClipboardAllowlist ?? false) === true;
+            }
+            if (shellClipboardShareDestIds) {
+                shellClipboardShareDestIds.value = (s?.shell?.clipboardShareDestinationIds || "").trim();
+            }
+            if (shellApplyRemoteDevice) shellApplyRemoteDevice.checked = (s?.shell?.applyRemoteClipboardToDevice ?? true) !== false;
+            if (shellAcceptContactsBridge) {
+                shellAcceptContactsBridge.checked = (s?.shell?.acceptContactsBridgeData ?? false) === true;
+            }
+            if (shellAcceptSmsBridge) {
+                shellAcceptSmsBridge.checked = (s?.shell?.acceptSmsBridgeData ?? false) === true;
+            }
             if (shellSms) shellSms.checked = (s?.shell?.enableNativeSms ?? true) !== false;
             if (shellContacts) shellContacts.checked = (s?.shell?.enableNativeContacts ?? true) !== false;
             refreshAdminDoorPreview();
@@ -1040,12 +1123,27 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                     appClientId: readTrimmedControlValue(coreAppClientId, current.core?.appClientId || ""),
                     allowInsecureTls: readCheckboxValue(coreAllowInsecureTls, Boolean(current.core?.allowInsecureTls)),
                     useCoreIdentityForAirPad: readCheckboxValue(coreUseCoreIdentityAirpad, (current.core?.useCoreIdentityForAirPad ?? true) !== false),
-                    socket: {
-                        ...(current.core?.socket || {}),
-                        airpadAuthToken: readTrimmedControlValue(coreSocketAirpadAuthToken, current.core?.socket?.airpadAuthToken || ""),
-                        routeTarget: readTrimmedControlValue(coreSocketRouteTarget, current.core?.socket?.routeTarget || ""),
-                        selfId: readTrimmedControlValue(coreSocketSelfId, current.core?.socket?.selfId || ""),
-                    },
+                    socket: (() => {
+                        const prev = { ...(current.core?.socket || {}) };
+                        delete (prev as { airpadAuthToken?: string }).airpadAuthToken;
+                        return {
+                            ...prev,
+                            accessToken: readTrimmedControlValue(
+                                coreSocketAccessToken,
+                                current.core?.socket?.accessToken || current.core?.socket?.airpadAuthToken || ""
+                            ),
+                            routeTarget: readTrimmedControlValue(coreSocketRouteTarget, current.core?.socket?.routeTarget || ""),
+                            selfId: "",
+                            clientAccessToken: readTrimmedControlValue(
+                                coreSocketClientAccessToken,
+                                current.core?.socket?.clientAccessToken || ""
+                            ),
+                            allowAccessTokenWithoutUserKey: readCheckboxValue(
+                                coreSocketAllowAccessWithoutUserKey,
+                                Boolean(current.core?.socket?.allowAccessTokenWithoutUserKey)
+                            ),
+                        };
+                    })(),
                     admin: {
                         ...(current.core?.admin || {}),
                         httpsOrigin: readTrimmedControlValue(coreAdminHttps, current.core?.admin?.httpsOrigin || ""),
@@ -1060,14 +1158,42 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                 shell: {
                     ...(current.shell || {}),
                     maintainHubSocketConnection: readCheckboxValue(shellMaintainHubSocket, Boolean(current.shell?.maintainHubSocketConnection)),
-                    enableRemoteClipboardBridge: readCheckboxValue(shellClipboard, (current.shell?.enableRemoteClipboardBridge ?? true) !== false),
-                    applyRemoteClipboardToDevice: readCheckboxValue(shellApplyRemoteDevice, (current.shell?.applyRemoteClipboardToDevice ?? true) !== false),
-                    pushLocalClipboardToLan: readCheckboxValue(shellPushClipboard, Boolean(current.shell?.pushLocalClipboardToLan)),
-                    clipboardPushIntervalMs: Math.max(
-                        800,
-                        Math.min(60000, parseNumberOrDefault(shellClipboardPushMs?.value, current.shell?.clipboardPushIntervalMs ?? 2000))
+                    clipboardBroadcastTargets: readTrimmedControlValue(
+                        shellClipboardBroadcastTargets,
+                        current.shell?.clipboardBroadcastTargets || ""
                     ),
-                    clipboardBroadcastTargets: readTrimmedControlValue(shellClipboardTargets, current.shell?.clipboardBroadcastTargets || ""),
+                    pushLocalClipboardToLan: readCheckboxValue(
+                        shellPushLocalClipboard,
+                        Boolean(current.shell?.pushLocalClipboardToLan)
+                    ),
+                    clipboardPushIntervalMs: (() => {
+                        const raw = shellClipboardPushIntervalMs?.value;
+                        const n = parseNumberOrDefault(raw, current.shell?.clipboardPushIntervalMs ?? 2000);
+                        return Math.min(60000, Math.max(800, Math.round(n)));
+                    })(),
+                    enableRemoteClipboardBridge: readCheckboxValue(shellClipboard, (current.shell?.enableRemoteClipboardBridge ?? true) !== false),
+                    acceptInboundClipboardData: readCheckboxValue(
+                        shellAcceptInboundClipboard,
+                        (current.shell?.acceptInboundClipboardData ?? true) !== false
+                    ),
+                    clipboardInboundAllowIds: readTrimmedControlValue(
+                        shellClipboardInboundAllowIds,
+                        current.shell?.clipboardInboundAllowIds || ""
+                    ),
+                    accessTokenBypassesClipboardAllowlist: readCheckboxValue(
+                        shellAccessTokenBypassClipboardAllow,
+                        Boolean(current.shell?.accessTokenBypassesClipboardAllowlist)
+                    ),
+                    clipboardShareDestinationIds: readTrimmedControlValue(
+                        shellClipboardShareDestIds,
+                        current.shell?.clipboardShareDestinationIds || ""
+                    ),
+                    applyRemoteClipboardToDevice: readCheckboxValue(shellApplyRemoteDevice, (current.shell?.applyRemoteClipboardToDevice ?? true) !== false),
+                    acceptContactsBridgeData: readCheckboxValue(
+                        shellAcceptContactsBridge,
+                        Boolean(current.shell?.acceptContactsBridgeData)
+                    ),
+                    acceptSmsBridgeData: readCheckboxValue(shellAcceptSmsBridge, Boolean(current.shell?.acceptSmsBridgeData)),
                     enableNativeSms: readCheckboxValue(shellSms, (current.shell?.enableNativeSms ?? true) !== false),
                     enableNativeContacts: readCheckboxValue(shellContacts, (current.shell?.enableNativeContacts ?? true) !== false),
                 },

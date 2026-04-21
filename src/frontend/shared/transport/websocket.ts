@@ -12,24 +12,27 @@
  */
 
 import { CWSP_ROUTE_QUERY } from '../../../../../../runtime/cwsp/endpoint/shared/cwsp-route-query';
+import { groupWireTargetsByAccessToken, parseWireTargetList, wireTargetNodeIds } from '../../../../../../runtime/cwsp/endpoint/shared/wire-target-id.ts';
 import { io, Socket } from './native-socket';
 import { log, getWsStatusEl } from '../../views/airpad/utils/utils';
 import {
     getRemoteHost,
     getRemoteProtocol,
     getRemoteRouteTarget,
-    getAirPadAuthToken,
+    getAccessToken,
     getAssociatedClientToken,
     getAirPadTransportMode,
     getAirPadTransportSecret,
     getAirPadSigningSecret,
     getAirPadClientId,
     getAirPadPeerInstanceId,
+    getClientAccessToken,
     isShellRemoteClipboardBridgeEnabled,
     isApplyRemoteClipboardToDeviceEnabled,
     isPushLocalClipboardToLanEnabled,
     getClipboardPushIntervalMs,
-    getClipboardBroadcastTargetNodes,
+    getClipboardBroadcastWireTargets,
+    isClipboardSenderAllowedForInbound,
 } from '../../views/airpad/config/config';
 import {
     isCapacitorNativeShell,
@@ -161,6 +164,9 @@ type CoordinatorPacket = {
     redirect?: boolean;
     token?: string;
     userKey?: string;
+    /** Access / control token (unified wire name). */
+    accessToken?: string;
+    /** @deprecated Incoming only — use {@link accessToken}. */
     airpadToken?: string;
     timestamp?: number;
     [key: string]: unknown;
@@ -300,14 +306,19 @@ const startClipboardPushLoop = (): void => {
 async function tickLocalClipboardPush(): Promise<void> {
     if (!socket?.connected) return;
     if (!isShellRemoteClipboardBridgeEnabled() || !isPushLocalClipboardToLanEnabled()) return;
-    const nodes = getClipboardBroadcastTargetNodes();
-    if (!nodes.length) return;
+    const entries = getClipboardBroadcastWireTargets();
+    if (!entries.length) return;
     try {
         const text = await readClipboardTextFromDevice();
         const t = String(text ?? "");
         if (!t || t === lastClipboardPushSent) return;
         lastClipboardPushSent = t;
-        sendCoordinatorAct("clipboard:update", { text: t }, nodes);
+        const groups = groupWireTargetsByAccessToken(entries, getWireAccessToken());
+        for (const g of groups) {
+            sendCoordinatorAct("clipboard:update", { text: t }, g.nodeIds, {
+                accessToken: g.accessToken
+            });
+        }
     } catch {
         // Permission or transient read failure
     }
@@ -345,6 +356,12 @@ const extractClipboardText = (value: any): string => {
     if (typeof value.data === "string") return value.data;
     if (typeof value.result === "string") return value.result;
     return "";
+};
+
+const getCoordinatorPacketSenderId = (packet: unknown): string => {
+    const p = packet as Record<string, unknown> | null | undefined;
+    if (!p || typeof p !== "object") return "";
+    return String(p.from || p.byId || p.sender || "").trim();
 };
 
 const inferPacketPurpose = (what: string): string => {
@@ -436,17 +453,9 @@ const getSecret = (): string => (getAirPadTransportSecret() || "").trim();
 const getSigningSecret = (): string => (getAirPadSigningSecret() || "").trim();
 const getClientId = (): string => (getAirPadClientId() || "").trim() || "airpad-client";
 const getClientToken = (): string => (getAssociatedClientToken() || "").trim();
-const getControlAuthToken = (): string => (getAirPadAuthToken() || "").trim();
-const parseNodeList = (value: string): string[] => {
-    return Array.from(new Set(
-        value
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean)
-    ));
-};
+const getWireAccessToken = (): string => (getAccessToken() || "").trim();
 const getCoordinatorNodes = (): string[] => {
-    return parseNodeList(getRemoteRouteTarget().trim());
+    return wireTargetNodeIds(parseWireTargetList(getRemoteRouteTarget().trim()));
 };
 const nextPacketId = (): string => {
     if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -479,7 +488,13 @@ const mapRuntimeOpToFrameOp = (value: CoordinatorPacket["op"]): CoordinatorPacke
 const toCanonicalCoordinatorPacket = (packet: CoordinatorPacket): CoordinatorPacket => {
     const clientId = getClientId();
     const clientToken = getClientToken();
-    const airpadToken = getControlAuthToken();
+    const fromPacket =
+        typeof packet.accessToken === "string" && packet.accessToken.trim()
+            ? packet.accessToken.trim()
+            : typeof packet.airpadToken === "string" && packet.airpadToken.trim()
+              ? packet.airpadToken.trim()
+              : "";
+    const wireAccessToken = fromPacket || getWireAccessToken();
     const sender = String(packet.sender || packet.byId || packet.from || clientId || "").trim() || undefined;
     const from = String(packet.from || sender || "").trim() || undefined;
     const byId = String(packet.byId || sender || "").trim() || undefined;
@@ -518,9 +533,7 @@ const toCanonicalCoordinatorPacket = (packet: CoordinatorPacket): CoordinatorPac
         userKey: typeof packet.userKey === "string" && packet.userKey.trim()
             ? packet.userKey
             : clientToken || undefined,
-        airpadToken: typeof packet.airpadToken === "string" && packet.airpadToken.trim()
-            ? packet.airpadToken
-            : airpadToken || undefined,
+        accessToken: wireAccessToken || undefined,
         flags: packet.flags || { canonicalV2: true },
         uuid,
         timestamp: Number(packet.timestamp || 0) > 0 ? Number(packet.timestamp) : now,
@@ -568,6 +581,9 @@ const handleCoordinatorPacket = async (packet: CoordinatorPacket): Promise<void>
     }
 
     if (what === "clipboard:update") {
+        if (!isClipboardSenderAllowedForInbound(getCoordinatorPacketSenderId(packet))) {
+            return;
+        }
         const clipboardPayload = packet.result ?? packet.results ?? packet.payload;
         const text = extractClipboardText(clipboardPayload);
         void applyIncomingClipboardText(text, { source: clipboardPayload?.source });
@@ -586,11 +602,14 @@ const buildCoordinatorPacket = (
     op: NonNullable<CoordinatorPacket["op"]>,
     what: string,
     payload: any,
-    options: { nodes?: string[]; uuid?: string } = {}
+    options: { nodes?: string[]; uuid?: string; accessToken?: string } = {}
 ): CoordinatorPacket => {
     const clientId = getClientId();
     const clientToken = getClientToken();
-    const airpadToken = getControlAuthToken();
+    const accessTok =
+        options.accessToken !== undefined
+            ? String(options.accessToken).trim() || getWireAccessToken()
+            : getWireAccessToken();
     return {
         op: mapRuntimeOpToFrameOp(op),
         what,
@@ -616,7 +635,7 @@ const buildCoordinatorPacket = (
         flags: { canonicalV2: true },
         token: clientToken || undefined,
         userKey: clientToken || undefined,
-        airpadToken: airpadToken || undefined,
+        accessToken: accessTok || undefined,
         timestamp: Date.now()
     };
 };
@@ -905,8 +924,13 @@ async function tryRequestLocalNetworkPermission(origin: string, host: string): P
  * NOTE: acts are queued briefly while the socket is reconnecting so clipboard
  * and UI actions do not disappear during short transport flaps.
  */
-export function sendCoordinatorAct(what: string, payload: any, nodes?: string[]): boolean {
-    const packet = buildCoordinatorPacket("act", what, payload, { nodes });
+export function sendCoordinatorAct(
+    what: string,
+    payload: any,
+    nodes?: string[],
+    opts?: { accessToken?: string }
+): boolean {
+    const packet = buildCoordinatorPacket("act", what, payload, { nodes, accessToken: opts?.accessToken });
     if (emitCoordinatorPacket(packet)) {
         return true;
     }
@@ -1435,7 +1459,8 @@ export function connectWS() {
     const buildHandshakeForCandidate = (candidate: WSConnectCandidate) => {
         const url = candidate.url;
         const clientToken = getClientToken();
-        const airpadToken = getControlAuthToken();
+        const accessToken = getWireAccessToken();
+        const clientAccessToken = getClientAccessToken();
         const clientId = getClientId();
         const peerInstanceId = getAirPadPeerInstanceId().trim();
         const handshakeAuth: Record<string, string> = {};
@@ -1443,8 +1468,11 @@ export function connectWS() {
             handshakeAuth.token = clientToken;
             handshakeAuth.userKey = clientToken;
         }
-        if (airpadToken) {
-            handshakeAuth.airpadToken = airpadToken;
+        if (accessToken) {
+            handshakeAuth.accessToken = accessToken;
+        }
+        if (clientAccessToken) {
+            handshakeAuth.clientAccessToken = clientAccessToken;
         }
         if (clientId) {
             handshakeAuth.clientId = clientId;
@@ -1475,8 +1503,14 @@ export function connectWS() {
             queryParams[CWSP_ROUTE_QUERY.viaPort] = candidate.port || "";
             queryParams[CWSP_ROUTE_QUERY.protocol] = candidate.protocol || "https";
         }
+        if (clientAccessToken) {
+            queryParams.clientAccessToken = clientAccessToken;
+        }
+        if (accessToken) {
+            queryParams.accessToken = accessToken;
+        }
 
-        return { url, clientToken, airpadToken, clientId, peerInstanceId, handshakeAuth, queryParams };
+        return { url, clientToken, accessToken, clientId, peerInstanceId, handshakeAuth, queryParams };
     };
 
     const finalizeConnectedSocket = (
@@ -1485,7 +1519,7 @@ export function connectWS() {
         index: number,
         url: string,
         clientToken: string,
-        airpadToken: string,
+        accessToken: string,
         clientId: string,
         peerInstanceId: string,
         engine: EngineLike | undefined,
@@ -1508,7 +1542,8 @@ export function connectWS() {
             peerInstanceId: peerInstanceId || undefined,
             token: clientToken || undefined,
             userKey: clientToken || undefined,
-            airpadToken: airpadToken || undefined,
+            accessToken: accessToken || undefined,
+            clientAccessToken: getClientAccessToken() || undefined,
             nodes: getCoordinatorNodes()
         });
 
@@ -1590,6 +1625,10 @@ export function connectWS() {
 
         socket.on("clipboard:update", async (msg: any) => {
             const decoded = await unwrapIncomingPayload(msg);
+            const sender = getCoordinatorPacketSenderId(decoded);
+            if (!isClipboardSenderAllowedForInbound(sender)) {
+                return;
+            }
             const text = extractClipboardText(decoded);
             void applyIncomingClipboardText(text, { source: decoded?.source });
         });
@@ -1670,7 +1709,7 @@ export function connectWS() {
                 }
                 clearProbeTimer(winner);
                 activeProbeSockets.delete(winner);
-                finalizeConnectedSocket(winner, candidate, index, url, hs.clientToken, hs.airpadToken, hs.clientId, hs.peerInstanceId, engine, oec, oee);
+                finalizeConnectedSocket(winner, candidate, index, url, hs.clientToken, hs.accessToken, hs.clientId, hs.peerInstanceId, engine, oec, oee);
                 resolve(true);
             };
 

@@ -38,8 +38,13 @@ export const getActiveCustomInstruction = async (settings?: AppSettings | null):
 export const callBackendIfAvailable = async <T = any>(path: string, payload: Record<string, any>): Promise<T | null> => {
     const settings = await loadAISettings();
     const core = settings?.core || {};
+    const socket = core?.socket || {};
     if (core?.mode !== "endpoint") return null;
-    if (!core?.endpointUrl || !core?.userId || !core?.userKey) return null;
+    if (!core?.endpointUrl || !core?.userId) return null;
+    const accessTok = (socket.accessToken || socket.airpadAuthToken || "").trim();
+    const bypassIdentity = (socket.allowAccessTokenWithoutUserKey ?? false) === true;
+    const userKeyTrim = (core.userKey || "").trim();
+    if (!userKeyTrim && !(bypassIdentity && accessTok)) return null;
 
     // Include active custom instruction in backend calls
     const customInstruction = await getActiveCustomInstruction();
@@ -50,7 +55,8 @@ export const callBackendIfAvailable = async <T = any>(path: string, payload: Rec
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 userId: core.userId,
-                userKey: core.userKey,
+                ...(userKeyTrim ? { userKey: userKeyTrim } : {}),
+                ...(accessTok ? { accessToken: accessTok } : {}),
                 ...payload,
                 ...(Array.isArray(settings?.ai?.mcp) ? { mcp: settings.ai.mcp } : {}),
                 ...(customInstruction ? { customInstruction } : {})

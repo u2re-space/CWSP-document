@@ -146,20 +146,43 @@ export type ShellSettings = {
      */
     applyRemoteClipboardToDevice?: boolean;
     /**
-     * Periodically read the local clipboard and broadcast to {@link clipboardBroadcastTargets}.
+     * Periodically read the local clipboard and broadcast to configured peers.
      * Use sparingly; pairs with server `clients.json` / `modules.clipboard` share/accept rules.
      */
     pushLocalClipboardToLan?: boolean;
     /** Polling interval for {@link pushLocalClipboardToLan} (ms). */
     clipboardPushIntervalMs?: number;
     /**
-     * Comma-separated device / peer ids to receive outbound clipboard (e.g. `L-192.168.0.196`).
+     * Comma/semicolon list of peer ids for outbound clipboard fan-out (optional; supports `ID::AccessToken`).
+     * When empty, routing falls back to the AirPad route target and other defaults from runtime config.
      */
     clipboardBroadcastTargets?: string;
     /** Reserved for native SMS bridge (Kotlin shell); persisted for parity with CWSAndroid. */
     enableNativeSms?: boolean;
     /** Reserved for native contacts bridge; persisted for parity with CWSAndroid. */
     enableNativeContacts?: boolean;
+    /**
+     * When false, inbound coordinator / `clipboard:update` payloads are ignored (connection may stay up for other ops).
+     */
+    acceptInboundClipboardData?: boolean;
+    /**
+     * Comma/semicolon-separated peer ids that may send clipboard to this client. Empty = any sender (unless restricted elsewhere).
+     */
+    clipboardInboundAllowIds?: string;
+    /**
+     * Optional destinations for outbound clipboard from share-target / quick-send flows. When empty, uses
+     * {@link clipboardBroadcastTargets} and route defaults.
+     */
+    clipboardShareDestinationIds?: string;
+    /**
+     * When true and {@link AppSettings.core.socket.accessToken} is set, inbound clipboard is accepted from any sender
+     * (endpoint control token bypasses the inbound allow list on the client).
+     */
+    accessTokenBypassesClipboardAllowlist?: boolean;
+    /** When true, allow contacts-related payloads from native/coordinator bridges (future). */
+    acceptContactsBridgeData?: boolean;
+    /** When true, allow SMS-related payloads from native/coordinator bridges (future). */
+    acceptSmsBridgeData?: boolean;
 };
 
 export type AppSettings = {
@@ -182,7 +205,7 @@ export type AppSettings = {
         appClientId?: string;
         /**
          * When true and AirPad’s own client-id field is empty, reuse {@link userId}.
-         * NOTE: AirPad control auth is configured separately via {@link socket.airpadAuthToken}.
+         * NOTE: Control / access auth is configured separately via {@link socket.accessToken}.
          */
         useCoreIdentityForAirPad?: boolean;
         /**
@@ -199,13 +222,29 @@ export type AppSettings = {
         };
         socket?: {
             protocol?: CoreSocketProtocol;
+            /** Optional default AirPad peer / route id (`L-…`). Empty is valid (hub, receive-only, or policy via allow lists + tokens). */
             routeTarget?: string;
             /** Optional AirPad self/client id override; when empty AirPad reuses `core.userId`. */
             selfId?: string;
             /**
-             * Optional AirPad/control auth token. This is not the same as the associated client token.
+             * Access / control token (unified with control, master, hub, admin on the wire).
+             * Not the same as the associated client identifier token {@link userKey}.
+             */
+            accessToken?: string;
+            /**
+             * @deprecated Use {@link accessToken}. Still loaded when migrating stored settings.
              */
             airpadAuthToken?: string;
+            /**
+             * Optional token for future reverse-client / “frontend is server” flows (e.g. WS ACL when this peer accepts inbound control).
+             * Distinct from {@link userKey} and {@link accessToken}.
+             */
+            clientAccessToken?: string;
+            /**
+             * When true, {@link userKey} is not required for endpoint-mode HTTP/AI calls if {@link accessToken}
+             * is set (verified as endpoint control token on the server). WebSocket already omits identity tokens when empty.
+             */
+            allowAccessTokenWithoutUserKey?: boolean;
             transportMode?: CoreSocketTransportMode;
             transportSecret?: string;
             signingSecret?: string;
@@ -326,7 +365,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
             protocol: "auto",
             routeTarget: "",
             selfId: "",
-            airpadAuthToken: "",
+            accessToken: "",
+            clientAccessToken: "",
+            allowAccessTokenWithoutUserKey: false,
             transportMode: "plaintext",
             transportSecret: "",
             signingSecret: ""
@@ -358,7 +399,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
         clipboardPushIntervalMs: 2000,
         clipboardBroadcastTargets: "",
         enableNativeSms: true,
-        enableNativeContacts: true
+        enableNativeContacts: true,
+        acceptInboundClipboardData: true,
+        clipboardInboundAllowIds: "",
+        clipboardShareDestinationIds: "",
+        accessTokenBypassesClipboardAllowlist: false,
+        acceptContactsBridgeData: false,
+        acceptSmsBridgeData: false
     },
     ai: {
         apiKey: "",

@@ -3,7 +3,14 @@
 // =========================
 
 import type { AppSettings } from "@rs-com/config/SettingsTypes";
+import {
+    parseWireTargetList,
+    wireTargetNodeIds,
+    type WireTargetEntry
+} from "../../../../../../../runtime/cwsp/endpoint/shared/wire-target-id.ts";
 import { invalidateAirpadTransportCredentials } from "../credential-cache-bridge";
+
+export type { WireTargetEntry };
 
 type RemoteProtocol = 'auto' | 'http' | 'https';
 export type AirpadTransportMode = "plaintext" | "secure";
@@ -20,6 +27,9 @@ interface StoredRemoteConfig {
     destinationId?: string;
     /** Legacy combined transport host field retained for migration only. */
     host?: string;
+    /** Canonical persisted control / access token. */
+    accessToken?: string;
+    /** @deprecated Legacy key; merged into accessToken on load. */
     authToken?: string;
     routeTarget?: string;
     clientId?: string;
@@ -151,7 +161,7 @@ function persistRemoteConfig(): void {
             endpointUrl: remoteConfig.endpointUrl,
             directUrl: remoteConfig.directUrl,
             destinationId: remoteConfig.destinationId,
-            authToken: remoteConfig.authToken,
+            accessToken: remoteConfig.accessToken,
             clientId: remoteConfig.clientId,
             peerInstanceId: remoteConfig.peerInstanceId,
         }));
@@ -174,7 +184,7 @@ const remoteConfig: {
     quickConnectValue: string;
     endpointUrl: string;
     directUrl: string;
-    authToken: string;
+    accessToken: string;
     destinationId: string;
     clientId: string;
     peerInstanceId: string;
@@ -182,7 +192,7 @@ const remoteConfig: {
     quickConnectValue: "",
     endpointUrl: "",
     directUrl: "",
-    authToken: "",
+    accessToken: "",
     destinationId: "",
     clientId: "",
     peerInstanceId: "",
@@ -203,10 +213,17 @@ let shellMaintainHubSocket = false;
 let shellPreferNativeWebsocket = true;
 let shellNativeSmsEnabled = true;
 let shellNativeContactsEnabled = true;
+let shellAcceptInboundClipboardData = true;
+let shellClipboardInboundAllowIds = "";
+let shellClipboardShareDestinationIds = "";
+let shellAccessTokenBypassesClipboardAllowlist = false;
+let shellAcceptContactsBridgeData = false;
+let shellAcceptSmsBridgeData = false;
 let coreSocketProtocol: RemoteProtocol = "auto";
 let coreSocketRouteTarget = "";
 let coreSocketSelfId = "";
-let coreSocketAirpadAuthToken = "";
+let coreSocketAccessToken = "";
+let coreSocketClientAccessToken = "";
 let coreSocketTransportMode: AirpadTransportMode = "plaintext";
 let coreSocketTransportSecret = "";
 let coreSocketSigningSecret = "";
@@ -234,7 +251,10 @@ function hydrateFromStored(stored: MigratedRemoteConfig): void {
     const quickConnectValue = toTrimmedString((stored as StoredRemoteConfig).quickConnectValue);
     remoteConfig.endpointUrl = endpointUrl;
     remoteConfig.directUrl = directUrl;
-    remoteConfig.authToken = stored.authToken || "";
+    remoteConfig.accessToken =
+        toTrimmedString((stored as StoredRemoteConfig).accessToken) ||
+        toTrimmedString((stored as StoredRemoteConfig).authToken) ||
+        "";
     remoteConfig.destinationId =
         toTrimmedString((stored as StoredRemoteConfig).destinationId) ||
         legacyRouteTarget;
@@ -257,7 +277,13 @@ hydrateFromStored(stored);
 if (!toTrimmedString((stored as StoredRemoteConfig).peerInstanceId)) {
     remoteConfig.peerInstanceId = remoteConfig.peerInstanceId || createPeerInstanceId();
 }
-if ((stored as MigratedRemoteConfig)._legacyMigrated === true || !(stored as StoredRemoteConfig).peerInstanceId) {
+const storedAccessToken = toTrimmedString((stored as StoredRemoteConfig).accessToken);
+const storedLegacyAuthToken = toTrimmedString((stored as StoredRemoteConfig).authToken);
+if (
+    (stored as MigratedRemoteConfig)._legacyMigrated === true ||
+    !(stored as StoredRemoteConfig).peerInstanceId ||
+    (storedLegacyAuthToken && !storedAccessToken)
+) {
     persistRemoteConfig();
 }
 
@@ -284,6 +310,8 @@ export type AirpadRemoteConfigInput = {
     destinationId?: string;
     /** Legacy combined connect host field; maps to endpointUrl for compatibility. */
     host?: string;
+    accessToken?: string;
+    /** @deprecated Use accessToken */
     authToken?: string;
     /** Legacy routed destination field; maps to destinationId for compatibility. */
     routeTarget?: string;
@@ -299,8 +327,10 @@ export function applyAirpadRemoteConfig(input: AirpadRemoteConfigInput, options?
     if (input.directUrl !== undefined) {
         remoteConfig.directUrl = normalizeOriginUrl(input.directUrl);
     }
-    if (input.authToken !== undefined) {
-        remoteConfig.authToken = input.authToken || "";
+    if (input.accessToken !== undefined) {
+        remoteConfig.accessToken = input.accessToken || "";
+    } else if (input.authToken !== undefined) {
+        remoteConfig.accessToken = input.authToken || "";
     }
     if (input.destinationId !== undefined) {
         remoteConfig.destinationId = (input.destinationId || "").trim();
@@ -348,10 +378,17 @@ export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
     shellPreferNativeWebsocket = (shell?.preferNativeWebsocket ?? interop?.preferNativeWebsocket ?? true) !== false;
     shellNativeSmsEnabled = (shell?.enableNativeSms ?? true) !== false;
     shellNativeContactsEnabled = (shell?.enableNativeContacts ?? true) !== false;
+    shellAcceptInboundClipboardData = (shell?.acceptInboundClipboardData ?? true) !== false;
+    shellClipboardInboundAllowIds = (shell?.clipboardInboundAllowIds || "").trim();
+    shellClipboardShareDestinationIds = (shell?.clipboardShareDestinationIds || "").trim();
+    shellAccessTokenBypassesClipboardAllowlist = (shell?.accessTokenBypassesClipboardAllowlist ?? false) === true;
+    shellAcceptContactsBridgeData = (shell?.acceptContactsBridgeData ?? false) === true;
+    shellAcceptSmsBridgeData = (shell?.acceptSmsBridgeData ?? false) === true;
     coreSocketProtocol = socket?.protocol === "http" || socket?.protocol === "https" ? socket.protocol : "auto";
     coreSocketRouteTarget = (socket?.routeTarget || "").trim();
     coreSocketSelfId = (socket?.selfId || "").trim();
-    coreSocketAirpadAuthToken = (socket?.airpadAuthToken || "").trim();
+    coreSocketAccessToken = (socket?.accessToken || socket?.airpadAuthToken || "").trim();
+    coreSocketClientAccessToken = (socket?.clientAccessToken || "").trim();
     coreSocketTransportMode = socket?.transportMode === "secure" ? "secure" : "plaintext";
     coreSocketTransportSecret = (socket?.transportSecret || "").trim();
     coreSocketSigningSecret = (socket?.signingSecret || "").trim();
@@ -395,22 +432,76 @@ export function getClipboardPushIntervalMs(): number {
     return shellClipboardPushIntervalMs;
 }
 
-const parseClipboardTargetList = (value: string): string[] => {
-    return Array.from(
-        new Set(
-            value
-                .split(/[;,]/)
-                .map((item) => item.trim())
-                .filter(Boolean)
-        )
-    );
-};
+function getClipboardBroadcastTargetEntries(): WireTargetEntry[] {
+    const fromExplicit = parseWireTargetList(shellClipboardBroadcastTargets);
+    if (fromExplicit.length) return fromExplicit;
+    const route = getRemoteRouteTarget().trim();
+    return route ? parseWireTargetList(route) : [];
+}
 
-/** Device ids for outbound clipboard acts (Settings → clipboard broadcast targets). */
+/** Device ids for outbound clipboard acts (`ID` or `ID::token`, comma/semicolon). */
 export function getClipboardBroadcastTargetNodes(): string[] {
-    const explicit = parseClipboardTargetList(shellClipboardBroadcastTargets);
-    if (explicit.length) return explicit;
-    return [];
+    return wireTargetNodeIds(getClipboardBroadcastTargetEntries());
+}
+
+/** Parsed outbound clipboard entries including optional per-id access tokens. */
+export function getClipboardBroadcastWireTargets(): WireTargetEntry[] {
+    return getClipboardBroadcastTargetEntries();
+}
+
+/** When false, ignore inbound clipboard payloads (coordinator still may run for other ops). */
+export function isShellClipboardInboundEnabled(): boolean {
+    return shellAcceptInboundClipboardData !== false;
+}
+
+/** Parsed allow list for inbound clipboard senders; empty means any sender (unless bypass rules apply). */
+export function getClipboardInboundAllowIds(): string[] {
+    return wireTargetNodeIds(parseWireTargetList(shellClipboardInboundAllowIds));
+}
+
+/** True when access token bypass of inbound allow list is enabled and a token is configured. */
+export function shouldBypassClipboardInboundAllowlistWithAccessToken(): boolean {
+    return shellAccessTokenBypassesClipboardAllowlist && Boolean(getAccessToken().trim());
+}
+
+/**
+ * Inbound clipboard from `senderId` (peer / device id on the wire). Respects allow list unless bypassed by access token.
+ */
+export function isClipboardSenderAllowedForInbound(senderId: string): boolean {
+    if (!isShellClipboardInboundEnabled()) return false;
+    if (!isShellRemoteClipboardBridgeEnabled()) return false;
+    if (shouldBypassClipboardInboundAllowlistWithAccessToken()) return true;
+    const allow = parseWireTargetList(shellClipboardInboundAllowIds);
+    if (!allow.length) return true;
+    const s = senderId.trim().toLowerCase();
+    if (!s) return false;
+    return allow.some((e) => e.nodeId.trim().toLowerCase() === s);
+}
+
+/**
+ * Destinations for share-target / quick-send clipboard; when unset, uses {@link getClipboardBroadcastTargetNodes}.
+ */
+export function getClipboardShareDestinationNodes(): string[] {
+    const share = parseWireTargetList(shellClipboardShareDestinationIds);
+    if (share.length) return wireTargetNodeIds(share);
+    return getClipboardBroadcastTargetNodes();
+}
+
+/** Share / quick-send entries with optional `ID::token` (see {@link getClipboardShareDestinationNodes}). */
+export function getClipboardShareDestinationWireTargets(): WireTargetEntry[] {
+    const share = parseWireTargetList(shellClipboardShareDestinationIds);
+    if (share.length) return share;
+    return getClipboardBroadcastTargetEntries();
+}
+
+/** Future: contacts payloads from native bridge. */
+export function isShellContactsBridgeDataAccepted(): boolean {
+    return shellAcceptContactsBridgeData === true;
+}
+
+/** Future: SMS payloads from native bridge. */
+export function isShellSmsBridgeDataAccepted(): boolean {
+    return shellAcceptSmsBridgeData === true;
 }
 
 /** Background WebSocket to cwsp / endpoint hub (any shell, not only AirPad view). */
@@ -447,10 +538,8 @@ export function getAirPadDirectTargetUrl(): string {
 }
 
 /**
- * Quick-connect value shown in the AirPad popup.
- *
- * INVARIANT: the popup only exposes one field now, so prefer an explicit target
- * device id first, otherwise show the current direct/url target.
+ * Quick-connect value shown in the AirPad popup (plus optional auth pass field).
+ * Prefer an explicit target device id first, otherwise show the current direct/url target.
  */
 export function getAirPadQuickConnectTarget(): string {
     if (remoteConfig.quickConnectValue.trim()) return remoteConfig.quickConnectValue.trim();
@@ -508,22 +597,37 @@ export function getAirPadTransportMode(): AirpadTransportMode {
     return coreSocketTransportMode;
 }
 
-export function getAirPadAuthToken(): string {
-    const local = (remoteConfig.authToken || "").trim();
+/** Resolved access / control token (local overlay, settings, then env globals). */
+export function getAccessToken(): string {
+    const local = (remoteConfig.accessToken || "").trim();
     if (local) return local;
-    if (coreSocketAirpadAuthToken.trim()) return coreSocketAirpadAuthToken.trim();
+    if (coreSocketAccessToken.trim()) return coreSocketAccessToken.trim();
     return readGlobalAirpadValue([
+        "CWS_ACCESS_TOKEN",
+        "ACCESS_TOKEN",
         "AIRPAD_AUTH_TOKEN",
         "AIRPAD_TOKEN",
         "CWS_AUTH_TOKEN",
         "HUB_AUTH_TOKEN",
-        "MASTER_AUTH_TOKEN"
+        "MASTER_AUTH_TOKEN",
+        "CONTROL_TOKEN",
+        "ADMIN_TOKEN"
     ]);
 }
 
-export function setAirPadAuthToken(token: string): void {
-    remoteConfig.authToken = token || "";
+/** @deprecated Use {@link getAccessToken} */
+export function getAirPadAuthToken(): string {
+    return getAccessToken();
+}
+
+export function setAccessToken(token: string): void {
+    remoteConfig.accessToken = token || "";
     persistRemoteConfig();
+}
+
+/** @deprecated Use {@link setAccessToken} */
+export function setAirPadAuthToken(token: string): void {
+    setAccessToken(token);
 }
 
 export function getAirPadClientId(): string {
@@ -535,6 +639,13 @@ export function getAirPadClientId(): string {
 
 export function getAssociatedClientToken(): string {
     return coreIdentityBridgeUserKey.trim();
+}
+
+/** Optional future-facing access token when this client acts as an inbound WS / reverse-server peer. */
+export function getClientAccessToken(): string {
+    const local = coreSocketClientAccessToken.trim();
+    if (local) return local;
+    return readGlobalAirpadValue(["CWS_CLIENT_ACCESS_TOKEN", "CLIENT_ACCESS_TOKEN"]);
 }
 
 export function setAirPadClientId(clientId: string): void {
