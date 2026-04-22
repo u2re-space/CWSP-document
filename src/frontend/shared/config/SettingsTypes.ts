@@ -248,6 +248,17 @@ export type AppSettings = {
             transportMode?: CoreSocketTransportMode;
             transportSecret?: string;
             signingSecret?: string;
+            /**
+             * WebSocket / Engine.IO handshake `connectionType` (before gateway normalization to `first-order` when applicable).
+             * @see runtime/cwsp/endpoint/SPECIFICATION-v2.md
+             */
+            connectionType?: string;
+            /** Handshake `archetype` (e.g. `server-v2`). */
+            archetype?: string;
+            /**
+             * Optional JSON object mirroring endpoint config-v2 `Protocols` (lane → roles). Reserved for future wire hints / tooling.
+             */
+            protocolLanesJson?: string;
         };
         interop?: {
             ipcProtocol?: "uniform" | "legacy";
@@ -370,7 +381,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
             allowAccessTokenWithoutUserKey: false,
             transportMode: "plaintext",
             transportSecret: "",
-            signingSecret: ""
+            signingSecret: "",
+            connectionType: "",
+            archetype: "",
+            protocolLanesJson: ""
         },
         interop: {
             ipcProtocol: "uniform",

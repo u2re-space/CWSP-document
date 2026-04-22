@@ -9,7 +9,8 @@
         "src/**/*.mjs",
         "src/**/*.js",
         "src/**/*.d.ts",
-        "src/**/*.tsx"
+        "src/**/*.tsx",
+        "cwsp/endpoint/shared/**/*.ts"
     ],
     "exclude": [
         "node_modules/**",
@@ -150,6 +151,9 @@
             ],
             "@shells/*": [
                 "./src/frontend/shells/*"
+            ],
+            "@cwsp-endpoint-shared/*": [
+                "./cwsp/endpoint/shared/*"
             ],
             "veela": [
                 "./shared/fest/veela/index.ts"

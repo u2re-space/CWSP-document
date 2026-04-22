@@ -65,6 +65,24 @@ export const RuntimeSection: SectionConfig = {
                 { path: "core.socket.accessToken", label: "Access / control token (optional)", type: "password", placeholder: "unified with control/master/hub on wire" },
                 { path: "core.socket.clientAccessToken", label: "Client access token (optional, future)", type: "password", placeholder: "reverse-client / inbound WS" },
                 {
+                    path: "core.socket.connectionType",
+                    label: "Wire connection type (optional)",
+                    type: "text",
+                    placeholder: "Default: exchanger-initiator"
+                },
+                {
+                    path: "core.socket.archetype",
+                    label: "Wire archetype (optional)",
+                    type: "text",
+                    placeholder: "Default: server-v2"
+                },
+                {
+                    path: "core.socket.protocolLanesJson",
+                    label: "Protocol lanes JSON (optional)",
+                    type: "textarea",
+                    placeholder: '{"websocket":["exchanger","initiator"]} — mirrors config-v2 Protocols'
+                },
+                {
                     path: "core.encrypt",
                     label: "Encrypt stored files",
                     type: "select",

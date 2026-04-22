@@ -7,7 +7,11 @@ import {
     parseWireTargetList,
     wireTargetNodeIds,
     type WireTargetEntry
-} from "../../../../../../../runtime/cwsp/endpoint/shared/wire-target-id.ts";
+} from "@cwsp-endpoint-shared/wire-target-id";
+import {
+    resolveWireArchetype,
+    resolveWireConnectionType,
+} from "@cwsp-endpoint-shared/cws-client-wire-defaults";
 import { invalidateAirpadTransportCredentials } from "../credential-cache-bridge";
 
 export type { WireTargetEntry };
@@ -227,6 +231,9 @@ let coreSocketClientAccessToken = "";
 let coreSocketTransportMode: AirpadTransportMode = "plaintext";
 let coreSocketTransportSecret = "";
 let coreSocketSigningSecret = "";
+let coreSocketConnectionType = "";
+let coreSocketArchetype = "";
+let coreSocketProtocolLanesJson = "";
 
 export let remoteHost = "";
 
@@ -392,6 +399,9 @@ export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
     coreSocketTransportMode = socket?.transportMode === "secure" ? "secure" : "plaintext";
     coreSocketTransportSecret = (socket?.transportSecret || "").trim();
     coreSocketSigningSecret = (socket?.signingSecret || "").trim();
+    coreSocketConnectionType = (socket?.connectionType || "").trim();
+    coreSocketArchetype = (socket?.archetype || "").trim();
+    coreSocketProtocolLanesJson = (socket?.protocolLanesJson || "").trim();
 
     const input: AirpadRemoteConfigInput = {};
     if (core?.endpointUrl?.trim()) {
@@ -675,6 +685,31 @@ export function getAirPadTransportSecret(): string {
 
 export function getAirPadSigningSecret(): string {
     return coreSocketSigningSecret;
+}
+
+/** Handshake `connectionType` before gateway `first-order` normalization (Settings → env → default). */
+export function getAirPadHandshakeConnectionType(): string {
+    const fromSettings = coreSocketConnectionType.trim();
+    if (fromSettings) return resolveWireConnectionType(fromSettings);
+    return resolveWireConnectionType(
+        readGlobalAirpadValue(["CWS_CONNECTION_TYPE", "AIRPAD_CONNECTION_TYPE"])
+    );
+}
+
+/** Handshake `archetype` (Settings → env → default). */
+export function getAirPadHandshakeArchetype(): string {
+    const fromSettings = coreSocketArchetype.trim();
+    if (fromSettings) return resolveWireArchetype(fromSettings);
+    return resolveWireArchetype(readGlobalAirpadValue(["CWS_ARCHETYPE", "AIRPAD_ARCHETYPE"]));
+}
+
+/**
+ * Optional JSON mirroring config-v2 `Protocols`; reserved for tooling / future wire hints.
+ */
+export function getAirPadProtocolLanesJson(): string {
+    const fromSettings = coreSocketProtocolLanesJson.trim();
+    if (fromSettings) return fromSettings;
+    return readGlobalAirpadValue(["CWS_PROTOCOL_LANES_JSON"]).trim();
 }
 
 // Направление и выбор осей (подбирается под телефон)

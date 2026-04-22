@@ -11,8 +11,8 @@
  * restrictions differ, especially Chromium extension pages versus normal tabs.
  */
 
-import { CWSP_ROUTE_QUERY } from '../../../../../../runtime/cwsp/endpoint/shared/cwsp-route-query';
-import { groupWireTargetsByAccessToken, parseWireTargetList, wireTargetNodeIds } from '../../../../../../runtime/cwsp/endpoint/shared/wire-target-id.ts';
+import { CWSP_ROUTE_QUERY } from '@cwsp-endpoint-shared/cwsp-route-query';
+import { groupWireTargetsByAccessToken, parseWireTargetList, wireTargetNodeIds } from '@cwsp-endpoint-shared/wire-target-id';
 import { io, Socket } from './native-socket';
 import { log, getWsStatusEl } from '../../views/airpad/utils/utils';
 import {
@@ -33,6 +33,8 @@ import {
     getClipboardPushIntervalMs,
     getClipboardBroadcastWireTargets,
     isClipboardSenderAllowedForInbound,
+    getAirPadHandshakeArchetype,
+    getAirPadHandshakeConnectionType,
 } from '../../views/airpad/config/config';
 import {
     isCapacitorNativeShell,
@@ -75,8 +77,6 @@ const AIRPAD_CANDIDATE_PARALLEL = 3;
 const AIRPAD_VERBOSE_QUERY_KEY = "CWS_AIRPAD_VERBOSE_QUERY";
 /** Coordinator ask/act wait — was 12s, tighter for snappier UI. */
 const AIRPAD_COORDINATOR_TIMEOUT_MS = 8000;
-const AIRPAD_CONNECTION_TYPE = "exchanger-initiator";
-const AIRPAD_ARCHETYPE = "server-v2";
 
 /**
  * Chrome/Edge MV3: content-script XHR (Engine.IO polling) to LAN often fails with
@@ -1487,8 +1487,8 @@ export function connectWS() {
             queryParams.peerInstanceId = peerInstanceId;
             queryParams.deviceInstanceId = peerInstanceId;
         }
-        queryParams.connectionType = AIRPAD_CONNECTION_TYPE;
-        queryParams.archetype = AIRPAD_ARCHETYPE;
+        queryParams.connectionType = getAirPadHandshakeConnectionType();
+        queryParams.archetype = getAirPadHandshakeArchetype();
         queryParams[CWSP_ROUTE_QUERY.via] = !isSameAsTargetHost() ? "tunnel" : candidate.source || "unknown";
         queryParams[CWSP_ROUTE_QUERY.localEndpoint] = isSameAsTargetHost() ? "1" : "0";
         if (resolvedRouteTarget) {
