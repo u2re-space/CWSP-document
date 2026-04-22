@@ -3,15 +3,34 @@ import style from "../scss/Settings.scss?inline";
 
 import { H } from "fest/lure";
 import { loadSettings, saveSettings } from "@rs-com/config/Settings";
-import { BUILTIN_AI_MODELS, type AppSettings, type CoreMode, type MCPConfig } from "@rs-com/config/SettingsTypes";
+import { BUILTIN_AI_MODELS, type AppSettings, type CoreMode } from "@rs-com/config/SettingsTypes";
 import { openAdminDoorFromCore, resolveAdminDoorUrls } from "@rs-com/config/admin-doors";
 import { sendMessage } from "@rs-com/core/UnifiedMessaging";
 import { applyTheme } from "@rs-core/utils/Theme";
 import { setString, StorageKeys } from "@rs-core/storage";
 import { navigateToView } from "@shells/boot";
-import { createCustomInstructionsEditor } from "../../../shared/ts/CustomInstructionsEditor";
 import { loadAsAdopted } from "fest/dom";
 import { applyAirpadRuntimeFromAppSettings } from "../../../views/airpad/config/config";
+
+import {
+    buildResponseLanguageOptions,
+    buildSpeechLanguageOptions,
+    parseFloatInRange,
+    parseNumberOrDefault,
+    readCheckboxValue,
+    readTrimmedControlValue,
+    speechLanguageLabel,
+} from "./settings-utils";
+import { collectMcpConfigurations, createMcpRow, renderMcpConfigurations } from "./settings-mcp";
+import { createSettingsFooter } from "./sections/SettingsFooter";
+import { createSettingsHeader } from "./sections/SettingsHeader";
+import { createAppearanceSection } from "./sections/SettingsAppearance";
+import { createMarkdownSection } from "./sections/SettingsMarkdown";
+import { createAiSection } from "./sections/SettingsAI";
+import { createMcpSection } from "./sections/SettingsMcp";
+import { createServerSection } from "./sections/SettingsServer";
+import { createInstructionsSection } from "./sections/SettingsInstructions";
+import { createExtensionSection } from "./sections/SettingsExtension";
 
 export type SettingsViewOptions = {
     isExtension: boolean;
@@ -19,80 +38,8 @@ export type SettingsViewOptions = {
     onTheme?: (theme: AppSettings["appearance"] extends { theme?: infer T } ? (T extends string ? T : "auto") : "auto") => void;
 };
 
-const SUPPORTED_SPEECH_LANGUAGES = ["en", "ru", "en-GB", "en-US"] as const;
-type SupportedSpeechLanguage = (typeof SUPPORTED_SPEECH_LANGUAGES)[number];
-
-const speechLanguageLabel = (lang: SupportedSpeechLanguage): string => {
-    if (lang === "en") return "English (generic)";
-    if (lang === "ru") return "Russian";
-    if (lang === "en-GB") return "English (UK)";
-    return "English (US)";
-};
-
-const normalizeSpeechLanguage = (lang: string | undefined): SupportedSpeechLanguage | null => {
-    const value = (lang || "").trim();
-    if (!value) return null;
-    if (value === "ru" || value.startsWith("ru-")) return "ru";
-    if (value === "en-GB") return "en-GB";
-    if (value === "en-US") return "en-US";
-    if (value === "en" || value.startsWith("en-")) return "en";
-    return null;
-};
-
-const buildSpeechLanguageOptions = (): SupportedSpeechLanguage[] => {
-    const ordered = new Set<SupportedSpeechLanguage>();
-    const navLanguages = typeof navigator !== "undefined"
-        ? [...(navigator.languages || []), navigator.language]
-        : [];
-
-    for (const navLanguage of navLanguages) {
-        const normalized = normalizeSpeechLanguage(navLanguage);
-        if (normalized) ordered.add(normalized);
-    }
-    for (const fallback of SUPPORTED_SPEECH_LANGUAGES) {
-        ordered.add(fallback);
-    }
-    return Array.from(ordered);
-};
-
-const buildResponseLanguageOptions = (): string[] => {
-    const baseline = ["ru", "en"];
-    const ordered = new Set<string>(baseline);
-    const navLanguages = typeof navigator !== "undefined"
-        ? [...(navigator.languages || []), navigator.language]
-        : [];
-
-    for (const navLanguage of navLanguages) {
-        const value = (navLanguage || "").trim();
-        if (!value || value === "en" || value === "ru") continue;
-        ordered.add(value);
-    }
-
-    return Array.from(ordered);
-};
-
-const parseNumberOrDefault = (value: string | undefined, fallback: number): number => {
-    const parsed = Number((value || "").trim());
-    if (!Number.isFinite(parsed)) return fallback;
-    return parsed;
-};
-const parseFloatInRange = (value: string | undefined, fallback: number, min: number, max: number): number => {
-    const parsed = Number.parseFloat((value || "").trim());
-    if (!Number.isFinite(parsed)) return fallback;
-    return Math.max(min, Math.min(max, parsed));
-};
-const readTrimmedControlValue = (
-    control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null | undefined,
-    fallback = ""
-): string => {
-    return control ? control.value.trim() : fallback;
-};
-const readCheckboxValue = (control: HTMLInputElement | null | undefined, fallback: boolean): boolean => {
-    return control ? Boolean(control.checked) : fallback;
-};
-
 export const createSettingsView = (opts: SettingsViewOptions) => {
-    loadAsAdopted(style)
+    loadAsAdopted(style);
     let note: HTMLElement | null = null;
     const setNote = (text: string) => {
         if (!note) return;
@@ -101,421 +48,17 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
     };
 
     const root = H`<div class="view-settings">
-
-    <header class="settings-screen__top">
-        <h2 class="settings-screen__title">Settings</h2>
-        <div class="settings-tab-actions" data-settings-tabs data-active-tab="ai" role="tablist" aria-label="Settings categories">
-        <button class="settings-tab-btn" type="button" role="tab" data-action="switch-settings-tab" data-tab="appearance" aria-selected="false">Appearance</button>
-        <button class="settings-tab-btn" type="button" role="tab" data-action="switch-settings-tab" data-tab="markdown" aria-selected="false">Markdown</button>
-        <button class="settings-tab-btn is-active" type="button" role="tab" data-action="switch-settings-tab" data-tab="ai" aria-selected="true">AI</button>
-        <button class="settings-tab-btn" type="button" role="tab" data-action="switch-settings-tab" data-tab="mcp" aria-selected="false">MCP</button>
-        <button class="settings-tab-btn" type="button" role="tab" data-action="switch-settings-tab" data-tab="server" aria-selected="false">Server</button>
-        <button class="settings-tab-btn" type="button" role="tab" data-action="switch-settings-tab" data-tab="instructions" aria-selected="false">Instructions</button>
-        <button class="settings-tab-btn" type="button" role="tab" data-action="switch-settings-tab" data-tab="extension" aria-selected="false" data-extension-tab hidden>Extension</button>
-        </div>
-    </header>
-
+    ${createSettingsHeader()}
     <div class="settings-screen__body">
-    <section class="card settings-tab-panel" data-tab-panel="appearance">
-      <h3>Appearance</h3>
-      <label class="field">
-        <span>Theme</span>
-        <select class="form-select" data-field="appearance.theme">
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-          <option value="auto">Auto</option>
-        </select>
-        <span>Font Size</span>
-        <select class="form-select" data-field="appearance.fontSize">
-          <option value="small">Small</option>
-          <option value="medium">Medium</option>
-          <option value="large">Large</option>
-        </select>
-      </label>
-    </section>
-
-    <section class="card settings-tab-panel" data-tab-panel="markdown">
-      <h3>Markdown Viewer</h3>
-      <label class="field">
-        <span>Style preset</span>
-        <select class="form-select" data-field="appearance.markdown.preset">
-          <option value="default">Default</option>
-          <option value="classic">Classic</option>
-          <option value="compact">Compact</option>
-          <option value="paper">Paper</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>Font family</span>
-        <select class="form-select" data-field="appearance.markdown.fontFamily">
-          <option value="system">System UI</option>
-          <option value="sans">Sans</option>
-          <option value="serif">Serif</option>
-          <option value="mono">Monospace</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>Font size (px)</span>
-        <input class="form-input" type="number" inputmode="numeric" min="12" max="26" step="1" data-field="appearance.markdown.fontSizePx" />
-      </label>
-      <label class="field">
-        <span>Line height</span>
-        <input class="form-input" type="number" inputmode="decimal" min="1.1" max="2.2" step="0.05" data-field="appearance.markdown.lineHeight" />
-      </label>
-      <label class="field">
-        <span>Content max width (px)</span>
-        <input class="form-input" type="number" inputmode="numeric" min="500" max="1400" step="10" data-field="appearance.markdown.contentMaxWidthPx" />
-      </label>
-      <label class="field">
-        <span>Print scale</span>
-        <input class="form-input" type="number" inputmode="decimal" min="0.5" max="1.5" step="0.05" data-field="appearance.markdown.printScale" />
-      </label>
-      <label class="field">
-        <span>Page size</span>
-        <select class="form-select" data-field="appearance.markdown.page.size">
-          <option value="auto">Auto</option>
-          <option value="A4">A4</option>
-          <option value="Letter">Letter</option>
-          <option value="Legal">Legal</option>
-          <option value="A5">A5</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>Page orientation</span>
-        <select class="form-select" data-field="appearance.markdown.page.orientation">
-          <option value="portrait">Portrait</option>
-          <option value="landscape">Landscape</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>Page margins (mm)</span>
-        <input class="form-input" type="number" inputmode="numeric" min="5" max="40" step="1" data-field="appearance.markdown.page.marginMm" />
-      </label>
-      <h4>Style modules</h4>
-      <p class="field-hint" style="margin: 0 0 0.5rem; opacity: 0.85; font-size: 0.9em;">Grouped by what they affect in the viewer. All are on by default.</p>
-      <fieldset class="field-group" style="border: 0; padding: 0; margin: 0 0 1rem;">
-        <legend class="field" style="font-weight: 600; margin-bottom: 0.35rem;">Type &amp; layout</legend>
-        <label class="field checkbox form-checkbox">
-          <input type="checkbox" data-field="appearance.markdown.modules.typography" />
-          <span>Typography (paragraphs, headings)</span>
-        </label>
-        <label class="field checkbox form-checkbox">
-          <input type="checkbox" data-field="appearance.markdown.modules.lists" />
-          <span>Lists (bullets &amp; numbering)</span>
-        </label>
-      </fieldset>
-      <fieldset class="field-group" style="border: 0; padding: 0; margin: 0 0 1rem;">
-        <legend class="field" style="font-weight: 600; margin-bottom: 0.35rem;">Blocks &amp; media</legend>
-        <label class="field checkbox form-checkbox">
-          <input type="checkbox" data-field="appearance.markdown.modules.tables" />
-          <span>Tables</span>
-        </label>
-        <label class="field checkbox form-checkbox">
-          <input type="checkbox" data-field="appearance.markdown.modules.codeBlocks" />
-          <span>Code blocks</span>
-        </label>
-        <label class="field checkbox form-checkbox">
-          <input type="checkbox" data-field="appearance.markdown.modules.blockquotes" />
-          <span>Blockquotes</span>
-        </label>
-        <label class="field checkbox form-checkbox">
-          <input type="checkbox" data-field="appearance.markdown.modules.media" />
-          <span>Images &amp; video</span>
-        </label>
-      </fieldset>
-      <fieldset class="field-group" style="border: 0; padding: 0; margin: 0 0 1rem;">
-        <legend class="field" style="font-weight: 600; margin-bottom: 0.35rem;">Print</legend>
-        <label class="field checkbox form-checkbox">
-          <input type="checkbox" data-field="appearance.markdown.modules.printBreaks" />
-          <span>Print breaks (avoid splits inside headings, tables, …)</span>
-        </label>
-      </fieldset>
-      <h4>Rendering plugins</h4>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="appearance.markdown.plugins.smartTypography" />
-        <span>Smart typography</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="appearance.markdown.plugins.softBreaksAsBr" />
-        <span>Soft line breaks as BR</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="appearance.markdown.plugins.externalLinksNewTab" />
-        <span>Open external links in new tab</span>
-      </label>
-      <label class="field">
-        <span>Custom CSS (screen/view)</span>
-        <textarea class="form-input" rows="8" data-field="appearance.markdown.customCss" placeholder=".markdown-viewer-content h1 { color: var(--color-primary); }"></textarea>
-      </label>
-      <label class="field">
-        <span>Custom CSS (print only)</span>
-        <textarea class="form-input" rows="8" data-field="appearance.markdown.printCss" placeholder=".markdown-viewer-content { font-size: 12pt; line-height: 1.5; }"></textarea>
-      </label>
-      <label class="field">
-        <span>Markdown extensions (JSON rules)</span>
-        <textarea class="form-input" rows="10" data-field="appearance.markdown.extensions" placeholder='[
-  {
-    "id": "highlight",
-    "pattern": "==(.+?)==",
-    "replacement": "<mark>$1</mark>",
-    "flags": "g",
-    "enabled": true
-  }
-]'></textarea>
-      </label>
-      <div class="mcp-actions">
-        <button class="btn" type="button" data-action="open-user-styles">Open <code>/user/styles/</code> in Explorer</button>
-        <button class="btn" type="button" data-action="open-assets-readonly">Open <code>/assets/</code> (read-only) in Explorer</button>
-      </div>
-      <p class="mcp-empty-note">Rules are regex replacements applied before markdown parsing. Invalid JSON is rejected on save. Custom CSS supports explicit <code>@layer</code> blocks for advanced interop.</p>
-    </section>
-
-    <section class="card settings-tab-panel is-active" data-tab-panel="ai">
-      <h3>AI</h3>
-      <label class="field">
-        <span>Base URL</span>
-        <input placeholder="https://api.proxyapi.ru/openai/v1" class="form-input" type="url" inputmode="url" autocomplete="off" data-field="ai.baseUrl" />
-      </label>
-      <label class="field">
-        <span>API Key</span>
-        <input placeholder="sk-..." class="form-input" type="password" autocomplete="off" data-field="ai.apiKey"/>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="ui.showKey" />
-        <span>Show API key</span>
-      </label>
-      <label class="field">
-        <span>Model</span>
-        <select class="form-select" data-field="ai.model"></select>
-      </label>
-      <label class="field" data-field-group="ai.customModel">
-        <span>Custom model identifier</span>
-        <input placeholder="provider/model-or-id" class="form-input" type="text" autocomplete="off" data-field="ai.customModel"/>
-      </label>
-      <label class="field">
-        <span>Default reasoning effort</span>
-        <select class="form-select" data-field="ai.defaultReasoningEffort">
-            <option value="none">None</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-        </select>
-      </label>
-      <details class="settings-spoiler" data-advanced-ai-spoiler>
-        <summary>Advanced AI settings</summary>
-        <div>
-          
-          <label class="field">
-            <span>Default verbosity</span>
-            <select class="form-select" data-field="ai.defaultVerbosity">
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Max output tokens</span>
-            <input placeholder="400000" class="form-input" type="number" inputmode="numeric" data-field="ai.maxOutputTokens" />
-          </label>
-          <label class="field">
-            <span>Context truncation</span>
-            <select class="form-select" data-field="ai.contextTruncation">
-              <option value="disabled">Disabled</option>
-              <option value="auto">Auto</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Prompt cache retention</span>
-            <select class="form-select" data-field="ai.promptCacheRetention">
-              <option value="in-memory">In-memory</option>
-              <option value="24h">24h</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Max tool calls</span>
-            <input placeholder="8" class="form-input" type="number" inputmode="numeric" data-field="ai.maxToolCalls" />
-          </label>
-          <label class="field checkbox form-checkbox">
-            <input type="checkbox" data-field="ai.parallelToolCalls" />
-            <span>Allow parallel tool calls</span>
-          </label>
-          <label class="field">
-            <span>Timeout low (ms)</span>
-            <input placeholder="60000" class="form-input" type="number" inputmode="numeric" data-field="ai.requestTimeout.low" />
-          </label>
-          <label class="field">
-            <span>Timeout medium (ms)</span>
-            <input placeholder="300000" class="form-input" type="number" inputmode="numeric" data-field="ai.requestTimeout.medium" />
-          </label>
-          <label class="field">
-            <span>Timeout high (ms)</span>
-            <input placeholder="900000" class="form-input" type="number" inputmode="numeric" data-field="ai.requestTimeout.high" />
-          </label>
-          <label class="field">
-            <span>Max retries</span>
-            <input placeholder="2" class="form-input" type="number" inputmode="numeric" data-field="ai.maxRetries" />
-          </label>
-        </div>
-      </details>
-      <label class="field">
-        <span>Share target mode</span>
-        <select class="form-select" data-field="ai.shareTargetMode">
-          <option value="recognize">Recognize and copy</option>
-          <option value="analyze">Analyze and store</option>
-        </select>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="ai.autoProcessShared" />
-        <span>Auto AI on Share Target / File Open (and copy to clipboard)</span>
-      </label>
-      <label class="field">
-        <span>Response language</span>
-        <select class="form-select" data-field="ai.responseLanguage"></select>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="ai.translateResults" />
-        <span>Translate results</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="ai.generateSvgGraphics" />
-        <span>Generate SVG graphics</span>
-      </label>
-      <label class="field">
-        <span>Speech Recognition language</span>
-        <select class="form-select" data-field="speech.language"></select>
-      </label>
-    </section>
-
-    <section class="card settings-tab-panel" data-tab-panel="mcp">
-      <h3>MCP</h3>
-      <div class="mcp-section" data-mcp-section></div>
-      <div class="mcp-actions">
-        <button class="btn" type="button" data-action="add-mcp-server">Add MCP server</button>
-      </div>
-    </section>
-
-    <section class="card settings-tab-panel" data-tab-panel="server">
-      <h3>Server</h3>
-      <p class="field-hint" style="margin: 0 0 0.75rem; opacity: 0.88; font-size: 0.9em;">
-        CWSP endpoint and this device’s identity. A default AirPad peer id or clipboard destination is not required to use the hub: connect with server URL and client id, then optionally set an access / control token and inbound allow lists (peer ids) for who may reach you directly or via relay. Per-destination <code>ID::AccessToken</code> in lists is supported on the wire. “Frontend as server” and WS reverse-listener roles are only partially implemented.
-      </p>
-      <h4>Endpoint and identity</h4>
-      <label class="field">
-        <span>Server URL</span>
-        <input class="form-input" type="url" inputmode="url" autocomplete="off" placeholder="https://192.168.0.200:8443" data-field="core.endpointUrl" />
-      </label>
-      <label class="field">
-        <span>Associated device / client ID</span>
-        <input class="form-input" type="text" autocomplete="off" data-field="core.userId" placeholder="L-192.168.0.196" />
-      </label>
-      <label class="field">
-        <span>Client identifier token</span>
-        <input class="form-input" type="password" autocomplete="off" data-field="core.userKey" placeholder="Endpoint-issued key" />
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="core.socket.allowAccessTokenWithoutUserKey" />
-        <span>Allow access / control token without associated client identifier token</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="core.allowInsecureTls" />
-        <span>Allow self-signed / insecure TLS</span>
-      </label>
-
-      <h4>AirPad</h4>
-      <p class="field-hint" style="margin: 0 0 0.75rem; opacity: 0.82; font-size: 0.9em;">
-        Defaults for remote control. Peer / route id is optional (leave empty for receive-only or hub-routed sessions). Optional tokens: control token authenticates coordinator acts; client access token is reserved for inbound / reverse-client WebSocket ACL (experimental).
-      </p>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="core.useCoreIdentityForAirPad" />
-        <span>Use associated device ID as AirPad client id</span>
-      </label>
-      <label class="field">
-        <span>AirPad peer / route ID (optional)</span>
-        <input class="form-input" type="text" autocomplete="off" data-field="core.socket.routeTarget" placeholder="Empty OK — e.g. L-192.168.0.110 when routing to one peer" />
-      </label>
-      <label class="field">
-        <span>AirPad control auth token (optional)</span>
-        <input class="form-input" type="password" autocomplete="off" data-field="core.socket.accessToken" placeholder="Access / control (peer input routing)" />
-      </label>
-      <label class="field">
-        <span>Client access token (optional, future)</span>
-        <input class="form-input" type="password" autocomplete="off" data-field="core.socket.clientAccessToken" placeholder="Reverse-client / inbound WS ACL (experimental)" />
-      </label>
-
-      <h4>Clipboard (PWA)</h4>
-      <p class="field-hint" style="margin: 0 0 0.75rem; opacity: 0.82; font-size: 0.9em;">
-        Browser limits apply. Default destination ids are not required: use the inbound allow list and optional control token for policy; set explicit broadcast or share lists only when you want outbound fan-out. The Chrome extension reads the same saved settings for clipboard sync and coordinator acts (background / service worker).
-      </p>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.maintainHubSocketConnection" />
-        <span>Maintain background WebSocket to CWSP hub (needed for coordinator clipboard / acts)</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.enableRemoteClipboardBridge" />
-        <span>Enable clipboard bridge</span>
-      </label>
-      <label class="field">
-        <span>Clipboard broadcast targets (optional)</span>
-        <input class="form-input" type="text" autocomplete="off" data-field="shell.clipboardBroadcastTargets" placeholder="L-192.168.0.110; L-192.168.0.196::token — empty uses AirPad route / defaults" />
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.pushLocalClipboardToLan" />
-        <span>Push local clipboard to peers (poll)</span>
-      </label>
-      <label class="field">
-        <span>Clipboard push interval (ms)</span>
-        <input class="form-input" type="number" inputmode="numeric" min="800" max="60000" step="100" data-field="shell.clipboardPushIntervalMs" placeholder="2000" />
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.acceptInboundClipboardData" />
-        <span>Accept inbound clipboard data from peers</span>
-      </label>
-      <label class="field">
-        <span>Inbound clipboard allow list (peer ids only; empty = any)</span>
-        <input class="form-input" type="text" autocomplete="off" data-field="shell.clipboardInboundAllowIds" placeholder="L-192.168.0.110; L-192.168.0.196 — suffix ::token ignored for matching" />
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.accessTokenBypassesClipboardAllowlist" />
-        <span>Access token bypasses inbound allow list (endpoint control token)</span>
-      </label>
-      <label class="field">
-        <span>Share / quick-send clipboard destinations (optional)</span>
-        <input class="form-input" type="text" autocomplete="off" data-field="shell.clipboardShareDestinationIds" placeholder="Overrides broadcast for share-target sends; ID::AccessToken allowed" />
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.applyRemoteClipboardToDevice" />
-        <span>Apply incoming clipboard to this device</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.acceptContactsBridgeData" />
-        <span>Allow contacts bridge data (future / native)</span>
-      </label>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="shell.acceptSmsBridgeData" />
-        <span>Allow SMS bridge data (future / native)</span>
-      </label>
-    </section>
-
-    <section class="card settings-tab-panel" data-tab-panel="instructions" data-section="instructions">
-      <h3>Recognition Instructions</h3>
-      <div data-custom-instructions="editor">
-        ${createCustomInstructionsEditor({ onUpdate: () => setNote("Instructions updated.") })}
-      </div>
-    </section>
-
-    <section class="card settings-tab-panel" data-tab-panel="extension" data-section="extension" hidden>
-      <h3>Extension</h3>
-      <label class="field checkbox form-checkbox">
-        <input type="checkbox" data-field="core.ntpEnabled" />
-        <span>Enable New Tab Page (offline Basic)</span>
-      </label>
-    </section>
+      ${createAppearanceSection()}
+      ${createMarkdownSection()}
+      ${createAiSection()}
+      ${createMcpSection()}
+      ${createServerSection()}
+      ${createInstructionsSection(setNote)}
+      ${createExtensionSection()}
     </div>
-
-    <footer class="settings-screen__footer">
-        <button class="btn primary" type="button" data-action="save">Save</button>
-        <span class="note" data-note></span>
-    </footer>
+    ${createSettingsFooter()}
   </div>` as HTMLElement;
 
     const field = (sel: string) => root.querySelector(sel) as HTMLInputElement | HTMLSelectElement | null;
@@ -763,64 +306,6 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         }
     };
 
-    const createMcpRow = (cfg: MCPConfig) => {
-        const safeCfg = {
-            id: (cfg?.id || `mcp-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`).trim(),
-            serverLabel: (cfg?.serverLabel || "").trim(),
-            origin: (cfg?.origin || "").trim(),
-            clientKey: (cfg?.clientKey || "").trim(),
-            secretKey: (cfg?.secretKey || "").trim(),
-        };
-
-        return H`<div class="field mcp-row" data-mcp-id=${safeCfg.id}>
-            <label class="field">
-              <span>Server Label</span>
-              <input class="form-input" type="text" data-mcp-field="serverLabel" autocomplete="off" value="${safeCfg.serverLabel}" />
-            </label>
-            <label class="field">
-              <span>Origin</span>
-              <input class="form-input" type="url" data-mcp-field="origin" autocomplete="off" placeholder="https://server.example" value="${safeCfg.origin}" />
-            </label>
-            <label class="field">
-              <span>Client Key</span>
-              <input class="form-input" type="text" data-mcp-field="clientKey" autocomplete="off" value="${safeCfg.clientKey}" />
-            </label>
-            <label class="field">
-              <span>Secret Key</span>
-              <input class="form-input" type="password" data-mcp-field="secretKey" autocomplete="off" placeholder="sk-..." value="${safeCfg.secretKey}" />
-            </label>
-            <button class="btn btn-danger" type="button" data-action="remove-mcp-server">Remove</button>
-          </div>` as HTMLElement;
-    };
-
-    const collectMcpConfigurations = () => {
-        if (!mcpSection) return [];
-        const rows = Array.from(mcpSection.querySelectorAll<HTMLElement>("[data-mcp-id]"));
-        const items: MCPConfig[] = [];
-
-        for (const row of rows) {
-            const id = row.getAttribute("data-mcp-id") || `mcp-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-            const serverLabel = row.querySelector<HTMLInputElement>('[data-mcp-field="serverLabel"]')?.value?.trim() || "";
-            const origin = row.querySelector<HTMLInputElement>('[data-mcp-field="origin"]')?.value?.trim() || "";
-            const clientKey = row.querySelector<HTMLInputElement>('[data-mcp-field="clientKey"]')?.value?.trim() || "";
-            const secretKey = row.querySelector<HTMLInputElement>('[data-mcp-field="secretKey"]')?.value?.trim() || "";
-            if (!serverLabel) continue;
-            items.push({ id, serverLabel, origin, clientKey, secretKey });
-        }
-        return items;
-    };
-
-    const renderMcpConfigurations = (configs: MCPConfig[]) => {
-        if (!mcpSection) return;
-        mcpSection.replaceChildren();
-        const list = Array.isArray(configs) ? configs : [];
-        if (!list.length) {
-            mcpSection.appendChild(H`<p class="mcp-empty-note">No MCP servers configured.</p>` as HTMLElement);
-            return;
-        }
-        list.forEach((cfg) => mcpSection.appendChild(createMcpRow(cfg)));
-    };
-
     void loadSettings()
         .then((s) => {
             if (apiUrl) apiUrl.value = (s?.ai?.baseUrl || "").trim();
@@ -954,12 +439,12 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
             if (shellSms) shellSms.checked = (s?.shell?.enableNativeSms ?? true) !== false;
             if (shellContacts) shellContacts.checked = (s?.shell?.enableNativeContacts ?? true) !== false;
             refreshAdminDoorPreview();
-            renderMcpConfigurations(Array.isArray(s?.ai?.mcp) ? s.ai.mcp : []);
+            renderMcpConfigurations(mcpSection, Array.isArray(s?.ai?.mcp) ? s.ai.mcp : []);
             applyAirpadRuntimeFromAppSettings(s);
             opts.onTheme?.((theme?.value as any) || "auto");
         })
         .catch(() => {
-            renderMcpConfigurations([]);
+            renderMcpConfigurations(mcpSection, []);
         });
 
     showKey?.addEventListener("change", () => {
@@ -996,7 +481,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
         if (removeMcpBtn) {
             removeMcpBtn.closest(".mcp-row")?.remove();
             if (mcpSection && !mcpSection.querySelector("[data-mcp-id]")) {
-                renderMcpConfigurations([]);
+                renderMcpConfigurations(mcpSection, []);
             }
             return;
         }
@@ -1106,7 +591,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                     responseLanguage: (responseLanguage?.value as any) || "auto",
                     translateResults: Boolean(translateResults?.checked),
                     generateSvgGraphics: Boolean(generateSvgGraphics?.checked),
-                    mcp: collectMcpConfigurations(),
+                    mcp: collectMcpConfigurations(mcpSection),
                 },
                 speech: {
                     language: (speechLanguage?.value as any) || "en-US",
