@@ -1,1 +1,0 @@
-../../../../modules/projects/uniform.ts/src/newer/SPECIFICATION_BASE.md
