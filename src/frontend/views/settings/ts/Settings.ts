@@ -10,7 +10,7 @@ import { applyTheme } from "@rs-core/utils/Theme";
 import { setString, StorageKeys } from "@rs-core/storage";
 import { navigateToView } from "@shells/boot";
 import { loadAsAdopted } from "fest/dom";
-import { applyAirpadRuntimeFromAppSettings } from "../airpad/config/config";
+import { applyAirpadRuntimeFromAppSettings } from "../../airpad/config/config";
 
 import {
     buildResponseLanguageOptions,
@@ -22,15 +22,15 @@ import {
     speechLanguageLabel,
 } from "./settings-utils";
 import { collectMcpConfigurations, createMcpRow, renderMcpConfigurations } from "./settings-mcp";
-import { createSettingsFooter } from "./sections/SettingsFooter";
-import { createSettingsHeader } from "./sections/SettingsHeader";
-import { createAppearanceSection } from "./sections/SettingsAppearance";
-import { createMarkdownSection } from "./sections/SettingsMarkdown";
-import { createAiSection } from "./sections/SettingsAI";
-import { createMcpSection } from "./sections/SettingsMcp";
-import { createServerSection } from "./sections/SettingsServer";
-import { createInstructionsSection } from "./sections/SettingsInstructions";
-import { createExtensionSection } from "./sections/SettingsExtension";
+import { createSettingsFooter } from "../sections/SettingsFooter";
+import { createSettingsHeader } from "../sections/SettingsHeader";
+import { createAppearanceSection } from "../sections/SettingsAppearance";
+import { createMarkdownSection } from "../sections/SettingsMarkdown";
+import { createAiSection } from "../sections/SettingsAI";
+import { createMcpSection } from "../sections/SettingsMcp";
+import { createServerSection } from "../sections/SettingsServer";
+import { createInstructionsSection } from "../sections/SettingsInstructions";
+import { createExtensionSection } from "../sections/SettingsExtension";
 
 export type SettingsViewOptions = {
     isExtension: boolean;
