@@ -5,7 +5,7 @@
  * Mobile / small viewports: default to minimal; experimental `environment` is desktop-oriented.
  */
 
-import type { ShellId } from "../../types";
+import type { ShellId } from "../../shells/types";
 
 export const LS_BOOT_SHELL_LAST_ACTIVE = "rs-boot-shell-last-active";
 

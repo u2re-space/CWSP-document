@@ -13,7 +13,7 @@ import type { BaseViewOptions } from "@views/types";
 
 // @ts-ignore
 import settingsStyles from "./scss/Settings.scss?inline";
-import { createSettingsView } from "./ts/Settings";
+import { createSettingsView } from "./Settings";
 
 // ============================================================================
 // SETTINGS TYPES

@@ -10,7 +10,7 @@ import { applyTheme } from "@rs-core/utils/Theme";
 import { setString, StorageKeys } from "@rs-core/storage";
 import { navigateToView } from "@shells/boot";
 import { loadAsAdopted } from "fest/dom";
-import { applyAirpadRuntimeFromAppSettings } from "../../../views/airpad/config/config";
+import { applyAirpadRuntimeFromAppSettings } from "../airpad/config/config";
 
 import {
     buildResponseLanguageOptions,

@@ -16,7 +16,7 @@ import { loadSettings } from "@rs-com/config/Settings";
 // Types only — runtime `mountShellApp` is dynamic-imported so this entry chunk does not
 // statically pull `channel-unknown` → unified/RecognizeData (would merge AI into `shell-boot-*`
 // and cause the extension service worker to import DOM-heavy chunks).
-import type { ShellOptions } from "../../../shared/routing/channel-unknown";
+import type { ShellOptions } from "../../shared/routing/channel-unknown";
 
 /**
  * @deprecated Legacy compatibility options for old shell-based entry.
@@ -34,8 +34,8 @@ export default async function frontend(
     mountElement: HTMLElement,
     options: ShellOptions = {}
 ): Promise<void> {
-    const { mountShellApp } = await import("../../../shared/routing/channel-unknown");
-    void import("../../../shared/transport/hub-socket-boot")
+    const { mountShellApp } = await import("../../shared/routing/channel-unknown");
+    void import("../../shared/transport/hub-socket-boot")
         .then((m) => m.bootHubSocketFromStoredSettings())
         .catch(() => undefined);
 
@@ -50,7 +50,7 @@ export default async function frontend(
     // (SW stores only counts in the metadata; files are stored as cache entries + a manifest.)
     if (sharedFlag === "1" || sharedFlag === "true") {
         try {
-            const { consumeCachedShareTargetPayload } = await import("../../../pwa/sw-handling");
+            const { consumeCachedShareTargetPayload } = await import("../../pwa/sw-handling");
             const payload = await consumeCachedShareTargetPayload({ clear: true });
             const files = payload?.files ?? [];
 
@@ -101,7 +101,7 @@ export default async function frontend(
                 if (!auto || !hasKey) return;
 
                 try {
-                    const { processShareTargetData } = await import("../../../pwa/sw-handling");
+                    const { processShareTargetData } = await import("../../pwa/sw-handling");
                     await processShareTargetData({
                         files: sharedFilesForAutoAI,
                         fileCount: sharedFilesForAutoAI.length,

@@ -10,7 +10,7 @@
         return;
     }
     try {
-        const mod = await import("./index.ts");
+        const mod = await import("../../index.ts");
         const run = mod?.default;
         if (typeof run !== "function") {
             console.error("[Boot] default export is not a function:", run);

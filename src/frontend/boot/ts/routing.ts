@@ -26,10 +26,10 @@
  * not a socket transport module by itself.
  */
 
-import type { ShellId, ViewId, Shell } from "../../types";
+import type { ShellId, ViewId, Shell } from "../../shells/types";
 import type { FrontendChoice } from "./boot-menu";
 import { bootMinimal, bootBase, bootWindow, bootTabbed, bootEnvironment, type BootConfig, type StyleSystem } from "./BootLoader";
-import { ENABLED_VIEW_IDS, DEFAULT_VIEW_ID, isEnabledView, pickEnabledView } from "../../../shared/routing/views";
+import { ENABLED_VIEW_IDS, DEFAULT_VIEW_ID, isEnabledView, pickEnabledView } from "../../shared/routing/views";
 import {
     coerceShellForBootViewport,
     normalizeBootShellId,
