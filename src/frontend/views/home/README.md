@@ -13,3 +13,5 @@ Or as main `${view}` content in other shells.
 |----------------------------------|
 
 Rotatable, may be like in desktop or mobile launcher.
+
+## Currently is AI slopped component
