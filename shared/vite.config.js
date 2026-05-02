@@ -17,7 +17,7 @@ import postcssConfig from "../postcss.config.js";
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { VitePWA } from 'vite-plugin-pwa'
 import { createLogger, searchForWorkspaceRoot } from "vite";
-import { ViteMcp } from 'vite-plugin-mcp';
+import { ViteMcp } from 'vite-plugin-mcp'
 
 const viteLogger = createLogger();
 const VITE_NOISY_WARNING_PATTERNS = [
