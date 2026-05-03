@@ -21,6 +21,7 @@ import { isEnabledView } from "shared/routing/views";
 import style from "./index.scss?inline";
 import { normalizeIpcAttachments, sendViewProtocolMessage, type ViewAttachmentInput } from "com/core/UniformViewTransport";
 import "./components/WindowFrame";
+import type { WindowFrameElement } from "./components/WindowFrame";
 
 // ============================================================================
 // TYPES

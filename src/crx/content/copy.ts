@@ -4,7 +4,7 @@
  */
 
 import { initClipboardHandler } from "crx/shared/clipboard-handler";
-import { showToast } from "../../frontend/shells/boot/ts/overlay";
+import { showToast } from "../../frontend/boot/ts/overlay";
 
 // Initialize handler for content script context
 // - No target filter (responds to all COPY_HACK messages)

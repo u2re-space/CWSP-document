@@ -11,7 +11,7 @@
  *  - Coordinate / element tracking for context-menu operations
  */
 
-import { showToast, initOverlay } from "../../frontend/shells/boot/ts/overlay";
+import { showToast, initOverlay } from "../../frontend/boot/ts/overlay";
 import { copyAsHTML, copyAsMathML, copyAsMarkdown, copyAsTeX } from "core/document/Conversion";
 import { isUserScopePath, toUserRelativePath } from "fest/core";
 

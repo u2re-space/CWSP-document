@@ -40,7 +40,7 @@ const getLureFs = (): Promise<LureFs> => {
 const notifyFsToast = async (kind: "success" | "error", message: string) => {
     try {
         // Static specifier so Vite can split this chunk; avoid `import(new URL(...).href)` (import-analysis warning + @fs URLs in dev).
-        const mod = await import("@fl-ui/items/overlay/Toast");
+        const mod = await import("@fl-ui/misc/Toast");
         (kind === "success" ? mod.showSuccess : mod.showError)(message);
     } catch {
         try {

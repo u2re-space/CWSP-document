@@ -2124,6 +2124,9 @@ export const CwViewViewer = createViewConstructor(TAG, (Base: any)=>{
     }
 } as any});
 
+/** Programmatic constructor alias (e.g. markdown editor preview); same custom element as {@link CwViewViewer}. */
+export { CwViewViewer as ViewerView };
+
 // ============================================================================
 // TYPE EXPORTS
 // ============================================================================

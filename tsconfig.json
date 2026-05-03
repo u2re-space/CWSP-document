@@ -109,8 +109,14 @@
             "com/service/*": [
                 "./src/shared/service/*"
             ],
+            "com/template/*": [
+                "./src/shared/template/*"
+            ],
             "com/routing/*": [
                 "./src/shared/routing/*"
+            ],
+            "com/store/*": [
+                "./src/shared/store/*"
             ],
             "core/modules/Clipboard": [
                 "./src/shared/modules/Clipboard.ts"
