@@ -14,15 +14,12 @@
  */
 
 import { H } from "fest/lure";
-import type { ShellId, ShellLayoutConfig, ShellTheme, ViewId } from "@shells/types";
-import { ShellBase } from "/frontend/shells/shells";
-import { isEnabledView } from "@shared/routing/views";
+import type { ShellId, ShellLayoutConfig, ShellTheme, ViewId } from "shells/types";
+import { isEnabledView } from "shared/routing/views";
 
 // @ts-ignore - SCSS import
 import style from "./index.scss?inline";
-import type { WindowFrameElement } from "/frontend/views";
-import { subscribeViewChannel, postViewChannelPayload } from "@rs-com/routing/view-api";
-import { normalizeIpcAttachments, sendViewProtocolMessage, type ViewAttachmentInput } from "@rs-com/core/UniformViewTransport";
+import { normalizeIpcAttachments, sendViewProtocolMessage, type ViewAttachmentInput } from "com/core/UniformViewTransport";
 import "./components/WindowFrame";
 
 // ============================================================================
@@ -483,7 +480,7 @@ export class WindowShell extends ShellBase {
         };
 
         try {
-            const { ViewRegistry } = await import("@shared/routing/registry");
+            const { ViewRegistry } = await import("shared/routing/registry");
             const registration = ViewRegistry.get(viewId);
             if (registration) {
                 const mod = await registration.loader();

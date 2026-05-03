@@ -87,7 +87,7 @@ import { WorkCenterDataProcessing } from "./WorkCenterDataProcessing";
 import { WorkCenterEvents } from "./WorkCenterEvents";
 
 // Import component registration system
-import { registerComponent, initializeComponent } from "@rs-com/core/UnifiedMessaging";
+import { registerComponent, initializeComponent } from "com/core/UnifiedMessaging";
 import { WorkCenterResults } from "./WorkCenterResults";
 import { WorkCenterAttachments } from "./WorkCenterAttachments";
 import { WorkCenterPrompts } from "./WorkCenterPrompts";

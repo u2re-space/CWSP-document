@@ -18,8 +18,8 @@
 import { encode } from "@toon-format/toon";
 
 //
-import { getGPTInstance } from "@rs-com/service/shared/gpt-utils";
-import { readJSONs, readOneMarkDown } from "@rs-core/storage/FileSystem";
+import { getGPTInstance } from "com/service/shared/gpt-utils";
+import { readJSONs, readOneMarkDown } from "core/storage/FileSystem";
 
 // Dynamic-only: static `misc/Cache` ties `observed`/`fest/object` into `com-app` and recreates com-app ↔ com-service cycles for the MV3 SW graph.
 const loadRealtimeStates = async () => {
@@ -34,13 +34,13 @@ const loadRealtimeStates = async () => {
 };
 
 // @ts-ignore
-import AI_OUTPUT_SCHEMA from "@rs-com/template/Entities-v2.md?raw";
+import AI_OUTPUT_SCHEMA from "com/template/Entities-v2.md?raw";
 
 //
-import { checkRemainsTime } from "@rs-core/time";
-import { fixEntityId } from "@rs-com/template/EntityId";
-import { loadSettings } from "@rs-com/config/Settings";
-import { parseAIResponseSafe } from "@rs-core/document/AIResponseParser";
+import { checkRemainsTime } from "core/time";
+import { fixEntityId } from "com/template/EntityId";
+import { loadSettings } from "com/config/Settings";
+import { parseAIResponseSafe } from "core/document/AIResponseParser";
 
 import {
     EVENTS_DIR,
@@ -48,7 +48,7 @@ import {
     PLANS_DIR,
     PREFERENCES_DIR,
     TIMELINE_DIR,
-} from "@rs-core/constants/data-paths";
+} from "core/constants/data-paths";
 import type { GPTResponses } from "../model/GPT-Responses";
 
 export {

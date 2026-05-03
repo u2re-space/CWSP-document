@@ -1,4 +1,4 @@
-import type { TimeType } from "@rs-com/template/EntityInterface";
+import type { TimeType } from "com/template/EntityInterface";
 
 //
 export interface DayDescriptor {

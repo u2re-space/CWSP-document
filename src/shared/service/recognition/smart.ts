@@ -1,7 +1,7 @@
-import { extractJSONFromAIResponse } from "@rs-core/document/AIResponseParser";
-import { getGPTInstance } from "@rs-com/service/shared/gpt-utils";
+import { extractJSONFromAIResponse } from "core/document/AIResponseParser";
+import { getGPTInstance } from "com/service/shared/gpt-utils";
 import { recognizeWithContext } from "./core";
-import type { AIConfig, RecognitionResult } from "@rs-com/service/shared/types";
+import type { AIConfig, RecognitionResult } from "com/service/shared/types";
 
 const waitForClipboardFrame = (): Promise<void> =>
 	new Promise((resolve) => {
@@ -36,7 +36,7 @@ export const smartRecognize = async (
 	},
 	config?: AIConfig,
 ): Promise<RecognitionResult & { entities?: any[] }> => {
-	const { extractEntities } = await import("@rs-com/service/processing/entities");
+	const { extractEntities } = await import("com/service/processing/entities");
 
 	const baseResult = await recognizeWithContext(
 		data,

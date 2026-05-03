@@ -6,7 +6,7 @@
  * Routes:
  * - `GET /{view}` → compatibility entry; app normalizes to `/` and opens that view in shell state.
  * - `POST /{view}` → In-app API (PWA: service worker; dev: Vite middleware): request body is relayed
- *   on BroadcastChannel `rs-view-{view}`; use `postViewApi()` from `@rs-frontend/shared/view-api`.
+ *   on BroadcastChannel `rs-view-{view}`; use `postViewApi()` from `frontend/shared/view-api`.
  * - `/` → canonical app URL (home shell entry; boot-selected shell)
  * - `/viewer` → Viewer
  * - `/workcenter` → Work Center
@@ -26,10 +26,10 @@
  * not a socket transport module by itself.
  */
 
-import type { ShellId, ViewId, Shell } from "../../shells/types";
+import type { ShellId, ViewId, Shell } from "shells/types";
 import type { FrontendChoice } from "./boot-menu";
 import { bootMinimal, bootBase, bootWindow, bootTabbed, bootEnvironment, type BootConfig, type StyleSystem } from "./BootLoader";
-import { ENABLED_VIEW_IDS, DEFAULT_VIEW_ID, isEnabledView, pickEnabledView } from "../../shared/routing/views";
+import { ENABLED_VIEW_IDS, DEFAULT_VIEW_ID, isEnabledView, pickEnabledView } from "shared/routing/views";
 import {
     coerceShellForBootViewport,
     normalizeBootShellId,

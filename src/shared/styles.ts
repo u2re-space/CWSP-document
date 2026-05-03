@@ -12,7 +12,7 @@
  */
 
 import { loadVeelaVariant, type VeelaVariant } from "fest/veela";
-import type { StyleSystem } from "@rs-frontend/main";
+import type { StyleSystem } from "frontend/main";
 
 export type StyleSystemId = StyleSystem;
 

@@ -1,5 +1,5 @@
-import { loadSettings } from "@rs-com/config/Settings";
-import type { MCPConfig } from "@rs-com/config/SettingsTypes";
+import { loadSettings } from "com/config/Settings";
+import type { MCPConfig } from "com/config/SettingsTypes";
 import { GPTResponses, createGPTInstance } from "../model/GPT-Responses";
 import type { AIConfig, OutputFormat } from "./types";
 

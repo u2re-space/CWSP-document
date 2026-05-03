@@ -13,7 +13,7 @@
  * @module layer-manager
  */
 
-import type { ShellId, ViewId } from "../../shells/types";
+import type { ShellId, ViewId } from "shells/types";
 
 // ============================================================================
 // TYPES

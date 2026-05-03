@@ -3,12 +3,12 @@
  * Reusable functions for processing share target data with GPT integration
  */
 
-import { getRuntimeSettings } from '@rs-com/config/RuntimeSettings';
-import { loadSettings } from '@rs-com/config/Settings';
-import type { AppSettings, CustomInstruction } from '@rs-com/config/SettingsTypes';
-import { DEFAULT_SETTINGS } from '@rs-com/config/SettingsTypes';
-import { executionCore } from '@rs-com/service/misc/ExecutionCore';
-import type { ActionContext, ActionInput } from '@rs-com/service/misc/ActionHistory';
+import { getRuntimeSettings } from 'com/config/RuntimeSettings';
+import { loadSettings } from 'com/config/Settings';
+import type { AppSettings, CustomInstruction } from 'com/config/SettingsTypes';
+import { DEFAULT_SETTINGS } from 'com/config/SettingsTypes';
+import { executionCore } from 'com/service/misc/ExecutionCore';
+import type { ActionContext, ActionInput } from 'com/service/misc/ActionHistory';
 import { normalizeDataAsset, parseDataUrl, isBase64Like } from 'fest/lure';
 
 // ============================================================================

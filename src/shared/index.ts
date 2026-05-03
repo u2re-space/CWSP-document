@@ -107,46 +107,6 @@ export {
 // TEXT UTILITIES
 // ============================================================================
 
-export {
-    // String utilities
-    isNotEmpty,
-    toStringSafe,
-    collapseWhitespace,
-    MAKE_LABEL,
-    cropFirstLetter,
-    startCase,
-    renderTabName,
-
-    // Multiline
-    toMultiline,
-    fromMultiline,
-    countLines,
-    wrapBySpan,
-
-    // Path utilities
-    splitPath,
-    getByPath,
-    setByPath,
-    unsetByPath,
-    makeObjectEntries,
-
-    // Markdown stripping
-    stripMarkdown,
-    sanitizeDocSnippet,
-    truncateDocSnippet,
-
-    // Date titles
-    ensureDate,
-    resolveBeginDate,
-    buildPrimaryDayTitle,
-    buildSecondaryDayTitle,
-
-    // Drag & copy handlers
-    beginDragAsText,
-    copyPhoneClick,
-    copyEmailClick
-} from "./text";
-
 // ============================================================================
 // PHONE UTILITIES
 // ============================================================================
@@ -234,11 +194,7 @@ export {
     type ClipboardWriteOptions,
     type ClipboardResult,
     type CRXCopyOptions
-} from "../../../../modules/projects/lur.e/src/extension/modules/Clipboard";
-
-// Legacy aliases
-export { copy as copyToClipboard } from "../../../../modules/projects/lur.e/src/extension/modules/Clipboard";
-export { readText as readFromClipboard } from "../../../../modules/projects/lur.e/src/extension/modules/Clipboard";
+} from "../../../../modules/projects/lur.e/src/interactive/modules/Clipboard";
 
 // ============================================================================
 // FILE UTILITIES
@@ -279,12 +235,6 @@ export {
 // ============================================================================
 // MODULES (Feature modules)
 // ============================================================================
-
-export { getCachedComponent, clearComponentCache, disposeCachedComponents } from "../../../../modules/projects/lur.e/src/extension/modules/LazyLoader";
-export { createFileHandler } from "./storage/FileHandling";
-export { getSpeechPrompt } from "../../../../modules/projects/lur.e/src/extension/modules/VoiceInput";
-export { createTemplateManager } from "../../../../modules/projects/lur.e/src/extension/modules/TemplateManager";
-export { HistoryManager, createHistoryManager } from "../../../../modules/projects/lur.e/src/extension/modules/HistoryManager";
 
 // ============================================================================
 // GENERAL UTILITIES
@@ -400,7 +350,7 @@ export function isWorker(): boolean {
  * - `ui/` — toasts, menus, items/cards, canvas helpers
  * - `policies/` — DOM/event timing guards
  *
- * Root `*.ts` files re-export for stable `@rs-frontend/shared/<Name>` imports.
+ * Root `*.ts` files re-export for stable `frontend/shared/<Name>` imports.
  *
  * @module frontend/shared
  */

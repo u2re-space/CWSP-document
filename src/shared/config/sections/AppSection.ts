@@ -1,4 +1,4 @@
-import type { SectionConfig } from "@rs-com/config/SettingsTypes.js";
+import type { SectionConfig } from "com/config/SettingsTypes.js";
 
 import { AdditionalSection } from "./AdditionalSection.js";
 

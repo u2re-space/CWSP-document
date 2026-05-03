@@ -1,4 +1,4 @@
-import type { CustomInstruction } from "@rs-com/config/SettingsTypes";
+import type { CustomInstruction } from "com/config/SettingsTypes";
 import { AI_INSTRUCTIONS } from "./core";
 import type { PromptTemplate } from "fest/lure";
 

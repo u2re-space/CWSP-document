@@ -1,5 +1,5 @@
 import { normalizeDataAsset } from "fest/lure";
-import { createProtocolEnvelope, sendProtocolMessage } from "@rs-com/core/UnifiedMessaging";
+import { createProtocolEnvelope, sendProtocolMessage } from "com/core/UnifiedMessaging";
 
 export type ViewAttachmentInput =
     | File

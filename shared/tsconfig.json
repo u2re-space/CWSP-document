@@ -2,8 +2,9 @@
     "include": [
         "./fest/**/*.ts",
         "./test/**/*.ts",
-        "./src/**/*.ts"
-, "../../../modules/projects/fl.ui/src/ui/misc/Canvas.ts"    ],
+        "../src/shared/**/*.ts",
+        "../../modules/projects/**/*.ts"
+    ],
     "exclude": [
         "node_modules/**",
         "dist/**",
@@ -20,75 +21,89 @@
         "outDir": "./dist/",
         "paths": {
             "@phosphor-icons/core/assets/*": [
-                "./node_modules/@phosphor-icons/core/assets/*"
+                "../node_modules/@phosphor-icons/core/assets/*"
+            ],
+            "shared/*": [
+                "../src/shared/*"
+            ],
+            "shells/types": [
+                "../src/frontend/shells/types.ts"
+            ],
+            "shells/boot": [
+                "../src/frontend/boot/index.ts"
+            ],
+            "shells/window": [
+                "../src/frontend/ai-slop/window/index.ts"
+            ],
+            "views/*": [
+                "../src/frontend/views/*"
             ],
             "fonts/*": [
-                "./shared/assets/fonts/*"
+                "./assets/fonts/*"
             ],
             "fest/*": [
-                "./shared/fest/*"
+                "./fest/*"
             ],
             "fest/cdnImport": [
-                "./shared/fest/cdnImport.mjs"
+                "./fest/cdnImport.mjs"
+            ],
+            "fest/core": [
+                "./fest/core/index.ts"
             ],
             "fest/dom": [
-                "./shared/fest/dom/index.ts"
+                "./fest/dom/index.ts"
+            ],
+            "fest/fl-ui": [
+                "./fest/fl-ui/index.ts"
             ],
             "fest/lure": [
-                "./shared/fest/lure/index.ts"
+                "./fest/lure/index.ts"
             ],
             "fest/object": [
-                "./shared/fest/object/index.ts"
+                "./fest/object/index.ts"
             ],
             "fest/uniform": [
-                "./shared/fest/uniform/index.ts"
+                "./fest/uniform/index.ts"
             ],
             "fest/theme": [
-                "./shared/fest/theme/index.ts"
+                "./fest/theme/index.ts"
             ],
             "fest/icon": [
-                "./shared/fest/icon/index.ts"
+                "./fest/icon/index.ts"
             ],
             "fest/polyfill/*": [
-                "./shared/fest/polyfill/*"
+                "./fest/polyfill/*"
             ],
             "polyfill/*": [
-                "./shared/fest/polyfill/*"
+                "./fest/polyfill/*"
             ],
-            "@fl-design/*": [
-                "./shared/fest/fl-ui/design/*"
+            "pwa/*": [
+                "../src/pwa/*"
             ],
-            "@fl-ui/*": [
-                "./shared/fest/fl-ui/ui/*"
+            "crx/*": [
+                "../src/crx/*"
             ],
-            "@fl-src/*": [
-                "./shared/fest/fl-ui/*"
+            "com/*": [
+                "../src/com/*"
             ],
-            "@rs-pwa/*": [
-                "./src/pwa/*"
+            "core/*": [
+                "../src/shared/*",
+                "../src/core/*"
             ],
-            "@rs-crx/*": [
-                "./src/crx/*"
+            "frontend/*": [
+                "../src/frontend/*"
             ],
-            "@rs-core/*": [
-                "./src/core/*"
+            "shared/*": [
+                "./*"
             ],
-            "@rs-com/*": [
-                "./src/com/*"
-            ],
-            "@rs-frontend/*": [
-                "./src/frontend/*"
-            ],
-            "@rs-shared/*": [
-                "./shared/*"
-            ],
-            "@rs-test/*": [
-                "./shared/test/*"
+            "test/*": [
+                "./test/*"
             ]
         },
         "target": "ESNext",
         "module": "ESNext",
         "moduleResolution": "bundler",
+        "preserveSymlinks": true,
         "lib": [
             "ESNext",
             "DOM",

@@ -21,7 +21,7 @@ import {
     sendCoordinatorRequest,
     onVoiceResult,
     isWSConnected
-} from "@shared/transport/websocket";
+} from "shared/transport/websocket";
 import { getRemoteHost, getRemoteProtocol } from "../config/config";
 
 export interface AirPadNetworkCoordinatorState {

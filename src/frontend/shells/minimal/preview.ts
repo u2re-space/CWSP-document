@@ -11,16 +11,16 @@
 
 import { H } from "fest/lure";
 import { affected } from "fest/object";
-import type { ShellId, ShellLayoutConfig, ViewId } from "@shells/types";
+import type { ShellId, ShellLayoutConfig, ViewId } from "shells/types";
 
 // @ts-ignore - SCSS import
 import style from "./minimal.scss?inline";
 
 // Side effect: register icon component
 import "fest/icon";
-import { ShellBase } from "/frontend/shells/shells";
-import { isEnabledView } from "@shared/routing/views";
-import type { ShellTheme } from "@shells/types";
+import { isEnabledView } from "shared/routing/views";
+import type { ShellTheme } from "shells/types";
+import { ShellBase } from "../core/shells";
 
 // ============================================================================
 // NAVIGATION ITEMS
@@ -84,6 +84,7 @@ export class MinimalShell extends ShellBase {
                         <div class="loading-spinner"></div>
                         <span>Loading...</span>
                     </div>
+                    <slot name="view"></slot>
                 </main>
                 <div class="app-shell__status" data-shell-status hidden aria-live="polite"></div>
             </div>

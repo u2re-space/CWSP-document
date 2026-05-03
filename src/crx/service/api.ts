@@ -9,8 +9,8 @@
  *  - Runtime channel message routing
  */
 
-import { ableToShowImage, encodeWithJSquash, removeAnyPrefix } from "@rs-core/workers/ImageProcess";
-import type { RecognizeResult } from "../../com/service/service/RecognizeData";
+import { ableToShowImage, encodeWithJSquash, removeAnyPrefix } from "core/workers/ImageProcess";
+import type { RecognizeResult } from "com/service/service/RecognizeData";
 import { toText } from "./sw-text";
 import * as swAiMod from "../sw-ai-modules";
 

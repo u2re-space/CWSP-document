@@ -10,7 +10,9 @@
         "src/**/*.js",
         "src/**/*.d.ts",
         "src/**/*.tsx",
-        "cwsp/endpoint/shared/**/*.ts"
+        "cwsp/endpoint/shared/**/*.ts",
+        "../../modules/projects/**/*.ts",
+        "../../modules/projects/**/*.tsx"
     ],
     "exclude": [
         "node_modules/**",
@@ -29,22 +31,13 @@
         "skipLibCheck": true,
         "jsx": "preserve",
         "paths": {
-            "/assets/*": [
-                "./assets/*"
-            ],
-            "/frontend/*": [
-                "./src/frontend/*"
-            ],
-            "@frontend/*": [
-                "./src/frontend/*"
-            ],
-            "@frontend/shared/*": [
+            "frontend/shared/*": [
                 "./src/frontend/shared/*"
             ],
-            "@frontend/pwa/*": [
+            "frontend/pwa/*": [
                 "./src/frontend/pwa/*"
             ],
-            "@frontend/shells/*": [
+            "frontend/shells/*": [
                 "./src/frontend/shells/*"
             ],
             "@phosphor-icons/core/assets/*": [
@@ -59,29 +52,29 @@
             "assets/*": [
                 "./assets/*"
             ],
-            "fest-src/*": [
-                "./shared/*"
+            "shared/*": [
+                "./src/shared/*"
             ],
-            "fest/*": [
-                "./shared/fest/*"
+            "shells/types": [
+                "./src/frontend/shells/types.ts"
             ],
-            "fest/fl-ui/*": [
-                "./shared/fest/fl-ui/*"
+            "shells/boot": [
+                "./src/frontend/boot/index.ts"
+            ],
+            "shells/window": [
+                "./src/frontend/ai-slop/window/index.ts"
+            ],
+            "fest/core": [
+                "./shared/fest/core/index.ts"
             ],
             "fest/dom": [
                 "./shared/fest/dom/index.ts"
             ],
-            "fest/dom/*": [
-                "./shared/fest/dom/*"
+            "fest/fl-ui": [
+                "./shared/fest/fl-ui/index.ts"
             ],
             "fest/lure": [
                 "./shared/fest/lure/index.ts"
-            ],
-            "fest/lure/core/*": [
-                "./shared/fest/lure/lure/core/*"
-            ],
-            "fest/lure/*": [
-                "./shared/fest/lure/*"
             ],
             "fest/object": [
                 "./shared/fest/object/index.ts"
@@ -98,62 +91,71 @@
             "fest/icon": [
                 "./shared/fest/icon/index.ts"
             ],
-            "fest/icon/*": [
-                "./shared/fest/icon/*"
+            "fest/veela": [
+                "./shared/fest/veela/index.ts"
+            ],
+            "fest/veela/*": [
+                "./shared/fest/veela/*"
             ],
             "fest/polyfill/*": [
-                "./shared/fest/polyfill/*"
+                "./shared/polyfill/*"
             ],
-            "polyfill/*": [
-                "./shared/fest/polyfill/*"
+            "com/config/*": [
+                "./src/shared/config/*"
             ],
-            "shared/*": [
-                "./shared/*"
+            "com/core/*": [
+                "./src/shared/channel/*"
+            ],
+            "com/service/*": [
+                "./src/shared/service/*"
+            ],
+            "com/routing/*": [
+                "./src/shared/routing/*"
+            ],
+            "core/modules/Clipboard": [
+                "./src/shared/modules/Clipboard.ts"
+            ],
+            "cwsp-shared/*": [
+                "../../runtime/cwsp/endpoint/shared/*"
             ],
             "@fl-ui/*": [
                 "./shared/fest/fl-ui/ui/*"
             ],
-            "@fl-src/*": [
-                "./shared/fest/fl-ui/*"
-            ],
-            "@fl-design/*": [
-                "./shared/fest/fl-ui/design/*"
-            ],
-            "@rs-pwa/*": [
-                "./src/pwa/*"
-            ],
-            "@rs-crx/*": [
-                "./src/crx/*"
-            ],
-            "@rs-core/*": [
-                "./src/core/*"
-            ],
-            "@rs-com/*": [
-                "./src/com/*"
-            ],
-            "@rs-frontend/*": [
-                "./src/frontend/*"
-            ],
-            "@rs-shared/*": [
+            "@shared/*": [
                 "./shared/*"
             ],
-            "@rs-test/*": [
+            "fl-ui/*": [
+                "./shared/fest/fl-ui/ui/*"
+            ],
+            "fl-src/*": [
+                "./shared/fest/fl-ui/*"
+            ],
+            "fl-design/*": [
+                "./shared/fest/fl-ui/design/*"
+            ],
+            "pwa/*": [
+                "./src/pwa/*"
+            ],
+            "crx/*": [
+                "./src/crx/*"
+            ],
+            "core/*": [
+                "./src/shared/*"
+            ],
+            "frontend/*": [
+                "./src/frontend/*"
+            ],
+            "boot/*": [
+                "./src/frontend/boot/*"
+            ],
+            "test/*": [
                 "./test/*"
             ],
-            "@shared/*": [
-                "./src/frontend/shared/*"
-            ],
-            "@pwa/*": [
-                "./src/frontend/pwa/*"
-            ],
-            "@views/*": [
+            "views/*": [
                 "./src/frontend/views/*"
             ],
-            "@shells/*": [
+            "shells/*": [
                 "./src/frontend/shells/*"
-            ],
-            "@cwsp-endpoint-shared/*": [
-                "./cwsp/endpoint/shared/*"
             ],
             "veela": [
                 "./shared/fest/veela/index.ts"
@@ -174,20 +176,22 @@
         "types": [
             "chrome"
         ],
-        "composite": true,
         "lib": [
             "ESNext",
             "DOM",
+            "DOM.Iterable",
             "WebWorker"
         ],
         "module": "ESNext",
         "target": "ESNext",
         "moduleDetection": "auto",
         "pretty": true,
+        "allowArbitraryExtensions": true,
         "emitDeclarationOnly": true,
         "resolveJsonModule": true,
         "allowSyntheticDefaultImports": true,
         "moduleResolution": "bundler",
+        "preserveSymlinks": true,
         "allowImportingTsExtensions": true,
         "rewriteRelativeImportExtensions": true,
         "esModuleInterop": true,
@@ -195,6 +199,7 @@
         "allowJs": true,
         "noEmit": true,
         "strict": false,
+        "strictNullChecks": false,
         "allowUnusedLabels": true,
         "noImplicitAny": false,
         "declaration": true,

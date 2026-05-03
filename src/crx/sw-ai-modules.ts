@@ -11,6 +11,6 @@ export {
     solveAndAnswer,
     writeCode,
     extractCSS,
-} from "../com/service/service/RecognizeData";
-export { getCustomInstructions } from "../com/service/instructions/CustomInstructions";
-export { executionCore } from "../com/service/misc/ExecutionCore";
+} from "com/service/service/RecognizeData";
+export { getCustomInstructions } from "com/service/instructions/CustomInstructions";
+export { executionCore } from "com/service/misc/ExecutionCore";

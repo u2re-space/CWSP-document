@@ -9,22 +9,22 @@ import {
     registerComponent,
     processInitialContent,
     enqueuePendingMessage
-} from "@rs-com/core/UnifiedMessaging";
-import { createMessageWithOverrides } from "@rs-com/core/UnifiedMessaging";
-import type { ContentContext, ContentType } from "@rs-com/core/UnifiedAIConfig";
+} from "com/core/UnifiedMessaging";
+import { createMessageWithOverrides } from "com/core/UnifiedMessaging";
+import type { ContentContext, ContentType } from "com/core/UnifiedAIConfig";
 
 // Import file handling components that are always needed
-import { createFileHandler } from "@rs-core/storage/FileHandling";
-import { createTemplateManager } from "@rs-core/modules/TemplateManager";
-import { BROADCAST_CHANNELS, getBroadcastChannelForDestination } from "@rs-com/config/Names";
+import { createFileHandler } from "core/storage/FileHandling";
+import { createTemplateManager } from "core/modules/TemplateManager";
+import { BROADCAST_CHANNELS, getBroadcastChannelForDestination } from "com/config/Names";
 import { loadAsAdopted } from "fest/dom";
 import { clearIconCaches, clearIconCache, testIconRacing, reinitializeRegistry, debugIconSystem } from "fest/icon";
-import type { AppSettings } from "@rs-com/config/SettingsTypes";
-import { loadSettings } from "@rs-com/config/Settings";
-import { fetchSwCachedEntries } from "@rs-com/core/ShareTargetGateway";
+import type { AppSettings } from "com/config/SettingsTypes";
+import { loadSettings } from "com/config/Settings";
+import { fetchSwCachedEntries } from "com/core/ShareTargetGateway";
 // @ts-ignore - bundled as inline stylesheet
-import style from "../../views/views.scss?inline";
-import type { FileManager } from "../../views/explorer";
+import style from "views/views.scss?inline";
+import type { FileManager } from "views/explorer";
 
 
 
@@ -920,7 +920,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
             // Lazy load markdown viewer
             const viewerModule = await getCachedComponent(
                 'markdown-viewer',
-                () => import('@rs-frontend/views/viewer'),
+                () => import('frontend/views/viewer'),
                 { componentName: 'MarkdownViewer' }
             );
 
@@ -1059,7 +1059,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
             // Lazy load markdown editor
             const editorModule = await getCachedComponent(
                 'markdown-editor',
-                () => import('../../views/editor/editors/MarkdownEditor'),
+                () => import("views/editor/editors/MarkdownEditor"),
                 { componentName: 'MarkdownEditor' }
             );
 
@@ -1138,7 +1138,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
             // Lazy load quill editor
             const editorModule = await getCachedComponent(
                 'quill-editor',
-                () => import('../../views/editor/editors/QuillEditor'),
+                () => import("views/editor/editors/QuillEditor"),
                 { componentName: 'QuillEditor' }
             );
 
@@ -1217,7 +1217,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
             // Lazy load history manager
             const historyModule = await getCachedComponent(
                 'history-manager',
-                () => import('../../../../../../modules/projects/lur.e/src/extension/modules/HistoryManager'),
+                () => import("../../../../../modules/projects/lur.e/src/interactive/modules/HistoryManager"),
                 { componentName: 'HistoryManager' }
             );
 
@@ -1234,7 +1234,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
                     // Lazy load work center if needed
                     getCachedComponent(
                         'workcenter',
-                        () => import('../../views/workcenter/ts/WorkCenter').then(m => m.WorkCenterManager),
+                        () => import("views/workcenter/ts/WorkCenter").then((m) => m.WorkCenterManager),
                         { componentName: 'WorkCenter' }
                     ).then(() => {
                         if (state.managers.workCenter.instance) {
@@ -1554,7 +1554,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
         try {
             const res = customAIFunction
                 ? await customAIFunction(input, { useActiveInstruction: true })
-                : await (await import("@rs-com/service/processing/unified")).recognizeByInstructions(input, instructions);
+                : await (await import("com/service/processing/unified")).recognizeByInstructions(input, instructions);
             const after = res?.ok && res?.data ? String(res.data) : "";
 
             state.history.push({
@@ -1650,7 +1650,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
                     content.innerHTML = '<div class="component-loading"><div class="loading-spinner"></div><span>Loading Settings...</span></div>';
 
                     const settingsModule = await loadComponent('settings',
-                        () => import('../../views/settings'),
+                        () => import("views/settings"),
                         { componentName: 'Settings' }
                     );
 
@@ -1684,7 +1684,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
                 'file-explorer': async () => {
                     content.innerHTML = '<div class="component-loading"><div class="loading-spinner"></div><span>Loading File Explorer...</span></div>';
 
-                    await loadComponent('file-explorer', () => import('../../views/explorer'), { componentName: 'FileManager' });
+                    await loadComponent("file-explorer", () => import("views/explorer"), { componentName: "FileManager" });
 
                     const explorerEl = document.createElement('ui-file-manager') as FileManager & HTMLElement;
 
@@ -1884,7 +1884,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
 
                 getCachedComponent(
                     'workcenter',
-                    () => import('../../views/workcenter/ts/WorkCenter').then(m => m.WorkCenterManager),
+                    () => import("views/workcenter/ts/WorkCenter").then((m) => m.WorkCenterManager),
                     { componentName: 'WorkCenter' }
                 ).then(async (workCenterModule) => {
                     // Create work center manager if not already created
@@ -1999,7 +1999,7 @@ export const mountShellApp = (mountElement: HTMLElement, options: ShellOptions =
             if (action === "export-docx") {
                 const md = state.markdown || "";
                 if (md.trim()) {
-                    const { downloadMarkdownAsDocx } = await import("@rs-core/document/DocxExport");
+                    const { downloadMarkdownAsDocx } = await import("core/document/DocxExport");
                     await downloadMarkdownAsDocx(md, {
                         title: "CrossWord",
                         filename: `crossword-${Date.now()}.docx`,

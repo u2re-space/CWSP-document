@@ -5,15 +5,15 @@
  * convenience operations used by share-target flows, recognition/analyze
  * pipelines, markdown/json persistence, and timeline/entity storage.
  */
-import { BASE64_PREFIX, convertImageToJPEG, DEFAULT_ENTITY_TYPE, MAX_BASE64_SIZE } from "@rs-core/workers/ImageProcess";
-import { dumpAndClear } from "@rs-com/store/IDBQueue";
-import { detectEntityTypeByJSON } from "@rs-com/template/EntityUtils";
-import { fixEntityId } from "@rs-com/template/EntityId";
-import { TIMELINE_DIR } from "@rs-core/constants/data-paths";
+import { BASE64_PREFIX, convertImageToJPEG, DEFAULT_ENTITY_TYPE, MAX_BASE64_SIZE } from "core/workers/ImageProcess";
+import { dumpAndClear } from "com/store/IDBQueue";
+import { detectEntityTypeByJSON } from "com/template/EntityUtils";
+import { fixEntityId } from "com/template/EntityId";
+import { TIMELINE_DIR } from "core/constants/data-paths";
 import { opfsModifyJson } from "./OPFSMod";
 import { writeFileSmart } from "./WriteFileSmart-v2";
 import { JSOX } from "jsox";
-import { canParseURL } from "@rs-core/utils/Runtime";
+import { canParseURL } from "core/utils/Runtime";
 
 const viteEnv = (import.meta as unknown as { env?: { PROD?: boolean } }).env;
 const isViteProd = Boolean(viteEnv?.PROD);

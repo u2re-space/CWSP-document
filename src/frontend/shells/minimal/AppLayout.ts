@@ -9,7 +9,7 @@ import { observe, propRef, affected } from "fest/object";
 import { H, C } from "fest/lure";
 import { navigate, historyState } from "fest/lure";
 import { isPrimitive } from "fest/core";
-import { scheduleFrame } from "@rs-core/utils/Runtime";
+import { scheduleFrame } from "core/utils/Runtime";
 
 //
 let skipCreateNewView = false;

@@ -12,11 +12,11 @@
  */
 
 import { H } from "fest/lure";
-import type { ShellId, ShellLayoutConfig, ShellTheme } from "@shells/types";
+import type { ShellId, ShellLayoutConfig, ShellTheme } from "shells/types";
 
 // @ts-ignore - SCSS import
 import style from "./base.scss?inline";
-import { ShellBase } from "/frontend/shells/shells";
+import { ShellBase } from "frontend/shells/core/shells";
 
 // ============================================================================
 // BASE SHELL IMPLEMENTATION
@@ -45,6 +45,7 @@ export class BaseShell extends ShellBase {
                             <div class="loading-spinner"></div>
                             <span>Loading...</span>
                         </div>
+                        <slot name="view"></slot>
                     </main>
                     <div class="app-shell__overlays" data-shell-overlays></div>
                 </div>

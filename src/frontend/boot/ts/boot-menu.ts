@@ -10,8 +10,8 @@ import { H } from "fest/lure";
 import { loadAsAdopted } from "fest/dom";
 //@ts-ignore
 import style from "../scss/boot-menu.scss?inline";
-import type { ShellId } from "../../shells/types";
-import { pickEnabledView } from "../../shared/routing/views";
+import type { ShellId } from "frontend/shells/types";
+import { pickEnabledView } from "shared/routing/views";
 
 // ============================================================================
 // Type Definitions

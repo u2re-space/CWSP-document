@@ -4,7 +4,7 @@
 
 import { log, getAiButton, getAiStatusEl, getVoiceTextEl } from '../utils/utils';
 import { connectAirPadSession, isAirPadSessionConnected, onAirPadVoiceMessage, sendAirPadIntent } from '../network/session';
-import { loadSettings } from '@rs-com/config/Settings';
+import { loadSettings } from 'com/config/Settings';
 
 let recognition: any = null;
 let aiListening = false;

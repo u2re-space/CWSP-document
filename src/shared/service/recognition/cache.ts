@@ -1,4 +1,4 @@
-import type { OutputFormat, RecognitionCacheEntry } from "@rs-com/service/shared/types";
+import type { OutputFormat, RecognitionCacheEntry } from "com/service/shared/types";
 
 export class RecognitionCache {
 	private cache = new Map<string, RecognitionCacheEntry>();

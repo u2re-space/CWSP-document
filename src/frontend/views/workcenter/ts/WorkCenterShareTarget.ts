@@ -1,6 +1,6 @@
-import { sendMessage as sendUnifiedMessage } from "@rs-com/core/UnifiedMessaging";
-import { consumeCachedShareTargetPayload, fetchCachedShareFiles } from "@rs-com/core/ShareTargetGateway";
-import { summarizeForLog } from "@rs-com/core/LogSanitizer";
+import { sendMessage as sendUnifiedMessage } from "com/core/UnifiedMessaging";
+import { consumeCachedShareTargetPayload, fetchCachedShareFiles } from "com/core/ShareTargetGateway";
+import { summarizeForLog } from "com/core/LogSanitizer";
 import { normalizeDataAsset } from "fest/lure";
 import type { WorkCenterState, WorkCenterDependencies } from "./WorkCenterState";
 import type { WorkCenterFileOps } from "./WorkCenterFileOps";

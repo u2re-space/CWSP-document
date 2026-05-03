@@ -11,10 +11,10 @@
  * restrictions differ, especially Chromium extension pages versus normal tabs.
  */
 
-import { CWSP_ROUTE_QUERY } from '@cwsp-endpoint-shared/cwsp-route-query';
-import { groupWireTargetsByAccessToken, parseWireTargetList, wireTargetNodeIds } from '@cwsp-endpoint-shared/wire-target-id';
+import { CWSP_ROUTE_QUERY } from 'cwsp-shared/cwsp-route-query';
+import { groupWireTargetsByAccessToken, parseWireTargetList, wireTargetNodeIds } from 'cwsp-shared/wire-target-id';
 import { io, Socket } from './native-socket';
-import { log, getWsStatusEl } from '../../views/airpad/utils/utils';
+import { log, getWsStatusEl } from "views/airpad/utils/utils";
 import {
     getRemoteHost,
     getRemoteProtocol,
@@ -35,13 +35,13 @@ import {
     isClipboardSenderAllowedForInbound,
     getAirPadHandshakeArchetype,
     getAirPadHandshakeConnectionType,
-} from '../../views/airpad/config/config';
+} from "views/airpad/config/config";
 import {
     isCapacitorNativeShell,
     readClipboardTextFromDevice,
     writeClipboardTextToDevice,
 } from "../native/clipboard-device";
-import { setAirpadCredentialInvalidator } from '../../views/airpad/credential-cache-bridge';
+import { setAirpadCredentialInvalidator } from "views/airpad/credential-cache-bridge";
 
 let socket: Socket | null = null;
 let wsConnected = false;

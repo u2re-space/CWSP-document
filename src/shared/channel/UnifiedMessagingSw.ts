@@ -3,7 +3,7 @@
  * Avoids `fest/uniform` (IndexedDB queue, worker bootstrap, import() side effects).
  */
 
-import { createDestinationChannelMappings } from "@rs-com/config/Names";
+import { createDestinationChannelMappings } from "com/config/Names";
 import { createInteropEnvelope, type InteropEnvelope, type InteropMessageInput } from "./UniformInterop";
 
 /** Shared SW-safe interop envelope used by CRX and PWA worker surfaces. */

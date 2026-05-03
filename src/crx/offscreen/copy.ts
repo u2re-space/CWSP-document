@@ -3,7 +3,7 @@
  * Uses unified clipboard handler module
  */
 
-import { initClipboardHandler } from "@rs-crx/shared/clipboard-handler";
+import { initClipboardHandler } from "crx/shared/clipboard-handler";
 
 // Initialize handler for offscreen context
 // - Only responds to messages with target: "offscreen"

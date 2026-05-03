@@ -4,8 +4,8 @@
  * - Dev (no SW): Vite middleware returns devRelay JSON; this module posts to rs-view-* locally.
  */
 
-import { normalizeDestination, normalizeViewId, viewBroadcastChannelName } from "@rs-com/config/Names";
-import { createProtocolEnvelope, sendProtocolMessage } from "@rs-com/core/UnifiedMessaging";
+import { normalizeDestination, normalizeViewId, viewBroadcastChannelName } from "com/config/Names";
+import { createProtocolEnvelope, sendProtocolMessage } from "com/core/UnifiedMessaging";
 
 export type ViewPostChannelPayload = {
     type: "view-post";

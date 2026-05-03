@@ -1,18 +1,17 @@
-import type { ViewId } from "../../shells/types";
+import type { ViewId } from "shells/types";
 
-export const VIEW_ENABLED_VIEWER = __RS_VIEW_VIEWER__;
-export const VIEW_ENABLED_EDITOR = __RS_VIEW_EDITOR__;
-export const VIEW_ENABLED_WORKCENTER = __RS_VIEW_WORKCENTER__;
-export const VIEW_ENABLED_EXPLORER = __RS_VIEW_EXPLORER__;
-export const VIEW_ENABLED_AIRPAD = __RS_VIEW_AIRPAD__;
-export const VIEW_ENABLED_SETTINGS = __RS_VIEW_SETTINGS__;
-export const VIEW_ENABLED_HISTORY = __RS_VIEW_HISTORY__;
-export const VIEW_ENABLED_HOME = __RS_VIEW_HOME__;
-export const VIEW_ENABLED_PRINT = __RS_VIEW_PRINT__;
+export const VIEW_ENABLED_VIEWER = "viewer";
+export const VIEW_ENABLED_EDITOR = "editor";
+export const VIEW_ENABLED_WORKCENTER = "workcenter";
+export const VIEW_ENABLED_EXPLORER = "explorer";
+export const VIEW_ENABLED_AIRPAD = "airpad";
+export const VIEW_ENABLED_SETTINGS = "settings";
+export const VIEW_ENABLED_HISTORY = "history";
+export const VIEW_ENABLED_HOME = "home";
+export const VIEW_ENABLED_PRINT = "print";
+export const DEFAULT_VIEW_ID = "viewer";
 
-export const DEFAULT_VIEW_ID = (__RS_DEFAULT_VIEW__ || "viewer") as ViewId;
-
-const VIEW_FLAGS: Record<string, boolean> = {
+const VIEW_FLAGS: Record<string, string> = {
     viewer: VIEW_ENABLED_VIEWER,
     editor: VIEW_ENABLED_EDITOR,
     workcenter: VIEW_ENABLED_WORKCENTER,

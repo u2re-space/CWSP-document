@@ -11,7 +11,7 @@
 
 import { getBox, getHint, getOverlay, getSizeBadge, hideSelection, showSelection, showToast } from "../../frontend/shells/boot/ts/overlay";
 import { createRuntimeChannelModule } from "../shared/runtime";
-import { registerCrxHandler } from "../../com/core/CrxMessaging";
+import { registerCrxHandler } from "com/core/CrxMessaging";
 
 // ---------------------------------------------------------------------------
 // Types

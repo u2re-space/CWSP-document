@@ -1,7 +1,7 @@
 import type { WorkCenterState, WorkCenterDependencies } from "./WorkCenterState";
 import type { WorkCenterTemplates } from "./WorkCenterTemplates";
 import type { WorkCenterVoice } from "./WorkCenterVoice";
-import type { CustomInstruction } from "@rs-com/config/SettingsTypes";
+import type { CustomInstruction } from "com/config/SettingsTypes";
 
 export class WorkCenterPrompts {
     private container: HTMLElement | null = null;

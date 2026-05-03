@@ -4,12 +4,13 @@
  * Text formatting and manipulation utilities.
  */
 
-import { writeText } from "@rs-core/modules/Clipboard";
-import { parseDateCorrectly, getISOWeekNumber, getTimeZone, formatDateTime } from "@rs-core/time";
+import { parseDateCorrectly, getISOWeekNumber, getTimeZone, formatDateTime } from "core/time";
 
 // ============================================================================
 // STRING UTILITIES
 // ============================================================================
+
+export const writeText = (text: string): void => {
 
 /**
  * Check if fragment is not empty

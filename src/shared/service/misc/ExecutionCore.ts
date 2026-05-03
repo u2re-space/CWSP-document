@@ -5,8 +5,8 @@
  * history, runs the processor, and optionally propagates clipboard/broadcast
  * side effects after success.
  */
-import { processDataWithInstruction } from '@rs-com/service/service/RecognizeData';
-import { toBase64 } from '@rs-com/service/model/GPT-Responses';
+import { processDataWithInstruction } from 'com/service/service/RecognizeData';
+import { toBase64 } from 'com/service/model/GPT-Responses';
 import { actionHistory, type ActionEntry, type ActionContext, type ActionInput, type ActionResult } from './ActionHistory';
 
 export interface ExecutionRule {

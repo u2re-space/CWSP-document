@@ -12,7 +12,7 @@
  */
 
 import { showToast, initOverlay } from "../../frontend/shells/boot/ts/overlay";
-import { copyAsHTML, copyAsMathML, copyAsMarkdown, copyAsTeX } from "@rs-core/document/Conversion";
+import { copyAsHTML, copyAsMathML, copyAsMarkdown, copyAsTeX } from "core/document/Conversion";
 import { isUserScopePath, toUserRelativePath } from "fest/core";
 
 // Content-script modules

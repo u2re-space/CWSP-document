@@ -1,5 +1,5 @@
-import { loadSettings } from "@rs-com/config/Settings";
-import { startTracking } from "@rs-core/workers/GeoLocation";
+import { loadSettings } from "com/config/Settings";
+import { startTracking } from "core/workers/GeoLocation";
 
 //
 export const loadPlanSource = async (): Promise<string | null> => {

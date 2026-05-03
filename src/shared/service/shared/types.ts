@@ -1,4 +1,4 @@
-import type { MCPConfig } from "@rs-com/config/SettingsTypes";
+import type { MCPConfig } from "com/config/SettingsTypes";
 import type { DataKind, DataContext } from "../model/GPT-Config";
 
 export type { DataKind, DataContext };

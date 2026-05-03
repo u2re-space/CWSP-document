@@ -13,14 +13,11 @@ import { loadAsAdopted, removeAdopted } from "fest/dom";
 import DOMPurify from 'dompurify';
 import renderMathInElement from "katex/dist/contrib/auto-render.mjs";
 import { ensureStyleSheet, reinitializeRegistry } from "fest/icon";
-import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@shells/types";
-import type { CwViewViewerHostElement } from "@views/base/UIElement";
-import type { BaseViewOptions } from "@views/types";
-import { createViewState } from "@views/types";
-import { writeText as writeClipboardText } from "@rs-core/modules/Clipboard";
-import { loadSettings } from "@rs-com/config/Settings";
-import type { MarkdownExtensionRule } from "@rs-com/config/SettingsTypes";
-import { requestOpenView } from "@rs-frontend/shared/routing/view-api";
+import type { View, ViewOptions, ViewLifecycle, ShellContext } from "shells/types";
+import type { BaseViewOptions } from "views/types";
+import { createViewState } from "views/types";
+import { loadSettings } from "core/config/Settings";
+import type { MarkdownExtensionRule } from "core/config/SettingsTypes";
 
 // Import fest/fl-ui (e.g. shared markdown utilities elsewhere)
 import "fest/icon";
@@ -28,7 +25,9 @@ import "fest/icon";
 // @ts-ignore - SCSS import
 import style from "./index.scss?inline";
 import type { MarkedExtension } from "marked";
-import BaseElement from "@views/base/BaseElement";
+import { createViewConstructor, ViewBase } from "../registry";
+import { requestOpenView } from "shared/routing/view-api";
+import { ViewRegistry } from "shared/routing/registry";
 
 let markedParserPromise: Promise<(markdown: string) => Promise<string>> | null = null;
 
@@ -78,6 +77,10 @@ const ensureViewerIconRuntime = (): void => {
     } catch (error) {
         console.warn("[Viewer] Failed to initialize icon runtime:", error);
     }
+};
+
+const writeClipboardText = (text: string): Promise<void> => {
+    return navigator?.clipboard?.writeText?.(text) ?? Promise.resolve(void 0);
 };
 
 type ViewerMarkdownSettings = {
@@ -244,8 +247,9 @@ export interface ViewerOptions extends BaseViewOptions {
 // Must register before `new ViewerView()` — HTMLElement subclasses throw Illegal constructor otherwise.
 // Distinct from shell host tag `cw-view-viewer` (ViewHostElement); this tag is only for CE construction.
 // @ts-ignore
-@defineElement("cw-viewer-view")
-export class ViewerView extends BaseElement implements View {
+export const TAG = "cw-view-viewer";
+export const CwViewViewer = createViewConstructor(TAG, (Base: any)=>{
+    return class ViewerView extends Base {
     id = "viewer" as const;
     name = "Viewer";
     icon = "eye";
@@ -366,7 +370,7 @@ export class ViewerView extends BaseElement implements View {
     /**
      * Mount under `<cw-view-viewer>`: chrome in shadow, raw + rendered bodies in light DOM (slotted).
      */
-    renderIntoWebComponentHost(host: CwViewViewerHostElement, options?: ViewOptions): void {
+    renderIntoWebComponentHost(host: HTMLElement, options?: ViewOptions): void {
         ensureViewerIconRuntime();
         if (options) {
             this.options = { ...this.options, ...options };
@@ -1162,13 +1166,13 @@ export class ViewerView extends BaseElement implements View {
             return;
         }
         try {
-            const result = await Promise.race([
+            const result: { ok: false; error: string } | undefined = await Promise.race([
                 writeClipboardText(raw),
                 new Promise<{ ok: false; error: string }>((resolve) =>
                     globalThis.setTimeout(() => resolve({ ok: false, error: "Clipboard timeout" }), 3500)
                 )
-            ]);
-            if (!result.ok) throw new Error(result.error || "Clipboard write failed");
+            ]) as { ok: false; error: string } | undefined;
+            if (!result?.ok) throw new Error(result?.error || "Clipboard write failed");
             this.showMessage("Copied raw content to clipboard");
             this.options.onCopy?.(raw);
         } catch (error) {
@@ -1194,13 +1198,13 @@ export class ViewerView extends BaseElement implements View {
             return;
         }
         try {
-            const result = await Promise.race([
+            const result: { ok: false; error: string } | undefined = await Promise.race([
                 writeClipboardText(text),
                 new Promise<{ ok: false; error: string }>((resolve) =>
                     globalThis.setTimeout(() => resolve({ ok: false, error: "Clipboard timeout" }), 3500)
                 )
-            ]);
-            if (!result.ok) throw new Error(result.error || "Clipboard write failed");
+            ]) as { ok: false; error: string } | undefined;
+            if (!result?.ok) throw new Error(result.error || "Clipboard write failed");
             this.showMessage("Copied rendered text to clipboard");
         } catch {
             this.showMessage("Failed to copy rendered text");
@@ -1232,7 +1236,7 @@ export class ViewerView extends BaseElement implements View {
             return;
         }
         try {
-            const { downloadMarkdownAsDocx } = await import("@rs-core/document/DocxExport");
+            const { downloadMarkdownAsDocx } = await import("core/document/DocxExport");
             await downloadMarkdownAsDocx(content, {
                 title: this.options.filename || "Markdown Content",
                 filename: `document-${Date.now()}.docx`,
@@ -1309,7 +1313,6 @@ export class ViewerView extends BaseElement implements View {
         await Promise.resolve(this.shellContext?.navigate("workcenter"));
 
         try {
-            const { ViewRegistry } = await import("@rs-frontend/shared/routing/registry");
             const workcenter =
                 ViewRegistry.getLoaded("workcenter") ||
                 await ViewRegistry.load("workcenter", { shellContext: this.shellContext });
@@ -2119,7 +2122,7 @@ export class ViewerView extends BaseElement implements View {
             }
         }
     }
-}
+} as any});
 
 // ============================================================================
 // TYPE EXPORTS
@@ -2134,22 +2137,6 @@ export interface ViewerDocument {
     mimeType?: string;
     lastModified?: number;
 }
-
-// ============================================================================
-// FACTORY FUNCTION
-// ============================================================================
-
-/**
- * Create a viewer view instance
- */
-export function createView(options?: ViewerOptions): ViewerView {
-    return new ViewerView(options);
-}
-
-/** Alias for createView */
-export const createMarkdownView = createView;
-
-export default createView;
 
 /**
  * <md-view> Web Component and MarkdownViewer API

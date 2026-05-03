@@ -1,7 +1,7 @@
 import { H } from "fest/lure";
 import type { WorkCenterState, WorkCenterDependencies } from "./WorkCenterState";
 import type { WorkCenterFileOps } from "./WorkCenterFileOps";
-import { ROUTE_HASHES } from '@rs-com/config/Names';
+import { ROUTE_HASHES } from 'com/config/Names';
 
 export class WorkCenterAttachments {
     private container: HTMLElement | null = null;

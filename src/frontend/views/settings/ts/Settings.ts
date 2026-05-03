@@ -2,13 +2,13 @@
 import style from "../scss/Settings.scss?inline";
 
 import { H } from "fest/lure";
-import { loadSettings, saveSettings } from "@rs-com/config/Settings";
-import { BUILTIN_AI_MODELS, type AppSettings, type CoreMode } from "@rs-com/config/SettingsTypes";
-import { openAdminDoorFromCore, resolveAdminDoorUrls } from "@rs-com/config/admin-doors";
-import { sendMessage } from "@rs-com/core/UnifiedMessaging";
-import { applyTheme } from "@rs-core/utils/Theme";
-import { setString, StorageKeys } from "@rs-core/storage";
-import { navigateToView } from "@shells/boot";
+import { loadSettings, saveSettings } from "com/config/Settings";
+import { BUILTIN_AI_MODELS, type AppSettings, type CoreMode } from "com/config/SettingsTypes";
+import { openAdminDoorFromCore, resolveAdminDoorUrls } from "com/config/admin-doors";
+import { sendMessage } from "com/core/UnifiedMessaging";
+import { applyTheme } from "core/utils/Theme";
+import { setString, StorageKeys } from "core/storage";
+import { navigateToView } from "shells/boot";
 import { loadAsAdopted } from "fest/dom";
 import { applyAirpadRuntimeFromAppSettings } from "../../airpad/config/config";
 
@@ -532,7 +532,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
 
         const openNativeSettingsBtn = t?.closest?.('button[data-action="open-native-app-settings"]') as HTMLButtonElement | null;
         if (openNativeSettingsBtn) {
-            void import("@shared/native/clipboard-device")
+            void import("shared/native/clipboard-device")
                 .then((m) => m.openAppClipboardRelatedSettings())
                 .then(() => setNote("App settings opened (native shell only)."))
                 .catch(() => setNote("Native settings unavailable in this context."));
@@ -541,7 +541,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
 
         const openNativeNotifBtn = t?.closest?.('button[data-action="open-native-notification-settings"]') as HTMLButtonElement | null;
         if (openNativeNotifBtn) {
-            void import("@shared/native/clipboard-device")
+            void import("shared/native/clipboard-device")
                 .then((m) => m.openNativeNotificationSettings?.())
                 .then(() => setNote("Notification settings opened (native shell only)."))
                 .catch(() => setNote("Native settings unavailable in this context."));
@@ -718,7 +718,7 @@ export const createSettingsView = (opts: SettingsViewOptions) => {
                 },
             };
             const saved = await saveSettings(next);
-            void import("@shared/transport/hub-socket-boot").then((m) => m.applyHubSocketFromSettings(saved));
+            void import("shared/transport/hub-socket-boot").then((m) => m.applyHubSocketFromSettings(saved));
             applyTheme(saved);
             opts.onTheme?.((saved.appearance?.theme as any) || "auto");
             setNote("Saved.");

@@ -5,7 +5,7 @@
  * all need the same destination, protocol, and envelope normalization without
  * each importing the full `fest/uniform` runtime graph.
  */
-import { getDestinationAliases, normalizeDestination } from "@rs-com/config/Names";
+import { getDestinationAliases, normalizeDestination } from "com/config/Names";
 
 export type InteropPurpose = "invoke" | "mail" | "attach" | "deliver" | "defer";
 

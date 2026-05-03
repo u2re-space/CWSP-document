@@ -10,7 +10,7 @@
 import { marked, type MarkedExtension } from "marked";
 import markedKatex from "marked-katex-extension";
 import DOMPurify from 'dompurify';
-import { downloadMarkdownAsDocx } from "@rs-core/document/DocxExport";
+import { downloadMarkdownAsDocx } from "core/document/DocxExport";
 
 // ---------------------------------------------------------------------------
 // Marked + KaTeX setup

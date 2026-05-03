@@ -13,10 +13,10 @@
         "skipLibCheck": true,
         "jsx": "preserve",
         "types": ["chrome"],
-        "composite": true,
         "lib": [
             "ESNext",
             "DOM",
+            "DOM.Iterable",
             "WebWorker"
         ],
         "module": "ESNext",

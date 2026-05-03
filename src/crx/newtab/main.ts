@@ -1,5 +1,5 @@
-import { crxFrontend } from "@shells/boot";
-import { loadSettings } from "@rs-com/config/Settings";
+import { crxFrontend } from "shells/boot";
+import { loadSettings } from "com/config/Settings";
 
 const mount = document.getElementById("app") as HTMLElement | null;
 

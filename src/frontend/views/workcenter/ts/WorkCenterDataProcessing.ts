@@ -1,7 +1,7 @@
 import { marked } from "marked";
 import DOMPurify from 'dompurify';
-import { extractJSONFromAIResponse } from "@rs-core/document/AIResponseParser";
-import { writeText as writeClipboardText } from "@rs-core/modules/Clipboard";
+import { extractJSONFromAIResponse } from "core/document/AIResponseParser";
+import { writeText as writeClipboardText } from "core/modules/Clipboard";
 
 export class WorkCenterDataProcessing {
     formatResult(result: any, format: string, outputFormat?: string): string {

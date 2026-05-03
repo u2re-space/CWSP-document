@@ -9,12 +9,12 @@ import {
     callBackendIfAvailable,
     getActiveCustomInstruction
 } from "./shared";
-import { pushToIDBQueue } from "@rs-com/service/service/ServiceHelper";
-import { loadSettings } from "@rs-com/config/Settings";
-import { getRuntimeSettings } from "@rs-com/config/RuntimeSettings";
+import { pushToIDBQueue } from "com/service/service/ServiceHelper";
+import { loadSettings } from "com/config/Settings";
+import { getRuntimeSettings } from "com/config/RuntimeSettings";
 import { fileToDataUrl, isProcessableImage, isImageDataUrl } from "../lib/ImageUtils";
-import { recognizeByInstructions } from "@rs-com/service/AI-ops/service/RecognizeData2";
-import { getUsableData } from "@rs-com/service/model/GPT-Responses";
+import { recognizeByInstructions } from "com/service/AI-ops/service/RecognizeData2";
+import { getUsableData } from "com/service/model/GPT-Responses";
 
 // IDB utilities for clipboard operations
 const CLIPBOARD_DB_NAME = 'rs-clipboard-queue';

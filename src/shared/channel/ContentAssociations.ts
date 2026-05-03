@@ -1,4 +1,4 @@
-import { CONTENT_TYPES } from "@rs-com/config/Names";
+import { CONTENT_TYPES } from "com/config/Names";
 import {
     UNIFIED_PROCESSING_RULES,
     type AssociationOverrideFactor

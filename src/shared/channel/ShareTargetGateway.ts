@@ -6,7 +6,7 @@
  * helpers persist the payload in browser-managed caches so the UI can consume
  * it later without depending on a live in-memory handoff.
  */
-import { API_ENDPOINTS } from "@rs-com/config/Names";
+import { API_ENDPOINTS } from "com/config/Names";
 
 export const SHARE_CACHE_NAME = "share-target-data";
 export const SHARE_CACHE_KEY = "/share-target-data";

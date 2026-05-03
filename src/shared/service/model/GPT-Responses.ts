@@ -18,8 +18,8 @@ import { JSOX } from "jsox";
 import {
     extractJSONFromAIResponse,
     STRICT_JSON_INSTRUCTIONS
-} from "@rs-core/document/AIResponseParser";
-import { canParseURL } from "@rs-core/utils/Runtime";
+} from "core/document/AIResponseParser";
+import { canParseURL } from "core/utils/Runtime";
 
 const hasFile = () => typeof (globalThis as any).File !== "undefined";
 const hasBlob = () => typeof (globalThis as any).Blob !== "undefined";

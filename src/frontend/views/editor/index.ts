@@ -7,10 +7,10 @@
 import { H } from "fest/lure";
 import { ref, affected } from "fest/object";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
-import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@shells/types";
-import type { BaseViewOptions } from "@views/types";
-import { createViewState } from "@views/types";
-import { writeText as writeClipboardText } from "@rs-core/modules/Clipboard";
+import type { View, ViewOptions, ViewLifecycle, ShellContext } from "shells/types";
+import type { BaseViewOptions } from "views/types";
+import { createViewState } from "views/types";
+import { writeText as writeClipboardText } from "core/modules/Clipboard";
 
 // @ts-ignore
 import style from "./editor.scss?inline";

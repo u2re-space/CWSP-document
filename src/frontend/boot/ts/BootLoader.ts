@@ -23,19 +23,19 @@ import {
     defaultTheme,
     darkTheme,
     lightTheme
-} from "../../shared/routing/registry";
-import type { ShellId, ViewId, Shell, ShellTheme } from "../../shells/types";
-import { serviceChannels, type ServiceChannelId } from "@rs-com/core/ServiceChannels";
+} from "shared/routing/registry";
+import type { ShellId, ViewId, Shell, ShellTheme } from "shells/types";
+import { serviceChannels, type ServiceChannelId } from "com/core/ServiceChannels";
 import { LS_BOOT_SHELL_LAST_ACTIVE } from "./shell-preference";
-import { loadSettings } from "@rs-com/config/Settings";
-import { applyTheme as applyAppTheme } from "@rs-core/utils/Theme";
-import { DEFAULT_SETTINGS, type AppSettings } from "@rs-com/config/SettingsTypes";
-import { isEnabledView, pickEnabledView } from "../../shared/routing/views";
+import { loadSettings } from "com/config/Settings";
+import { applyTheme as applyAppTheme } from "core/utils/Theme";
+import { DEFAULT_SETTINGS, type AppSettings } from "com/config/SettingsTypes";
+import { isEnabledView, pickEnabledView } from "shared/routing/views";
 
-import { initializeLayers } from "../../shared/routing/layer-manager";
-import { loadStyleSystem } from "../../shared/styles";
-import { initCwsNativeBridge } from "../../shared/native/cws-bridge";
-import { applyHubSocketFromSettings } from "../../shared/transport/hub-socket-boot";
+import { initializeLayers } from "shared/routing/layer-manager";
+import { loadStyleSystem } from "shared/styles";
+import { initCwsNativeBridge } from "shared/native/cws-bridge";
+import { applyHubSocketFromSettings } from "shared/transport/hub-socket-boot";
 
 // ============================================================================
 // BOOT TYPES

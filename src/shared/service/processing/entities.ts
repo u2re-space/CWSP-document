@@ -1,13 +1,13 @@
-import { detectDataKindFromContent } from "@rs-com/service/model/GPT-Config";
-import { extractJSONFromAIResponse } from "@rs-core/document/AIResponseParser";
-import { loadSettings } from "@rs-com/config/Settings";
+import { detectDataKindFromContent } from "com/service/model/GPT-Config";
+import { extractJSONFromAIResponse } from "core/document/AIResponseParser";
+import { loadSettings } from "com/config/Settings";
 import { getGPTInstance } from "../shared/gpt-utils";
 import {
 	CORE_ENTITY_EXTRACTION_INSTRUCTION,
 	DATA_MODIFICATION_INSTRUCTION,
 } from "../instructions/core";
 import type { AIConfig, ExtractionRule, ExtractionResult } from "../shared/types";
-import type { AIResponse } from "@rs-com/service/model/GPT-Responses";
+import type { AIResponse } from "com/service/model/GPT-Responses";
 
 export const extractEntities = async (
 	data: File | Blob | string,
@@ -91,7 +91,7 @@ User modification request: ${modificationPrompt}
 		},
 	];
 
-	const { recognizeByInstructions } = await import("@rs-com/service/processing/unified");
+	const { recognizeByInstructions } = await import("com/service/processing/unified");
 	return recognizeByInstructions(input, "", sendResponse);
 };
 

@@ -1,7 +1,7 @@
 import { encode } from "@toon-format/toon";
 import { type ModificationInstruction, buildModificationPrompt } from "../model/GPT-Config";
 import { fixEntityId } from "../../template/EntityId";
-import { parseAIResponseSafe } from "@rs-core/document/AIResponseParser";
+import { parseAIResponseSafe } from "core/document/AIResponseParser";
 import { getGPTInstance } from "../shared/gpt-utils";
 import type { AIConfig } from "../shared/types";
 

@@ -12,16 +12,16 @@
  * implemented; the extension typically acts as a normal CWSP client to the hub.
  */
 
-import type { AppSettings } from "../../frontend/shared/config/SettingsTypes";
-import { loadSettings } from "../../com/config/Settings";
-import { isCapacitorCwsNativeShell } from "../../frontend/shared/native/cws-bridge";
+import type { AppSettings } from "com/config/SettingsTypes";
+import { loadSettings } from "com/config/Settings";
+import { isCapacitorCwsNativeShell } from "shared/native/cws-bridge";
 import {
     applyAirpadRuntimeFromAppSettings,
     getRemoteHost,
     isMaintainHubSocketConnectionEnabled,
     isPreferNativeWebsocketEnabled,
-} from "../../frontend/views/airpad/config/config";
-import { installAirpadHubLifecycleRecovery } from "../../frontend/shared/transport/hub-socket-boot";
+} from "views/airpad/config/config";
+import { installAirpadHubLifecycleRecovery } from "shared/transport/hub-socket-boot";
 import {
     connectWS,
     disconnectWS,
@@ -32,7 +32,7 @@ import {
     sendCoordinatorAct,
     sendCoordinatorAsk,
     sendCoordinatorRequest,
-} from "../../frontend/shared/transport/websocket";
+} from "shared/transport/websocket";
 
 type NetworkClipboardMeta = { source?: string };
 type NetworkClipboardHandler = (text: string, meta?: NetworkClipboardMeta) => void;

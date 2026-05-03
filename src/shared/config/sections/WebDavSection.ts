@@ -1,4 +1,4 @@
-import type { SectionConfig } from "@rs-com/config/SettingsTypes";
+import type { SectionConfig } from "com/config/SettingsTypes";
 
 //
 export const WebDavSection: SectionConfig = {

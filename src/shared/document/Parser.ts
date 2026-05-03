@@ -1,6 +1,6 @@
 import { H } from "fest/lure";
 import type { DocCollection, DocEntry, DocParser } from "../utils/Types";
-import { formatDateTime, sanitizeDocSnippet, truncateDocSnippet } from "@rs-core/text";
+import { formatDateTime, sanitizeDocSnippet, truncateDocSnippet } from "core/text";
 
 //
 export const parseMarkdownEntry: DocParser = async ({ collection, file, filePath }) => {

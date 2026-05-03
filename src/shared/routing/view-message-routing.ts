@@ -1,6 +1,6 @@
-import type { View } from "../../shells/types";
-import type { UnifiedMessage } from "@rs-com/core/UnifiedMessaging";
-import { normalizeViewId } from "@rs-com/config/Names";
+import type { View } from "shells/types";
+import type { UnifiedMessage } from "com/core/UnifiedMessaging";
+import { normalizeViewId } from "com/config/Names";
 
 const VIEW_MESSAGE_FALLBACKS: Record<string, string[]> = {
     viewer: ["content-view", "content-load", "markdown-content"],

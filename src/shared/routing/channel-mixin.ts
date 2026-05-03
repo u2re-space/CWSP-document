@@ -3,7 +3,7 @@ import type {
     View,
     ViewLifecycle,
     ViewOptions
-} from "../../shells/types";
+} from "shells/types";
 import type {
     ChannelConnectedView,
     ViewMessageHandler,
@@ -17,17 +17,16 @@ import {
     sendToChannel,
     type ServiceChannelId,
     type ChannelMessage 
-} from "@rs-com/core/ServiceChannels";
-import { BROADCAST_CHANNELS, MESSAGE_TYPES, getDestinationAliases, matchesDestination, normalizeViewId } from "@rs-com/config/Names";
+} from "com/core/ServiceChannels";
+import { BROADCAST_CHANNELS, MESSAGE_TYPES, getDestinationAliases, matchesDestination, normalizeViewId } from "com/config/Names";
 import {
     registerHandler,
     unregisterHandler,
     registerComponent,
     initializeComponent,
     type UnifiedMessage
-} from "@rs-com/core/UnifiedMessaging";
-import { fetchSwCachedEntries } from "@rs-com/core/ShareTargetGateway";
-import { toUnifiedInteropMessage } from "../core/UniformInterop";
+} from "com/core/UnifiedMessaging";
+import { fetchSwCachedEntries } from "com/core/ShareTargetGateway";
 import { inferViewDestination, mapUnifiedMessageToView } from "./view-message-routing";
 import { subscribeViewChannel } from "./view-api";
 

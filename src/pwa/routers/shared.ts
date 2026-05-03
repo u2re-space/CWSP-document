@@ -1,11 +1,11 @@
 
-import { resolveEntity } from "@rs-com/service/service/EntityItemResolve";
-import { UnifiedAIService, type RecognizeByInstructionsOptions } from "@rs-com/service/AI-ops/service/RecognizeData2";
+import { resolveEntity } from "com/service/service/EntityItemResolve";
+import { UnifiedAIService, type RecognizeByInstructionsOptions } from "com/service/AI-ops/service/RecognizeData2";
 import { getOrDefaultComputedOfDataSourceCache } from "../lib/DataSourceCache";
-import { GPTResponses } from "@rs-com/service/model/GPT-Responses";
-import type { AppSettings, CustomInstruction } from "@rs-com/config/SettingsTypes";
-import { loadSettings } from "@rs-com/config/Settings";
-import { canParseURL } from "@rs-core/utils/Runtime";
+import { GPTResponses } from "com/service/model/GPT-Responses";
+import type { AppSettings, CustomInstruction } from "com/config/SettingsTypes";
+import { loadSettings } from "com/config/Settings";
+import { canParseURL } from "core/utils/Runtime";
 
 // Re-export unified functions for backward compatibility
 const { analyzeRecognizeUnified, loadAISettings } = UnifiedAIService;

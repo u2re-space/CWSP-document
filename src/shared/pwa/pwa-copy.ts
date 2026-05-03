@@ -4,11 +4,10 @@
  * Listens for clipboard requests from service worker via BroadcastChannel
  */
 
-import { initClipboardReceiver, listenForClipboardRequests, requestCopy } from "../../core";
-import { copy } from "../../../../../modules/projects/lur.e/src/extension/modules/Clipboard";
-import { initToastReceiver, showToast } from "@fl-ui/items/overlay/Toast";
-import { unifiedMessaging } from "@rs-com/core/UnifiedMessaging";
-import { summarizeForLog } from "@rs-com/core/LogSanitizer";
+import { initToastReceiver, showToast } from "fest/fl-ui";
+import { unifiedMessaging } from "com/core/UnifiedMessaging";
+import { summarizeForLog } from "com/core/LogSanitizer";
+import { copy, initClipboardReceiver, listenForClipboardRequests, requestCopy } from "fest/lure";
 
 // Track initialization
 let _pwaClipboardInitialized = false;
@@ -177,7 +176,6 @@ const checkPendingClipboardOperations = async (): Promise<void> => {
                     console.log('[PWA-Copy] Processing pending AI result:', operation.id);
                     const text = extractRecognizedContent(operation.data);
                     await copy(text, { showFeedback: true });
-
                     await sendShareTargetResultToWorkcenter({
                         content: typeof text === "string" ? text : JSON.stringify(text),
                         rawData: operation.data,

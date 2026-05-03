@@ -1,6 +1,6 @@
-import { createDayDescriptor, insideOfDay, parseDateCorrectly } from "@rs-core/time";
-import type { ChapterDescriptor, DayDescriptor } from "@rs-core/utils/Types";
-import type { EntityInterface } from "@rs-com/template/EntityInterface";
+import { createDayDescriptor, insideOfDay, parseDateCorrectly } from "core/time";
+import type { ChapterDescriptor, DayDescriptor } from "core/utils/Types";
+import type { EntityInterface } from "com/template/EntityInterface";
 import { JSOX } from "jsox";
 
 //

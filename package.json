@@ -22,7 +22,8 @@
         "dev:lite": "npm run dev",
         "test": "npm run dev",
         "test:dev": "npm run dev",
-        "test:test": "echo 'No tests configured for crossword' && exit 0"
+        "test:test": "echo 'No tests configured for crossword' && exit 0",
+        "test:explorer": "npx --yes tsx --test ./src/frontend/views/explorer/inject.test.ts"
     },
     "browserslist": [
         "last 1 chrome version",

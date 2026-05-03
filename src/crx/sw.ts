@@ -12,22 +12,22 @@
  * Heavy capture/AI/clipboard logic is in `./service/api.ts`.
  */
 
-import { createTimelineGenerator, requestNewTimeline } from "../com/service/service/MakeTimeline";
+import { createTimelineGenerator, requestNewTimeline } from "com/service/service/MakeTimeline";
 import { COPY_HACK, enableCapture } from "./service/api";
-import type { GPTResponses } from "../com/service/model/GPT-Responses";
-import type { CustomInstruction } from "../com/service/instructions/CustomInstructions";
-import { loadSettings } from "../com/config/Settings";
+import type { GPTResponses } from "com/service/model/GPT-Responses";
+import type { CustomInstruction } from "com/service/instructions/CustomInstructions";
+import { loadSettings } from "com/config/Settings";
 
 import * as swAi from "./sw-ai-modules";
-import type { ActionContext, ActionInput } from "../com/service/misc/ActionHistory";
-import { crxMessaging, registerCrxHandler, broadcastToCrxTabs } from "../com/core/CrxMessaging";
+import type { ActionContext, ActionInput } from "com/service/misc/ActionHistory";
+import { crxMessaging, registerCrxHandler, broadcastToCrxTabs } from "com/core/CrxMessaging";
 import {
     CRX_SOLVE_AND_ANSWER_INSTRUCTION,
     CRX_WRITE_CODE_INSTRUCTION,
     CRX_EXTRACT_CSS_INSTRUCTION,
-} from "../com/core/BuiltInAI";
-import { unifiedMessaging } from "../com/core/UnifiedMessagingSw";
-import { createInteropEnvelope } from "../com/core/UniformInterop";
+} from "com/core/BuiltInAI";
+import { unifiedMessaging } from "com/core/UnifiedMessagingSw";
+import { createInteropEnvelope } from "com/core/UniformInterop";
 import { isUserScopePath } from "fest/core";
 import { getCrxNetworkCoordinator } from "./network/Coordinator";
 

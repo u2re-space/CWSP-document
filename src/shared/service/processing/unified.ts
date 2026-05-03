@@ -1,18 +1,18 @@
-import { loadSettings } from "@rs-com/config/Settings";
-import { buildInstructionPrompt, getOutputFormatInstruction, getIntermediateRecognitionInstruction } from "@rs-com/service/instructions/utils";
-import { DEFAULT_API_URL, DEFAULT_MODEL, getGPTInstance, isImageData, unwrapUnwantedCodeBlocks, getResponseFormat } from "@rs-com/service/shared/gpt-utils";
-import { loadAISettings, getActiveCustomInstruction, getLanguageInstruction, getSvgGraphicsAddon } from "@rs-com/service/processing/settings";
-import { RecognitionCache } from "@rs-com/service/recognition/cache";
-import { detectPlatform, getPlatformAdapter } from "@rs-com/service/processing/adapters";
-import { solveAndAnswer, writeCode, extractCSS } from "@rs-com/service/processing/core";
-import { extractEntities } from "@rs-com/service/processing/entities";
-import { smartRecognize } from "@rs-com/service/recognition/smart";
+import { loadSettings } from "com/config/Settings";
+import { buildInstructionPrompt, getOutputFormatInstruction, getIntermediateRecognitionInstruction } from "com/service/instructions/utils";
+import { DEFAULT_API_URL, DEFAULT_MODEL, getGPTInstance, isImageData, unwrapUnwantedCodeBlocks, getResponseFormat } from "com/service/shared/gpt-utils";
+import { loadAISettings, getActiveCustomInstruction, getLanguageInstruction, getSvgGraphicsAddon } from "com/service/processing/settings";
+import { RecognitionCache } from "com/service/recognition/cache";
+import { detectPlatform, getPlatformAdapter } from "com/service/processing/adapters";
+import { solveAndAnswer, writeCode, extractCSS } from "com/service/processing/core";
+import { extractEntities } from "com/service/processing/entities";
+import { smartRecognize } from "com/service/recognition/smart";
 import type {
 	AIConfig,
 	ProcessDataWithInstructionOptions,
 	ProcessDataWithInstructionResult,
 	RecognizeByInstructionsOptions,
-} from "@rs-com/service/shared/types";
+} from "com/service/shared/types";
 
 const recognitionCache = new RecognitionCache();
 

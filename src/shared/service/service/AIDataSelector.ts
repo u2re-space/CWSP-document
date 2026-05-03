@@ -1,6 +1,6 @@
 import { decode, encode } from "@toon-format/toon";
 import { type DataFilter } from "../model/GPT-Config";
-import { parseAIResponseSafe } from "@rs-core/document/AIResponseParser";
+import { parseAIResponseSafe } from "core/document/AIResponseParser";
 import { getGPTInstance } from "../shared/gpt-utils";
 import type { AIConfig } from "../shared/types";
 

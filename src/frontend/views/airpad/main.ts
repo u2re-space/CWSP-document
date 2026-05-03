@@ -6,9 +6,9 @@
  * teardown path required for shell remounts.
  */
 
-//
+// @ts-ignore
 import stylesheet from "./main.scss?inline";
-import { initServiceWorker } from "@rs-frontend/pwa/sw-handling";
+import { initServiceWorker } from "core/pwa/sw-handling";
 
 //
 import { log, getBtnConnect, getAirpadDomRoot, queryAirpad, setAirpadDomRoot } from "./utils/utils";
@@ -24,7 +24,7 @@ import { showConfigUI, teardownAirpadConfigOverlay } from "./ui/config-ui";
 import { resetClipboardToolbarState } from "./ui/clipboard-toolbar";
 import { loadAsAdopted } from "fest/dom";
 import { H } from "fest/lure";
-import { waitForDomPaint } from "@rs-frontend/shared/policies/event-handling-policy";
+import { waitForDomPaint } from "shared/policies/event-handling-policy";
 import { resetMotionAccum } from "./config/motion-state";
 import { resetMotionBaseline } from "./ui/air-button";
 import { resetRelativeOrientationRuntimeState } from "./input/sensor/relative-orientation";
@@ -197,14 +197,6 @@ async function initAirpadApp(initToken: number | undefined, signal: AbortSignal,
     }
 
     bindBus("ui.config.open", () => showConfigUI());
-    bindBus("ui.admin.open", () => {
-        void import("@rs-com/config/Settings")
-            .then(({ loadSettings }) => loadSettings())
-            .then((s) => import("@rs-com/config/admin-doors").then(({ openAdminDoorFromCore }) => {
-                openAdminDoorFromCore(s.core, "https");
-            }))
-            .catch((e) => console.warn("[Airpad] admin door:", e));
-    });
     bindBus("ui.motion.reset", () => resetMotionRuntime());
     bindBus("ui.reload.request", () => {
         try {

@@ -11,7 +11,7 @@ import {
     type ChannelState
 } from 'fest/uniform';
 
-import { BROADCAST_CHANNELS, ROUTE_HASHES, COMPONENTS } from '@rs-com/config/Names';
+import { BROADCAST_CHANNELS, ROUTE_HASHES, COMPONENTS } from 'com/config/Names';
 
 // Re-export types for consumers
 export type { ServiceChannelConfig, ChannelMessage, ChannelState };

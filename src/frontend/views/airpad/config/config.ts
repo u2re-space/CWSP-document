@@ -2,16 +2,16 @@
 // Конфигурация
 // =========================
 
-import type { AppSettings } from "@rs-com/config/SettingsTypes";
+import type { AppSettings } from "com/config/SettingsTypes";
 import {
     parseWireTargetList,
     wireTargetNodeIds,
     type WireTargetEntry
-} from "@cwsp-endpoint-shared/wire-target-id";
+} from "cwsp-shared/wire-target-id";
 import {
     resolveWireArchetype,
     resolveWireConnectionType,
-} from "@cwsp-endpoint-shared/cws-client-wire-defaults";
+} from "cwsp-shared/cws-client-wire-defaults";
 import { invalidateAirpadTransportCredentials } from "../credential-cache-bridge";
 
 export type { WireTargetEntry };

@@ -84,6 +84,7 @@ export class MinimalShell extends ShellBase {
                         <div class="loading-spinner"></div>
                         <span>Loading...</span>
                     </div>
+                    <slot name="view"></slot>
                 </main>
                 <div class="app-shell__status" data-shell-status hidden aria-live="polite"></div>
             </div>
@@ -110,10 +111,10 @@ export class MinimalShell extends ShellBase {
 
         navRight.appendChild(btn);
         btn.addEventListener("click", () => {
-            void import("@rs-com/config/Settings")
+            void import("com/config/Settings")
                 .then(({ loadSettings }) => loadSettings())
                 .then((s) =>
-                    import("@rs-com/config/admin-doors").then(({ openAdminDoorFromCore }) => {
+                    import("com/config/admin-doors").then(({ openAdminDoorFromCore }) => {
                         openAdminDoorFromCore(s.core, "https");
                     })
                 )

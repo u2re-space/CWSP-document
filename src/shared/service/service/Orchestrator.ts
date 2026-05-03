@@ -7,11 +7,11 @@
 import { encode } from "@toon-format/toon";
 
 // Service imports
-import type { MCPConfig } from "@rs-com/config/SettingsTypes";
+import type { MCPConfig } from "com/config/SettingsTypes";
 import { GPTResponses, type AIResponse } from "../model/GPT-Responses";
 import { type DataContext, type DataFilter, type ModificationInstruction } from "../model/GPT-Config";
-import { fixEntityId } from "@rs-com/template/EntityId";
-import { detectEntityTypeByJSON } from "@rs-com/template/EntityUtils";
+import { fixEntityId } from "com/template/EntityId";
+import { detectEntityTypeByJSON } from "com/template/EntityUtils";
 import { getGPTInstance } from "../shared/gpt-utils";
 
 import {

@@ -1,5 +1,5 @@
 /**
- * Minimal `toText` for CRX service worker — avoids importing `@rs-core/modules/Clipboard`,
+ * Minimal `toText` for CRX service worker — avoids importing `core/modules/Clipboard`,
  * which pulls lure controllers and lands in `com/app.js` with DOM/icon code.
  */
 export const toText = (data: unknown): string => {

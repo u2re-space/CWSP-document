@@ -8,10 +8,10 @@
 import { H } from "fest/lure";
 import { observe } from "fest/object";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
-import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@shells/types";
-import type { BaseViewOptions } from "@views/types";
-import { getItem, setItem } from "@rs-core/storage";
-import { writeText as writeClipboardText } from "@rs-core/modules/Clipboard";
+import type { View, ViewOptions, ViewLifecycle, ShellContext } from "shells/types";
+import type { BaseViewOptions } from "views/types";
+import { getItem, setItem } from "core/storage";
+import { writeText as writeClipboardText } from "core/modules/Clipboard";
 
 // @ts-ignore
 import style from "./scss/history.scss?inline";

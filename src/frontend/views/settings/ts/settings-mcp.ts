@@ -1,5 +1,5 @@
 import { H } from "fest/lure";
-import type { MCPConfig } from "@rs-com/config/SettingsTypes";
+import type { MCPConfig } from "com/config/SettingsTypes";
 
 export const createMcpRow = (cfg: MCPConfig) => {
     const safeCfg = {

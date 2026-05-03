@@ -6,19 +6,19 @@
  * page side, while `src/pwa/sw.ts` owns the worker-side behavior.
  */
 import { initPWAClipboard } from "./pwa-copy";
-import { showToast } from "@fl-ui/items/overlay/Toast";
+import { showToast } from "fest/fl-ui";
 import { ensureServiceWorkerRegistered } from "./sw-url";
-import { dispatchViewTransfer, type ViewTransferHint } from "@rs-com/core/ViewTransferRouting";
-import { BROADCAST_CHANNELS } from "@rs-com/config/Names";
-import { loadSettings } from "@rs-com/config/Settings";
-import { summarizeForLog } from "@rs-com/core/LogSanitizer";
+import { dispatchViewTransfer, type ViewTransferHint } from "com/core/ViewTransferRouting";
+import { BROADCAST_CHANNELS } from "com/config/Names";
+import { loadSettings } from "com/config/Settings";
+import { summarizeForLog } from "com/core/LogSanitizer";
 import {
     buildShareDataFromCachedPayload,
     consumeCachedShareTargetPayload as consumeCachedShareTargetPayloadFromGateway,
     storeShareTargetPayloadToCache as storeShareTargetPayloadToCacheGateway,
     type CachedShareTargetPayload
-} from "@rs-com/core/ShareTargetGateway";
-import { waitForIngressPipelineSlot } from "@rs-frontend/shared/policies/ingress-pipeline-guard";
+} from "com/core/ShareTargetGateway";
+import { waitForIngressPipelineSlot } from "shared/policies/ingress-pipeline-guard";
 
 // ============================================================================
 // CSS INJECTION
@@ -423,7 +423,7 @@ const routeToTransferView = async (
         // hard reload. This keeps markdown/viewer launches on the same surface.
         if (delivered) {
             try {
-                const { bootLoader } = await import("../shells/boot/ts/BootLoader");
+                const { bootLoader } = await import("boot/ts/BootLoader");
                 const shell = bootLoader.getShell();
                 const supportsSingletonViewReuse = shell && !["window", "tabbed", "environment"].includes(shell.id);
                 if (supportsSingletonViewReuse && shell.getElement?.()?.isConnected) {
@@ -610,7 +610,7 @@ export const processShareTargetData = async (shareData: ShareDataInput, skipIfEm
 
             // Send to workcenter for display (destination-aware)
             try {
-                const { unifiedMessaging } = await import("@rs-com/core/UnifiedMessaging");
+                const { unifiedMessaging } = await import("com/core/UnifiedMessaging");
                 await unifiedMessaging.sendMessage({
                     type: 'share-target-result',
                     source: 'share-target',
@@ -721,7 +721,7 @@ const tryServerSideProcessing = async (shareData: ShareDataInput): Promise<boole
         console.log("[ShareTarget] Attempting server-side AI fallback");
 
         // Get API settings
-        const { getRuntimeSettings } = await import("@rs-com/config/RuntimeSettings");
+        const { getRuntimeSettings } = await import("com/config/RuntimeSettings");
         const settings = await getRuntimeSettings().catch(() => null);
         const apiKey = settings?.ai?.apiKey;
 

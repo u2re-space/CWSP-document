@@ -1,4 +1,4 @@
-import { pushOne } from "@rs-com/store/IDBQueue";
+import { pushOne } from "com/store/IDBQueue";
 
 //
 const boardcastChannel = new BroadcastChannel('geolocation');

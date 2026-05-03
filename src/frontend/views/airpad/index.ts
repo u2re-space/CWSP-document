@@ -7,8 +7,10 @@
 
 import { H } from "fest/lure";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
-import type { View, ViewOptions, ViewLifecycle, ShellContext } from "@shells/types";
-import type { BaseViewOptions } from "@views/types";
+import type { ViewOptions as ShellViewOptions, ViewLifecycle } from "shells/types";
+import type { BaseViewOptions } from "views/types";
+import type { ViewOptions as RegistryViewOptions } from "../registry";
+import { createViewConstructor, ViewBase } from "../registry";
 import { setRemoteKeyboardEnabled } from "./input/virtual-keyboard";
 import { ensureCwAirpadAppDefined, type CwAirpadApp } from "./component/CwAirpadApp";
 
@@ -17,17 +19,18 @@ import style from "./airpad.scss?inline";
 
 export type AirpadViewOptions = BaseViewOptions;
 
+export const TAG = "cw-airpad-view";
+
 // ============================================================================
 // AIRPAD VIEW
 // ============================================================================
 
-export class AirpadView implements View {
+export const CwAirpadView = createViewConstructor(TAG, (Base: typeof ViewBase) => {
+    return class AirpadView extends Base {
     id = "airpad" as const;
     name = "Airpad";
     icon = "hand-pointing";
 
-    private options: BaseViewOptions;
-    private shellContext?: ShellContext;
     private element: HTMLElement | null = null;
     private appElement: CwAirpadApp | null = null;
     private initialized = false;
@@ -54,15 +57,20 @@ export class AirpadView implements View {
         },
     };
 
-    constructor(options: BaseViewOptions = {}) {
-        this.options = options;
-        this.shellContext = options.shellContext;
+    constructor(options?: BaseViewOptions) {
+        super();
+        if (options) {
+            this.options = options as unknown as RegistryViewOptions;
+        }
     }
 
-    render(options?: ViewOptions): HTMLElement {
+    /** Shell passes shell `ViewOptions`; registry `ViewBase` uses a narrower options bag — merge via cast. */
+    render = (options?: ShellViewOptions): HTMLElement => {
         if (options) {
-            this.options = { ...this.options, ...options };
-            this.shellContext = options.shellContext || this.shellContext;
+            this.options = {
+                ...(this.options as object),
+                ...(options as object)
+            } as RegistryViewOptions;
         }
 
         // If the view root is being re-created (e.g. after shell cache refresh),
@@ -83,7 +91,7 @@ export class AirpadView implements View {
         // and to match other views; keeps a single code path.
 
         return this.element;
-    }
+    };
 
     getToolbar(): HTMLElement | null {
         return null;
@@ -126,12 +134,14 @@ export class AirpadView implements View {
 
     private async lockOrientationForAirpad(): Promise<void> {
         try {
-            const orientationApi = globalThis?.screen?.orientation as ScreenOrientation;
+            const orientationApi = globalThis?.screen?.orientation as ScreenOrientation & {
+                lock?: (type: OrientationType) => Promise<void>;
+            };
             if (!orientationApi || typeof orientationApi.lock !== "function") return;
 
             const type = (String(orientationApi.type || "").toLowerCase()) || "natural";
             const lockType = type as OrientationType;
-            await orientationApi?.lock?.(lockType);
+            await orientationApi.lock(lockType);
             this._orientationLocked = true;
         } catch {
             // Orientation lock can fail outside installed/fullscreen contexts.
@@ -157,17 +167,11 @@ export class AirpadView implements View {
     }
 
     async handleMessage(): Promise<void> {}
+    }
+}) as CustomElementConstructor;
+
+export function createAirpadView(options?: BaseViewOptions) {
+    return new CwAirpadView(options);
 }
 
-// ============================================================================
-// FACTORY
-// ============================================================================
-
-export function createView(options?: AirpadViewOptions): AirpadView {
-    return new AirpadView(options);
-}
-
-/** Alias for createView */
-export const createAirpadView = createView;
-
-export default createView;
+export default createAirpadView;

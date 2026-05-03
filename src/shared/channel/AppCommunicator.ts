@@ -7,7 +7,7 @@
  */
 
 import { unifiedMessaging, type UnifiedMessage, type MessageHandler } from './UnifiedMessaging';
-import { BROADCAST_CHANNELS } from '@rs-com/config/Names';
+import { BROADCAST_CHANNELS } from 'com/config/Names';
 
 // Re-export types for backward compatibility
 export type { UnifiedMessage, MessageHandler };

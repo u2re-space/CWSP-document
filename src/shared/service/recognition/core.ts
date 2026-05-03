@@ -1,15 +1,15 @@
-import { getUsableData } from "@rs-com/service/model/GPT-Responses";
-import { detectDataKindFromContent, type DataContext, type DataKind } from "@rs-com/service/model/GPT-Config";
-import { extractJSONFromAIResponse } from "@rs-core/document/AIResponseParser";
-import { getGPTInstance } from "@rs-com/service/shared/gpt-utils";
-import { CORE_IMAGE_INSTRUCTION, CORE_DATA_CONVERSION_INSTRUCTION, CORE_ENTITY_EXTRACTION_INSTRUCTION } from "@rs-com/service/instructions/core";
+import { getUsableData } from "com/service/model/GPT-Responses";
+import { detectDataKindFromContent, type DataContext, type DataKind } from "com/service/model/GPT-Config";
+import { extractJSONFromAIResponse } from "core/document/AIResponseParser";
+import { getGPTInstance } from "com/service/shared/gpt-utils";
+import { CORE_IMAGE_INSTRUCTION, CORE_DATA_CONVERSION_INSTRUCTION, CORE_ENTITY_EXTRACTION_INSTRUCTION } from "com/service/instructions/core";
 import type {
 	AIConfig,
 	RecognitionMode,
 	RecognitionResult,
 	BatchRecognitionResult,
 	RecognizeByInstructionsOptions,
-} from "@rs-com/service/shared/types";
+} from "com/service/shared/types";
 
 export const recognizeImageData = async (
 	input: any,
@@ -17,7 +17,7 @@ export const recognizeImageData = async (
 	config?: AIConfig,
 	options?: RecognizeByInstructionsOptions,
 ): Promise<{ ok: boolean; data?: string; text?: string; arrayBuffer?: ArrayBuffer; error?: string }> => {
-	const { recognizeByInstructions } = await import("@rs-com/service/processing/unified");
+	const { recognizeByInstructions } = await import("com/service/processing/unified");
 	return recognizeByInstructions(input, CORE_IMAGE_INSTRUCTION, sendResponse, config, options);
 };
 
@@ -27,7 +27,7 @@ export const convertTextualData = async (
 	config?: AIConfig,
 	options?: RecognizeByInstructionsOptions,
 ): Promise<{ ok: boolean; data?: string; error?: string }> => {
-	const { recognizeByInstructions } = await import("@rs-com/service/processing/unified");
+	const { recognizeByInstructions } = await import("com/service/processing/unified");
 	return recognizeByInstructions(input, CORE_DATA_CONVERSION_INSTRUCTION, sendResponse, config, options);
 };
 

@@ -12,8 +12,8 @@ import type { WorkCenterDependencies } from "./ts/WorkCenterState";
 
 // @ts-ignore - SCSS import
 import workcenterStyles from "./scss/_index.scss?inline";
-import BaseElement from "../base/BaseElement";
-import { defineElement, type CustomElementLifecycle } from "fest/lure";
+import { defineElement } from "fest/lure";
+import { UIElement } from "fest/fl-ui";
 
 export interface WorkCenterOptions extends BaseViewOptions {
     initialFiles?: File[];
@@ -40,7 +40,7 @@ type WorkCenterInboundMessage = {
 
 // @ts-ignore
 @defineElement("cw-workcenter-view")
-export class WorkCenterView extends BaseElement implements View {
+export class WorkCenterView extends UIElement implements View {
     id = "workcenter" as const;
     name = "Work Center";
     icon = "lightning";
@@ -80,7 +80,6 @@ export class WorkCenterView extends BaseElement implements View {
             onFilesChanged: () => this.emitFilesChanged()
         };
     }
-
     /**
      * GLitElement calls `render(weakRef)` when the host is connected; the shell calls `render(options?)`.
      * Only merge real view options — never a WeakRef from GLit.

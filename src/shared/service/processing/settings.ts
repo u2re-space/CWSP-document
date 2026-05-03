@@ -1,6 +1,6 @@
-import { getRuntimeSettings } from "@rs-com/config/RuntimeSettings";
-import { loadSettings } from "@rs-com/config/Settings";
-import type { ResponseLanguage } from "@rs-com/config/SettingsTypes";
+import { getRuntimeSettings } from "com/config/RuntimeSettings";
+import { loadSettings } from "com/config/Settings";
+import type { ResponseLanguage } from "com/config/SettingsTypes";
 import { detectPlatform } from "./adapters";
 import { SVG_GRAPHICS_ADDON, LANGUAGE_INSTRUCTIONS, TRANSLATE_INSTRUCTION } from "../instructions/utils";
 

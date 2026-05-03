@@ -5,10 +5,10 @@
  * translation and AI-assisted fallback behavior for some richer sources.
  */
 import { escapeML, bySelector, serialize, extractFromAnnotation, getContainerFromTextSelection } from './DocTools';
-import { deAlphaChannel } from '@rs-core/workers/ImageProcess';
-import { writeText, writeHTML } from '@rs-core/modules/Clipboard';
-import { loadSettings } from '@rs-com/config/Settings';
-import type { ResponseLanguage } from '@rs-com/config/SettingsTypes';
+import { deAlphaChannel } from 'core/workers/ImageProcess';
+import { writeText, writeHTML } from 'core/modules/Clipboard';
+import { loadSettings } from 'com/config/Settings';
+import type { ResponseLanguage } from 'com/config/SettingsTypes';
 
 // Lazy-load CJS packages so vite:import-analysis never needs to run
 // transformCjsImport → parseAst on them (fragile with some bundler CJS interop paths).

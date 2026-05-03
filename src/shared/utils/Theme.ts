@@ -1,6 +1,6 @@
-import { loadSettings } from "@rs-com/config/Settings";
-import type { AppSettings } from "@rs-com/config/SettingsTypes";
-import { applyGridSettings } from "@rs-core/storage/StateStorage";
+import { loadSettings } from "com/config/Settings";
+import type { AppSettings } from "com/config/SettingsTypes";
+import { applyGridSettings } from "core/storage/StateStorage";
 
 /** Convert getComputedStyle background (rgb/rgba or hex) to #rrggbb for meta theme-color / PWA chrome. */
 export const cssBackgroundToOpaqueHex = (css: string): string | null => {

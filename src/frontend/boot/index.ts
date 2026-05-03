@@ -11,8 +11,8 @@
  * - App initialization helpers
  *
  * Usage:
- *   import { bootLoader, quickBoot, initializeApp } from "@rs-frontend/main";
- *   import { navigate, parseCurrentRoute, onRouteChange } from "@rs-frontend/main";
+ *   import { bootLoader, quickBoot, initializeApp } from "frontend/main";
+ *   import { navigate, parseCurrentRoute, onRouteChange } from "frontend/main";
  */
 
 /**
@@ -130,7 +130,7 @@ export {
     type ToastPosition,
     type ToastOptions,
     type ToastLayerConfig
-} from "@fl-ui/items/overlay/Toast";
+} from "fest/fl-ui";
 
 // ============================================================================
 // OVERLAY SYSTEM
@@ -173,9 +173,9 @@ export type { CrxAppOptions } from "./ts/crx-entry";
 
 import { bootLoader, type BootConfig } from "./ts/BootLoader";
 import { createBootConfigFromUrl, loadSubAppWithShell } from "./ts/routing";
-import type { Shell } from "@shells/types";
-import type { ServiceChannelId } from "@rs-com/core/ServiceChannels";
-import { isEnabledView, pickEnabledView } from "@shared/routing/views";
+import type { Shell } from "shells/types";
+import type { ServiceChannelId } from "com/core/ServiceChannels";
+import { isEnabledView, pickEnabledView } from "shared/routing/views";
 
 /**
  * Execution context types

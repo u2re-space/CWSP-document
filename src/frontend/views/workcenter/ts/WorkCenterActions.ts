@@ -1,5 +1,5 @@
-import { executionCore } from "@rs-com/service/misc/ExecutionCore";
-import type { ActionContext, ActionInput } from "@rs-com/service/misc/ActionHistory";
+import { executionCore } from "com/service/misc/ExecutionCore";
+import type { ActionContext, ActionInput } from "com/service/misc/ActionHistory";
 import type { WorkCenterState, WorkCenterDependencies } from "./WorkCenterState";
 import type { WorkCenterUI } from "./WorkCenterUI";
 import type { WorkCenterFileOps } from "./WorkCenterFileOps";
@@ -7,7 +7,7 @@ import type { WorkCenterResults } from "./WorkCenterResults";
 import type { WorkCenterDataProcessing } from "./WorkCenterDataProcessing";
 import type { WorkCenterHistory } from "./WorkCenterHistory";
 import type { WorkCenterTemplates } from "./WorkCenterTemplates";
-import { extractJSONFromAIResponse } from "@rs-core/document/AIResponseParser";
+import { extractJSONFromAIResponse } from "core/document/AIResponseParser";
 
 export class WorkCenterActions {
     private deps: WorkCenterDependencies;
@@ -232,7 +232,7 @@ export class WorkCenterActions {
         }
 
         try {
-            const { unifiedMessaging } = await import('@rs-com/core/UnifiedMessaging');
+            const { unifiedMessaging } = await import('com/core/UnifiedMessaging');
 
             let resultContent = typeof state.lastRawResult === 'string'
                 ? state.lastRawResult
@@ -294,7 +294,7 @@ export class WorkCenterActions {
 
         try {
             // Import the unified messaging system
-            const { unifiedMessaging } = await import('@rs-com/core/UnifiedMessaging');
+            const { unifiedMessaging } = await import('com/core/UnifiedMessaging');
 
             // Create the content to save
             const resultContent = typeof state.lastRawResult === 'string'

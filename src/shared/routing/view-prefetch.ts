@@ -1,6 +1,6 @@
 import { ENABLED_VIEW_IDS } from "./views";
 import { ViewRegistry } from "./registry";
-import type { ViewId } from "../../shells/types";
+import type { ViewId } from "shells/types";
 
 /**
  * Low-priority prefetch of view chunks after the focused view is interactive.

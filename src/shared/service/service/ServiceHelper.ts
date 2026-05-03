@@ -1,6 +1,6 @@
-import { fixEntityId } from "@rs-com/template/EntityId";
-import { dataCategories } from "@rs-com/service/misc/Cache";
-import { pushMany } from "@rs-com/store/IDBQueue";
+import { fixEntityId } from "com/template/EntityId";
+import { dataCategories } from "com/service/misc/Cache";
+import { pushMany } from "com/store/IDBQueue";
 
 //
 export const queueEntityForWriting = (entity, entityType, dataType: string | null = "json"): any => {

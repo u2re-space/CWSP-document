@@ -6,22 +6,22 @@
  * about OPFS handles or import-heavy recognition modules directly.
  */
 import { getDirectoryHandle, handleIncomingEntries } from "fest/lure";
-import { handleDataTransferFiles, postCommitAnalyze, postCommitRecognize, writeFilesToDir } from "@rs-core/storage/FileSystem";
-import { sanitizeFileName, writeFileSmart } from "@rs-core/storage/WriteFileSmart-v2";
-type AnalyzeRecognizeUnified = typeof import("@rs-com/service/service/RecognizeData").analyzeRecognizeUnified;
+import { handleDataTransferFiles, postCommitAnalyze, postCommitRecognize, writeFilesToDir } from "core/storage/FileSystem";
+import { sanitizeFileName, writeFileSmart } from "core/storage/WriteFileSmart-v2";
+type AnalyzeRecognizeUnified = typeof import("com/service/service/RecognizeData").analyzeRecognizeUnified;
 let analyzeRecognizeUnifiedRef: AnalyzeRecognizeUnified | null = null;
 const getAnalyzeRecognizeUnified = async (): Promise<AnalyzeRecognizeUnified> => {
     if (!analyzeRecognizeUnifiedRef) {
-        const m = await import("@rs-com/service/service/RecognizeData");
+        const m = await import("com/service/service/RecognizeData");
         analyzeRecognizeUnifiedRef = m.analyzeRecognizeUnified;
     }
     return analyzeRecognizeUnifiedRef;
 };
 
-let clipboardRw: Pick<typeof import("@rs-core/modules/Clipboard"), "readText" | "writeText"> | null = null;
+let clipboardRw: Pick<typeof import("core/modules/Clipboard"), "readText" | "writeText"> | null = null;
 const getClipboardRw = async () => {
     if (!clipboardRw) {
-        const m = await import("@rs-core/modules/Clipboard");
+        const m = await import("core/modules/Clipboard");
         clipboardRw = { readText: m.readText, writeText: m.writeText };
     }
     return clipboardRw;

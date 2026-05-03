@@ -1,4 +1,4 @@
-import type { EntityInterface } from "@rs-com/template/EntityInterface";
+import type { EntityInterface } from "com/template/EntityInterface";
 import { observe } from "./cache-reactivity";
 
 //

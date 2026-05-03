@@ -508,6 +508,7 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
 
     //
     const veelaScssRoot = resolve(workspaceRoot, "modules/projects/veela.css/src/scss");
+    const veelaBundledLib = resolve(__dirname, "./shared/fest/veela/scss/lib");
     const css = {
         postcss: postcssConfig,
         preprocessorOptions: {
@@ -516,8 +517,11 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
                 quietDeps: true,
                 charset: false,
                 precision: 8,
-                // Explorer (and other) SCSS copies Veela `misc/_config.scss` which forwards `lib/core/misc/functions`.
-                loadPaths: existsSync(veelaScssRoot) ? [veelaScssRoot] : [],
+                // Bundled Veela lib (`@use "core/misc/config"` from fl-ui markdown SCSS) + optional monorepo veela.css tree.
+                loadPaths: [
+                    ...(existsSync(veelaBundledLib) ? [veelaBundledLib] : []),
+                    ...(existsSync(veelaScssRoot) ? [veelaScssRoot] : []),
+                ],
             }
         }
     }

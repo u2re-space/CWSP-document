@@ -8,8 +8,8 @@
 export * from "./core/types";
 export * from "./core/shells";
 
-export * from "@shared/routing/registry";
-export { ShellRegistry, ViewRegistry, getDefaultBootConfig } from "@shared/routing/registry";
+export * from "shared/routing/registry";
+export { ShellRegistry, ViewRegistry, getDefaultBootConfig } from "shared/routing/registry";
 
 export { BaseShell, createShell as createBaseShell } from "./base";
 export { ContentShell, createShell as createContentShell } from "./content";

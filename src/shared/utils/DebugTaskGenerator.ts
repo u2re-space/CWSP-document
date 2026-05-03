@@ -1,5 +1,5 @@
 import { writeTimelineTask } from "../storage/FileSystem.js";
-import { fixEntityId } from "@rs-com/template/EntityId.js";
+import { fixEntityId } from "com/template/EntityId.js";
 
 // Debug configuration
 const DEBUG_IMMITATE = 10 * 1000; // 10 seconds

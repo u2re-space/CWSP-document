@@ -4,7 +4,7 @@
  * Auto-detects context and handles messages appropriately
  */
 
-import { toText } from "@rs-core/modules/Clipboard";
+import { toText } from "core/modules/Clipboard";
 
 export type CopyResponse = {
     ok: boolean;
@@ -308,5 +308,5 @@ export const initClipboardHandler = (
 };
 
 // Re-export for convenience
-export { writeText, toText } from "@rs-core/modules/Clipboard";
+export { writeText, toText } from "core/modules/Clipboard";
 

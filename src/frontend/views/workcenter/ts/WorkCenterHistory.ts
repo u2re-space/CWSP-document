@@ -1,6 +1,6 @@
 import { H } from "fest/lure";
-import { actionHistory } from "@rs-com/service/misc/ActionHistory";
-import type { ActionEntry } from "@rs-com/service/misc/ActionHistory";
+import { actionHistory } from "com/service/misc/ActionHistory";
+import type { ActionEntry } from "com/service/misc/ActionHistory";
 import type { WorkCenterState, WorkCenterDependencies } from "./WorkCenterState";
 
 export class WorkCenterHistory {

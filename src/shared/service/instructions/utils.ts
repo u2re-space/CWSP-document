@@ -1,5 +1,5 @@
-import type { ResponseLanguage } from "@rs-com/config/SettingsTypes";
-import type { CustomInstruction } from "@rs-com/config/SettingsTypes";
+import type { ResponseLanguage } from "com/config/SettingsTypes";
+import type { CustomInstruction } from "com/config/SettingsTypes";
 import type { OutputFormat } from "../shared/types";
 
 export type { CustomInstruction };

@@ -1,6 +1,6 @@
-import type { ShellId, ShellLayoutConfig, ViewId } from "@shells/types";
-import { WindowShell } from "@shells/window";
-import { ENABLED_VIEW_IDS } from "@shared/routing/views";
+import type { ShellId, ShellLayoutConfig, ViewId } from "shells/types";
+import { WindowShell } from "shells/window";
+import { ENABLED_VIEW_IDS } from "shared/routing/views";
 
 /**
  * Environment shell: canonical desktop/webtop orchestrator.

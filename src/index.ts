@@ -7,19 +7,19 @@
  * - active view/process is stored in `history.state` and (for focused windows) in `location.hash`
  */
 
-import { initPWA, checkForUpdates, forceRefreshAssets } from "./frontend/pwa/pwa-handling";
+import { initPWA, checkForUpdates, forceRefreshAssets } from "core/pwa/pwa-handling";
 import {
     loadSubAppWithShell,
     VALID_VIEWS,
     getShellFromQuery,
     getSavedShellPreference
-} from "./frontend/shells/boot";
-import type { ShellId } from "./frontend/shells/types";
-import { initializeLayers } from "@rs-frontend/shared/routing/layer-manager";
+} from "shells/boot";
+import type { ShellId } from "frontend/shells/types";
+import { initializeLayers } from "shared/routing/layer-manager";
 import type { ViewId } from "./frontend/shells/types";
-import { pickEnabledView } from "./frontend/shared/routing/views";
+import { pickEnabledView } from "shared/routing/views";
 import { loadAsAdopted } from "fest/dom";
-import { ensureAppLayers } from "@rs-frontend/shared/routing/app-layers";
+import { ensureAppLayers } from "shared/routing/app-layers";
 
 // @ts-ignore
 import viewStyles from "./frontend/views/views.scss?inline";
@@ -32,10 +32,9 @@ import {
     handleShareTarget,
     setupLaunchQueueConsumer,
     checkPendingShareData
-} from "./frontend/pwa/sw-handling";
+} from "core/pwa/sw-handling";
 
 // Import uniform channel manager
-import { initializeAppChannels } from "./com/core/UniformChannelManager";
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
@@ -220,9 +219,9 @@ export default async function index(mountElement: HTMLElement) {
 
     // Initialize uniform channel manager
     console.log('[Index] Initializing uniform channels...');
-    initializeAppChannels();
+    //initializeAppChannels();
 
-    void import("./frontend/shared/transport/hub-socket-boot")
+    void import("shared/transport/hub-socket-boot")
         .then((m) => m.bootHubSocketFromStoredSettings())
         .catch(() => undefined);
 

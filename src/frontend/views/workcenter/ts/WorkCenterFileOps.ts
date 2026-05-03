@@ -1,5 +1,5 @@
 import type { WorkCenterState, WorkCenterDependencies } from "./WorkCenterState";
-import { ROUTE_HASHES } from '@rs-com/config/Names';
+import { ROUTE_HASHES } from 'com/config/Names';
 import { normalizeDataAsset, parseDataUrl, isBase64Like } from 'fest/lure';
 
 export class WorkCenterFileOps {

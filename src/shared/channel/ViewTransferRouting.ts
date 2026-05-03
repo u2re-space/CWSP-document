@@ -1,6 +1,6 @@
-import { sendProtocolMessage, enqueuePendingMessage, type UnifiedMessage } from "@rs-com/core/UnifiedMessaging";
-import { summarizeForLog } from "@rs-com/core/LogSanitizer";
-import { normalizeDestination, viewBroadcastChannelName } from "@rs-com/config/Names";
+import { sendProtocolMessage, enqueuePendingMessage, type UnifiedMessage } from "com/core/UnifiedMessaging";
+import { summarizeForLog } from "com/core/LogSanitizer";
+import { normalizeDestination, viewBroadcastChannelName } from "com/config/Names";
 
 export type ViewTransferSource = "share-target" | "launch-queue" | "pending" | "clipboard";
 

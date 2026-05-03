@@ -19,26 +19,24 @@ import type {
     View,
     ViewFactory,
     ShellTheme,
-    ViewLifecycle,
     ViewOptions
-} from "../../shells/types";
+} from "shells/types";
 import { 
     serviceChannels, 
     affectedToChannel,
     sendToChannel,
     type ServiceChannelId,
     type ChannelMessage 
-} from "@rs-com/core/ServiceChannels";
-import { BROADCAST_CHANNELS, MESSAGE_TYPES } from "@rs-com/config/Names";
+} from "com/core/ServiceChannels";
+import { BROADCAST_CHANNELS, MESSAGE_TYPES } from "com/config/Names";
 import {
     registerHandler,
     unregisterHandler,
     registerComponent,
     initializeComponent,
     type UnifiedMessage
-} from "@rs-com/core/UnifiedMessaging";
+} from "com/core/UnifiedMessaging";
 import { bindViewReceiveChannel } from "./channel-mixin";
-import { createWebComponentViewAdapter } from "../../views/base/UIElement";
 import {
     VIEW_ENABLED_VIEWER,
     VIEW_ENABLED_WORKCENTER,
@@ -50,8 +48,37 @@ import {
     VIEW_ENABLED_HOME,
     VIEW_ENABLED_PRINT
 } from "./views";
-import { ensureViewElementDefined, getViewElementTagName } from "@fl-ui/items/BaseElement.ts";
 
+/**
+ * View factories usually return custom elements; some legacy modules return a plain
+ * object implementing `View` (render/lifecycle/id). Accept both for shell compatibility.
+ */
+function createWebComponentViewAdapter(viewInstance: unknown): View {
+    if (viewInstance instanceof HTMLElement) {
+        return viewInstance as View;
+    }
+    const legacy = viewInstance as Partial<View> | null | undefined;
+    if (legacy && typeof legacy.render === "function" && typeof legacy.id === "string") {
+        return legacy as View;
+    }
+    throw new Error("View factory must return an HTMLElement or a legacy view with render() and id");
+}
+
+/** Maps logical view ids to custom element tag names (must match @defineElement). */
+const VIEW_ELEMENT_TAG_BY_ID: Partial<Record<ViewId, string>> = {
+    viewer: "cw-viewer-view",
+    workcenter: "cw-workcenter-view"
+};
+
+function getViewElementTagName(viewId: string): string {
+    const mapped = VIEW_ELEMENT_TAG_BY_ID[viewId as ViewId];
+    if (mapped) return mapped;
+    return `cw-${viewId}-view`;
+}
+
+function ensureViewElementDefined(viewId: string): string {
+    return getViewElementTagName(viewId);
+}
 
 // ============================================================================
 // SHELL REGISTRY
@@ -149,6 +176,21 @@ export const ShellRegistry = new ShellRegistryClass();
  * channels and shell-owned DOM roots assume stable identity.
  */
 class ViewRegistryClass {
+    /** COMPAT: Modules often default-export a CE class (`CwViewExplorer`) — must be invoked with `new`. */
+    private static isCustomElementClassCtor(fn: unknown): fn is new (opts?: Parameters<ViewFactory>[0]) => HTMLElement {
+        if (typeof fn !== "function") return false;
+        try {
+            const proto = (fn as { prototype?: unknown }).prototype;
+            return (
+                proto != null &&
+                typeof HTMLElement !== "undefined" &&
+                HTMLElement.prototype.isPrototypeOf(proto as object)
+            );
+        } catch {
+            return false;
+        }
+    }
+
     private resolveViewFactory(module: Record<string, unknown>): ViewFactory | null {
         const candidates = [
             module?.default,
@@ -158,13 +200,18 @@ class ViewRegistryClass {
             module?.createViewerView,
             module?.createExplorerView,
             module?.createSettingsView,
-            module?.createHistoryView
+            module?.createHistoryView,
+            module?.createHomeView
         ];
 
         for (const candidate of candidates) {
-            if (typeof candidate === "function") {
-                return candidate as ViewFactory;
+            if (typeof candidate !== "function") continue;
+            if (ViewRegistryClass.isCustomElementClassCtor(candidate)) {
+                const Ctor = candidate;
+                return ((options?: Parameters<ViewFactory>[0]) =>
+                    new Ctor(options)) as ViewFactory;
             }
+            return candidate as ViewFactory;
         }
 
         const values = Object.values(module || {});
@@ -300,7 +347,7 @@ export function registerDefaultShells(): void {
         id: "base",
         name: "Base",
         description: "Base shell with no frames or navigation",
-        loader: () => import("../../shells/base/index")
+        loader: () => import("frontend/shells/base/index")
     });
 
     // Minimalshell (simple toolbar-based navigation)
@@ -308,43 +355,14 @@ export function registerDefaultShells(): void {
         id: "minimal",
         name: "Minimal",
         description: "Minimal toolbar-based navigation",
-        loader: () => import("../../shells/minimal/preview")
-    });
-
-    ShellRegistry.register({
-        id: "window",
-        name: "Window",
-        description: "Desktop-like multi-window shell",
-        loader: () => import("../../shells/window/index")
-    });
-
-    ShellRegistry.register({
-        id: "tabbed",
-        name: "Tabbed",
-        description: "Tabbed window variant for focused multi-tasking",
-        loader: () => import("../../shells/tabbed/index")
-    });
-
-    ShellRegistry.register({
-        id: "environment",
-        name: "Environment",
-        description: "Desktop/webtop environment shell",
-        loader: () => import("../../shells/environment/index")
+        loader: () => import("shells/minimal/preview")
     });
 
     ShellRegistry.register({
         id: "content",
         name: "Content",
         description: "CRX content shell with overlay-focused layering",
-        loader: () => import("../../shells/content/index")
-    });
-
-    // Legacy faint alias (kept for compatibility)
-    ShellRegistry.register({
-        id: "faint",
-        name: "Faint (legacy)",
-        description: "Legacy alias redirected to tabbed shell",
-        loader: () => import("../../shells/tabbed/index")
+        loader: () => import("shells/content/index")
     });
 }
 
@@ -355,7 +373,7 @@ export function registerDefaultViews(): void {
             id: "viewer",
             name: "Viewer",
             icon: "eye",
-            loader: () => import("../../views/viewer")
+            loader: () => import("views/viewer")
         });
     }
 
@@ -364,7 +382,7 @@ export function registerDefaultViews(): void {
             id: "workcenter",
             name: "Work Center",
             icon: "lightning",
-            loader: () => import("../../views/workcenter")
+            loader: () => import("views/workcenter")
         });
     }
 
@@ -373,7 +391,7 @@ export function registerDefaultViews(): void {
             id: "settings",
             name: "Settings",
             icon: "gear",
-            loader: () => import("../../views/settings")
+            loader: () => import("views/settings")
         });
     }
 
@@ -382,7 +400,7 @@ export function registerDefaultViews(): void {
             id: "history",
             name: "History",
             icon: "clock-counter-clockwise",
-            loader: () => import("../../views/history")
+            loader: () => import("views/history")
         });
     }
 
@@ -391,7 +409,7 @@ export function registerDefaultViews(): void {
             id: "explorer",
             name: "Explorer",
             icon: "folder",
-            loader: () => import("../../views/explorer")
+            loader: () => import("views/explorer")
         });
     }
 
@@ -400,7 +418,7 @@ export function registerDefaultViews(): void {
             id: "airpad",
             name: "Airpad",
             icon: "hand-pointing",
-            loader: () => import("../../views/airpad")
+            loader: () => import("views/airpad")
         });
     }
 
@@ -409,7 +427,7 @@ export function registerDefaultViews(): void {
             id: "editor",
             name: "Editor",
             icon: "pencil",
-            loader: () => import("../../views/editor")
+            loader: () => import("views/editor")
         });
     }
 
@@ -418,7 +436,7 @@ export function registerDefaultViews(): void {
             id: "home",
             name: "Home",
             icon: "house",
-            loader: () => import("../../views/home/ts/outdated")
+            loader: () => import("views/home")
         });
     }
 
@@ -427,7 +445,8 @@ export function registerDefaultViews(): void {
             id: "print",
             name: "Print",
             icon: "printer",
-            loader: () => import("../../shells/print")
+            // FIXME: No dedicated print view module yet; reuse viewer until a `cw-print-view` exists.
+            loader: () => import("views/viewer")
         });
     }
 }

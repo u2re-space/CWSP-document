@@ -4,8 +4,8 @@
  * Consolidated time/date handling utilities.
  */
 
-import type { ChapterDescriptor, DayDescriptor } from "@rs-core/utils/Types";
-import type { EntityInterface, TimeType } from "@rs-com/template/EntityInterface";
+import type { ChapterDescriptor, DayDescriptor } from "core/utils/Types";
+import type { EntityInterface, TimeType } from "com/template/EntityInterface";
 
 // ============================================================================
 // TIME ZONE

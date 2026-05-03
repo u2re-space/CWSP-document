@@ -12,11 +12,11 @@
 
 import { bootLoader } from "./BootLoader";
 import type { ViewId, Shell } from "../../shells/types";
-import { ViewRegistry } from "../../shared/routing/registry";
-import { initializeLayers } from "../../shared/routing/layer-manager";
-import { ensureAppLayers } from "../../environment/app-layers";
-import { pickEnabledView } from "../../shared/routing/views";
+import { ViewRegistry } from "shared/routing/registry";
+import { initializeLayers } from "shared/routing/layer-manager";
+import { pickEnabledView } from "shared/routing/views";
 import { getCrxNetworkCoordinator } from "../../../crx/network/Coordinator";
+import { ensureAppLayers } from "shared/routing/app-layers";
 
 // ============================================================================
 // TYPES

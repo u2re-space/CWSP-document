@@ -1,4 +1,4 @@
-import { BUILTIN_AI_MODELS, type SectionConfig } from "@rs-com/config/SettingsTypes";
+import { BUILTIN_AI_MODELS, type SectionConfig } from "com/config/SettingsTypes";
 
 //
 export const AISection: SectionConfig = {

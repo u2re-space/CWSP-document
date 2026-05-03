@@ -27,7 +27,7 @@ import {
     createDestinationChannelMappings,
     getDestinationAliases,
     normalizeDestination,
-} from '@rs-com/config/Names';
+} from 'com/config/Names';
 
 import { resolveAssociation, resolveAssociationPipeline } from './ContentAssociations';
 import { createInteropEnvelope, toUnifiedInteropMessage } from "./UniformInterop";

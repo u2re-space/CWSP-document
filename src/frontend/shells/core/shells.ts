@@ -1,21 +1,24 @@
 import { ref } from "fest/object";
 import type { Shell, ShellContext, ShellId, ShellLayoutConfig, ShellNavigationState, ShellTheme, View, ViewId } from "../types";
 import { loadInlineStyle, preloadStyle } from "fest/dom";
-import { ViewRegistry } from "@shared/routing/registry";
-import { showToast } from "@fl-ui/items/overlay/Toast";
-import { withViewTransition, getTransitionDirection } from "@shared/routing/view-transitions";
-import { loadSettings, saveSettings } from "@rs-com/config/Settings";
-import { applyTheme as applyAppTheme, syncBrowserChromeTheme } from "@rs-core/utils/Theme";
-import { isEnabledView } from "@shared/routing/views";
-import { scheduleViewModulePrefetch } from "@shared/routing/view-prefetch";
+import { ViewRegistry } from "shared/routing/registry";
+import { showToast } from "fest/fl-ui";
+import { withViewTransition, getTransitionDirection } from "shared/routing/view-transitions";
+import { loadSettings, saveSettings } from "shared/config/Settings";
+import { applyTheme as applyAppTheme, syncBrowserChromeTheme } from "shared/utils/Theme";
+import { isEnabledView } from "shared/routing/views";
+import { scheduleViewModulePrefetch } from "shared/routing/view-prefetch";
 import { ensureStyleSheet } from "fest/icon";
 import "fest/icon";
 import { dynamicTheme } from "fest/lure";
-import { ensureShellElementDefined, type ShellElement, MinimalShellHostElement } from "@fl-ui/items/BaseElement";
-import { initBootShellWindowActivity } from "./boot/ts/shell-preference";
+import { initBootShellWindowActivity } from "../../boot/ts/shell-preference";
+import {
+    type ShellElement,
+    ensureShellElementDefined
+} from "./shell-elements";
 
 //@ts-ignore
-import style from "../views/views.scss?inline";
+import style from "../../views/views.scss?inline";
 
 
 /**
@@ -94,7 +97,7 @@ export abstract class ShellBase implements Shell {
 
         // Create slotted shell host and mount shell layout into it.
         const shellTagName = ensureShellElementDefined(this.id);
-        const shellHost = document.createElement(shellTagName) as ShellElement | MinimalShellHostElement;
+        const shellHost = document.createElement(shellTagName) as ShellElement;
         const shellLayout = this.createLayout();
         shellHost.mountShellLayout(shellLayout);
         this.rootElement = shellHost;
@@ -106,7 +109,7 @@ export abstract class ShellBase implements Shell {
         }
 
         // Phosphor rules live on document.adoptedStyleSheets; they do not pierce this shadow tree.
-        if (shellHost instanceof MinimalShellHostElement && shellHost.shadowRoot) {
+        if (this.id === "minimal" && shellHost.shadowRoot) {
             const iconSheet = ensureStyleSheet();
             if (iconSheet) {
                 try {

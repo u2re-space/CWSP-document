@@ -3,7 +3,7 @@
  * Uses unified clipboard handler module
  */
 
-import { initClipboardHandler } from "@rs-crx/shared/clipboard-handler";
+import { initClipboardHandler } from "crx/shared/clipboard-handler";
 import { showToast } from "../../frontend/shells/boot/ts/overlay";
 
 // Initialize handler for content script context

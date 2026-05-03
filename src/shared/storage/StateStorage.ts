@@ -6,10 +6,10 @@
  * richer shortcut configuration separate from the compact visible item list.
  */
 import { makeObjectAssignable, observe, stringRef, safe } from "fest/object";
-import { makeUIState } from "fest/lure/extension/core/UIState";
+import { makeUIState } from "fest/lure";
 import { JSOX } from "jsox";
-import { readText } from "@rs-core/modules/Clipboard";
-import { scheduleFrame } from "@rs-core/utils/Runtime";
+import { readText } from "core/modules/Clipboard";
+import { scheduleFrame } from "core/utils/Runtime";
 
 export type GridCell = [number, number];
 

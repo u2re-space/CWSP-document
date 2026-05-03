@@ -1,4 +1,4 @@
-import { canParseURL } from "@rs-core/utils/Runtime";
+import { canParseURL } from "core/utils/Runtime";
 export type DataKind = "math" | "url" | "output_text" | "input_text" | "image" | "image_url" | "text" | "input_image" | "input_url" | "json" | "markdown" | "code" | "entity" | "structured" | "unknown" | "svg" | "xml";
 export type DataInput = {
     dataSource: string | Blob | File | any,

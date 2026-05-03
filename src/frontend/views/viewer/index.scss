@@ -111,7 +111,9 @@
     }
 
     .cw-view-viewer-shell:not([data-raw]) .view-viewer {
-        flex: 0 0 auto;
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
     }
 
     /* Standalone: raw lives in .view-viewer__content; grow view-viewer when showing raw */
@@ -526,6 +528,8 @@
 
     /* Standalone / non–slot-mode: __content is the scrollport */
     .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default)) .view-viewer__content {
+        flex: 1 1 auto;
+        min-block-size: 0;
         overflow-block: auto;
         overflow-inline: hidden;
         overscroll-behavior: contain;
@@ -556,16 +560,20 @@
     }
 
     /*
-     * Ensure the light-DOM prose node itself is a scroll container in custom-element mode.
-     * This avoids relying only on ::slotted() sizing/overflow propagation.
+     * Prose mount: column flex so outline stays above and .view-viewer__md-root fills remaining block-size.
+     * Shell-without-host uses .cw-view-viewer-shell only — include that path (not just cw-view-viewer …).
      */
+    .cw-view-viewer-shell .view-viewer__content > [data-render-target],
     cw-view-viewer [data-render-target] {
-        display: block;
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        align-self: stretch;
         box-sizing: border-box;
-        block-size: 100%;
-        max-block-size: none;
         min-block-size: 0;
         min-inline-size: 0;
+        block-size: auto;
+        max-block-size: none;
         overflow-block: auto;
         overflow-inline: hidden;
         overscroll-behavior: contain;
@@ -3755,6 +3763,8 @@
 
     /* Standalone / non–slot-mode: __content is the scrollport */
     .cw-view-viewer-shell:not(:has(.cw-view-viewer__slot-default)) .view-viewer__content {
+        flex: 1 1 auto;
+        min-block-size: 0;
         overflow-block: auto;
         overflow-inline: hidden;
         overscroll-behavior: contain;
@@ -3785,17 +3795,19 @@
     }
 
     /*
-     * Ensure the light-DOM prose node itself is a scroll container in custom-element mode.
-     * This avoids relying only on ::slotted() sizing/overflow propagation.
+     * Same as viewer.components: prose fills .view-viewer__content when only .cw-view-viewer-shell wraps the UI.
      */
+    .cw-view-viewer-shell .view-viewer__content > [data-render-target],
     cw-view-viewer [data-render-target] {
         display: flex;
         flex-direction: column;
+        flex: 1 1 auto;
+        align-self: stretch;
         box-sizing: border-box;
-        block-size: stretch;
-        max-block-size: none;
         min-block-size: 0;
         min-inline-size: 0;
+        block-size: auto;
+        max-block-size: none;
         overflow-block: auto;
         overflow-inline: hidden;
         overscroll-behavior: contain;
@@ -4022,7 +4034,9 @@
     }
 
     .cw-view-viewer-shell:not([data-raw]) .view-viewer {
-        flex: 0 0 auto;
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
     }
 
     /* Standalone: raw lives in .view-viewer__content; grow view-viewer when showing raw */

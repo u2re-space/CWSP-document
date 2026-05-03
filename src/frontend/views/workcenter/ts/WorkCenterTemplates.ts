@@ -4,9 +4,9 @@ import {
     getCustomInstructions,
     getInstructionRegistry,
     setActiveInstruction,
-} from "@rs-com/service/instructions/CustomInstructions";
-import { buildInstructionPrompt } from "@rs-com/service/instructions/utils";
-import type { CustomInstruction } from "@rs-com/config/SettingsTypes";
+} from "com/service/instructions/CustomInstructions";
+import { buildInstructionPrompt } from "com/service/instructions/utils";
+import type { CustomInstruction } from "com/config/SettingsTypes";
 
 export class WorkCenterTemplates {
     private deps: WorkCenterDependencies;
@@ -87,7 +87,7 @@ export class WorkCenterTemplates {
 
     /** Get default instruction templates (for seeding). Dynamic import avoids TDZ when workcenter loads before `com/app` finishes. */
     async getDefaultTemplates(): Promise<Omit<CustomInstruction, "id">[]> {
-        const { DEFAULT_INSTRUCTION_TEMPLATES } = await import("@rs-com/service/instructions/templates");
+        const { DEFAULT_INSTRUCTION_TEMPLATES } = await import("com/service/instructions/templates");
         return DEFAULT_INSTRUCTION_TEMPLATES;
     }
 
