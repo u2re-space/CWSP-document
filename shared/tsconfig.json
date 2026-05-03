@@ -3,7 +3,7 @@
         "./fest/**/*.ts",
         "./test/**/*.ts",
         "./src/**/*.ts"
-    ],
+, "../../../modules/projects/fl.ui/src/ui/misc/Canvas.ts"    ],
     "exclude": [
         "node_modules/**",
         "dist/**",
