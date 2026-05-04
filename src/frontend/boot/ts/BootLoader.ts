@@ -622,12 +622,12 @@ export async function bootMinimal(
     container: HTMLElement,
     view: ViewId = "viewer"
 ): Promise<Shell> {
-    const channels = ["workcenter", "settings", "viewer"].filter((channelId) =>
-        isEnabledView(channelId)
-    ) as ServiceChannelId[];
     const defaultView = pickEnabledView(view, "viewer");
-    const channelPriorityId: ServiceChannelId | undefined =
-        (channels.find((c) => c === defaultView) ?? channels[0]) as ServiceChannelId | undefined;
+    /** Minimal shell: init only the active view's channel — others register on first navigate (see ShellBase.loadView). */
+    const channels = isEnabledView(defaultView)
+        ? ([defaultView] as ServiceChannelId[])
+        : (["viewer"] as ServiceChannelId[]);
+    const channelPriorityId = channels[0];
     return bootLoader.boot(container, {
         styleSystem: "vl-basic",
         shell: "minimal",

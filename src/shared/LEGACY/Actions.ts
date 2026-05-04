@@ -7,18 +7,15 @@
 import type { EntityDescriptor } from "core/utils/Types";
 import { generateNewPlan } from "core/workers/AskToPlan";
 import { triggerDebugTaskGeneration } from "core/utils/DebugTaskGenerator";
-import { makeEntityEdit } from "@fl-ui/items/editor/EntityEdit";
-import { downloadByPath, openPickerAndAnalyze, openPickerAndWrite, pasteAndAnalyze, pasteIntoClipboardWithRecognize } from "../storage/FileOps";
-import { showSuccess, showError } from "@fl-ui/items/overlay/Toast";
-import { writeFileSmart } from "core/storage/WriteFileSmart-v2";
 import type { EntityInterface } from "com/template/EntityInterface";
 import { currentWebDav, loadSettings, saveSettings } from "com/config/Settings";
-import { getDirectoryHandle, mountAsRoot, navigate } from "fest/lure";
-import { NAVIGATION_SHORTCUTS, snapshotSpeedDialItem } from "core/storage/StateStorage";
+import { downloadByPath, getDirectoryHandle, mountAsRoot, navigate, openPickerAndAnalyze, openPickerAndWrite, pasteAndAnalyze, pasteIntoClipboardWithRecognize, writeFileSmart } from "fest/lure";
+import { NAVIGATION_SHORTCUTS, snapshotSpeedDialItem } from "core/store/StateStorage";
 import { JSOX } from "jsox";
-import { stringRef } from "fest-src/fest/object/index";
+import { stringRef } from "fest/object";
 import { writeText, readText } from "core/modules/Clipboard";
 import { canParseURL } from "core/utils/Runtime";
+import { showError, showSuccess } from "fest/fl-ui";
 
 //
 const SERVICE_UUID = '12345678-1234-5678-1234-5678abcdef01';

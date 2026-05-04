@@ -9,6 +9,7 @@ import type { ViewOptions as ShellViewOptions, ViewLifecycle } from "shells/type
 import type { BaseViewOptions } from "views/types";
 import type { ViewOptions as RegistryViewOptions } from "../registry";
 import { createViewConstructor, ViewBase } from "../registry";
+import { loadAsAdopted, removeAdopted } from "fest/dom";
 import type { FileManager } from "fest/fl-ui";
 import type { ExplorerInjectApi } from "./inject";
 import type { LocalFileManager } from "./runtime";

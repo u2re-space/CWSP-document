@@ -14,7 +14,7 @@ import {
     ensureSpeedDialMeta,
     persistSpeedDialItems,
     persistSpeedDialMeta
-} from "core/storage/StateStorage";
+} from "core/store/StateStorage";
 import type { ExplorerFileItem, ExplorerInjectApi } from "./inject";
 import { getRegisteredExplorerInject, mergeExplorerInject } from "./inject";
 import {

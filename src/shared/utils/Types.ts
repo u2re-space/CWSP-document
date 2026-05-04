@@ -1,9 +1,7 @@
-import type { TimeType } from "com/template/EntityInterface";
-
 //
 export interface DayDescriptor {
-    begin_time?: TimeType | Date | string | null;
-    end_time?: TimeType | Date | string | null;
+    begin_time?: Date | string | null;
+    end_time?: Date | string | null;
     status?: string | null;
 
     // less usual fields
@@ -14,7 +12,7 @@ export interface DayDescriptor {
 }
 
 //
-export type ChapterDescriptor = DayDescriptor | TimeType | string | null;
+export type ChapterDescriptor = DayDescriptor | string | null;
 
 //
 export interface EntityDescriptor {

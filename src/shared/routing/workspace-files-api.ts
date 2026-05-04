@@ -10,7 +10,7 @@ import {
     persistWallpaper,
     wallpaperState,
     type SpeedDialItem
-} from "core/storage/StateStorage";
+} from "core/store/StateStorage";
 import {
     ExplorerChannelAction,
     FileAttachmentApiAction,

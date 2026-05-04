@@ -1,6 +1,6 @@
 import { loadSettings } from "com/config/Settings";
 import type { AppSettings } from "com/config/SettingsTypes";
-import { applyGridSettings } from "core/storage/StateStorage";
+import { applyGridSettings } from "core/store/StateStorage";
 
 /** Convert getComputedStyle background (rgb/rgba or hex) to #rrggbb for meta theme-color / PWA chrome. */
 export const cssBackgroundToOpaqueHex = (css: string): string | null => {
@@ -83,6 +83,15 @@ export const syncBrowserChromeTheme = (
     root.setAttribute("data-scheme", scheme);
     root.setAttribute("data-theme", resolved);
     root.style.colorScheme = resolved;
+
+    try {
+        const body = document.body;
+        if (body) {
+            body.style.colorScheme = resolved;
+        }
+    } catch {
+        // ignore (SSR / stale documents)
+    }
 
     // When LUR.E dynamic theme is active, it is the single writer for meta theme-color.
     if ((globalThis as any)?.__LURE_DYNAMIC_THEME_PRIORITY__ === true) {

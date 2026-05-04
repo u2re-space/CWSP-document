@@ -1,4 +1,4 @@
-import { getCachedComponent, H } from "fest/lure";
+import { createFileHandler, getCachedComponent, getSpeechPrompt, H } from "fest/lure";
 import { ensureStyleSheet } from "fest/icon";
 
 // Import unified messaging system
@@ -14,7 +14,6 @@ import { createMessageWithOverrides } from "com/core/UnifiedMessaging";
 import type { ContentContext, ContentType } from "com/core/UnifiedAIConfig";
 
 // Import file handling components that are always needed
-import { createFileHandler } from "core/storage/FileHandling";
 import { createTemplateManager } from "core/modules/TemplateManager";
 import { BROADCAST_CHANNELS, getBroadcastChannelForDestination } from "com/config/Names";
 import { loadAsAdopted } from "fest/dom";

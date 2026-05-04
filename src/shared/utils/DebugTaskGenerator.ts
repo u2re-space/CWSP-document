@@ -1,4 +1,4 @@
-import { writeTimelineTask } from "../storage/FileSystem.js";
+
 import { fixEntityId } from "com/template/EntityId.js";
 
 // Debug configuration
@@ -126,70 +126,6 @@ export const generateDebugTasks = (count: number = 3): any[] => {
 };
 
 /**
- * Writes debug tasks to the timeline
- */
-export const writeDebugTasks = async (taskCount: number = 1): Promise<any[]> => {
-    if (!DEBUG_ENABLED) {
-        console.log("Debug task generation is disabled");
-        return [];
-    }
-
-    const tasks = generateDebugTasks(taskCount);
-    const results: any[] = [];
-
-    for (const task of tasks) {
-        try {
-            const result = await writeTimelineTask(task);
-            results.push(result);
-            console.log("Debug task written:", task.name, task.id);
-        } catch (error) {
-            console.warn("Failed to write debug task:", error);
-        }
-    }
-
-    return results;
-};
-
-/**
- * Auto-generates debug tasks on page refresh and via setTimeout
- */
-export const startDebugTaskGeneration = (): void => {
-    if (!DEBUG_ENABLED) {
-        console.log("Debug task generation is disabled");
-        return;
-    }
-
-    console.log("Starting debug task generation...");
-
-    // Generate initial task on page load
-    //writeDebugTasks(1).catch(console.warn);
-
-    // Set up periodic generation
-    const generatePeriodically = () => {
-        setTimeout(async () => {
-            if (DEBUG_ENABLED) {
-                await writeDebugTasks(1);
-                generatePeriodically(); // Schedule next generation
-            }
-        }, DEBUG_IMMITATE);
-    };
-
-    //generatePeriodically();
-};
-
-/**
- * Manual trigger for debug task generation
- */
-export const triggerDebugTaskGeneration = (count: number = 1): Promise<any[]> => {
-    if (!DEBUG_ENABLED) {
-        console.log("Debug task generation is disabled");
-        return Promise.resolve([]);
-    }
-
-    return writeDebugTasks(count);
-};
-
-/**
  * Enable or disable debug mode
  */
 export const setDebugMode = (enabled: boolean): void => {
@@ -203,12 +139,3 @@ export const setDebugMode = (enabled: boolean): void => {
 export const isDebugModeEnabled = (): boolean => {
     return DEBUG_ENABLED;
 };
-
-// Expose debug functions to global scope for easy testing
-if (typeof globalThis !== 'undefined') {
-    (globalThis as any).debugTaskGenerator = {
-        generate: triggerDebugTaskGeneration,
-        setMode: setDebugMode,
-        isEnabled: isDebugModeEnabled
-    };
-}

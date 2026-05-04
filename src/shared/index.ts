@@ -32,85 +32,6 @@ export {
     type ApiPath
 } from "./api";
 
-// ============================================================================
-// STORAGE
-// ============================================================================
-
-export {
-    // Keys
-    StorageKeys,
-    type StorageKey,
-
-    // LocalStorage
-    getItem,
-    setItem,
-    removeItem,
-    getString,
-    setString,
-    isLocalStorageAvailable,
-
-    // SessionStorage
-    getSessionItem,
-    setSessionItem,
-    removeSessionItem,
-
-    // IndexedDB
-    getIDBItem,
-    setIDBItem,
-    removeIDBItem,
-    IDBStorage,
-
-    // Pre-configured instances
-    workCenterStorage,
-    historyStorage,
-    settingsStorage
-} from "./storage";
-
-// ============================================================================
-// TIME UTILITIES
-// ============================================================================
-
-export {
-    // Timezone
-    getTimeZone,
-
-    // Parsing
-    isPureHHMM,
-    parseDateCorrectly,
-    parseAndGetCorrectTime,
-    getComparableTimeValue,
-    isDate,
-
-    // Range checks
-    checkInTimeRange,
-    checkRemainsTime,
-
-    // Day descriptors
-    getISOWeekNumber,
-    createDayDescriptor,
-    insideOfDay,
-    notInPast,
-
-    // Timeline
-    SplitTimelinesByDays,
-    computeTimelineOrderInGeneral,
-    computeTimelineOrderInsideOfDay,
-
-    // Formatting
-    normalizeSchedule,
-    formatAsTime,
-    formatAsDate,
-    formatDateTime
-} from "./time";
-
-// ============================================================================
-// TEXT UTILITIES
-// ============================================================================
-
-// ============================================================================
-// PHONE UTILITIES
-// ============================================================================
-
 export {
     // Constants
     PHONE_CANDIDATE_RE,
@@ -131,7 +52,7 @@ export {
     // Types
     type NormalizeOptions,
     type DuplicateResult
-} from "./phone";
+} from "fest/core";
 
 // ============================================================================
 // DOCUMENT (Markdown & DOCX)
@@ -230,7 +151,7 @@ export {
     // File System Access API
     saveFile,
     openFile
-} from "./storage/file-utils";
+} from "fest/lure";
 
 // ============================================================================
 // MODULES (Feature modules)

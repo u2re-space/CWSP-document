@@ -1,4 +1,4 @@
-import type { ClipboardResult, ImageProcessingOptions, PlatformAdapter } from "../shared/types";
+import type { ClipboardResult, PlatformAdapter } from "../shared/types";
 
 /** Dynamic-only: static `core/modules/Clipboard` is merged into `com-app` and ties the MV3 SW graph to DOM chunks. */
 let clipboardMod: typeof import("core/modules/Clipboard") | null = null;

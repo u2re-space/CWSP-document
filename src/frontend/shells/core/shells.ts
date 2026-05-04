@@ -8,6 +8,7 @@ import { loadSettings, saveSettings } from "shared/config/Settings";
 import { applyTheme as applyAppTheme, syncBrowserChromeTheme } from "shared/utils/Theme";
 import { isEnabledView } from "shared/routing/views";
 import { scheduleViewModulePrefetch } from "shared/routing/view-prefetch";
+import { serviceChannels, type ServiceChannelId } from "com/core/ServiceChannels";
 import { ensureStyleSheet } from "fest/icon";
 import "fest/icon";
 import { dynamicTheme } from "fest/lure";
@@ -20,6 +21,18 @@ import {
 //@ts-ignore
 import style from "../../views/views.scss?inline";
 
+/** Views backed by {@link SERVICE_CHANNEL_CONFIG}; lazily initialized on first navigate when not boot-preloaded. */
+const VIEW_SERVICE_CHANNEL_IDS = new Set<string>([
+    "workcenter",
+    "settings",
+    "viewer",
+    "explorer",
+    "airpad",
+    "print",
+    "history",
+    "editor",
+    "home"
+]);
 
 /**
  * Abstract base shell with common functionality
@@ -377,6 +390,14 @@ export abstract class ShellBase implements Shell {
             params,
             initialData,
         });
+
+        if (VIEW_SERVICE_CHANNEL_IDS.has(viewId)) {
+            try {
+                await serviceChannels.initChannel(viewId as ServiceChannelId);
+            } catch (err) {
+                console.warn(`[${this.id}] initChannel(${viewId}) failed:`, err);
+            }
+        }
 
         // Render view
         const element = view.render({

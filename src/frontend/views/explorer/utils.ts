@@ -1,4 +1,4 @@
-import { speedDialItems } from "core/storage/StateStorage";
+import { speedDialItems } from "core/store/StateStorage";
 
 //
 export type ContextMenuItem = {

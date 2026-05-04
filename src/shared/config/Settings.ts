@@ -3,6 +3,7 @@ import { JSOX } from "jsox";
 //
 import type { AppSettings } from "com/config/SettingsTypes";
 import { DEFAULT_SETTINGS } from "com/config/SettingsTypes";
+import { writeFileSmart } from "fest/lure";
 
 //
 export const SETTINGS_KEY = "rs-settings";
@@ -586,7 +587,7 @@ const downloadContentsToOPFS = async (
     const { getDirectoryHandle, readFile } = await loadLureFs();
     const files = await webDavClient
         ?.getDirectoryContents?.(path || "/")
-        ?.catch?.((e) => { console.warn(e); return []; }) as FileStat[];
+        ?.catch?.((e) => { console.warn(e); return []; }) as any;
 
     // Если включено — удаляем локальные элементы, которых нет на сервере
     if (opts.pruneLocal && files?.length > 0) {
@@ -632,7 +633,6 @@ const downloadContentsToOPFS = async (
 
                     // mime может отсутствовать — ставим разумный дефолт
                     const mime = (file as any)?.mime || "application/octet-stream";
-                    const { writeFileSmart } = await import("core/storage/WriteFileSmart-v2");
                     return writeFileSmart(rootHandle, fullPath, new File([contents], file.basename, { type: mime }));
                 }
             }

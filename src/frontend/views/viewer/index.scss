@@ -3531,7 +3531,8 @@
         container-type: inline-size;
         isolation: isolate;
 
-        background: var(--color-surface-container-high, var(--view-toolbar-surface));
+        /* Prefer semantic toolbar canvas token so light/dark stays aligned with `--view-bg` (see viewer-view-tokens). */
+        background: var(--view-toolbar-bg, var(--color-surface-container-high, var(--view-toolbar-surface)));
         border-block-end: none;
         box-shadow: var(--view-toolbar-shadow);
 
@@ -3920,8 +3921,11 @@
 
     color-scheme: light dark;
 
-    /* colors — app tokens win when set; otherwise follow prefers-color-scheme via CSS light-dark() */
-    --view-bg: var(--color-surface, #{_viewer-css-light-dark("light-dark(#f4f6fa, #0b0d12)")});
+    /*
+     * WHY: Transparent pill chrome belongs on `.view-viewer__toolbar` only. Setting `--color-surface`
+     * on `:root` leaked into minimal shell tokens (`light-dark(var(--color-surface), …)`), breaking light theme.
+     */
+    --view-bg: #{_viewer-css-light-dark("light-dark(#f4f6fa, #0b0d12)")};
     --view-fg: var(--color-on-surface, #{_viewer-css-light-dark("light-dark(#1a1a1a, #e8eaef)")});
     --view-border: var(
         --color-border,
@@ -3943,10 +3947,8 @@
     --view-link-color: var(--color-link, #{_viewer-css-light-dark("light-dark(#06c, #7eb8ff)")});
     --view-link-hover: var(--color-link-hover, #{_viewer-css-light-dark("light-dark(#005fa3, #a8d0ff)")});
 
-    /* fl-ui / toolbar controls (transparent chrome; icons follow scheme) */
-    --color-surface: transparent;
+    /* fl-ui / toolbar controls — neutral text on canvas; pill surfaces scoped under `.view-viewer__toolbar` */
     --color-on-surface: #{_viewer-css-light-dark("light-dark(#2d3748, #c4c9d4)")};
-    --color-surface-container-high: var(--view-btn-hover-bg);
     --color-primary: #{_viewer-css-light-dark("light-dark(#2563eb, #8ab4ff)")};
 
     /* toolbar (see .view-viewer__toolbar) */
@@ -3975,6 +3977,46 @@
     cw-view-viewer[data-view="viewer"],
     cw-view-viewer[data-view-id="viewer"] {
         @include viewer-view-tokens;
+    }
+
+    /*
+     * WHY: Match resolved app theme so `light-dark()` in `--view-toolbar-bg` / prose tokens does not follow OS
+     * while `html[data-theme]` & Theme.ts already locked the product to light or dark.
+     */
+    html[data-theme="light"] :where(.cw-view-viewer-shell, .view-viewer) {
+        color-scheme: light;
+    }
+
+    html[data-theme="dark"] :where(.cw-view-viewer-shell, .view-viewer) {
+        color-scheme: dark;
+    }
+
+    /*
+     * WHY: Semi-transparent `light-dark()` toolbar fills composite against whatever sits behind the row; combined
+     * with token drift the bar could stay visually dark while `--color-on-surface` followed the light palette (washed-out icons).
+     * Lock opaque chrome + fg to `html[data-theme]` (same source as Theme.ts), not UA/OS scheme alone.
+     */
+    html[data-theme="light"] .view-viewer .view-viewer__toolbar {
+        color-scheme: light;
+        background: var(--viewer-toolbar-row-fill, #e8ecf4);
+        --color-on-surface: #1e293b;
+        --view-picon-fill: #1e293b;
+        --view-picon-fill-hover: #2563eb;
+        --color-surface-container-high: rgb(0 0 0 / 0.1);
+    }
+
+    html[data-theme="dark"] .view-viewer .view-viewer__toolbar {
+        color-scheme: dark;
+        background: var(--viewer-toolbar-row-fill, #151f2e);
+        --color-on-surface: #e5e7eb;
+        --view-picon-fill: #e5e7eb;
+        --view-picon-fill-hover: var(--color-primary-hover, #93c5fd);
+        --color-surface-container-high: rgb(255 255 255 / 0.14);
+    }
+
+    /* Pill chrome only — keeps global `--color-surface` valid for minimal/base shell tokens on `:root`. */
+    .view-viewer__toolbar {
+        --color-surface: transparent;
     }
 }
 
