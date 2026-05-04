@@ -1,7 +1,6 @@
 import { UUIDv4 } from "fest/core";
 import { UIElement } from "fest/fl-ui";
 import { defineElement, type CustomElementLifecycle, type GLitElementConstructor } from "fest/lure";
-import type { ContextMenuItem } from "./explorer/utils";
 
 /** Registered custom element constructors produced through `createViewConstructor` / `extendViewConstructor`. */
 export const registeredViewConstructors = new Map<string, CustomElementConstructor>();
@@ -25,7 +24,6 @@ export interface ViewOptions {
     viewType?: string;
     viewIcon?: string;
     viewMetaData?: ViewMetaData;
-    contextMenu?: (this: ViewInstance, x: number, y: number, items: ContextMenuItem[]) => any;
 }
 
 //
@@ -48,7 +46,6 @@ export interface ConstructorOptions {
     render?: (this: ViewInstance, ...args: any[]) => any;
     styles?: (this: ViewInstance, ...args: any[]) => any;
     lifecycle?: ViewLifecycle;
-    contextMenu?: (this: ViewInstance, x: number, y: number, items: ContextMenuItem[]) => any;
 }
 
 /** Merge additive `ConstructorOptions` (later wins on overlapping shallow keys except lifecycle hooks chain). */
@@ -91,7 +88,6 @@ function mergeLifecycle(proto: ViewInstance, lifecycle: ViewLifecycle): void {
 /** Apply declarative patches after the class exists (chains with any existing prototype implementation). */
 export function applyConstructorOptions(Ctor: GLitElementConstructor<ViewBase>, opts: ConstructorOptions): void {
     const proto = Ctor.prototype as ViewInstance;
-    if (opts.contextMenu) extendPrototypeMethod(proto, "contextMenu", opts.contextMenu as (...args: any[]) => unknown);
     if (opts.initialization) extendPrototypeMethod(proto, "onInitialize", opts.initialization as (...args: any[]) => unknown);
     if (opts.rendering) extendPrototypeMethod(proto, "onRender", opts.rendering as (...args: any[]) => unknown);
     if (opts.render) extendPrototypeMethod(proto, "render", opts.render as (...args: any[]) => unknown);
