@@ -1,41 +1,5 @@
 # AGENTS.md
 
-## Pantry — persistent project notes
-
-This project uses persistent notes via the `pantry` MCP tools.
-
-### Required at session start
-
-Before doing any substantive work, load existing context from previous sessions:
-
-1. Call `pantry_context` to retrieve recent project notes.
-2. If the task is about a specific feature, bug, subsystem, file, or topic, also call `pantry_search` with relevant keywords.
-
-Do not skip this step. Important context may exist only in Pantry and may not be visible in the repository.
-
-### Required at session end
-
-If the session produced any durable outcome, store it in Pantry before finishing. This includes:
-
-- code changes
-- architectural or implementation decisions
-- bug investigations or root causes
-- useful discoveries
-- non-obvious project context that would help a future agent
-
-Use `pantry_store` with:
-
-- `title`: short descriptive title
-- `what`: what happened or what was decided
-- `why`: the reasoning behind it
-- `impact`: what changed or what is affected
-- `category`: one of `decision`, `pattern`, `bug`, `context`, `learning`
-- `details`: enough detail for a future agent with no prior context
-
-Do not skip this step for tasks that involved changes, decisions, bugs, or learnings. Pantry is the project’s long-term memory across sessions.
-
----
-
 ## Known gotchas
 
 - **No physical device or emulator is available in the Cloud VM.**
