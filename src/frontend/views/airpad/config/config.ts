@@ -381,7 +381,8 @@ export function applyAirpadRuntimeFromAppSettings(settings: AppSettings): void {
     shellClipboardPushIntervalMs =
         Number.isFinite(intervalRaw) && intervalRaw >= 800 ? Math.min(Math.round(intervalRaw), 60000) : 2000;
     shellClipboardBroadcastTargets = (shell?.clipboardBroadcastTargets || "").trim();
-    shellMaintainHubSocket = Boolean(shell?.maintainHubSocketConnection);
+    /** Align with {@link isMaintainHubSocketConnectionEnabled}: explicit false disables; missing shells default on. */
+    shellMaintainHubSocket = (shell?.maintainHubSocketConnection ?? true) !== false;
     shellPreferNativeWebsocket = (shell?.preferNativeWebsocket ?? interop?.preferNativeWebsocket ?? true) !== false;
     shellNativeSmsEnabled = (shell?.enableNativeSms ?? true) !== false;
     shellNativeContactsEnabled = (shell?.enableNativeContacts ?? true) !== false;

@@ -5,6 +5,13 @@
 import { H } from "fest/lure";
 import type { View, ViewOptions, ViewLifecycle, ShellContext } from "shells/types";
 import type { BaseViewOptions } from "views/types";
+import { HomeChannelAction } from "views/apis/channel-actions";
+import {
+    workspaceApplyWallpaper,
+    workspaceApplyWallpaperFromFile,
+    workspacePinFileToSpeedDial,
+    workspacePinHrefToSpeedDial
+} from "shared/routing/workspace-files-api";
 
 export type HomeViewOptions = BaseViewOptions;
 
@@ -67,6 +74,56 @@ export class HomeView implements View {
     }
 
     async handleMessage(): Promise<void> {}
+
+    invokeChannelApi(action: string, payload?: unknown): unknown {
+        if (action === HomeChannelAction.Navigate || action === HomeChannelAction.OpenView) {
+            const id =
+                typeof payload === "string"
+                    ? payload
+                    : payload && typeof payload === "object" && payload !== null && "viewId" in payload
+                      ? String((payload as Record<string, unknown>).viewId)
+                      : "";
+            const trimmed = id.trim();
+            if (trimmed) this.shellContext?.navigate(trimmed as never);
+            return Boolean(trimmed);
+        }
+
+        if (action === HomeChannelAction.WallpaperSet) {
+            const p = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+            workspaceApplyWallpaper({
+                src: typeof p.src === "string" ? p.src : undefined,
+                opacity: typeof p.opacity === "number" ? p.opacity : undefined,
+                blur: typeof p.blur === "number" ? p.blur : undefined
+            });
+            return true;
+        }
+
+        if (action === HomeChannelAction.WallpaperFromFile && payload instanceof File) {
+            workspaceApplyWallpaperFromFile(payload);
+            return true;
+        }
+
+        if (action === HomeChannelAction.SpeedDialPinHref) {
+            const p = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+            const href = typeof p.href === "string" ? p.href : "";
+            const label = typeof p.label === "string" ? p.label : href;
+            if (!href.trim()) return false;
+            workspacePinHrefToSpeedDial({
+                href,
+                label,
+                icon: typeof p.icon === "string" ? p.icon : undefined,
+                action: typeof p.action === "string" ? (p.action as "open-link") : undefined
+            });
+            return true;
+        }
+
+        if (action === HomeChannelAction.SpeedDialPinFile && payload instanceof File) {
+            workspacePinFileToSpeedDial(payload);
+            return true;
+        }
+
+        return undefined;
+    }
 }
 
 export function createView(options?: HomeViewOptions): HomeView {

@@ -36,7 +36,7 @@ import {
     initializeComponent,
     type UnifiedMessage
 } from "com/core/UnifiedMessaging";
-import { bindViewReceiveChannel } from "./channel-mixin";
+import { attachImplicitViewMessaging } from "./implicit-view-bridge";
 import {
     VIEW_ENABLED_VIEWER,
     VIEW_ENABLED_WORKCENTER,
@@ -284,7 +284,7 @@ class ViewRegistryClass {
         }
 
         this.loadedViews.set(id, view);
-        this.viewReceiveCleanup.set(id, bindViewReceiveChannel(view, {
+        this.viewReceiveCleanup.set(id, attachImplicitViewMessaging(view, {
             destination: String(id),
             componentId: `view:${id}`
         }));

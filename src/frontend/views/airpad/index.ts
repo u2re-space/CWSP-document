@@ -13,6 +13,7 @@ import type { ViewOptions as RegistryViewOptions } from "../registry";
 import { createViewConstructor, ViewBase } from "../registry";
 import { setRemoteKeyboardEnabled } from "./input/virtual-keyboard";
 import { ensureCwAirpadAppDefined, type CwAirpadApp } from "./component/CwAirpadApp";
+import { AirpadChannelAction } from "views/apis/channel-actions";
 
 // @ts-ignore
 import style from "./airpad.scss?inline";
@@ -159,6 +160,19 @@ export const CwAirpadView = createViewConstructor(TAG, (Base: typeof ViewBase) =
             // no-op
         } finally {
             this._orientationLocked = false;
+        }
+    }
+
+    async invokeChannelApi(action: string, _payload?: unknown): Promise<unknown> {
+        switch (action) {
+            case AirpadChannelAction.Start:
+            case AirpadChannelAction.AirpadStart:
+                return this.initAirpad();
+            case AirpadChannelAction.Retry:
+                this.appElement?.retry?.();
+                return true;
+            default:
+                return undefined;
         }
     }
 

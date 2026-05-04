@@ -12,6 +12,7 @@ import type { View, ViewOptions, ViewLifecycle, ShellContext } from "shells/type
 import type { BaseViewOptions } from "views/types";
 import { getItem, setItem } from "core/storage";
 import { writeText as writeClipboardText } from "core/modules/Clipboard";
+import { HistoryChannelAction } from "views/apis/channel-actions";
 
 // @ts-ignore
 import style from "./scss/history.scss?inline";
@@ -175,6 +176,11 @@ export class HistoryView implements View {
         this.updateList();
     }
 
+    /** Pull latest history entries from storage into the list UI. */
+    reloadHistory(): void {
+        this.loadHistory();
+    }
+
     private clearHistory(): void {
         this.entries.length = 0;
         setItem(STORAGE_KEY, []);
@@ -205,6 +211,14 @@ export class HistoryView implements View {
 
     private showMessage(message: string): void {
         this.shellContext?.showMessage(message);
+    }
+
+    invokeChannelApi(action: string, _payload?: unknown): unknown {
+        if (action === HistoryChannelAction.Reload || action === HistoryChannelAction.Refresh) {
+            this.reloadHistory();
+            return true;
+        }
+        return undefined;
     }
 
     canHandleMessage(): boolean {

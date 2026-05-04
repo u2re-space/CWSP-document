@@ -10,6 +10,7 @@ import { loadAsAdopted, removeAdopted } from "fest/dom";
 import type { View, ViewOptions, ViewLifecycle, ShellContext } from "shells/types";
 import type { BaseViewOptions } from "views/types";
 import { createViewState } from "views/types";
+import { EditorChannelAction } from "views/apis/channel-actions";
 import { writeText as writeClipboardText } from "core/modules/Clipboard";
 
 // @ts-ignore
@@ -234,6 +235,33 @@ export class EditorView implements View {
 
     private showMessage(message: string): void {
         this.shellContext?.showMessage(message);
+    }
+
+    async invokeChannelApi(action: string, payload?: unknown): Promise<unknown> {
+        const p =
+            payload != null && typeof payload === "object" && !Array.isArray(payload)
+                ? (payload as Record<string, unknown>)
+                : {};
+        const text =
+            typeof p.text === "string"
+                ? p.text
+                : typeof p.content === "string"
+                    ? p.content
+                    : typeof payload === "string"
+                        ? payload
+                        : "";
+
+        if (
+            action === EditorChannelAction.SetContent ||
+            action === EditorChannelAction.ContentLoad ||
+            action === EditorChannelAction.ContentEdit
+        ) {
+            if (text) this.setContent(text);
+            return true;
+        }
+
+        await this.handleMessage({ type: action, data: { text, content: text } });
+        return true;
     }
 
     canHandleMessage(messageType: string): boolean {

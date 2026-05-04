@@ -32,6 +32,7 @@ import { applyTheme as applyAppTheme } from "core/utils/Theme";
 import { DEFAULT_SETTINGS, type AppSettings } from "com/config/SettingsTypes";
 import { isEnabledView, pickEnabledView } from "shared/routing/views";
 
+import { startImplicitViewMessagingBridge } from "shared/routing/implicit-view-bridge";
 import { initializeLayers } from "shared/routing/layer-manager";
 import { loadStyleSystem } from "shared/styles";
 import { initCwsNativeBridge } from "shared/native/cws-bridge";
@@ -184,6 +185,9 @@ export class BootLoader {
     
     // Loaded shell instance
     private shellInstance: Shell | null = null;
+
+    /** MutationObserver-driven view host bindings (shared routing); disconnected between boots. */
+    private implicitBridgeCleanup: (() => void) | null = null;
     
     
     // Phase handlers for customization
@@ -216,6 +220,8 @@ export class BootLoader {
             // SW handoffs, etc.), dispose previous shell instance to avoid stale handlers.
             if (this.shellInstance) {
                 try {
+                    this.implicitBridgeCleanup?.();
+                    this.implicitBridgeCleanup = null;
                     ShellRegistry.unload(this.shellInstance.id);
                 } catch (error) {
                     console.warn("[BootLoader] Failed to unload previous shell:", error);
@@ -255,7 +261,11 @@ export class BootLoader {
 
             // Phase 4: Mount Shell
             await shell.mount(container);
-            
+
+            // Implicit DOM-discovered receive bindings (views expose `handleMessage` / APIs; no transport mixins required).
+            this.implicitBridgeCleanup?.();
+            this.implicitBridgeCleanup = startImplicitViewMessagingBridge();
+
             // Phase 5: Initialize channels (primary sync, rest on idle)
             if (config.channels && config.channels.length > 0) {
                 await this.initChannels(config.channels, config.channelPriorityId);

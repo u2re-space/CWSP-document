@@ -8,12 +8,15 @@
  * and clipboard policy. Use this for coordinator `act` / `ask` traffic, remote
  * clipboard sync, and future AI or automation asks routed through the endpoint.
  *
+ * MV3 cold start: {@link startFromStoredSettings} respects {@link shouldDeferCrxHubSocketBootstrap}
+ * so we do not probe localhost until Settings were saved or endpoint URL left the dev default.
+ *
  * Modes such as “frontend as server” or WS reverse-listener are not fully
  * implemented; the extension typically acts as a normal CWSP client to the hub.
  */
 
 import type { AppSettings } from "com/config/SettingsTypes";
-import { loadSettings } from "com/config/Settings";
+import { loadSettings, shouldDeferCrxHubSocketBootstrap } from "com/config/Settings";
 import { isCapacitorCwsNativeShell } from "shared/native/cws-bridge";
 import {
     applyAirpadRuntimeFromAppSettings,
@@ -81,6 +84,7 @@ const createCoordinator = (): CrxNetworkCoordinator => {
     return {
         startFromStoredSettings: async () => {
             const settings = await loadSettings();
+            if (await shouldDeferCrxHubSocketBootstrap(settings)) return;
             await startFromSettings(settings);
         },
 

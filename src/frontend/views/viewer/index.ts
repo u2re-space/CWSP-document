@@ -28,6 +28,7 @@ import type { MarkedExtension } from "marked";
 import { createViewConstructor, ViewBase } from "../registry";
 import { requestOpenView } from "shared/routing/view-api";
 import { ViewRegistry } from "shared/routing/registry";
+import { ViewerChannelAction } from "views/apis/channel-actions";
 
 let markedParserPromise: Promise<(markdown: string) => Promise<string>> | null = null;
 
@@ -997,7 +998,7 @@ export const CwViewViewer = createViewConstructor(TAG, (Base: any)=>{
         }
     }
 
-    private async openMarkdownSource(source: string, filename?: string): Promise<boolean> {
+    public async openMarkdownFromUrl(source: string, filename?: string): Promise<boolean> {
         const renderTarget = this.queryViewerSlotted("[data-render-target]");
         if (renderTarget) {
             renderTarget.setAttribute("aria-busy", "true");
@@ -1070,7 +1071,7 @@ export const CwViewViewer = createViewConstructor(TAG, (Base: any)=>{
                     this.setOutlineVisible(!this.outlineVisible);
                     break;
                 case "attach":
-                    void this.handleAttachToWorkCenter();
+                    void this.attachCurrentContentToWorkcenter();
                     break;
             }
         });
@@ -1131,7 +1132,7 @@ export const CwViewViewer = createViewConstructor(TAG, (Base: any)=>{
             if (!shouldOpenAsMarkdown) return;
 
             e.preventDefault();
-            void this.openMarkdownSource(resolved).then((ok) => {
+            void this.openMarkdownFromUrl(resolved).then((ok) => {
                 if (!ok) {
                     this.showMessage("Failed to open markdown link");
                 }
@@ -1272,7 +1273,8 @@ export const CwViewViewer = createViewConstructor(TAG, (Base: any)=>{
         }
     }
 
-    private async handleAttachToWorkCenter(): Promise<void> {
+    /** Push current markdown buffer into Work Center (toolbar attach / channel API). */
+    async attachCurrentContentToWorkcenter(): Promise<void> {
         const content = this.contentRef.value || "";
         if (!content.trim()) {
             this.showMessage("No content to attach");
@@ -2069,6 +2071,45 @@ export const CwViewViewer = createViewConstructor(TAG, (Base: any)=>{
     }
 
     // ========================================================================
+    // CHANNEL API (imperative / routing / extensions)
+    // ========================================================================
+
+    async invokeChannelApi(action: string, payload?: unknown): Promise<unknown> {
+        const p =
+            payload != null && typeof payload === "object" && !Array.isArray(payload)
+                ? (payload as Record<string, unknown>)
+                : {};
+
+        switch (action) {
+            case ViewerChannelAction.AttachToWorkcenter:
+                return this.attachCurrentContentToWorkcenter().then(() => undefined);
+            case ViewerChannelAction.OpenUrl:
+            case ViewerChannelAction.OpenMarkdownUrl: {
+                const url = String(p.url || "");
+                if (!url) return false;
+                return this.openMarkdownFromUrl(url, typeof p.filename === "string" ? p.filename : undefined);
+            }
+            default:
+                return this.handleMessage({
+                    type: action,
+                    data: {
+                        text: typeof p.text === "string" ? p.text : undefined,
+                        content: typeof p.content === "string" ? p.content : undefined,
+                        filename: typeof p.filename === "string" ? p.filename : undefined,
+                        url: typeof p.url === "string" ? p.url : undefined,
+                        source: typeof p.source === "string" ? p.source : undefined,
+                        path: typeof p.path === "string" ? p.path : undefined,
+                        src: typeof p.src === "string" ? p.src : undefined,
+                        file: p.file instanceof File ? p.file : undefined,
+                        files: Array.isArray(p.files)
+                            ? p.files.filter((x): x is File => x instanceof File)
+                            : undefined
+                    }
+                }).then(() => undefined);
+        }
+    }
+
+    // ========================================================================
     // MESSAGE HANDLING
     // ========================================================================
 
@@ -2101,7 +2142,7 @@ export const CwViewViewer = createViewConstructor(TAG, (Base: any)=>{
 
         if (msg.data?.url) {
             const source = msg.data.source || msg.data.src || msg.data.path || msg.data.url;
-            const opened = await this.openMarkdownSource(source, msg.data.filename);
+            const opened = await this.openMarkdownFromUrl(source, msg.data.filename);
             if (!opened) {
                 const fallbackContent = `> Failed to load markdown from:\n> ${source}`;
                 this.setContent(fallbackContent, msg.data.filename, source);

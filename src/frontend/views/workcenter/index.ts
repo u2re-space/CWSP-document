@@ -252,6 +252,22 @@ export class WorkCenterView extends UIElement implements View {
         await this.handleMessageWithManager(msg);
     }
 
+    /** Stable imperative entry for channels — mirrors {@link handleMessage} shapes. */
+    async invokeChannelApi(action: string, payload?: unknown): Promise<boolean> {
+        let data: WorkCenterMessageData | undefined;
+        if (payload != null && typeof payload === "object" && !Array.isArray(payload)) {
+            data = payload as WorkCenterMessageData;
+        } else if (Array.isArray(payload) && payload.length > 0 && payload.every((f): f is File => f instanceof File)) {
+            data = { files: payload };
+        } else if (payload instanceof File) {
+            data = { file: payload };
+        } else if (typeof payload === "string") {
+            data = { text: payload };
+        }
+        await this.handleMessage({ type: action, data });
+        return true;
+    }
+
     private async handleMessageWithManager(msg: WorkCenterInboundMessage): Promise<void> {
         if (!this.manager) return;
 

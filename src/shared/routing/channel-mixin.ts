@@ -29,6 +29,7 @@ import {
 import { fetchSwCachedEntries } from "com/core/ShareTargetGateway";
 import { inferViewDestination, mapUnifiedMessageToView } from "./view-message-routing";
 import { subscribeViewChannel } from "./view-api";
+import { toUnifiedInteropMessage } from "com/core/UniformInterop";
 
 /**
  * Creates a channel-connected view by mixing channel functionality into an existing view.

@@ -9,10 +9,11 @@ import type { ViewOptions as ShellViewOptions, ViewLifecycle } from "shells/type
 import type { BaseViewOptions } from "views/types";
 import type { ViewOptions as RegistryViewOptions } from "../registry";
 import { createViewConstructor, ViewBase } from "../registry";
-import { loadAsAdopted, removeAdopted } from "fest/dom";
+import type { FileManager } from "fest/fl-ui";
 import type { ExplorerInjectApi } from "./inject";
 import type { LocalFileManager } from "./runtime";
 import { wireExplorerSubtree } from "./runtime";
+import { ExplorerChannelAction } from "views/apis/channel-actions";
 
 /** Re-export + ensure `ui-file-manager` is defined when this module loads. */
 export { FileManager, FileManagerContent } from "fest/fl-ui";
@@ -149,10 +150,93 @@ export const CwViewExplorer = createViewConstructor(TAG, (Base: typeof ViewBase)
         }
 
         async handleMessage(message: unknown): Promise<void> {
-            const msg = message as { data?: { path?: string; into?: string } };
+            const msg = message as { type?: string; data?: { path?: string; into?: string; file?: File } };
+            if (msg.data?.file instanceof File) {
+                await this.saveIncomingFileToWorkspace(msg.data.file, msg.data.path || msg.data.into);
+                return;
+            }
             const targetPath = msg.data?.path || msg.data?.into;
             if (targetPath && this.wiredFileManager) {
                 void this.wiredFileManager.navigate(targetPath);
+            }
+        }
+
+        private async saveIncomingFileToWorkspace(file: File, destPath?: string): Promise<boolean> {
+            const fm = this.wiredFileManager as unknown as FileManager | null;
+            const op = fm?.operative as { ingestFileIntoWorkspace?: (f: File, p?: string) => Promise<void> } | undefined;
+            if (!op?.ingestFileIntoWorkspace) return false;
+            await op.ingestFileIntoWorkspace(file, destPath);
+            return true;
+        }
+
+        /** Imperative API — channels / tooling (FL-UI `ui-file-manager` when wired). */
+        navigateExplorer(path: string): void | Promise<void> {
+            const p = String(path || "").trim();
+            if (!p || !this.wiredFileManager) return;
+            return this.wiredFileManager.navigate(p);
+        }
+
+        getExplorerFileManager(): LocalFileManager | null {
+            return this.wiredFileManager;
+        }
+
+        getExplorerShellRoot(): HTMLElement | null {
+            return this.explorerRoot;
+        }
+
+        invokeChannelApi(action: string, payload?: unknown): unknown | Promise<unknown> {
+            const pathFromPayload = (): string => {
+                if (typeof payload === "string") return payload.trim();
+                if (payload && typeof payload === "object") {
+                    const o = payload as Record<string, unknown>;
+                    const raw = o.path ?? o.into ?? o.target;
+                    return typeof raw === "string" ? raw.trim() : "";
+                }
+                return "";
+            };
+
+            switch (action) {
+                case ExplorerChannelAction.NavigatePath:
+                case ExplorerChannelAction.ContentExplorer:
+                case ExplorerChannelAction.Navigate: {
+                    const path = pathFromPayload();
+                    if (!path) return false;
+                    void this.navigateExplorer(path);
+                    return true;
+                }
+                case ExplorerChannelAction.GetPath:
+                    return this.wiredFileManager?.path ?? null;
+                case ExplorerChannelAction.FileSave:
+                case "file-save": {
+                    const o = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+                    const file = o.file instanceof File ? o.file : null;
+                    const dest = typeof o.path === "string" ? o.path : typeof o.into === "string" ? o.into : undefined;
+                    if (!file) return false;
+                    return this.saveIncomingFileToWorkspace(file, dest);
+                }
+                case ExplorerChannelAction.RequestUse: {
+                    const fm = this.wiredFileManager as unknown as FileManager | null;
+                    fm?.requestUse?.();
+                    return true;
+                }
+                case ExplorerChannelAction.RequestUpload: {
+                    const fm = this.wiredFileManager as unknown as FileManager | null;
+                    fm?.requestUpload?.();
+                    return true;
+                }
+                case ExplorerChannelAction.RequestPaste: {
+                    const fm = this.wiredFileManager as unknown as FileManager | null;
+                    fm?.requestPaste?.();
+                    return true;
+                }
+                default:
+                    return this.handleMessage({
+                        type: action,
+                        data:
+                            typeof payload === "object" && payload
+                                ? (payload as Record<string, unknown>)
+                                : { path: pathFromPayload() || undefined }
+                    }).then(() => true);
             }
         }
 

@@ -4,7 +4,7 @@
  */
 
 import type { AppSettings } from "core/config/SettingsTypes";
-import { loadSettings } from "core/config/Settings";
+import { loadSettings, shouldDeferCrxHubSocketBootstrap } from "core/config/Settings";
 import {
     applyAirpadRuntimeFromAppSettings,
     getRemoteHost,
@@ -104,6 +104,9 @@ export async function bootHubSocketFromStoredSettings(): Promise<void> {
  * Apply after any settings mutation (Save, storage sync). Idempotent with {@link applyAirpadRuntimeFromAppSettings}.
  */
 export async function applyHubSocketFromSettings(settings: AppSettings): Promise<void> {
+    if (await shouldDeferCrxHubSocketBootstrap(settings)) {
+        return;
+    }
     applyAirpadRuntimeFromAppSettings(settings);
 
     // WHY: native shells can own the socket lifecycle themselves, so the web

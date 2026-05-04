@@ -216,6 +216,14 @@ export function enqueuePendingMessage(destination: string, message: UnifiedMessa
     unifiedMessaging.enqueuePendingMessage(dest, message);
 }
 
+/**
+ * Replay IndexedDB-backed queued messages for a destination (mail/deferred pipeline).
+ * Safe after handlers register — implicit view bridge calls this post-bind.
+ */
+export function replayQueuedMessagesForDestination(destination?: string): Promise<void> {
+    return unifiedMessaging.processQueuedMessages(destination);
+}
+
 export function registerComponent(componentId: string, destination: string): void {
     unifiedMessaging.registerComponent(componentId, normalizeDestination(destination) || destination);
 }

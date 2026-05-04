@@ -251,6 +251,61 @@ export const idbPutSettings = async (value: any, key: string = SETTINGS_KEY): Pr
     }
 }
 
+/** Normalize `core.endpointUrl` for equality checks (scheme + host + port, lowercase). */
+export const normalizeCoreEndpointOrigin = (raw: string): string => {
+    const t = (raw || "").trim();
+    if (!t) return "";
+    try {
+        const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(t) ? t : `http://${t}`;
+        const u = new URL(withScheme);
+        return `${u.protocol}//${u.host}`.toLowerCase();
+    } catch {
+        return t.toLowerCase();
+    }
+};
+
+/**
+ * True when persisted settings explicitly contain `shell.maintainHubSocketConnection`
+ * (Shell section was saved with that field — distinct from merge-time defaults).
+ */
+export const didPersistShellMaintainHubSocket = async (): Promise<boolean> => {
+    try {
+        const raw = await idbGetSettings();
+        const stored = typeof raw === "string" ? JSOX.parse(raw) as any : raw;
+        if (!stored || typeof stored !== "object") return false;
+        const shell = (stored as any).shell;
+        return (
+            typeof shell === "object" &&
+            shell !== null &&
+            Object.prototype.hasOwnProperty.call(shell, "maintainHubSocketConnection")
+        );
+    } catch {
+        return false;
+    }
+};
+
+const isChromeExtensionRuntime = (): boolean => {
+    try {
+        const id = (globalThis as unknown as { chrome?: { runtime?: { id?: string } } }).chrome?.runtime?.id;
+        return typeof id === "string" && id.length > 0;
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * MV3 Chrome extension: skip hub WebSocket bootstrap until the user saves Settings or points
+ * {@link AppSettings.core.endpointUrl} away from the bundled dev default. Avoids console spam and
+ * useless probes when cwsp is not running on localhost.
+ */
+export const shouldDeferCrxHubSocketBootstrap = async (settings: AppSettings): Promise<boolean> => {
+    if (!isChromeExtensionRuntime()) return false;
+    if (await didPersistShellMaintainHubSocket()) return false;
+    const defaultEp = normalizeCoreEndpointOrigin(DEFAULT_SETTINGS.core?.endpointUrl || "");
+    const currentEp = normalizeCoreEndpointOrigin(settings.core?.endpointUrl || "");
+    return Boolean(defaultEp) && currentEp === defaultEp;
+};
+
 //
 export const loadSettings = async (): Promise<AppSettings> => {
     try {

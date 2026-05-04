@@ -10,6 +10,7 @@ import { ref } from "fest/object";
 import { loadAsAdopted, removeAdopted } from "fest/dom";
 import type { View, ViewOptions, ViewLifecycle, ShellContext } from "shells/types";
 import type { BaseViewOptions } from "views/types";
+import { SettingsChannelAction } from "views/apis/channel-actions";
 
 // @ts-ignore
 import settingsStyles from "./scss/Settings.scss?inline";
@@ -273,6 +274,14 @@ export class SettingsView implements View {
             this.settings.value = { ...this.settings.value, ...msg.data };
             this.updateUI();
         }
+    }
+
+    invokeChannelApi(action: string, payload?: unknown): unknown {
+        if (action === SettingsChannelAction.Patch || action === SettingsChannelAction.SettingsUpdate) {
+            void this.handleMessage({ data: payload as Partial<AppSettings> });
+            return true;
+        }
+        return undefined;
     }
 }
 
