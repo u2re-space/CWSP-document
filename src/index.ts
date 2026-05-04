@@ -14,15 +14,14 @@ import {
     getShellFromQuery,
     getSavedShellPreference
 } from "shells/boot";
-import type { ShellId } from "frontend/shells/types";
+import type { ShellId, ViewId } from "shared/boot/types";
 import { initializeLayers } from "shared/routing/layer-manager";
-import type { ViewId } from "./frontend/shells/types";
 import { pickEnabledView } from "shared/routing/views";
 import { loadAsAdopted } from "fest/dom";
 import { ensureAppLayers } from "shared/routing/app-layers";
 
 // @ts-ignore
-import viewStyles from "./frontend/views/views.scss?inline";
+import viewStyles from "boot/ts/views.scss?inline";
 
 // Import PWA handlers
 import {
@@ -258,7 +257,7 @@ export default async function index(mountElement: HTMLElement) {
         // Warm viewer markdown engine chunk early when route targets viewer (non-blocking).
         const prePath = getNormalizedPathname();
         if (!prePath || prePath === "viewer" || prePath === "share-target" || prePath === "share_target") {
-            void import("./frontend/views/viewer")
+            void import("views/viewer")
                 .then((m: { warmViewerMarkdownEngine?: () => void }) => m.warmViewerMarkdownEngine?.())
                 .catch(() => { /* optional */ });
         }
@@ -311,7 +310,10 @@ export default async function index(mountElement: HTMLElement) {
                 ? pickEnabledView("viewer", "home")
                 : pickEnabledView("home", "home")
         );
-        const allowPathRoutedShell = preferredShell === "base" || preferredShell === "minimal";
+        const allowPathRoutedShell =
+            preferredShell === "base" ||
+            preferredShell === "minimal" ||
+            preferredShell === "immersive";
         const useDesktopLayers =
             preferredShell === "window" ||
             preferredShell === "environment" ||

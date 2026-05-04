@@ -52,65 +52,65 @@
             "assets/*": [
                 "./assets/*"
             ],
-            "shared/*": [
-                "./src/shared/*"
-            ],
             "shells/types": [
                 "./src/frontend/shells/types.ts"
             ],
             "shells/boot": [
-                "./src/frontend/boot/index.ts"
+                "./src/frontend/shells/boot/index.ts"
             ],
             "shells/window": [
                 "./src/frontend/ai-slop/window/index.ts"
             ],
+            "shells/window/tabbed": [
+                "./src/frontend/ai-slop/window/tabbed.ts"
+            ],
+            "shells/window/environment": [
+                "./src/frontend/ai-slop/window/environment.ts"
+            ],
             "fest/core": [
-                "./shared/fest/core/index.ts"
+                "../../modules/projects/core.ts/src/index.ts"
             ],
             "fest/dom": [
-                "./shared/fest/dom/index.ts"
+                "../../modules/projects/dom.ts/src/index.ts"
             ],
             "fest/fl-ui": [
-                "./shared/fest/fl-ui/index.ts"
+                "../../modules/projects/fl.ui/src/index.ts"
             ],
             "fest/lure": [
-                "./shared/fest/lure/index.ts"
+                "../../modules/projects/lur.e/src/index.ts"
             ],
             "fest/object": [
-                "./shared/fest/object/index.ts"
+                "../../modules/projects/object.ts/src/index.ts"
             ],
             "fest/object/*": [
-                "./shared/fest/object/*"
+                "../../modules/projects/object.ts/src/*"
             ],
             "fest/uniform": [
-                "./shared/fest/uniform/index.ts"
+                "../../modules/projects/uniform.ts/src/index.ts"
             ],
             "fest/theme": [
-                "./shared/fest/theme/index.ts"
+                "../../modules/projects/lur.e/src/index.ts"
             ],
             "fest/icon": [
-                "./shared/fest/icon/index.ts"
-            ],
-            "fest/veela": [
-                "./shared/fest/veela/index.ts"
+                "../../modules/projects/icon.ts/src/index.ts"
             ],
             "fest/veela/*": [
-                "./shared/fest/veela/*"
+                "../../modules/projects/veela.css/src/*"
             ],
             "fest/polyfill/*": [
                 "./shared/polyfill/*"
             ],
             "com/config/*": [
-                "./src/shared/config/*"
+                "./src/shared/other/config/*"
             ],
             "com/core/*": [
-                "./src/shared/channel/*"
+                "../../modules/projects/subsystem/src/routing/channel/*"
             ],
             "com/service/*": [
                 "./src/shared/service/*"
             ],
             "com/template/*": [
-                "./src/shared/template/*"
+                "../../modules/projects/subsystem/src/service/template/*"
             ],
             "com/routing/*": [
                 "./src/shared/routing/*"
@@ -118,35 +118,128 @@
             "com/store/*": [
                 "./src/shared/store/*"
             ],
+            "shared/routing/registry": [
+                "./src/shared/routing/core/registry.ts"
+            ],
+            "shared/routing/views": [
+                "./src/shared/routing/core/views.ts"
+            ],
+            "shared/routing/view-prefetch": [
+                "./src/shared/routing/core/view-prefetch.ts"
+            ],
+            "shared/routing/layer-manager": [
+                "./src/shared/routing/core/layer-manager.ts"
+            ],
+            "shared/routing/app-layers": [
+                "./src/shared/routing/core/app-layers.ts"
+            ],
+            "shared/routing/implicit-view-bridge": [
+                "./src/shared/routing/core/implicit-view-bridge.ts"
+            ],
+            "shared/routing/channel-unknown": [
+                "./src/shared/routing/core/channel-unknown.ts"
+            ],
+            "shared/routing/view-transitions": [
+                "../../modules/projects/subsystem/src/routing/core/view-transitions.ts"
+            ],
+            "shared/policies/ingress-pipeline-guard": [
+                "../../modules/projects/subsystem/src/routing/policies/ingress-pipeline-guard.ts"
+            ],
+            "boot/ts/*": [
+                "../../modules/projects/subsystem/src/boot/*"
+            ],
+            "shared/policies/event-handling-policy": [
+                "../../modules/projects/subsystem/src/routing/policies/event-handling-policy.ts"
+            ],
+            "shared/config/*": [
+                "./src/shared/other/config/*"
+            ],
+            "shared/utils/*": [
+                "./src/shared/other/utils/*"
+            ],
+            "shared/native/cws-bridge": [
+                "./src/shared/routing/native/cws-bridge.ts"
+            ],
+            "shared/native/clipboard-device": [
+                "./src/shared/routing/native/clipboard-device.ts"
+            ],
+            "shared/styles": [
+                "./src/shared/styles.ts"
+            ],
+            "shared/transport/hub-socket-boot": [
+                "../../modules/projects/subsystem/src/boot/hub-socket-boot.ts"
+            ],
+            "shared/transport/websocket": [
+                "../../modules/projects/subsystem/src/boot/websocket.ts"
+            ],
+            "shared/pwa/*": [
+                "./src/shared/routing/pwa/*"
+            ],
+            "shared/*": [
+                "./src/shared/*"
+            ],
+            "core/config/*": [
+                "./src/shared/other/config/*"
+            ],
+            "core/document/*": [
+                "./src/shared/other/document/*"
+            ],
+            "core/utils/*": [
+                "./src/shared/other/utils/*"
+            ],
+            "core/workers/*": [
+                "./src/shared/routing/workers/*"
+            ],
+            "core/pwa/*": [
+                "./src/shared/routing/pwa/*"
+            ],
+            "core/store/*": [
+                "./src/shared/store/*"
+            ],
+            "core/constants/*": [
+                "./src/shared/routing/constants/*"
+            ],
+            "core/storage/*": [
+                "./src/shared/store/*"
+            ],
+            "core/service/*": [
+                "./src/shared/service/*"
+            ],
             "core/modules/Clipboard": [
                 "./src/shared/modules/Clipboard.ts"
+            ],
+            "core/modules/TemplateManager": [
+                "../../modules/projects/lur.e/src/interactive/modules/TemplateManager.ts"
+            ],
+            "core/text": [
+                "./src/shared/text.ts"
+            ],
+            "core/*": [
+                "./src/shared/*"
             ],
             "cwsp-shared/*": [
                 "../../runtime/cwsp/endpoint/shared/*"
             ],
             "@fl-ui/*": [
-                "./shared/fest/fl-ui/ui/*"
+                "../../modules/projects/fl.ui/src/ui/*"
             ],
             "@shared/*": [
-                "./shared/*"
+                "./src/shared/*"
             ],
             "fl-ui/*": [
-                "./shared/fest/fl-ui/ui/*"
+                "../../modules/projects/fl.ui/src/ui/*"
             ],
             "fl-src/*": [
-                "./shared/fest/fl-ui/*"
+                "../../modules/projects/fl.ui/src/*"
             ],
             "fl-design/*": [
-                "./shared/fest/fl-ui/design/*"
+                "../../modules/projects/fl.ui/src/styles/*"
             ],
             "pwa/*": [
                 "./src/pwa/*"
             ],
             "crx/*": [
                 "./src/crx/*"
-            ],
-            "core/*": [
-                "./src/shared/*"
             ],
             "frontend/*": [
                 "./src/frontend/*"
@@ -157,26 +250,104 @@
             "test/*": [
                 "./test/*"
             ],
+            "views/apis/channel-actions": [
+                "../../modules/projects/subsystem/src/routing/api/channel-actions.ts"
+            ],
+            "markdown-view-typography": [
+                "../../modules/views/markdown-view/src/scss/_markdown.scss"
+            ],
+            "markdown-view/viewer": [
+                "../../modules/views/markdown-view/src/needs-to-API.ts"
+            ],
+            "fest/veela/runtime": [
+                "../../modules/projects/subsystem/src/boot/veela-variant-runtime.ts"
+            ],
+            "views/registry": [
+                "../../modules/projects/subsystem/registry.ts"
+            ],
+            "views/types": [
+                "../../modules/projects/subsystem/types.ts"
+            ],
+            "views/viewer": [
+                "../../modules/views/viewer-view/src"
+            ],
+            "views/workcenter": [
+                "../../modules/views/workcenter-view/src"
+            ],
+            "views/settings": [
+                "../../modules/views/settings-view/src"
+            ],
+            "views/history": [
+                "../../modules/views/history-view/src"
+            ],
+            "views/explorer": [
+                "../../modules/views/explorer-view/src"
+            ],
+            "views/airpad": [
+                "../../modules/views/airpad-view/src"
+            ],
+            "views/editor": [
+                "../../modules/views/editor-view/src"
+            ],
+            "views/home": [
+                "../../modules/views/home-view/src"
+            ],
+            "views/viewer/*": [
+                "../../modules/views/viewer-view/src/*"
+            ],
+            "views/workcenter/*": [
+                "../../modules/views/workcenter-view/src/*"
+            ],
+            "views/settings/*": [
+                "../../modules/views/settings-view/src/*"
+            ],
+            "views/history/*": [
+                "../../modules/views/history-view/src/*"
+            ],
+            "views/explorer/*": [
+                "../../modules/views/explorer-view/src/*"
+            ],
+            "views/airpad/*": [
+                "../../modules/views/airpad-view/src/*"
+            ],
+            "views/editor/*": [
+                "../../modules/views/editor-view/src/*"
+            ],
+            "views/home/*": [
+                "../../modules/views/home-view/src/*"
+            ],
             "views/*": [
                 "./src/frontend/views/*"
+            ],
+            "shells/minimal/*": [
+                "../../modules/shells/minimal-shell/src/*"
+            ],
+            "shells/content/*": [
+                "../../modules/shells/content-shell/src/*"
+            ],
+            "shells/immersive/index": [
+                "../../modules/shells/immersive-shell/src/index.ts"
+            ],
+            "shells/immersive/*": [
+                "../../modules/shells/immersive-shell/src/*"
             ],
             "shells/*": [
                 "./src/frontend/shells/*"
             ],
             "veela": [
-                "./shared/fest/veela/index.ts"
+                "../../modules/projects/veela.css/src/index.scss"
             ],
             "veela-runtime": [
-                "./shared/fest/veela/scss/runtime/index.ts"
+                "../../modules/projects/veela.css/src/scss/index.scss"
             ],
             "veela-runtime/*": [
-                "./shared/fest/veela/scss/runtime/*"
+                "../../modules/projects/veela.css/src/scss/*"
             ],
             "veela-lib": [
-                "./shared/fest/veela/scss/lib/index.scss"
+                "../../modules/projects/veela.css/src/scss/index.scss"
             ],
             "veela-lib/*": [
-                "./shared/fest/veela/scss/lib/*"
+                "../../modules/projects/veela.css/src/scss/*"
             ]
         },
         "types": [

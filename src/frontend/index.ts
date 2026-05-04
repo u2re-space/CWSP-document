@@ -151,7 +151,7 @@ export {
     type BootConfig,
     type BootState,
     type BootPhaseHandler
-} from "./ts/BootLoader";
+} from "boot/ts/BootLoader";
 
 // ============================================================================
 // ROUTING (Path-based)
@@ -200,7 +200,7 @@ export {
     type RouteHandler,
     type AppLoaderResult,
     type RoutingMode
-} from "./ts/routing";
+} from "boot/ts/routing";
 
 export {
     coerceShellForBootViewport,
@@ -209,7 +209,7 @@ export {
     recordBootShellWindowActivity,
     initBootShellWindowActivity,
     LS_BOOT_SHELL_LAST_ACTIVE
-} from "./ts/shell-preference";
+} from "boot/ts/shell-preference";
 
 // ============================================================================
 // BOOT MENU
@@ -220,7 +220,7 @@ export {
     type FrontendChoice,
     type ChoiceScreenOptions,
     type ChoiceScreenResult
-} from "./ts/boot-menu";
+} from "boot/ts/boot-menu";
 
 // ============================================================================
 // TOAST SYSTEM
@@ -239,7 +239,7 @@ export {
     type ToastPosition,
     type ToastOptions,
     type ToastLayerConfig
-} from "fest/fl-ui";
+} from "boot/ts/toast";
 
 // ============================================================================
 // OVERLAY SYSTEM
@@ -263,25 +263,25 @@ export {
     sizeBadge,
     type OverlayConfig,
     type OverlayElements
-} from "./ts/overlay";
+} from "boot/ts/overlay";
 
 // ============================================================================
 // FRONTEND ENTRY POINTS
 // ============================================================================
 
-export { default as frontend, frontend as mountFrontend } from "./ts/frontend-entry";
-export type { MinimalAppOptions } from "./ts/frontend-entry";
+export { default as frontend, frontend as mountFrontend } from "boot/ts/frontend-entry";
+export type { MinimalAppOptions } from "boot/ts/frontend-entry";
 
 // CRX-specific entry (content shell, no toolbar/tabs)
-export { default as crxFrontend, crxFrontend as mountCrxFrontend } from "./ts/crx-entry";
-export type { CrxAppOptions } from "./ts/crx-entry";
+export { default as crxFrontend, crxFrontend as mountCrxFrontend } from "boot/ts/crx-entry";
+export type { CrxAppOptions } from "boot/ts/crx-entry";
 
 // ============================================================================
 // APP INITIALIZATION
 // ============================================================================
 
-import { bootLoader, type BootConfig } from "./ts/BootLoader";
-import { createBootConfigFromUrl, loadSubAppWithShell } from "./ts/routing";
+import { bootLoader, type BootConfig } from "boot/ts/BootLoader";
+import { createBootConfigFromUrl, loadSubAppWithShell } from "boot/ts/routing";
 import type { Shell } from "shells/types";
 import type { ServiceChannelId } from "com/core/ServiceChannels";
 import { isEnabledView, pickEnabledView } from "shared/routing/views";

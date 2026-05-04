@@ -306,18 +306,45 @@ function normalizeAliasPattern(pattern) {
     return pattern.replace(/\/\*+$/, '');
 }
 
+/** Escape for building a RegExp from a tsconfig path key prefix. */
+const escapeRegExpPrefix = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 //
 const importFromTSConfig = (tsconfig, __dirname) => {
     const paths = tsconfig?.compilerOptions?.paths || {};
+    /** Longer wildcard keys first so `views/airpad/*` wins over `views/*`. */
+    const entries = Object.entries(paths).map(([key, targets]) => ({
+        key,
+        target: targets[0],
+    }));
+    entries.sort((a, b) => {
+        const aW = a.key.endsWith("/*");
+        const bW = b.key.endsWith("/*");
+        if (aW !== bW) {
+            return aW ? 1 : -1;
+        }
+        if (!aW && !bW) {
+            /* Longer keys first so `fest/veela/runtime` wins over `fest/veela` prefix-style resolution. */
+            if (b.key.length !== a.key.length) return b.key.length - a.key.length;
+            return a.key.localeCompare(b.key);
+        }
+        return b.key.length - a.key.length;
+    });
     const alias = [];
-    for (const key in paths) {
-        const normalizedKey = normalizeAliasPattern(key);
-        const target = paths[key][0];
-        const normalizedTarget = normalizeAliasPattern(target);
-        alias.push({
-            find: normalizedKey,
-            replacement: resolve(__dirname, normalizedTarget),
-        });
+    for (const { key, target } of entries) {
+        if (key.endsWith("/*")) {
+            const findPrefix = key.slice(0, -2);
+            const replBase = normalizeAliasPattern(target);
+            alias.push({
+                find: new RegExp(`^${escapeRegExpPrefix(findPrefix)}/(.+)$`),
+                replacement: `${resolve(__dirname, replBase)}/$1`,
+            });
+        } else {
+            alias.push({
+                find: key,
+                replacement: resolve(__dirname, target),
+            });
+        }
     }
     return alias;
 };
@@ -365,12 +392,18 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
     const workspaceRoot = searchForWorkspaceRoot(__dirname);
     const phosphorCoreRoot = resolve(workspaceRoot, "node_modules", "@phosphor-icons", "core");
     const devFsAllow = buildDevFsAllowList(__dirname, workspaceRoot, phosphorCoreRoot);
+    const markdownTypographyScss = resolve(workspaceRoot, "modules/views/markdown-view/src/scss/_markdown.scss");
+    const veelaVariantRuntimeTs = resolve(workspaceRoot, "modules/projects/subsystem/src/boot/veela-variant-runtime.ts");
     const $resolve = {
         dedupe: ["katex"],
         // `shared/fest` is symlinked; realpath resolution can duplicate modules vs `fest/*` tsconfig paths.
         preserveSymlinks: process.env.VITE_RESOLVE_PRESERVE_SYMLINKS !== "0",
         alias: [
             { find: "@phosphor-icons/core", replacement: phosphorCoreRoot },
+            /* Dev server: ensure this id always resolves (tsconfig path is relative to app root; some setups mis-resolve). */
+            { find: "fest/veela/runtime", replacement: veelaVariantRuntimeTs },
+            /* Rolldown: bare tsconfig alias loses `?inline` imports on this key (viewer-view Markdown typography). */
+            { find: /^markdown-view-typography(.*)$/, replacement: `${markdownTypographyScss}$1` },
             ...importFromTSConfig(tsconfig, __dirname),
         ],
     };

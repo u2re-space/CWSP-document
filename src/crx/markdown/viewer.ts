@@ -1,5 +1,5 @@
 import { crxFrontend } from "shells/boot";
-import type { ViewId } from "../../frontend/core/types";
+import type { ViewId } from "shells/types";
 
 const rawPre = document.getElementById("raw-md") as HTMLPreElement | null;
 const appDiv = document.getElementById("app") as HTMLDivElement | null;
