@@ -1,65 +1,87 @@
-# 🤖 U2RE.space 🤖
+# CrossWord
 
-🌳 Here is our project land... 🌳
+Что значит мой проект... ну если ещё не поняли, это несколько более малых проектов, и к ним `shell`'ы и `endpoint`'ы. 
+Многоцелевой проект, с несколькими назначениями.
 
-## ⛑️ CrossWord i1 ⛑️
+Из `${view}` это:
+- `viewer` - Markdown просмотрщик. Из его умений: 
+  - открыть данные файлы, 
+  - вставить markdown text из буфера обмена для отображения.
+  - сделать drag&drop в поле просмотра, и его этим отобразить.
+  - самое главное - распечатать и/или экспортировать в Word документ т.е. `docx`.
+  - и главное, подобранные стили под Markdown, как я только мог.
+- `settings` - Общие настройки всего приложения (включая все модули)
+  - AI настройки, MCP, прочие.
+  - Markdown настройки (или, и прочие тонкости).
+- `explorer` - файловые менеджер браузера (OPFS) от приложения. По идеи должен был выполнять роль хранилища. 
+  - Его применение, оставлено на будущее для других `$[shell]`
+  - Да и context-menu сломался как всегда...
+  - А так, в своё время, в его функции хорошо вкладывался.
+- `airpad` - гироскопический трекбол для ПК. Требуется `endpoint` (`runtime`) то есть backend к нему.
+  - До стабильного конца довести не удалось до сих пор.
+- `workcenter` - до конца не доработан, основная суть это работа по ИИ (преобразование, конвертация, распознавание и т.д.).
+- `sheduler` - удалён, но планировалась когда-то умная система расписаний, планов, основываясь на открытых источниках, данных, включая и погоду.
+  - С возможностями загружать в базу и свои данные, включая и скриншоты, и работало бы даже в Android.
 
-> 💡 *Open a markdown file or paste content here.*
+Из `$[shell]` это:
+- `base` или `none` - вообще чисто показать `${view}`, без всяких элементов UI.
+- `content` - употребляется в контексте Chrome расширений, когда используется content-scripts.
+- `minimal` - переключаемые вкладки между `${view}` которые заданы в скрытом списке.
+- `environment` - основное желание в недалеком будущем. Сможет служить роль Speed Dial в браузере (New Tab Page). Из особенностей.
+  - Оконный менеджмент
+  - Статус бар
+  - Док (task) бар
 
-**Welcome to CrossWord i1.**
+## Каким оно может быть?
 
-### Features
-
-- Advanced markdown viewer
-- AI processing (work-center)
-- File explorer (experimental)
-- AirPad (experimental)
-- Print (experimental)
-- DOCX-export (experimental)
-- PWA share target
-- Drop and paste events
-
-### Github
-
-- [CrossWord](https://github.com/u2re-space/crossword) (source code)
-- [Fest Live](https://github.com/fest-live) (libraries, frameworks)
-
-### Components
-
-- [Endpoint](https://github.com/u2re-space/crossword/src/endpoint) (nodejs, source code)
-- [PWA-APP](https://u2re.space/) (public)
-
-### Coming soon
-
-- CRX extension in public release
-- Endpoint for AirPad
-
-### Developers
-
-- [Fest Live](https://github.com/fest-live) (libraries, frameworks)
-- [L2NE](https://github.com/L2NE-dev) (developer profile)
-
-### Name references
-
-- Cross
-- Sword
-- Word
-
-All of those words has reference to bible.
+- CRX (chrome расширение)
+- PWA (progressive web application)
 
 ---
 
-## 📱 Mobile Agent 📱
+## Из других.
 
-😔 **Coming soon...** 😔
+`CWSP` - та самая точка endpoint, в настоящий момент разрабатывается в связке с fastify frontend отображателем. 
+  - Разрабатывается унификаций серверных функций (точки, endpoint) куда разворачиваются.
+  - Предполагается: WebDav, IPFS, AirPad, AI-passthrough, assets, и прочие компоненты.
+  - В теории может: заменить собой какой-нибудь CDN.
+  - А также это целая некая сеть себе подобных, соединённых один с другим (например для bridge, проксирование)...
 
-### Features
+`CWSAndroid` - проект который так и не получился. Его основной задачей должно было стать 
+  - синхронизация SMS, уведомлений, clipboard (буфера обмена).
+  - общий clipboard и в одном, и в другом смартфоне, и в ПК.
+  - всё оно подключалось бы к общему endpoint что имеет внешний IP.
 
-- AI assistance
-- Remote control
-- User defined API
-- Synchronizations
-- Clipboard sharing
-- Data storage
-- Tunneling
-- WebView
+---
+
+## Фреймворки
+
+- `fest/lure`    - UI реактивность
+- `fest/object`  - ядро реактивности
+- `fest/uniform` - прослойка коммуникации между модулям (worker, service или чему-то ещё в пределах одного приложения).
+- `fest/veela`   - библиотека стилей, сейчас правда там небольшой беспорядок.
+- `fest/fl-ui`   - должно было бы стать библиотекой для UI.
+- `fest/dom`     - библиотека для DOM (утилиты).
+- `fest/core`    - все функции, утилиты, нужные для всех остальных...
+- `fest/icon`    - библиотека для отображения иконок.
+
+### Иерархия
+
+- `fest/core`
+  - `fest/dom` + `fest/object`
+    - `fest/veela` + `fest/icon` + `fest/lure`
+      - `fest/fl-ui`
+        - `apps`
+          - `CrossWord` (`CW-i1`)
+- `CWSP` (работает но не полностью)
+- `CWSAndroid` (не разработан)
+
+--
+
+## Подавились мы...
+
+Костью в нашем горле стало:
+- `CWSAndroid` (даже синхронизации clipboard и поддержка сети)
+- `shell:environment`
+- Более лучший дизайн и адаптивность
+- Планировщик и расписания
