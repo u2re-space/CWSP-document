@@ -214,6 +214,9 @@
             "core/text": [
                 "./src/shared/text.ts"
             ],
+            "core/clipboard-device": [
+                "../../modules/projects/subsystem/runtime/clipboard-device.ts"
+            ],
             "core/*": [
                 "./src/shared/*"
             ],

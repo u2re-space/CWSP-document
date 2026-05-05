@@ -1,0 +1,55 @@
+/* Base shell: single content region (CRX / options page, bare frames). WHY: Without shell CSS,
+ * the host + `.app-shell` had no definite block-size; `%` heights in Settings collapsed and
+ * scroll/tabs felt broken. Mirrors minimal shell content sizing in a smaller surface. */
+
+@layer shell.base {
+    :host {
+        display: block;
+        box-sizing: border-box;
+        inline-size: 100%;
+        block-size: 100%;
+        min-inline-size: 0;
+        min-block-size: 0;
+        max-inline-size: 100%;
+        max-block-size: 100%;
+    }
+
+    .app-shell--base {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
+        min-inline-size: 0;
+        min-block-size: 0;
+        overflow: hidden;
+        box-sizing: border-box;
+    }
+
+    .app-shell__content {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-inline-size: 0;
+        min-block-size: 0;
+        inline-size: stretch;
+        block-size: stretch;
+        overflow: hidden;
+        box-sizing: border-box;
+    }
+
+    /* Active view fills the content box; inner scroll comes from each view (e.g. settings body). */
+    .app-shell__content > [data-view] {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        min-inline-size: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-sizing: border-box;
+    }
+
+    .app-shell__content > [data-view="settings"] {
+        overflow: hidden;
+    }
+}

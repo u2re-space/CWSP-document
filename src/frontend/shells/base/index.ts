@@ -5,6 +5,9 @@ import { H } from "fest/lure";
 import type { ShellId, ShellLayoutConfig, ShellTheme } from "shells/types";
 import { ShellBase } from "boot/ts/shells";
 
+// @ts-expect-error — Vite inline SCSS
+import baseShellCss from "./base-shell.scss?inline";
+
 export class BaseShell extends ShellBase {
     id: ShellId = "base";
     name = "Base";
@@ -18,13 +21,14 @@ export class BaseShell extends ShellBase {
     };
 
     protected createLayout(): HTMLElement {
+        /* INVARIANT: `ShellBase` resolves `contentContainer` via `[data-shell-content]` (not `data-content`). */
         return H`<div class="app-shell app-shell--base" data-shell="base">
-            <div class="app-shell__content" data-content></div>
+            <div class="app-shell__content" data-shell-content></div>
         </div>`;
     }
 
     protected getStylesheet(): string | null {
-        return null;
+        return baseShellCss;
     }
 
     protected applyTheme(theme: ShellTheme): void {

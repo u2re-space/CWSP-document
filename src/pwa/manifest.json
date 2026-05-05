@@ -2,8 +2,8 @@
     "name": "cw.u2re.space",
     "short_name": "CW-i1",
     "description": "AI-and-control-toolset",
-    "start_url": "/",
-    "scope": "/",
+    "start_url": "../",
+    "scope": "../",
     "display": "standalone",
     "display_override": [
         "window-controls-overlay",
@@ -31,11 +31,33 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
+        },
+        {
+            "src": "icons/maskable.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "screenshots/wide.png",
+            "sizes": "1280x720",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "CrossWord (desktop)"
+        },
+        {
+            "src": "screenshots/mobile.png",
+            "sizes": "540x960",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "CrossWord (mobile)"
         }
     ],
     "file_handlers": [
         {
-            "action": "/",
+            "action": "../",
             "accept": {
                 "text/*": [
                     ".txt",
@@ -131,7 +153,7 @@
         }
     ],
     "share_target": {
-        "action": "/share-target",
+        "action": "../share-target",
         "method": "POST",
         "enctype": "multipart/form-data",
         "params": {
@@ -170,14 +192,28 @@
         {
             "name": "Viewer (MD)",
             "short_name": "viewer",
-            "url": "/viewer",
-            "description": "Markdown Viewer"
+            "url": "../viewer",
+            "description": "Markdown Viewer",
+            "icons": [
+                {
+                    "src": "icons/icon-96.png",
+                    "sizes": "96x96",
+                    "type": "image/png"
+                }
+            ]
         },
         {
             "name": "Work Center (AI)",
             "short_name": "Analyze",
-            "url": "/workcenter",
-            "description": "AI-powered processing"
+            "url": "../workcenter",
+            "description": "AI-powered processing",
+            "icons": [
+                {
+                    "src": "icons/icon-96.png",
+                    "sizes": "96x96",
+                    "type": "image/png"
+                }
+            ]
         }
     ],
     "handle_links": "preferred",
@@ -187,7 +223,7 @@
     "orientation": "natural",
     "edge_side": "left",
     "edge_side_delegate": {
-        "url": "/",
+        "url": "../",
         "edge_side": "left"
     }
 }

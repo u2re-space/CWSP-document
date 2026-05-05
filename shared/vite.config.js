@@ -20,6 +20,60 @@ import { createLogger, searchForWorkspaceRoot } from "vite";
 import { ViteMcp } from 'vite-plugin-mcp'
 
 const viteLogger = createLogger();
+
+/** In dev, `viteStaticCopy` does not run — mirror production URLs `/pwa/*` from `src/pwa/*`. */
+const servePwaSrcAsDistPlugin = (appRoot) => ({
+    name: "cw-serve-pwa-src-at-pwa-prefix",
+    enforce: "pre",
+    configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+            const pathname = (req.url || "").split("?")[0] || "";
+            if (pathname === "/pwa/manifest.json") {
+                const fp = resolve(appRoot, "src/pwa/manifest.json");
+                if (!existsSync(fp)) return next();
+                res.setHeader("Content-Type", "application/manifest+json; charset=utf-8");
+                res.setHeader("Cache-Control", "no-store");
+                res.end(readFileSync(fp));
+                return;
+            }
+            if (pathname.startsWith("/pwa/icons/")) {
+                const rest = pathname.slice("/pwa/icons/".length);
+                if (!rest || rest.includes("..")) return next();
+                const iconsRoot = resolve(appRoot, "src/pwa/icons");
+                const fp = resolve(iconsRoot, rest);
+                if (!fp.startsWith(iconsRoot) || !existsSync(fp)) return next();
+                const ext = rest.split(".").pop()?.toLowerCase();
+                const ct =
+                    ext === "svg"
+                        ? "image/svg+xml"
+                        : ext === "png"
+                          ? "image/png"
+                          : ext === "ico"
+                            ? "image/x-icon"
+                            : "application/octet-stream";
+                res.setHeader("Content-Type", ct);
+                res.setHeader("Cache-Control", "no-store");
+                res.end(readFileSync(fp));
+                return;
+            }
+            if (pathname.startsWith("/pwa/screenshots/")) {
+                const rest = pathname.slice("/pwa/screenshots/".length);
+                if (!rest || rest.includes("..")) return next();
+                const shotsRoot = resolve(appRoot, "src/pwa/screenshots");
+                const fp = resolve(shotsRoot, rest);
+                if (!fp.startsWith(shotsRoot) || !existsSync(fp)) return next();
+                const ext = rest.split(".").pop()?.toLowerCase();
+                const ct = ext === "png" ? "image/png" : "application/octet-stream";
+                res.setHeader("Content-Type", ct);
+                res.setHeader("Cache-Control", "no-store");
+                res.end(readFileSync(fp));
+                return;
+            }
+            next();
+        });
+    }
+});
+
 const VITE_NOISY_WARNING_PATTERNS = [
     "[INEFFECTIVE_DYNAMIC_IMPORT]",
     "manualChunks option is ignored because the codeSplitting option is specified.",
@@ -442,6 +496,7 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
     const devServerOrigin = (process.env.VITE_DEV_SERVER_ORIGIN || "").trim();
     const plugins = [
         evictStaleKatexDepChunksPlugin(),
+        servePwaSrcAsDistPlugin(__dirname),
         // SPA fallback for PWA routes (share-target, etc.)
         spaFallbackPlugin(),
         relocateWorkerBundleAssetsPlugin(),
@@ -457,6 +512,10 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
                       { src: resolve(__dirname, "./src/pwa/icons/icon.svg"), dest: resolve(__dirname, "./dist/pwa/icons/") },
                       { src: resolve(__dirname, "./src/pwa/icons/icon.png"), dest: resolve(__dirname, "./dist/pwa/icons/") },
                       { src: resolve(__dirname, "./src/pwa/icons/icon.ico"), dest: resolve(__dirname, "./dist/pwa/icons/") },
+                      { src: resolve(__dirname, "./src/pwa/icons/icon-96.png"), dest: resolve(__dirname, "./dist/pwa/icons/") },
+                      { src: resolve(__dirname, "./src/pwa/icons/maskable.png"), dest: resolve(__dirname, "./dist/pwa/icons/") },
+                      { src: resolve(__dirname, "./src/pwa/screenshots/wide.png"), dest: resolve(__dirname, "./dist/pwa/screenshots/") },
+                      { src: resolve(__dirname, "./src/pwa/screenshots/mobile.png"), dest: resolve(__dirname, "./dist/pwa/screenshots/") },
                   ],
               })
             : []),
@@ -478,7 +537,8 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             filename: "sw.ts",
             registerType: 'autoUpdate',
             strategies: 'injectManifest',
-            injectRegister: 'auto',
+            /* Registration is handled by `initPWA` → `ensureServiceWorkerRegistered()` (single owner, correct BASE_URL + scope). */
+            injectRegister: null,
             selfDestroying: false,
             mode: 'development',
             // workbox options are ignored when using injectManifest
@@ -635,8 +695,19 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
                 const url = req.url || '';
                 const pathname = url.split('?')[0] || '';
 
-                // Never rewrite service worker requests (must be JS, not HTML)
-                if (pathname === '/sw.js' || pathname === '/apps/cw/sw.js') {
+                // PWA static assets (dev: servePwaSrcAsDistPlugin) — never rewrite to index.html.
+                if (pathname.startsWith("/pwa/")) {
+                    return next();
+                }
+
+                // Never rewrite service worker requests (must be JS, not HTML). Includes dev worker
+                // at `${base}dev-sw.js?dev-sw` when the app is mounted under a subpath.
+                if (
+                    pathname === "/sw.js" ||
+                    pathname === "/apps/cw/sw.js" ||
+                    pathname.endsWith("/dev-sw.js") ||
+                    pathname.endsWith("/sw.js")
+                ) {
                     return next();
                 }
 
