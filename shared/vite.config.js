@@ -491,9 +491,25 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
      * Optional absolute origin for generated module / HMR URLs (reverse proxy, odd LAN setups).
      * If unset, Vite uses the browser’s current host:port — required when you open dev via
      * localhost, 127.0.0.1, or a different machine IP than a hardcoded LAN address.
-     * Example: VITE_DEV_SERVER_ORIGIN=https://192.168.0.200:5173
+     * Example: VITE_DEV_SERVER_ORIGIN=https://192.168.0.200:8443
+     *
+     * When using VITE_DEV_PORT below, set VITE_DEV_SERVER_ORIGIN to the same host and port you
+     * open in the browser (proxy public origin or direct https://IP:PORT).
      */
     const devServerOrigin = (process.env.VITE_DEV_SERVER_ORIGIN || "").trim();
+    /**
+     * Dev server listen port. Default 443 matches HTTPS parity with production-style LAN tests.
+     * Unprivileged environments often hit EACCES on 443 — use e.g. VITE_DEV_PORT=8443 (see npm run dev:8443).
+     * Precedence: VITE_DEV_PORT → DEV_PORT → PORT → 443.
+     */
+    const devListenPort = (() => {
+        const raw = String(
+            process.env.VITE_DEV_PORT || process.env.DEV_PORT || process.env.PORT || ""
+        ).trim();
+        if (!raw) return 443;
+        const n = Number(raw);
+        return Number.isFinite(n) && n > 0 && n < 65536 ? Math.floor(n) : 443;
+    })();
     const plugins = [
         evictStaleKatexDepChunksPlugin(),
         servePwaSrcAsDistPlugin(__dirname),
@@ -525,7 +541,7 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
                   ViteMcp({
                       target: "browser",
                       mode: "development",
-                      port: 443,
+                      port: devListenPort,
                       host: "0.0.0.0",
                       ...(devServerOrigin ? { origin: devServerOrigin } : {}),
                       allowedHosts: true,
@@ -633,7 +649,7 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
 
     //
     const server = {
-        port: 443,
+        port: devListenPort,
         open: false,
         host: "0.0.0.0",
         ...(devServerOrigin ? { origin: devServerOrigin } : {}),

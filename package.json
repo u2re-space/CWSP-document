@@ -16,6 +16,7 @@
         "preview": "node ./scripts/run-vite.mjs preview",
         "start": "npm run dev",
         "dev": "VITE_MCP_DISABLE=1 node ./scripts/run-vite.mjs dev",
+        "dev:8443": "VITE_MCP_DISABLE=1 VITE_DEV_PORT=8443 node ./scripts/run-vite.mjs dev",
         "dev:clean": "rm -rf node_modules/.vite && npm run dev",
         "dev:full": "node ./scripts/run-vite.mjs dev",
         "dev:no-sw": "VITE_MCP_DISABLE=1 VITE_PWA_DEV_DISABLE=1 node ./scripts/run-vite.mjs dev",

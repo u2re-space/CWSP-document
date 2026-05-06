@@ -94,6 +94,9 @@
             "fest/icon": [
                 "../../modules/projects/icon.ts/src/index.ts"
             ],
+            "fest/image": [
+                "../../modules/projects/image.ts/src/index.ts"
+            ],
             "fest/veela/*": [
                 "../../modules/projects/veela.css/src/*"
             ],

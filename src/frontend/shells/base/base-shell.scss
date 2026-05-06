@@ -3,6 +3,12 @@
  * scroll/tabs felt broken. Mirrors minimal shell content sizing in a smaller surface. */
 
 @layer shell.base {
+    @keyframes shell-base-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
     :host {
         display: block;
         box-sizing: border-box;
@@ -51,5 +57,34 @@
 
     .app-shell__content > [data-view="settings"] {
         overflow: hidden;
+    }
+
+    .app-shell__loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        font: 400 1rem/1.4 system-ui, sans-serif;
+        color: light-dark(#555, #aaa);
+        background: light-dark(#fff, #121820);
+        pointer-events: none;
+
+        /* WHY: Author `display: flex` ties UA `[hidden]` specificity and wins by order — spinner stayed on top in CRX/base. */
+        &[hidden] {
+            display: none !important;
+        }
+    }
+
+    .app-shell__loading .loading-spinner {
+        inline-size: 32px;
+        block-size: 32px;
+        border: 3px solid light-dark(#e8e8e8, #333);
+        border-block-start-color: light-dark(#007acc, #5ab0ff);
+        border-radius: 50%;
+        animation: shell-base-spin 0.9s linear infinite;
     }
 }

@@ -8,20 +8,11 @@
  */
 
 import { initPWA, checkForUpdates, forceRefreshAssets } from "core/pwa/pwa-handling";
-import {
-    loadSubAppWithShell,
-    VALID_VIEWS,
-    getShellFromQuery,
-    getSavedShellPreference
-} from "shells/boot";
 import type { ShellId, ViewId } from "shared/boot/types";
 import { initializeLayers } from "shared/routing/layer-manager";
 import { pickEnabledView } from "shared/routing/views";
 import { loadAsAdopted } from "fest/dom";
 import { ensureAppLayers } from "shared/routing/app-layers";
-
-// @ts-ignore
-import viewStyles from "boot/ts/views.scss?inline";
 
 // Import PWA handlers
 import {
@@ -69,12 +60,6 @@ const isPwaDisplayMode = (): boolean => {
     return matchMedia("(display-mode: standalone)").matches ||
            (globalThis?.navigator as any)?.standalone === true;
 };
-
-/**
- * Check if a path is a valid view route (type guard)
- */
-const isValidViewPath = (path: string): path is ViewId =>
-    (VALID_VIEWS as readonly string[]).includes(path);
 
 // ============================================================================
 // LOADING STATE MANAGEMENT
@@ -124,6 +109,9 @@ const clearLoadingState = (mountElement: HTMLElement) => {
         loading.style.opacity = '0';
         setTimeout(() => loading.remove(), 300);
     }
+    /* index.html static splash (not wrapped in .app-loading) */
+    mountElement.querySelector(":scope > .loading-spinner")?.remove();
+    mountElement.querySelector(":scope > .loading-message")?.remove();
 };
 
 const showErrorState = (mountElement: HTMLElement, error: any, retryFn?: () => void) => {
@@ -210,8 +198,12 @@ const withTimeout = async <T>(
 export default async function index(mountElement: HTMLElement) {
     // CRITICAL: Initialize CSS layer hierarchy FIRST
     // This must happen before any styles are loaded
-    await initializeLayers();
-    await loadAsAdopted(viewStyles);
+    initializeLayers();
+
+    // WHY: Keep `shells/boot` off the static graph of this module so `html-boot` can `import(index.ts)`
+    // quickly over slow LAN / reverse-proxy dev — the barrel pulls registry + BootLoader + routing.
+    const viewMod = await import("boot/ts/views.scss?inline");
+    await loadAsAdopted(viewMod.default);
 
     //
     console.log('[Index] Starting CrossWord frontend loader');
@@ -227,6 +219,16 @@ export default async function index(mountElement: HTMLElement) {
     setLoadingState(mountElement, 'Initializing CrossWord...');
 
     try {
+        const {
+            loadSubAppWithShell,
+            VALID_VIEWS,
+            getShellFromQuery,
+            getSavedShellPreference
+        } = await import("shells/boot");
+
+        const isValidViewPath = (path: string): path is ViewId =>
+            (VALID_VIEWS as readonly string[]).includes(path);
+
         // Initialize PWA features (non-blocking)
         const pwaPromise = initPWA();
 
