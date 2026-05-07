@@ -106,6 +106,12 @@
             "com/config/*": [
                 "./src/shared/other/config/*"
             ],
+            "com/other/*": [
+                "../../modules/projects/subsystem/src/other/*"
+            ],
+            "com/styles": [
+                "../../modules/projects/subsystem/src/styles.ts"
+            ],
             "com/core/view-ingress-validation": [
                 "../../modules/projects/subsystem/src/core/view-ingress-validation.ts"
             ],
