@@ -105,15 +105,31 @@ const isBrowsableUrl = (url?: string): boolean => {
 const looksLikeMarkdownSourceUrl = (url: string): boolean =>
     /\.(?:md|markdown|mdown|mkd|mkdn|mdtxt|mdtext)(?:$|[?#])/i.test(url);
 
+const isCrxExtensionPage = (): boolean =>
+    typeof globalThis.location !== "undefined" && globalThis.location.protocol === "chrome-extension:";
+
+/** Strip `file:` URL hints from the viewer query map — routing must not propagate them into chrome-extension origins. */
+const sanitizeCrxViewerQueryParams = (collected: Record<string, string>): Record<string, string> => {
+    if (!isCrxExtensionPage()) return collected;
+    const next = { ...collected };
+    for (const k of ["src", "url", "path", "view-src", "referrer"]) {
+        const v = next[k];
+        if (typeof v === "string" && /^file:/i.test(v.trim())) delete next[k];
+    }
+    return next;
+};
+
 const resolveSourceFromOpenTabs = async (): Promise<string | null> => {
     try {
         const currentTab = await chrome.tabs.getCurrent();
         const currentTabId = currentTab?.id;
         const tabs = await chrome.tabs.query({ lastFocusedWindow: true });
+        const suppressFileTabs = isCrxExtensionPage();
         const candidates = tabs
             .filter((tab) => typeof tab.id === "number" && tab.id !== currentTabId)
             .map((tab) => tab.url)
-            .filter((url): url is string => Boolean(url && isBrowsableUrl(url)));
+            .filter((url): url is string => Boolean(url && isBrowsableUrl(url)))
+            .filter((url) => !suppressFileTabs || !/^file:/i.test(url));
 
         const markdownCandidate = candidates.find(looksLikeMarkdownSourceUrl);
         return markdownCandidate || candidates[0] || null;
@@ -125,6 +141,12 @@ const resolveSourceFromOpenTabs = async (): Promise<string | null> => {
 const resolveSource = async (params: URLSearchParams): Promise<string | null> => {
     const explicitSource = params.get("src");
     if (explicitSource && !isVirtualViewValue(explicitSource)) {
+        if (
+            isCrxExtensionPage() &&
+            /^file:/i.test(explicitSource.trim())
+        ) {
+            return null;
+        }
         return explicitSource;
     }
 
@@ -140,6 +162,12 @@ const resolveSource = async (params: URLSearchParams): Promise<string | null> =>
 
     const sourceFromView = params.get("view-src") || params.get("view");
     if (sourceFromView && !isVirtualViewValue(sourceFromView)) {
+        if (
+            isCrxExtensionPage() &&
+            /^file:/i.test(sourceFromView.trim())
+        ) {
+            return null;
+        }
         return sourceFromView;
     }
 
@@ -186,6 +214,11 @@ const init = async () => {
     const appendContent = params.get("append") || params.get("extra") || "";
     const directContent = params.get("content") || params.get("text");
     const source = await resolveSource(params);
+    const sanitizedParams = sanitizeCrxViewerQueryParams(collectViewParams(params));
+    const payloadSource =
+        source && !(isCrxExtensionPage() && /^file:/i.test(source.trim()))
+            ? source || undefined
+            : undefined;
 
     let markdown = "";
     if (directContent) {
@@ -207,14 +240,14 @@ const init = async () => {
     await crxFrontend(appDiv, {
         shell: "immersive",
         initialView: resolveTargetView(params),
-        viewParams: collectViewParams(params),
+        viewParams: sanitizedParams,
         viewPayload: {
             text: markdown,
             content: markdown,
             filename,
-            source: source || undefined,
-            args: collectViewParams(params)
-        }
+            source: payloadSource,
+            args: sanitizedParams,
+        },
     });
 
     hideRawLayer();

@@ -507,7 +507,14 @@ const initMarkdownViewer = () => {
         if (tryFile && /^file:/i.test(tryFile) && isMarkdownPath(tryFile)) {
             chrome.runtime.sendMessage({ type: "crx:open-markdown-file", url: tryFile }, (r) => {
                 if (chrome.runtime.lastError || !r?.ok) {
-                    chrome.tabs.create({ url: tryFile });
+                    const vu = chrome.runtime.getURL("markdown/viewer.html");
+                    const guide =
+                        "> **CrossWord could not read this local markdown file.**\n>\n" +
+                        "> 1. Open `chrome://extensions`, find CrossWord.\n>\n" +
+                        "> 2. Enable **Allow access to file URLs**.\n>\n" +
+                        "> 3. Try again.\n>\n" +
+                        "> Opening the raw `file:` tab is blocked by Chromium nested-file security.";
+                    chrome.tabs.create({ url: `${vu}?append=${encodeURIComponent(guide)}` });
                     globalThis?.close?.();
                     return;
                 }
@@ -521,7 +528,14 @@ const initMarkdownViewer = () => {
         if (/^file:/i.test(url)) {
             chrome.runtime.sendMessage({ type: "crx:open-markdown-file", url }, (r) => {
                 if (chrome.runtime.lastError || !r?.ok) {
-                    chrome.tabs.create({ url });
+                    const vu = chrome.runtime.getURL("markdown/viewer.html");
+                    const guide =
+                        "> **CrossWord could not read this local markdown file.**\n>\n" +
+                        "> 1. Open `chrome://extensions`, find CrossWord.\n>\n" +
+                        "> 2. Enable **Allow access to file URLs**.\n>\n" +
+                        "> 3. Try again.\n>\n" +
+                        "> Opening the raw `file:` tab is blocked by Chromium nested-file security.";
+                    chrome.tabs.create({ url: `${vu}?append=${encodeURIComponent(guide)}` });
                 }
                 globalThis?.close?.();
             });
