@@ -93,6 +93,14 @@ const isIgnorableRollupWarning = (warning) => {
     if (warning?.code === "INEFFECTIVE_DYNAMIC_IMPORT") {
         return true;
     }
+    // Rolldown + IIFE SW: @jsquash / wasm bundles still reference `import.meta.url`; safe to mute here.
+    if (warning?.code === "EMPTY_IMPORT_META") {
+        return true;
+    }
+    const message = String(warning?.message || "");
+    if (message.includes("EMPTY_IMPORT_META")) {
+        return true;
+    }
     return isIgnorableViteWarning(warning);
 };
 
@@ -577,6 +585,13 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
                     "**/stats.html",
                     "**/report.html",
                 ],
+                // Secondary Vite build for `sw.js` does not inherit root `rollupOptions.onwarn`.
+                rollupOptions: {
+                    onwarn(warning, defaultHandler) {
+                        if (isIgnorableRollupWarning(warning)) return;
+                        defaultHandler(warning);
+                    },
+                },
             },
             includeAssets: [
                 resolve(__dirname, './src/pwa/icons/icon.svg')

@@ -42,6 +42,9 @@ const crxRolldownCodeSplitting = {
 const crxChunkFileNames = (chunkInfo) => {
     const n = chunkInfo.name || "";
     if (n === CRX_SW_SHARED_CHUNK || n.startsWith(`${CRX_SW_SHARED_CHUNK}-`)) return "com/sw-lib.js";
+    // Rolldown names the content-script slice `main.ts`; keep a stable path without `.ts.` in the filename
+    // so packagers and `web_accessible_resources` never drop it as "source-looking" output.
+    if (n === "main.ts" || n.endsWith("/main.ts")) return "chunks/crx-content-bootstrap.js";
     return distChunkFileNames(chunkInfo);
 };
 

@@ -459,7 +459,7 @@ const safeCacheMatch = async (
               : undefined;
     if (!key) return undefined;
     try {
-        return await cache.match(key);
+        return await cache?.match?.(key);
     } catch (error) {
         console.warn('[SW] Cache.match failed:', request, error);
         return undefined;
@@ -470,7 +470,7 @@ const safeCachesMatch = async (requestLike: RequestInfo | URL | null | undefined
     const request = toCacheRequestInfo(requestLike);
     if (!request) return undefined;
     try {
-        return await caches.match(request);
+        return await caches?.match?.(request);
     } catch (error) {
         console.warn('[SW] caches.match failed:', request, error);
         return undefined;
