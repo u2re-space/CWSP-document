@@ -559,6 +559,14 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             mode: 'development',
             // workbox options are ignored when using injectManifest
             injectManifest: {
+                /**
+                 * WHY: `rollupFormat: 'es'` leaves `import.meta` in the bundle. The app SW pulls large
+                 * deps (fest/lure, ExecutionCore, …) that emit `import.meta.url` / Vite preload helpers.
+                 * Browsers that reject module registration (or our `tryRegister` fallback to classic)
+                 * then throw `Cannot use 'import.meta' outside a module` and break PWA/boot.
+                 * IIFE inlines the graph and avoids exposing `import.meta` in the worker script.
+                 */
+                rollupFormat: 'iife',
                 injectionPoint: "self.__WB_MANIFEST",
                 maximumFileSizeToCacheInBytes: 1024 * 1024 * 16,
                 globPatterns: ['**/*.{js,css,html,png,svg,json}'],
