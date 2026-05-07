@@ -187,7 +187,7 @@ export function manualChunks(id) {
     if (p.includes("/src/com/template/")) return "com-service";
     if (p.includes("/src/com/")) return "com-app";
 
-    const shellSub = p.match(/\/frontend\/shells\/(minimal|base|faint)\//);
+    const shellSub = p.match(/\/frontend\/shells\/(minimal|immersive|faint)\//);
     if (shellSub) return `shell-${shellSub[1]}`;
 
     if (p.includes("/frontend/shells/")) {

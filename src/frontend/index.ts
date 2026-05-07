@@ -4,7 +4,7 @@
  * Unified entry point for the CrossWord frontend application.
  *
  * Subsystems:
- * - shells/  : Layout containers (base, window, tabbed, minimal, environment, content)
+ * - shells/  : Layout containers (immersive, base alias, window, tabbed, minimal, environment, content)
  * - views/   : Content components (workcenter, settings, viewer, etc.)
  * - styles/  : Style systems (vl-core, vl-basic, vl-advanced, vl-beercss, base)
  * - shared/  : Shared utilities (clipboard, storage, markdown)
@@ -365,7 +365,15 @@ export async function initializeLegacy(
  */
 export async function quickInit(
     container: HTMLElement,
-    shell: "base" | "window" | "tabbed" | "minimal" | "environment" | "content" | "faint" = "window",
+    shell:
+        | "base"
+        | "immersive"
+        | "window"
+        | "tabbed"
+        | "minimal"
+        | "environment"
+        | "content"
+        | "faint" = "window",
     view: string = "home"
 ): Promise<Shell> {
     return initializeApp(container, {

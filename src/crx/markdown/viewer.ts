@@ -205,6 +205,7 @@ const init = async () => {
     }
 
     await crxFrontend(appDiv, {
+        shell: "immersive",
         initialView: resolveTargetView(params),
         viewParams: collectViewParams(params),
         viewPayload: {

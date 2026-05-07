@@ -40,7 +40,7 @@ void loadSettings()
             renderDisabled();
             return;
         }
-        // Raw shell — no toolbar, just the viewer
-        crxFrontend(mount, { initialView: "viewer" });
+        // Chromeless immersive shell — no toolbar, just the viewer
+        crxFrontend(mount, { shell: "immersive", initialView: "viewer" });
     })
     .catch(() => renderDisabled());
