@@ -163,7 +163,7 @@ const evictStaleKatexDepChunksPlugin = () => ({
  */
 /** Matches `VIEW_POST_API_SEGMENTS` in `src/com/config/Names.ts` (dev POST API relay). */
 const VIEW_POST_API_SEGMENTS = new Set([
-    'viewer', 'workcenter', 'settings', 'explorer', 'history', 'editor', 'airpad', 'print', 'home',
+    'viewer', 'workcenter', 'settings', 'explorer', 'history', 'editor', 'print', 'home',
 ]);
 
 const spaFallbackPlugin = () => ({

@@ -211,10 +211,8 @@ export default async function index(mountElement: HTMLElement) {
     // Initialize uniform channel manager
     console.log('[Index] Initializing uniform channels...');
     //initializeAppChannels();
-
-    void import("shared/transport/hub-socket-boot")
-        .then((m) => m.bootHubSocketFromStoredSettings())
-        .catch(() => undefined);
+    /* Hub CWSP socket: gated by Settings → shell.maintainHubSocketConnection (default off).
+     * {@link BootLoader} calls applyHubSocketFromSettings after loadSettings — avoid duplicate preload here. */
 
     setLoadingState(mountElement, 'Initializing CrossWord...');
 
@@ -263,10 +261,6 @@ export default async function index(mountElement: HTMLElement) {
                 .then((m: { warmViewerMarkdownEngine?: () => void }) => m.warmViewerMarkdownEngine?.())
                 .catch(() => { /* optional */ });
         }
-        if (prePath === "airpad") {
-            void import("./frontend/views/airpad/main").catch(() => { /* optional */ });
-        }
-
         void withTimeout(pwaPromise, "initPWA", 5000, null, { warnOnTimeout: false })
             .then(() => {
                 console.log('[Index] PWA initialization complete');

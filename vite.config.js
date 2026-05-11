@@ -83,7 +83,7 @@ export const __dirname = resolve(import.meta.dirname, "./");
 const manifest = await readFile(resolve(__dirname, "./src/crx/manifest.json"), { encoding: "utf8" }).then(JSON.parse);
 
 const crxRoot = resolve(__dirname, "./src/crx");
-const ALL_VIEW_IDS = ["viewer", "editor", "workcenter", "explorer", "airpad", "settings", "history", "home", "print"];
+const ALL_VIEW_IDS = ["viewer", "editor", "workcenter", "explorer", "settings", "history", "home", "print"];
 const DEFAULT_VIEWS_BY_MODE = {
     crx: ["viewer", "editor", "settings", "history", "home", "print"],
     default: ALL_VIEW_IDS
