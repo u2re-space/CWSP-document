@@ -283,11 +283,18 @@ export default async function index(mountElement: HTMLElement) {
 
         // Legacy /{view} links are accepted as entry points.
         const isLegacyViewRoute = Boolean(pathname && isValidViewPath(pathname));
-        const explicitRequestedView: ViewId | null = isLegacyViewRoute
-            ? pickEnabledView(pathname as ViewId, "home")
-            : (sharedFlag === "1" || sharedFlag === "true" || markdownContent)
-                ? pickEnabledView("viewer", "home")
-                : null;
+        // Explicit `?view=<id>` selects the initial view (Capacitor minimal shell
+        // boots AirPad this way; also matches the minimal-shell demo convention).
+        const queryViewRaw = urlParams.get("view");
+        const queryView: ViewId | null =
+            queryViewRaw && isValidViewPath(queryViewRaw) ? pickEnabledView(queryViewRaw as ViewId, "home") : null;
+        const explicitRequestedView: ViewId | null = queryView
+            ? queryView
+            : isLegacyViewRoute
+                ? pickEnabledView(pathname as ViewId, "home")
+                : (sharedFlag === "1" || sharedFlag === "true" || markdownContent)
+                    ? pickEnabledView("viewer", "home")
+                    : null;
         const queryShell = getShellFromQuery();
         if (queryShell) {
             try {
