@@ -284,7 +284,7 @@ export default async function index(mountElement: HTMLElement) {
         // Legacy /{view} links are accepted as entry points.
         const isLegacyViewRoute = Boolean(pathname && isValidViewPath(pathname));
         // Explicit `?view=<id>` selects the initial view (Capacitor minimal shell
-        // boots AirPad this way; also matches the minimal-shell demo convention).
+        // boots Network status this way; also matches the minimal-shell demo convention).
         const queryViewRaw = urlParams.get("view");
         const queryView: ViewId | null =
             queryViewRaw && isValidViewPath(queryViewRaw) ? pickEnabledView(queryViewRaw as ViewId, "home") : null;

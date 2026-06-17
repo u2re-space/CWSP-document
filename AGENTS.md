@@ -70,7 +70,7 @@ How &ould works our network.
 
 ```
 [ Laptop/Ultrabook ] Bi-dir  {[ Server (Endpoint), Have External Entry IP ]}
-[ L-192.168.0.110  ] ←←---→→ {[ 192.168.0.200:8443 / 45.147.121.152:8443  ]}
+[ L-192.168.0.110  ] ←←---→→ {[ 192.168.0.200:8434 / 45.147.121.152:8434  ]}
           ↑                         ↑                         ↑
           ┷                         ↑                         ↑ 
           |                         ↓                         ↓ 
@@ -86,7 +86,7 @@ How &ould works our network.
   - mouse
   - keyboard
   - clipboard
-- tunneling through 192.168.0.200:8443 / 45.147.121.152:8443 if in LTE/NAT mode, using identification client token
+- tunneling through 192.168.0.200:8434 / 45.147.121.152:8434 if in LTE/NAT mode, using identification client token
 
 **L-192.168.0.110 <---> L-192.168.0.208**
 - clipboard (via android application, and cwsp endpoint server)
@@ -94,35 +94,35 @@ How &ould works our network.
   - mouse
   - keyboard
   - clipboard
-- tunneling through 192.168.0.200:8443 / 45.147.121.152:8443 if in LTE/NAT mode, using identification client token
+- tunneling through 192.168.0.200:8434 / 45.147.121.152:8434 if in LTE/NAT mode, using identification client token
 
 **L-192.168.0.196 <---> L-192.168.0.208**
 - clipboard (via android application, and cwsp endpoint server)
-- tunneling through 192.168.0.200:8443 / 45.147.121.152:8443 if one of in LTE/NAT mode, using identification client token
+- tunneling through 192.168.0.200:8434 / 45.147.121.152:8434 if one of in LTE/NAT mode, using identification client token
 
-**L-192.168.0.110 <---> {[ 192.168.0.200:8443 / 45.147.121.152:8443 ]}**
+**L-192.168.0.110 <---> {[ 192.168.0.200:8434 / 45.147.121.152:8434 ]}**
 - initiated or initiator exchanger (bridge/tunnel/link)
 - `L-192.168.0.110` is AirPad controllable (by PWA apps)
   - Or directly, or through bridge/proxy
 - `L-192.168.0.110` is one of `clipboard` (and/or other data) synchronize/exchanger member
   - Devices through bridge/proxy can/may ask or pass `clipboard` (and/or other data) data
 
-**{[ 192.168.0.200:8443 / 45.147.121.152:8443 ]}** 
+**{[ 192.168.0.200:8434 / 45.147.121.152:8434 ]}** 
 - is in general a central coordinator (bridge, and/or tunnel/proxy)
 
 ---
 
 ## Potential routes what needs to support
 
-- Airpad (PWA) or Native from `L-192.168.0.196` to https://192.168.0.110:8443/ (local/private network)
-- Airpad (PWA) or Native from `L-192.168.0.196` through `https://192.168.0.200:8443/`  to `L-192.168.0.110` (local/private network)
-- Airpad (PWA) or Native from `L-192.168.0.196` through `https://45.147.121.152:8443/` to `L-192.168.0.110` (any network of device)
-- Native (app) Clipboard (and/or other data) from `L-192.168.0.196` to https://192.168.0.110:8443/ (local network, directly)
-- Native (app) Clipboard (and/or other data) from `L-192.168.0.196` to through `https://192.168.0.200:8443/`  to `L-192.168.0.110` (local network, directly)
-- Native (app) Clipboard (and/or other data) from `L-192.168.0.196` to through `https://45.147.121.152:8443/` to `L-192.168.0.110` (any network of device)
-- CWSP/`endpoint` Clipboard (and/or other data) from `L-192.168.0.110` to https://192.168.0.196:8443/ (rare case, local network, directly)
-- CWSP/`endpoint` Clipboard (and/or other data) from `L-192.168.0.110` to through `https://192.168.0.200:8443/`  to `L-192.168.0.196` (local network, directly)
-- CWSP/`endpoint` Clipboard (and/or other data) from `L-192.168.0.110` to through `https://45.147.121.152:8443/` to `L-192.168.0.196` (any network of device)
+- Airpad (PWA) or Native from `L-192.168.0.196` to https://192.168.0.110:8434/ (local/private network)
+- Airpad (PWA) or Native from `L-192.168.0.196` through `https://192.168.0.200:8434/`  to `L-192.168.0.110` (local/private network)
+- Airpad (PWA) or Native from `L-192.168.0.196` through `https://45.147.121.152:8434/` to `L-192.168.0.110` (any network of device)
+- Native (app) Clipboard (and/or other data) from `L-192.168.0.196` to https://192.168.0.110:8434/ (local network, directly)
+- Native (app) Clipboard (and/or other data) from `L-192.168.0.196` to through `https://192.168.0.200:8434/`  to `L-192.168.0.110` (local network, directly)
+- Native (app) Clipboard (and/or other data) from `L-192.168.0.196` to through `https://45.147.121.152:8434/` to `L-192.168.0.110` (any network of device)
+- CWSP/`endpoint` Clipboard (and/or other data) from `L-192.168.0.110` to https://192.168.0.196:8434/ (rare case, local network, directly)
+- CWSP/`endpoint` Clipboard (and/or other data) from `L-192.168.0.110` to through `https://192.168.0.200:8434/`  to `L-192.168.0.196` (local network, directly)
+- CWSP/`endpoint` Clipboard (and/or other data) from `L-192.168.0.110` to through `https://45.147.121.152:8434/` to `L-192.168.0.196` (any network of device)
 
 ### `L-192.168.0.196` may/can be:
 

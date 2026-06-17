@@ -499,7 +499,7 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
      * Optional absolute origin for generated module / HMR URLs (reverse proxy, odd LAN setups).
      * If unset, Vite uses the browser’s current host:port — required when you open dev via
      * localhost, 127.0.0.1, or a different machine IP than a hardcoded LAN address.
-     * Example: VITE_DEV_SERVER_ORIGIN=https://192.168.0.200:8443
+     * Example: VITE_DEV_SERVER_ORIGIN=https://192.168.0.200:8434
      *
      * When using VITE_DEV_PORT below, set VITE_DEV_SERVER_ORIGIN to the same host and port you
      * open in the browser (proxy public origin or direct https://IP:PORT).
@@ -507,7 +507,7 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
     const devServerOrigin = (process.env.VITE_DEV_SERVER_ORIGIN || "").trim();
     /**
      * Dev server listen port. Default 443 matches HTTPS parity with production-style LAN tests.
-     * Unprivileged environments often hit EACCES on 443 — use e.g. VITE_DEV_PORT=8443 (see npm run dev:8443).
+     * Unprivileged environments often hit EACCES on 443 — use e.g. VITE_DEV_PORT=8434 (see npm run dev:8434).
      * Precedence: VITE_DEV_PORT → DEV_PORT → PORT → 443.
      */
     const devListenPort = (() => {
