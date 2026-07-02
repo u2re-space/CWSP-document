@@ -233,3 +233,9 @@ src/**/*.js.map
 !shared/vite.config.ts
 !postcss.config.js
 !postcss.config.mjs
+
+#
+.backups/*
+.backups/**/*
+.backup/*
+.backup/**/*
