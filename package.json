@@ -38,7 +38,7 @@
         "@jsquash/jpeg": ">=1.6.0",
         "@jsquash/png": ">=3.1.1",
         "@phosphor-icons/core": ">=2.1.1",
-        "@rolldown/binding-linux-x64-gnu": "^1.0.0-rc.13",
+        "@rolldown/binding-linux-x64-gnu": "1.1.5",
         "@toon-format/toon": ">=2.1.0",
         "@types/chrome": "^0.1.39",
         "@types/sanitize-html": ">=2.14.0",
