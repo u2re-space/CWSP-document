@@ -95,6 +95,9 @@ const crxRoot = resolve(__dirname, "./src/crx");
 const ALL_VIEW_IDS = ["viewer", "editor", "workcenter", "explorer", "settings", "history", "home", "print", "airpad", "network"];
 const DEFAULT_VIEWS_BY_MODE = {
     crx: ["viewer", "editor", "settings", "history", "home", "print"],
+    // VDS md.u2re.space / /markdown/ — markdown workspace (viewer + workcenter tools).
+    markdown: ["viewer", "workcenter", "editor", "settings", "history", "home", "print"],
+    "cw-markdown": ["viewer", "workcenter", "editor", "settings", "history", "home", "print"],
     default: ALL_VIEW_IDS
 };
 
@@ -116,7 +119,12 @@ const parseViewsFromEnv = (rawValue) => {
 };
 
 const resolveEnabledViews = (mode, env) => {
-    const defaults = mode === "crx" ? DEFAULT_VIEWS_BY_MODE.crx : DEFAULT_VIEWS_BY_MODE.default;
+    const defaults =
+        mode === "crx"
+            ? DEFAULT_VIEWS_BY_MODE.crx
+            : mode === "markdown" || mode === "cw-markdown"
+              ? DEFAULT_VIEWS_BY_MODE.markdown
+              : DEFAULT_VIEWS_BY_MODE.default;
     const explicit = parseViewsFromEnv(env?.VITE_ENABLED_VIEWS);
     const disabled = parseViewsFromEnv(env?.VITE_DISABLED_VIEWS);
     const start = explicit ?? defaults;
@@ -336,9 +344,128 @@ const crxOutput = objectAssign({}, crxOutputBase, {
     };
 };
 
+/**
+ * VDS host SPA for md.u2re.space and LAN `/markdown/` — real index.html + base "./"
+ * (endpoint lib build stays the default `build:pwa` path).
+ */
+const createMarkdownSpaConfig = async (mode) => {
+    const { viteStaticCopy } = await import("vite-plugin-static-copy");
+    const { VitePWA } = await import("vite-plugin-pwa");
+    const outDir = resolve(__dirname, "./build/cw-markdown");
+    const platformRoot = resolve(__dirname, "./src/frontend/web/cw-markdown");
+
+    const isPwaPlugin = (plugin) => {
+        const name = plugin?.name;
+        return typeof name === "string" && (name === "vite-plugin-pwa" || name.startsWith("vite-plugin-pwa:"));
+    };
+    const isStaticCopyPlugin = (plugin) => {
+        const name = plugin?.name;
+        return typeof name === "string" && name.startsWith("vite-plugin-static-copy:");
+    };
+    const isMcpPlugin = (plugin) => {
+        const name = plugin?.name;
+        return typeof name === "string" && name.toLowerCase().includes("mcp");
+    };
+
+    const basePlugins = (baseConfig?.plugins || [])
+        .flat?.(Infinity)
+        ?.filter?.(
+            (plugin) =>
+                plugin?.name !== "vite:singlefile" &&
+                !isPwaPlugin(plugin) &&
+                !isStaticCopyPlugin(plugin) &&
+                !isMcpPlugin(plugin)
+        ) ?? [];
+
+    const baseRollup = baseConfig?.build?.rollupOptions ?? {};
+    const baseOutput = Array.isArray(baseRollup.output) ? baseRollup.output[0] : (baseRollup.output ?? {});
+
+    return {
+        ...baseConfig,
+        // WHY: root at HTML dir so emitted file is `index.html` (not nested src/.../index.html).
+        root: platformRoot,
+        base: "./",
+        // Keep CrossWord cache + public resolve from the app package.
+        cacheDir: resolve(__dirname, "node_modules/.vite-cw-markdown"),
+        define: {
+            ...(baseConfig?.define ?? {}),
+            ...createViewDefine(mode),
+            "import.meta.env.VITE_ENABLED_VIEWS": JSON.stringify(
+                (DEFAULT_VIEWS_BY_MODE.markdown || []).join(",")
+            )
+        },
+        plugins: [
+            ...basePlugins,
+            viteStaticCopy({
+                targets: [
+                    { src: resolve(__dirname, "./src/pwa/manifest.json"), dest: "pwa" },
+                    { src: resolve(__dirname, "./src/pwa/icons/*"), dest: "pwa/icons" },
+                    { src: resolve(__dirname, "./src/pwa/screenshots/*"), dest: "pwa/screenshots" }
+                ]
+            }),
+            VitePWA({
+                // Absolute sw source — Vite root is nested under frontend/web/cw-markdown.
+                srcDir: resolve(__dirname, "./src/pwa"),
+                filename: "sw.ts",
+                outDir,
+                registerType: "autoUpdate",
+                strategies: "injectManifest",
+                injectRegister: null,
+                selfDestroying: false,
+                injectManifest: {
+                    rollupFormat: "iife",
+                    injectionPoint: "self.__WB_MANIFEST",
+                    maximumFileSizeToCacheInBytes: 1024 * 1024 * 16,
+                    globPatterns: ["**/*.{js,css,html,png,svg,json}"],
+                    globIgnores: ["**/node_modules/**/*", "**/*.map", "**/stats.html", "**/report.html"]
+                },
+                manifest: false,
+                devOptions: { enabled: false }
+            })
+        ],
+        build: {
+            ...(baseConfig?.build ?? {}),
+            // CRITICAL: endpoint lib mode must not apply — Fastify apps need index.html SPA.
+            lib: false,
+            outDir,
+            emptyOutDir: true,
+            minify: false,
+            cssMinify: false,
+            terserOptions: undefined,
+            cssCodeSplit: false,
+            modulePreload: true,
+            rollupOptions: {
+                ...baseRollup,
+                input: resolve(platformRoot, "index.html"),
+                output: {
+                    ...baseOutput,
+                    dir: outDir,
+                    entryFileNames: "assets/[name]-[hash].js",
+                    chunkFileNames: distChunkFileNames,
+                    assetFileNames: distAssetFileNames(NAME)
+                }
+            },
+            rolldownOptions: {
+                ...(baseConfig?.build?.rolldownOptions ?? {}),
+                input: resolve(platformRoot, "index.html"),
+                output: {
+                    ...baseOutput,
+                    dir: outDir,
+                    entryFileNames: "assets/[name]-[hash].js",
+                    chunkFileNames: distChunkFileNames,
+                    assetFileNames: distAssetFileNames(NAME)
+                }
+            }
+        }
+    };
+};
+
 export default async ({ mode } = {}) => {
     if (mode === "crx") {
         return createCrxConfig(mode);
+    }
+    if (mode === "markdown" || mode === "cw-markdown") {
+        return createMarkdownSpaConfig(mode);
     }
 
     // For regular build, modify base config to use multiple entry points

@@ -180,7 +180,17 @@ async function patchCrxManifest(distPath) {
 }
 
 async function run() {
-    const dirs = [resolve(appRoot, "dist"), resolve(appRoot, "dist-crx")];
+    const argDir = process.argv.find((a) => a.startsWith("--dir="))?.slice("--dir=".length)
+        || (process.argv.includes("--dir")
+            ? process.argv[process.argv.indexOf("--dir") + 1]
+            : "");
+    const dirs = argDir
+        ? [resolve(appRoot, argDir)]
+        : [
+              resolve(appRoot, "dist"),
+              resolve(appRoot, "dist-crx"),
+              resolve(appRoot, "build/cw-markdown")
+          ];
     const results = [];
     for (const d of dirs) {
         const stat = await fs.stat(d).catch(() => null);

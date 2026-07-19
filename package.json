@@ -11,7 +11,9 @@
         "postbuild:pwa": "node ./scripts/copy-pwa-to-endpoint.mjs",
         "build:crx": "rm -rf ./dist-crx && node ./scripts/run-vite.mjs build --config vite.config.js --mode crx && node ./scripts/normalize-worker-names.mjs",
         "build:crx:lite": "VITE_ENABLED_VIEWS=viewer,editor,settings,history,home,print vite build --config vite.config.js --mode crx",
+        "build:cw-markdown": "rm -rf ./build/cw-markdown && node ./scripts/run-vite.mjs build --config vite.config.js --mode markdown && node ./scripts/normalize-worker-names.mjs --dir build/cw-markdown && node ./scripts/stage-cw-markdown.mjs",
         "build:all": "node ./scripts/build.mjs pwa crx",
+        "stage:cw-markdown": "node ./scripts/stage-cw-markdown.mjs",
         "build:modules": "node ./scripts/build.mjs modules",
         "preview": "node ./scripts/run-vite.mjs preview",
         "start": "npm run dev",
@@ -25,7 +27,7 @@
         "test:dev": "npm run dev",
         "test:test": "echo 'No tests configured for crossword' && exit 0",
         "test:explorer": "npx --yes tsx --test ./src/frontend/views/explorer/inject.test.ts",
-        "sync:cw-markdown": "node ../../runtime/fastify/scripts/sync-cw-markdown.mjs"
+        "sync:cw-markdown": "node ./scripts/stage-cw-markdown.mjs"
     },
     "browserslist": [
         "last 1 chrome version",
