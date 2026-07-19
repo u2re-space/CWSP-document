@@ -404,6 +404,68 @@ export const COPY_HACK = async (
     });
 };
 
+/**
+ * Read OS clipboard text (offscreen preferred; content-script fallback).
+ * Used by Paste by CWSP when CWSP peers return empty.
+ */
+export const READ_CLIPBOARD = async (
+    ext: typeof chrome,
+    tabId?: number,
+): Promise<{ ok: boolean; data?: string; error?: string }> => {
+    // 1. Offscreen (has clipboardRead + focused document)
+    try {
+        const offscreenUrl = "offscreen/copy.html";
+        const existing = await ext.runtime.getContexts?.({
+            contextTypes: [ext.runtime.ContextType.OFFSCREEN_DOCUMENT as any],
+            documentUrls: [ext.runtime.getURL(offscreenUrl)],
+        })?.catch?.(() => []);
+
+        if (!existing?.length) {
+            await ext.offscreen.createDocument({
+                url: offscreenUrl,
+                reasons: [ext.offscreen.Reason.CLIPBOARD],
+                justification: "Read clipboard for Paste by CWSP",
+            });
+            await new Promise((r) => setTimeout(r, 400));
+        }
+        const r = await ext.runtime.sendMessage({ target: "offscreen", type: "READ_HACK" });
+        if (r?.ok && typeof r.data === "string" && r.data.length) {
+            return { ok: true, data: r.data };
+        }
+        if (r && r.ok === false && r.error) {
+            // keep trying other paths
+        }
+    } catch {
+        /* continue */
+    }
+
+    // 2. Active tab content script
+    if (tabId && tabId > 0) {
+        try {
+            const r = await ext.tabs.sendMessage(tabId, { type: "READ_HACK" });
+            if (r?.ok && typeof r.data === "string" && r.data.length) {
+                return { ok: true, data: r.data };
+            }
+        } catch {
+            /* continue */
+        }
+    }
+
+    // 3. Direct (rarely works in SW)
+    try {
+        if (typeof navigator !== "undefined" && navigator.clipboard?.readText) {
+            const text = await navigator.clipboard.readText();
+            if (typeof text === "string" && text.length) {
+                return { ok: true, data: text };
+            }
+        }
+    } catch {
+        /* continue */
+    }
+
+    return { ok: false, error: "Could not read OS clipboard" };
+};
+
 // ---------------------------------------------------------------------------
 // Public: enableCapture — registers message listeners on service worker
 // ---------------------------------------------------------------------------

@@ -89,11 +89,43 @@ async function rewriteReferences(distDir) {
     return updated;
 }
 
+/**
+ * WHY: Vite `__vitePreload` uses bare `window.dispatchEvent`. MV3 SW has no `window`,
+ * and the polyfill import inside `sw.ts` is often dropped when bundling `app/background.js`.
+ *
+ * INVARIANT: polyfill must be a *separate first import* of the SW loader. A bare statement
+ * before `import` still runs *after* dependency evaluation — too late for fest/uniform.
+ */
+const SW_WINDOW_POLYFILL_FILE = "sw-window-polyfill.js";
+const SW_WINDOW_POLYFILL_SOURCE = `/* crx-sw-window-polyfill */
+(() => {
+  const g = globalThis;
+  if (typeof g.window === "undefined") g.window = g;
+})();
+`;
+
+async function patchCrxServiceWorkerWindowPolyfill(distPath) {
+    if (!normalizePosixPath(distPath).endsWith("dist-crx")) return false;
+    const loaderPath = resolve(distPath, "service-worker-loader.js");
+    const text = await fs.readFile(loaderPath, "utf8").catch(() => null);
+    if (!text) return false;
+
+    await fs.writeFile(resolve(distPath, SW_WINDOW_POLYFILL_FILE), SW_WINDOW_POLYFILL_SOURCE, "utf8");
+
+    const importLine = `import "./${SW_WINDOW_POLYFILL_FILE}";\n`;
+    if (text.includes(SW_WINDOW_POLYFILL_FILE)) return true;
+
+    // Keep polyfill as the first import so it evaluates before chunks/sw.ts.js → background.
+    await fs.writeFile(loaderPath, `${importLine}${text}`, "utf8");
+    return true;
+}
+
 async function normalizeDir(distPath) {
     const renamed = await renameHashedAssets(distPath);
     const refs = await rewriteReferences(distPath);
     const manifestPatched = await patchCrxManifest(distPath);
-    return { distPath, renamed, refs, manifestPatched };
+    const swWindowPolyfill = await patchCrxServiceWorkerWindowPolyfill(distPath);
+    return { distPath, renamed, refs, manifestPatched, swWindowPolyfill };
 }
 
 function normalizePosixPath(p) {
@@ -157,7 +189,7 @@ async function run() {
     }
 
     for (const r of results) {
-        if (!r.renamed.length && !r.refs && !r.manifestPatched) continue;
+        if (!r.renamed.length && !r.refs && !r.manifestPatched && !r.swWindowPolyfill) continue;
         console.log(`[normalize-dist-assets] ${r.distPath}`);
         for (const n of r.renamed) {
             console.log(`  ${n.from} -> ${n.to}`);
@@ -167,6 +199,9 @@ async function run() {
         }
         if (r.manifestPatched) {
             console.log("  patched CRX manifest web_accessible_resources");
+        }
+        if (r.swWindowPolyfill) {
+            console.log("  patched CRX service-worker-loader window polyfill");
         }
     }
 }

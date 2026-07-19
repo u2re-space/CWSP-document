@@ -233,7 +233,13 @@
                 "./src/shared/*"
             ],
             "cwsp-shared/*": [
-                "../../runtime/cwsp/endpoint/shared/*"
+                "../../modules/projects/cwsp-shared/src/*"
+            ],
+            "@fest-lib/cwsp-shared": [
+                "../../modules/projects/cwsp-shared/src/index.ts"
+            ],
+            "@fest-lib/cwsp-shared/*": [
+                "../../modules/projects/cwsp-shared/src/*"
             ],
             "@fl-ui/*": [
                 "../../modules/projects/fl.ui/src/ui/*"

@@ -17,7 +17,16 @@ const CRX_SW_SHARED_CHUNK = "crx-sw-shared";
 
 /** Rolldown (Vite 8) uses `output.codeSplitting.groups`; `manualChunks` alone may not isolate chunks. */
 const CRX_SW_SHARED_CHUNK_TEST =
-    /\/modules\/projects\/core\.ts\/|\/node_modules\/jsox\/|\/node_modules\/@toon-format\/|\/src\/com\/config\/|\/src\/frontend\/shared\/config\/|\/src\/core\/document\/AIResponseParser|\/src\/core\/utils\/Runtime|\/src\/core\/constants\/data-paths|\/src\/core\/storage\/FileSystem|\/src\/(?:com\/template|frontend\/shared\/template)\/Entity(?:Id|Utils)|\/src\/(?:com\/store|frontend\/shared\/store)\/IDBQueue|\/src\/(?:com\/service|frontend\/shared\/service)\/instructions\/(?:core|templates|utils|AIInstructions)|\/src\/(?:com\/service|frontend\/shared\/service)\/model\/GPT-Config/;
+    /\/modules\/projects\/core\.ts\/|\/fest\/core\/|\/dom-globals-polyfill|\/node_modules\/jsox\/|\/node_modules\/@toon-format\/|\/src\/com\/config\/|\/src\/frontend\/shared\/config\/|\/src\/core\/document\/AIResponseParser|\/src\/core\/utils\/Runtime|\/src\/core\/constants\/data-paths|\/src\/core\/storage\/FileSystem|\/src\/(?:com\/template|frontend\/shared\/template)\/Entity(?:Id|Utils)|\/src\/(?:com\/store|frontend\/shared\/store)\/IDBQueue|\/src\/(?:com\/service|frontend\/shared\/service)\/instructions\/(?:core|templates|utils|AIInstructions)|\/src\/(?:com\/service|frontend\/shared\/service)\/model\/GPT-Config/;
+
+/**
+ * WHY: Rolldown (Vite 8) panics in `compute_cross_chunk_links` when
+ * `installDomConstructorPolyfills` is tree-shaken out of every chunk while SW
+ * code-splitting still references it via `fest/core`. `moduleSideEffects` alone
+ * does not prevent the panic — disable treeshake for CRX until Rolldown fixes it.
+ * Minify stays on in production; set `VITE_CRX_DEBUG_BUNDLE=1` for sourcemaps.
+ */
+const CRX_DISABLE_TREESHAKE = true;
 
 const crxRollupOutputChunks = {
     minifyInternalExports: false,
@@ -195,10 +204,11 @@ const crxDedupeComServicePlugin = () => ({
 });
 
 const createCrxConfig = (mode) => {
-    // Diagnostic CRX mode can be enabled explicitly.
-    // Production defaults to optimized tree-shaken bundle.
+    // Diagnostic CRX mode: no minify + sourcemaps. Treeshake is always off for CRX
+    // (Rolldown SW chunk panic — see CRX_DISABLE_TREESHAKE).
     const env = loadEnv(mode || "crx", __dirname, "");
     const debugCrxBundle = env?.VITE_CRX_DEBUG_BUNDLE === "1";
+    const crxTreeshake = CRX_DISABLE_TREESHAKE ? false : undefined;
 
     const crxPlugin = crx({
         manifest,
@@ -288,9 +298,7 @@ const crxOutput = objectAssign({}, crxOutputBase, {
             } : {}),
             rollupOptions: {
                 ...baseRollup,
-                ...(debugCrxBundle ? {
-                    treeshake: false,
-                } : {}),
+                ...(crxTreeshake === false ? { treeshake: false } : {}),
                 input: crxInputs,
                 output: {
                     ...crxOutput,
@@ -301,7 +309,7 @@ const crxOutput = objectAssign({}, crxOutputBase, {
             // `com/service.js` is not forced to static-import `com/app.js` (MV3 SW / customElements).
             rolldownOptions: {
                 ...(baseConfig?.build?.rolldownOptions ?? {}),
-                ...(debugCrxBundle ? { treeshake: false } : {}),
+                ...(crxTreeshake === false ? { treeshake: false } : {}),
                 input: crxInputs,
                 output: {
                     ...crxOutput,

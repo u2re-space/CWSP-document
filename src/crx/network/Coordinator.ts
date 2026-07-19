@@ -8,15 +8,20 @@
  * and clipboard policy. Use this for coordinator `act` / `ask` traffic, remote
  * clipboard sync, and future AI or automation asks routed through the endpoint.
  *
- * MV3 cold start: {@link startFromStoredSettings} respects {@link shouldDeferCrxHubSocketBootstrap}
- * so we do not probe localhost until Settings were saved or endpoint URL left the dev default.
+ * MV3 cold start: {@link startFromStoredSettings} respects {@link shouldDeferCrxHubSocketBootstrap}.
+ * After CRX seed (`ensureCrxCwspSettingsSeeded`), hub-maintain is on for localhost / WAN.
+ * Context-menu Share/Paste uses {@link ensureConnected} (force) so hub-maintain alone is not required.
  *
  * Modes such as “frontend as server” or WS reverse-listener are not fully
  * implemented; the extension typically acts as a normal CWSP client to the hub.
  */
 
 import type { AppSettings } from "com/config/SettingsTypes";
-import { loadSettings, shouldDeferCrxHubSocketBootstrap } from "com/config/Settings";
+import {
+    ensureCrxCwspSettingsSeeded,
+    loadSettings,
+    shouldDeferCrxHubSocketBootstrap,
+} from "com/config/Settings";
 import { isCapacitorCwsNativeShell } from "shared/native/cws-bridge";
 import {
     applyAirpadRuntimeFromAppSettings,
@@ -41,9 +46,18 @@ type NetworkClipboardMeta = { source?: string };
 type NetworkClipboardHandler = (text: string, meta?: NetworkClipboardMeta) => void;
 type ConnectionHandler = (connected: boolean) => void;
 
+export type CrxConnectOptions = {
+    /** Skip defer + hub-maintain gate (context-menu Share/Paste). */
+    force?: boolean;
+    /** Max wait for WS open (ms). */
+    timeoutMs?: number;
+};
+
 export interface CrxNetworkCoordinator {
     startFromStoredSettings(): Promise<void>;
-    startFromSettings(settings: AppSettings): Promise<void>;
+    startFromSettings(settings: AppSettings, opts?: CrxConnectOptions): Promise<void>;
+    /** Seed settings if needed, then connect (force) and wait until open or timeout. */
+    ensureConnected(opts?: CrxConnectOptions): Promise<{ ok: boolean; host: string; error?: string }>;
     stop(): void;
     isConnected(): boolean;
     getRemoteHost(): string;
@@ -59,6 +73,26 @@ export interface CrxNetworkCoordinator {
     sendCoordinatorRequest(what: string, payload: any, nodes?: string[]): Promise<any>;
 }
 
+const waitForWs = (timeoutMs: number): Promise<boolean> =>
+    new Promise((resolve) => {
+        if (isWSConnected()) {
+            resolve(true);
+            return;
+        }
+        let done = false;
+        const finish = (ok: boolean) => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            unsub();
+            resolve(ok);
+        };
+        const unsub = onWSConnectionChange((connected) => {
+            if (connected) finish(true);
+        });
+        const timer = setTimeout(() => finish(isWSConnected()), timeoutMs);
+    });
+
 const createCoordinator = (): CrxNetworkCoordinator => {
     const shouldSkipConnection = (): boolean => {
         if (isCapacitorCwsNativeShell() && isPreferNativeWebsocketEnabled()) {
@@ -67,12 +101,15 @@ const createCoordinator = (): CrxNetworkCoordinator => {
         return false;
     };
 
-    const startFromSettings = async (settings: AppSettings): Promise<void> => {
+    const startFromSettings = async (
+        settings: AppSettings,
+        opts?: CrxConnectOptions
+    ): Promise<void> => {
         installAirpadHubLifecycleRecovery();
         applyAirpadRuntimeFromAppSettings(settings);
 
         if (shouldSkipConnection()) return;
-        if (!isMaintainHubSocketConnectionEnabled()) return;
+        if (!opts?.force && !isMaintainHubSocketConnectionEnabled()) return;
 
         const host = getRemoteHost().trim();
         if (!host) return;
@@ -83,12 +120,47 @@ const createCoordinator = (): CrxNetworkCoordinator => {
 
     return {
         startFromStoredSettings: async () => {
+            try {
+                await ensureCrxCwspSettingsSeeded();
+            } catch {
+                /* seed best-effort */
+            }
             const settings = await loadSettings();
             if (await shouldDeferCrxHubSocketBootstrap(settings)) return;
             await startFromSettings(settings);
         },
 
         startFromSettings,
+
+        ensureConnected: async (opts?: CrxConnectOptions) => {
+            try {
+                await ensureCrxCwspSettingsSeeded();
+            } catch {
+                /* seed best-effort */
+            }
+            const settings = await loadSettings();
+            const host =
+                String(settings.core?.endpointUrl || "").trim() ||
+                getRemoteHost().trim() ||
+                "https://127.0.0.1:8434";
+            const timeoutMs = opts?.timeoutMs ?? 8000;
+
+            if (isWSConnected()) {
+                return { ok: true, host };
+            }
+
+            await startFromSettings(settings, { force: true, ...opts });
+            const ok = await waitForWs(timeoutMs);
+            if (ok) return { ok: true, host: getRemoteHost().trim() || host };
+
+            return {
+                ok: false,
+                host: getRemoteHost().trim() || host,
+                error:
+                    "CWSP hub not connected. Check https://127.0.0.1:8434 is up, cert trusted in Chrome, " +
+                    "and CWSP Settings has Client id L-110-crx + ecosystem token.",
+            };
+        },
 
         stop: () => {
             disconnectWS();

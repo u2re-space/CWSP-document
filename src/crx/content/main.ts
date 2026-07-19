@@ -17,6 +17,7 @@ import { isUserScopePath, toUserRelativePath } from "fest/core";
 
 // Content-script modules
 import "./copy";           // COPY_HACK handler
+import "./paste-cwsp";     // CWSP_PASTE_INSERT (Paste by CWSP context menu)
 import "./rect-selector";  // global crxSnipSelectRect
 import "./snip";           // START_SNIP / SOLVE_AND_ANSWER / WRITE_CODE / EXTRACT_CSS / CUSTOM_INSTRUCTION
 

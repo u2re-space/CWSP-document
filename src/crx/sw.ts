@@ -2,21 +2,24 @@
  * CrossWord — Chrome Extension Service Worker
  *
  * Responsibilities:
- *  - Context menu setup (copy-as-*, snip modes, markdown viewer, custom instructions)
+ *  - Context menu setup (copy-as-*, CWSP share/paste, snip modes, markdown viewer, custom instructions)
  *  - Keyboard command handling (Ctrl+Shift+X/Y)
  *  - AI recognition message dispatch (gpt:recognize, gpt:solve, gpt:code, gpt:css, gpt:custom, gpt:translate)
  *  - Markdown URL detection & auto-redirect to viewer
  *  - CRX result pipeline (clipboard → content-script → popup → workcenter → notification)
- *  - CRX unified messaging integration
+ *  - CRX unified messaging + CWSP hub (localhost Neutralino or WAN as L-110-crx)
  *
  * Heavy capture/AI/clipboard logic is in `./service/api.ts`.
  */
+
+// WHY: first import — alias missing `window` before Vite preload / Capacitor touch it.
+import "./sw-window-polyfill";
 
 import { createTimelineGenerator, requestNewTimeline } from "com/service/service/MakeTimeline";
 import { COPY_HACK, enableCapture } from "./service/api";
 import type { GPTResponses } from "com/service/model/GPT-Responses";
 import type { CustomInstruction } from "com/service/instructions/CustomInstructions";
-import { loadSettings } from "com/config/Settings";
+import { ensureCrxCwspSettingsSeeded, loadSettings } from "com/config/Settings";
 
 import * as swAi from "./sw-ai-modules";
 import type { ActionContext, ActionInput } from "com/service/misc/ActionHistory";
@@ -30,6 +33,12 @@ import { unifiedMessaging } from "com/core/UnifiedMessagingSw";
 import { createInteropEnvelope } from "com/core/UniformInterop";
 import { isUserScopePath } from "fest/core";
 import { getCrxNetworkCoordinator } from "./network/Coordinator";
+import {
+    copyAndShareByCwsp,
+    installCrxCwspClipboardHold,
+    notifyCwspClipboard,
+    pasteByCwsp,
+} from "./network/cwsp-clipboard-actions";
 
 // ---------------------------------------------------------------------------
 // Environment detection
@@ -38,7 +47,17 @@ import { getCrxNetworkCoordinator } from "./network/Coordinator";
 const isInCrxEnvironment = crxMessaging.isCrxEnvironment();
 
 if (isInCrxEnvironment) {
-    void getCrxNetworkCoordinator().startFromStoredSettings().catch(() => undefined);
+    // WHY: seed L-110-crx + maintain hub before first connect (shared local Neutralino backend).
+    void (async () => {
+        try {
+            await ensureCrxCwspSettingsSeeded();
+        } catch {
+            /* seed best-effort */
+        }
+        ensureCwspContextMenus();
+        installCrxCwspClipboardHold();
+        await getCrxNetworkCoordinator().startFromStoredSettings().catch(() => undefined);
+    })();
 }
 
 // ---------------------------------------------------------------------------
@@ -688,6 +707,25 @@ const CTX_ITEMS = [
     { id: "EXTRACT_CSS", title: "Extract CSS Styles (AI)" },
 ];
 
+/** CWSP share/paste — bypass Neutralino/Android Share & Accept popups. */
+const CWSP_CTX_COPY_SHARE = "cwsp-copy-and-share";
+const CWSP_CTX_PASTE = "cwsp-paste";
+
+/** Idempotent — safe on SW wake (onInstalled alone misses already-installed updates). */
+const ensureCwspContextMenus = () => {
+    const create = (id: string, title: string, contexts: chrome.contextMenus.ContextType[]) => {
+        try {
+            chrome.contextMenus.create({ id, title, contexts }, () => {
+                void chrome.runtime.lastError;
+            });
+        } catch {
+            /* exists / unavailable */
+        }
+    };
+    create(CWSP_CTX_COPY_SHARE, "Copy & Share by CWSP", ["selection"]);
+    create(CWSP_CTX_PASTE, "Paste by CWSP", ["editable", "page", "frame"]);
+};
+
 const CUSTOM_PREFIX = "CUSTOM_INSTRUCTION:";
 let customMenuIds: string[] = [];
 
@@ -728,6 +766,8 @@ chrome.runtime.onInstalled.addListener(() => {
     // CRX-Snip context menus
     try { chrome.contextMenus.create({ id: "crx-snip-text", title: "Process Text with CrossWord (CRX-Snip)", contexts: ["selection"] }); } catch { /* */ }
     try { chrome.contextMenus.create({ id: "crx-snip-screen", title: "Capture & Process Screen Area (CRX-Snip)", contexts: ["page", "frame", "editable"] }); } catch { /* */ }
+
+    ensureCwspContextMenus();
 
     updateCustomInstructionMenus().catch(() => {});
 });
@@ -796,6 +836,43 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
                 const r = await processCrxSnipWithPipeline(imageData, "image");
                 chrome.notifications.create({ type: "basic", iconUrl: "icons/icon.png", title: "CrossWord CRX-Snip", message: r.success ? "Captured and processed!" : `Failed: ${r.error || "Unknown"}` });
             } catch { chrome.notifications.create({ type: "basic", iconUrl: "icons/icon.png", title: "CrossWord CRX-Snip", message: "Capture failed" }); }
+        })();
+        return;
+    }
+
+    // CWSP Copy & Share — selection → local copy + clipboard:update (Share bypass)
+    if (menuId === CWSP_CTX_COPY_SHARE) {
+        void (async () => {
+            let text = String(info.selectionText || "").trim();
+            if (!text && tabId != null && tabId >= 0) {
+                try {
+                    const results = await chrome.scripting.executeScript({
+                        target: { tabId },
+                        func: () => (typeof window !== "undefined" ? window : globalThis)?.getSelection?.()?.toString?.() || "",
+                    });
+                    text = String(results?.[0]?.result || "").trim();
+                } catch { /* ignore */ }
+            }
+            const r = await copyAndShareByCwsp(text, tabId);
+            notifyCwspClipboard(
+                "CWSP Share",
+                r.ok ? "Copied & shared via CWSP" : (r.error || "Share failed")
+            );
+        })();
+        return;
+    }
+
+    // CWSP Paste — OS stash / held inbound / peer clipboard → insert (Accept bypass)
+    if (menuId === CWSP_CTX_PASTE) {
+        void (async () => {
+            const frameId = typeof info.frameId === "number" ? info.frameId : undefined;
+            const r = await pasteByCwsp(tabId, frameId);
+            notifyCwspClipboard(
+                "CWSP Paste",
+                r.ok
+                    ? (r.error || `Pasted ${r.length || 0} chars${r.source ? ` (${r.source})` : ""}`)
+                    : (r.error || "Paste failed")
+            );
         })();
         return;
     }
@@ -1105,7 +1182,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (!ai?.apiKey) { sendResponse({ ok: false, error: "No API key configured" }); return; }
 
                 const baseUrl = ai.baseUrl || "https://api.proxyapi.ru/openai/v1";
-                const model = ai.model || "gpt-5.4";
+                const model = ai.model || "gpt-5.6-luna";
                 const res = await fetch(`${baseUrl}/responses`, {
                     method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${ai.apiKey}` },
                     body: JSON.stringify({ model, input: inputText, instructions: instruction, reasoning: { effort: "low" }, text: { verbosity: "low" } }),

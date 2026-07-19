@@ -1,3 +1,10 @@
+/*
+ * Filename: clipboard-handler.ts
+ * FullPath: apps/CrossWord/src/crx/shared/clipboard-handler.ts
+ * Change date and time: 14.25.00_19.07.2026
+ * Reason for changes: Add READ_HACK for Paste by CWSP OS-clipboard fallback via offscreen.
+ */
+
 /**
  * Unified CRX Clipboard Handler
  * Works in both content script and offscreen document contexts
@@ -7,6 +14,13 @@
 import { toText } from "core/modules/Clipboard";
 
 export type CopyResponse = {
+    ok: boolean;
+    data?: string;
+    method?: string;
+    error?: string;
+};
+
+export type ReadResponse = {
     ok: boolean;
     data?: string;
     method?: string;
@@ -253,10 +267,28 @@ export const handleCopyRequest = async (
     };
 };
 
+/**
+ * Read OS clipboard text (offscreen / content — needs clipboardRead).
+ */
+export const handleReadRequest = async (): Promise<ReadResponse> => {
+    try {
+        if (typeof navigator !== "undefined" && navigator.clipboard?.readText) {
+            const text = await navigator.clipboard.readText();
+            if (typeof text === "string" && text.length) {
+                return { ok: true, data: text, method: "clipboard-api" };
+            }
+            return { ok: false, error: "OS clipboard empty", data: "" };
+        }
+    } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+    return { ok: false, error: "clipboard.readText unavailable" };
+};
+
 let _handlerRegistered = false;
 
 /**
- * Initialize COPY_HACK message handler
+ * Initialize COPY_HACK / READ_HACK message handler
  * Auto-configures based on detected context
  */
 export const initClipboardHandler = (
@@ -299,6 +331,23 @@ export const initClipboardHandler = (
                 sendResponse({ ok: false, error: String(error) });
             });
             return true; // async response
+        }
+
+        if (message?.type === "READ_HACK") {
+            handleReadRequest()
+                .then((response) => {
+                    console.log(`[Clipboard] READ_HACK response:`, {
+                        ok: response.ok,
+                        len: response.data?.length ?? 0,
+                        error: response.error,
+                    });
+                    sendResponse(response);
+                })
+                .catch((error) => {
+                    console.error(`[Clipboard] READ_HACK error:`, error);
+                    sendResponse({ ok: false, error: String(error) });
+                });
+            return true;
         }
 
         return false;
