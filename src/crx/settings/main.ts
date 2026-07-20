@@ -1,9 +1,8 @@
 /*
  * Filename: main.ts
  * FullPath: apps/CrossWord/src/crx/settings/main.ts
- * Change date and time: 22.00.00_19.07.2026
- * Reason for changes: Extension tab layout — reuse CWSP settings field helpers
- *   (.field / form-checkbox) instead of unstyled settings-field HTML.
+ * Change date and time: 10.40.00_20.07.2026
+ * Reason for changes: Force CRX client id ≠ CWSP shell.clientId on load/save.
  */
 
 import { crxFrontend } from "shells/boot";
@@ -16,12 +15,30 @@ import {
     settingsTextField,
     type SettingsPanelChild
 } from "com/config/settings/settings-contribution-ui";
-import { CRX_WIRE_CLIENT_ID, registerCrxNeutralinoSettingsSync } from "./neutralino-settings-arm";
+import {
+    CRX_BACKEND_CLIENT_ID_DEFAULT,
+    CRX_WIRE_CLIENT_ID,
+    reconcileCrxWireAndBackendIds,
+    registerCrxNeutralinoSettingsSync
+} from "./neutralino-settings-arm";
+
+/** Default desk Neutralino CWSP hub for L-110-crx wire (Extension tab only). */
+export const CRX_LOCAL_HUB_URL = "https://127.0.0.1:8434/";
+
+const isLoopbackHubUrl = (raw: string): boolean => {
+    try {
+        const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+        const host = u.hostname.toLowerCase();
+        return host === "127.0.0.1" || host === "localhost" || host === "::1";
+    } catch {
+        return /^(https?:\/\/)?(127\.0\.0\.1|localhost|::1)(:|\/|$)/i.test(String(raw || "").trim());
+    }
+};
 
 /**
  * Extension tab — CRX-only CWSP identity + chrome prefs.
- * WHY: shared gateway/token/clipboard live under CWSP (Neutralino SoT);
- * wire id must stay L-110-crx and must not overwrite desk L-110 in portable.config.
+ * WHY: CWSP Relay (`core.endpointUrl`) is Neutralino/gateway SoT;
+ * Extension Local hub (`shell.localHubUrl`) is the Chrome wire target — never the same field.
  */
 registerSettingsContribution({
     id: "crx",
@@ -36,6 +53,14 @@ registerSettingsContribution({
             "CWSP identity",
             settingsTextField("CRX client id", "core.userId", CRX_WIRE_CLIENT_ID),
             settingsTextField("Socket self id", "core.socket.selfId", CRX_WIRE_CLIENT_ID),
+            settingsTextField(
+                "Local hub URL (Neutralino / desk backend)",
+                "shell.localHubUrl",
+                CRX_LOCAL_HUB_URL
+            ),
+            settingsHint(
+                "WebSocket hub for this extension only (L-110-crx). Default https://127.0.0.1:8434/. Independent from CWSP → Relay / gateway (Neutralino portable). Non-loopback hubs still use the CWSP ecosystem token for auth."
+            ),
             settingsCheckboxField(
                 "Maintain hub socket connection",
                 "shell.maintainHubSocketConnection"
@@ -46,7 +71,7 @@ registerSettingsContribution({
                 ["http", "http"]
             ]),
             settingsHint(
-                "Hub default: https://127.0.0.1:8434. WAN relay under CWSP → Relay. Context menu: Copy & Share by CWSP / Paste by CWSP."
+                "Context menu: Copy & Share by CWSP / Paste by CWSP. Relay, ecosystem token, and clipboard modes live under CWSP."
             ),
             "Chrome",
             settingsCheckboxField("Enable New Tab Page (offline Basic)", "core.ntpEnabled"),
@@ -62,39 +87,52 @@ registerSettingsContribution({
             ),
             settingsCheckboxField("Accept contacts bridge", "shell.acceptContactsBridgeData"),
             settingsHint(
-                "Gateway, ecosystem token, destinations, and clipboard modes live under CWSP (synced to Neutralino /service/config when the desk host is up)."
+                "Gateway / Relay + token sync to Neutralino /service/config under CWSP. Changing Relay does not rewrite Local hub URL (unless you edit Local hub yourself)."
             )
         ];
         return settingsPanel("crx", "Extension", children);
     },
     load: (settings, panel) => {
-        const userId =
-            String(settings.core?.userId || "").trim() || CRX_WIRE_CLIENT_ID;
-        const selfId =
-            String(settings.core?.socket?.selfId || "").trim() || userId;
+        // INVARIANT: Extension tab always shows wire peer — never bare desk L-110.
+        const fixed = reconcileCrxWireAndBackendIds(settings as Record<string, unknown>);
+        Object.assign(settings, fixed);
+        let localHub = String(settings.shell?.localHubUrl || "").trim();
+        // COMPAT: older builds stored CRX wire host in core.endpointUrl (loopback).
+        if (!localHub) {
+            const ep = String(settings.core?.endpointUrl || "").trim();
+            localHub = ep && isLoopbackHubUrl(ep) ? ep : CRX_LOCAL_HUB_URL;
+        }
         const userInput = panel.querySelector(
             '[data-field="core.userId"]'
         ) as HTMLInputElement | null;
         const selfInput = panel.querySelector(
             '[data-field="core.socket.selfId"]'
         ) as HTMLInputElement | null;
-        if (userInput && !userInput.value.trim()) userInput.value = userId;
-        if (selfInput && !selfInput.value.trim()) selfInput.value = selfId;
+        const hubInput = panel.querySelector(
+            '[data-field="shell.localHubUrl"]'
+        ) as HTMLInputElement | null;
+        // WHY: always overwrite — empty-only fill left swapped L-110 visible after bind.
+        if (userInput) userInput.value = CRX_WIRE_CLIENT_ID;
+        if (selfInput) selfInput.value = CRX_WIRE_CLIENT_ID;
+        if (hubInput && !hubInput.value.trim()) hubInput.value = localHub;
     },
     save: (settings) => {
-        // INVARIANT: never persist bare L-110 from a mistaken paste — collide with Neutralino.
-        const uid = String(settings.core?.userId || "").trim();
-        if (!uid || /^L-110$/i.test(uid)) {
-            settings.core = { ...(settings.core || {}), userId: CRX_WIRE_CLIENT_ID };
+        // INVARIANT: wire peer is always L-110-crx; never persist bare L-110 here.
+        const fixed = reconcileCrxWireAndBackendIds(settings as Record<string, unknown>);
+        settings.core = fixed.core as typeof settings.core;
+        settings.shell = fixed.shell as typeof settings.shell;
+        // WHY: empty Local hub would leave Coordinator without a desk target;
+        // do not fall back to CWSP Relay (that would couple the two fields).
+        const hub = String(settings.shell?.localHubUrl || "").trim();
+        if (!hub) {
+            settings.shell = { ...(settings.shell || {}), localHubUrl: CRX_LOCAL_HUB_URL };
         }
-        const selfId = String(settings.core?.socket?.selfId || "").trim();
-        if (!selfId || /^L-110$/i.test(selfId)) {
-            settings.core = {
-                ...(settings.core || {}),
-                socket: {
-                    ...(settings.core?.socket || {}),
-                    selfId: String(settings.core?.userId || CRX_WIRE_CLIENT_ID)
-                }
+        // WHY: if CWSP tab left shell.clientId as wire id, pin desk default before Neutralino POST.
+        const desk = String(settings.shell?.clientId || "").trim();
+        if (!desk || /^L-\d{1,3}-crx$/i.test(desk)) {
+            settings.shell = {
+                ...(settings.shell || {}),
+                clientId: CRX_BACKEND_CLIENT_ID_DEFAULT
             };
         }
     }

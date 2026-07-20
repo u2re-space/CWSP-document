@@ -139,10 +139,11 @@ const createCoordinator = (): CrxNetworkCoordinator => {
                 /* seed best-effort */
             }
             const settings = await loadSettings();
+            // WHY: Extension Local hub ≠ CWSP Relay — wire uses shell.localHubUrl only.
             const host =
-                String(settings.core?.endpointUrl || "").trim() ||
+                String(settings.shell?.localHubUrl || "").trim() ||
                 getRemoteHost().trim() ||
-                "https://127.0.0.1:8434";
+                "https://127.0.0.1:8434/";
             const timeoutMs = opts?.timeoutMs ?? 8000;
 
             if (isWSConnected()) {
@@ -157,8 +158,8 @@ const createCoordinator = (): CrxNetworkCoordinator => {
                 ok: false,
                 host: getRemoteHost().trim() || host,
                 error:
-                    "CWSP hub not connected. Check https://127.0.0.1:8434 is up, cert trusted in Chrome, " +
-                    "and CWSP Settings has Client id L-110-crx + ecosystem token.",
+                    "CWSP hub not connected. Check Extension → Local hub URL (default https://127.0.0.1:8434/), " +
+                    "cert trusted in Chrome, L-110-crx + CWSP ecosystem token (WAN hubs need auth).",
             };
         },
 
