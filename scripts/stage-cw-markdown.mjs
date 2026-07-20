@@ -2,8 +2,8 @@
 /*
  * Filename: stage-cw-markdown.mjs
  * FullPath: apps/CrossWord/scripts/stage-cw-markdown.mjs
- * Change date and time: 22.20.00_19.07.2026
- * Reason for changes: Stage CrossWord markdown SPA → runtime/fastify/apps/cw-markdown.
+ * Change date and time: 13.25.00_20.07.2026
+ * Reason for changes: Flatten nested pwa/pwa/manifest.json so md.u2re.space ./pwa/manifest.json resolves.
  */
 
 import fs from "node:fs";
@@ -34,6 +34,24 @@ if (fs.existsSync(dest)) {
 
 for (const name of fs.readdirSync(src)) {
     fs.cpSync(path.join(src, name), path.join(dest, name), { recursive: true });
+}
+
+// COMPAT: viteStaticCopy + chunk placement can nest manifest under pwa/pwa/.
+// HTML expects ./pwa/manifest.json (md.u2re.space installable PWA).
+const nestedManifest = path.join(dest, "pwa", "pwa", "manifest.json");
+const flatManifest = path.join(dest, "pwa", "manifest.json");
+if (fs.existsSync(nestedManifest) && !fs.existsSync(flatManifest)) {
+    fs.mkdirSync(path.dirname(flatManifest), { recursive: true });
+    fs.renameSync(nestedManifest, flatManifest);
+    const nestedDir = path.join(dest, "pwa", "pwa");
+    try {
+        if (fs.existsSync(nestedDir) && fs.readdirSync(nestedDir).length === 0) {
+            fs.rmdirSync(nestedDir);
+        }
+    } catch {
+        /* ignore */
+    }
+    console.log("[stage-cw-markdown] normalized pwa/pwa/manifest.json → pwa/manifest.json");
 }
 
 fs.writeFileSync(
