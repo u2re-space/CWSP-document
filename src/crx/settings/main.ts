@@ -1,8 +1,9 @@
 /*
  * Filename: main.ts
  * FullPath: apps/CrossWord/src/crx/settings/main.ts
- * Change date and time: 10.40.00_20.07.2026
+ * Change date and time: 20.50.00_20.07.2026
  * Reason for changes: Force CRX client id ≠ CWSP shell.clientId on load/save.
+ *   On Control 401 during Save — open pairing modal (same as SPA re-auth).
  */
 
 import { crxFrontend } from "shells/boot";
@@ -71,7 +72,7 @@ registerSettingsContribution({
                 ["http", "http"]
             ]),
             settingsHint(
-                "Context menu: Copy & Share by CWSP / Paste by CWSP. Relay, ecosystem token, and clipboard modes live under CWSP."
+                "Context menu: Copy & Share by CWSP / Paste by CWSP require Control pairing on the CWSP tab (persistent session). Relay, ecosystem token, and clipboard modes also live under CWSP."
             ),
             "Chrome",
             settingsCheckboxField("Enable New Tab Page (offline Basic)", "core.ntpEnabled"),
@@ -140,12 +141,35 @@ registerSettingsContribution({
 
 const mount = document.getElementById("app") as HTMLElement | null;
 
+/** Debounced: saveSettings/webnativeControl 401 → pairing modal (arm also recovers on patch). */
+let unauthorizedPairTimer = 0;
+const armUnauthorizedPairing = (): void => {
+    if (unauthorizedPairTimer) window.clearTimeout(unauthorizedPairTimer);
+    unauthorizedPairTimer = window.setTimeout(() => {
+        unauthorizedPairTimer = 0;
+        void import("./neutralino-settings-arm")
+            .then((m) => m.recoverCrxControlAuthFromUnauthorized())
+            .then((ok) => {
+                if (ok) {
+                    console.log("[CRX settings] Control re-paired after unauthorized");
+                    try {
+                        chrome.runtime.sendMessage({ type: "cwsp-control-session-changed" });
+                    } catch {
+                        /* ignore */
+                    }
+                }
+            })
+            .catch((e) => console.warn("[CRX settings] Control re-pair failed:", e));
+    }, 120);
+};
+
 void (async () => {
     // WHY: arm must register before Settings hydrate (settings:get → /service/config).
     const live = await registerCrxNeutralinoSettingsSync();
     console.log(
         `[CRX settings] Neutralino /service/config ${live ? "live" : "offline (chrome.storage only)"}`
     );
+    window.addEventListener("cwsp-control-unauthorized", () => armUnauthorizedPairing());
     crxFrontend(mount ?? document.body, {
         shell: "immersive",
         initialView: "settings"

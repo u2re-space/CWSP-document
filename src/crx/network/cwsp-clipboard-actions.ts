@@ -1,14 +1,16 @@
 /*
  * Filename: cwsp-clipboard-actions.ts
  * FullPath: apps/CrossWord/src/crx/network/cwsp-clipboard-actions.ts
- * Change date and time: 14.50.00_19.07.2026
+ * Change date and time: 20.40.00_20.07.2026
  * Reason for changes: Paste: Neutralino inbound `take` before OS stash (Accept popup bypass).
+ *   Gate Copy & Share / Paste by CWSP on persistent Control session.
  */
 /**
  * CRX CWSP clipboard helpers for service-worker context menus.
  *
  * - Copy & Share: local copy + `clipboard:update` act (skips Neutralino/Android Share prompt path).
  * - Paste by CWSP: Neutralino Accept-take → CRX held → OS stash → peers → insert.
+ * - Both require a valid Control pairing session (chrome.storage.local).
  */
 
 import {
@@ -17,12 +19,16 @@ import {
     getAirPadClientId,
 } from "views/airpad/config/config";
 import { getLastServerClipboard } from "shared/transport/websocket";
+import { hasValidCrxControlSession } from "com/config/settings/crx-control-session";
 import { getCrxNetworkCoordinator } from "./Coordinator";
 import {
     dismissNeutralinoInboundAsk,
     takeNeutralinoInboundAskClipboard,
 } from "./neutralino-clipboard-take";
 import { COPY_HACK, READ_CLIPBOARD } from "../service/api";
+
+const CONTROL_PAIR_REQUIRED =
+    "Pair Control in CWSP settings (public token + device code) first";
 
 type HeldInbound = {
     text: string;
@@ -135,6 +141,9 @@ export const copyAndShareByCwsp = async (
     text: string,
     tabId?: number
 ): Promise<{ ok: boolean; error?: string }> => {
+    if (!(await hasValidCrxControlSession())) {
+        return { ok: false, error: CONTROL_PAIR_REQUIRED };
+    }
     const payload = String(text ?? "");
     if (!payload.trim()) {
         return { ok: false, error: "No text to share" };
@@ -430,6 +439,9 @@ export const pasteByCwsp = async (
     tabId?: number,
     frameId?: number
 ): Promise<{ ok: boolean; error?: string; length?: number; source?: string }> => {
+    if (!(await hasValidCrxControlSession())) {
+        return { ok: false, error: CONTROL_PAIR_REQUIRED };
+    }
     const opts: PasteTabOpts = { tabId, frameId };
     const resolved = await resolveCwspPasteText(opts);
     const text = resolved.text;

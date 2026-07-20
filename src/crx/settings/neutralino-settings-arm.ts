@@ -1,8 +1,9 @@
 /*
  * Filename: neutralino-settings-arm.ts
  * FullPath: apps/CrossWord/src/crx/settings/neutralino-settings-arm.ts
- * Change date and time: 10.40.00_20.07.2026
- * Reason for changes: Keep Extension core.userId (L-110-crx) ≠ CWSP shell.clientId (L-110).
+ * Change date and time: 21.10.00_20.07.2026
+ * Reason for changes: CRX Control resolve is session-only (no API-key / sidecar spam).
+ *   Unpaired → chrome.storage SoT; Pair Control / Save opens modal.
  */
 
 import {
@@ -12,6 +13,13 @@ import {
     type SettingsPatch,
     type SettingsSyncArm
 } from "views/settings";
+import {
+    clearCrxControlSession,
+    getCrxControlSessionToken,
+    hasValidCrxControlSession,
+    pairCrxControlWithModal,
+    readCrxControlSession
+} from "com/config/settings/crx-control-session";
 
 /**
  * INVARIANT: desk Neutralino portable.config keeps wire id L-110.
@@ -47,6 +55,8 @@ const SIDECAR_CONTROL_PORTS: number[] = (() => {
 })();
 
 type ControlEndpoint = {
+    /** Persistent CRX Control session (preferred over desk key for extension Origin). */
+    session?: string;
     origin: string;
     key: string;
     via: "local-hub" | "sidecar";
@@ -149,20 +159,49 @@ const endpointFetch = async (
     try {
         const headers = new Headers(init?.headers);
         headers.set("Content-Type", "application/json");
-        headers.set("X-API-Key", endpoint.key);
+        // SECURITY: chrome-extension Origin cannot use desk X-API-Key — session only.
+        const session =
+            String(endpoint.session || "").trim() || (await getCrxControlSessionToken());
+        try {
+            const extOrigin =
+                typeof chrome !== "undefined" && chrome?.runtime?.id
+                    ? `chrome-extension://${chrome.runtime.id}`
+                    : "";
+            if (extOrigin) headers.set("X-Control-Origin", extOrigin);
+        } catch {
+            /* ignore */
+        }
+        if (session) {
+            headers.set("X-Control-Session", session);
+            headers.set("X-Skip-Legacy-Key", "1");
+        }
+        // WHY: chrome-extension Origin never accepts desk X-API-Key — skip it (avoids 401 spam).
         const signal =
             init?.signal ??
             (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
                 ? AbortSignal.timeout(FETCH_TIMEOUT_MS)
                 : undefined);
         const url = `${endpoint.origin.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
-        return await fetch(url, {
+        const res = await fetch(url, {
             ...init,
             headers,
             cache: "no-store",
             signal,
             credentials: "omit"
         });
+        // WHY: only clear when the paired Control host rejects — probes to other ports must not wipe session.
+        if ((res.status === 401 || res.status === 403) && session && path.includes("/service/")) {
+            const paired = await readCrxControlSession().catch(() => null);
+            const pairedHost = String(paired?.controlHost || "")
+                .trim()
+                .replace(/\/+$/, "");
+            const tried = endpoint.origin.replace(/\/+$/, "");
+            if (pairedHost && pairedHost === tried) {
+                await clearCrxControlSession().catch(() => undefined);
+                cachedEndpoint = null;
+            }
+        }
+        return res;
     } catch {
         return null;
     }
@@ -185,35 +224,112 @@ const publishAuthGlobals = (endpoint: ControlEndpoint): void => {
         };
         g.__NEUTRALINO_AUTH__ = auth;
         g.__WEBNATIVE_AUTH__ = auth;
-        g.__CWSP_CONTROL_VIA__ = endpoint.via === "local-hub" ? "android" : "neutralino";
+        // WHY: CRX Local hub is desk Neutralino (:8434 alias or :29110) — not Capacitor.
+        g.__CWSP_CONTROL_VIA__ = "neutralino";
     } catch {
         /* ignore */
     }
 };
 
+/** Clear Control globals so Settings hydrate does not treat CRX as live WebNative SoT. */
+const clearAuthGlobals = (): void => {
+    try {
+        const g = globalThis as unknown as {
+            __NEUTRALINO_AUTH__?: unknown;
+            __WEBNATIVE_AUTH__?: unknown;
+            __CWSP_CONTROL_VIA__?: string;
+        };
+        delete g.__NEUTRALINO_AUTH__;
+        delete g.__WEBNATIVE_AUTH__;
+        delete g.__CWSP_CONTROL_VIA__;
+    } catch {
+        /* ignore */
+    }
+};
+
+/** Serialize pairing modals so Save + unauthorized event do not open two dialogs. */
+let pairModalInFlight: Promise<boolean> | null = null;
+
+/**
+ * Ensure persistent Control session before write.
+ * Opens pairing modal when missing/expired (chrome-extension Origin cannot use desk API key).
+ */
+async function ensureCrxControlAuthorized(opts?: {
+    forceModal?: boolean;
+    localHubUrl?: string;
+}): Promise<ControlEndpoint | null> {
+    const run = async (): Promise<boolean> => {
+        if (!opts?.forceModal && (await hasValidCrxControlSession())) {
+            cachedEndpoint = null;
+            const auth = await resolveNeutralinoControlAuth();
+            if (auth) {
+                const probe = await endpointFetch(auth, "/service/config", { method: "GET" });
+                if (probe?.ok) return true;
+            }
+        }
+        const { localHubUrl } = await readCrxStorageHints();
+        let preferred: string[] = [];
+        try {
+            const ds = String(document.documentElement.dataset.cwspControlOrigin || "").trim();
+            if (ds) preferred.push(ds);
+            if (cachedEndpoint?.origin) preferred.push(cachedEndpoint.origin);
+        } catch {
+            /* ignore */
+        }
+        // WHY: always prefer canonical Neutralino Control (:29110) — UI token comes from there.
+        preferred.unshift("http://127.0.0.1:29110");
+        const result = await pairCrxControlWithModal({
+            localHubUrl: opts?.localHubUrl || localHubUrl,
+            preferredOrigins: preferred
+        });
+        if (!result.ok) {
+            if (result.cancelled) return false;
+            throw new Error(result.error || "Control pairing failed");
+        }
+        cachedEndpoint = null;
+        return Boolean(await resolveNeutralinoControlAuth());
+    };
+
+    if (!pairModalInFlight) {
+        pairModalInFlight = run().finally(() => {
+            pairModalInFlight = null;
+        });
+    }
+    const ok = await pairModalInFlight;
+    return ok ? resolveNeutralinoControlAuth() : null;
+}
+
 async function probeEndpoint(
     origin: string,
     key: string,
-    via: ControlEndpoint["via"]
+    via: ControlEndpoint["via"],
+    session?: string
 ): Promise<ControlEndpoint | null> {
-    const endpoint = { origin, key, via };
+    const endpoint = { origin, key, via, session };
     const res = await endpointFetch(endpoint, "/service/config", { method: "GET" });
-    // WHY: 200 = live SoT; 401 = wrong key but host is Control (retry other keys).
+    // WHY: 200 = live SoT; 401 = wrong key/session but host may still be Control.
     if (res?.ok) return endpoint;
     return null;
 }
 
 /**
  * Resolve Control SoT for CWSP tab.
- * INVARIANT: prefer Extension Local hub URL (default :8434), then Neutralino sidecar :29110.
+ * INVARIANT (CRX): chrome-extension Origin may only use X-Control-Session.
+ * Without a paired session → offline (chrome.storage SoT); never probe with API key.
  */
 export async function resolveNeutralinoControlAuth(): Promise<ControlEndpoint | null> {
-    const { localHubUrl, token } = await readCrxStorageHints();
-    // WHY: Control API key defaults to cwsp-neutralino-local; ecosystem token is for hub WS
-    // and may differ — try desk Control key first so Local hub hydrate is not stuck on 401.
-    const keys = [...new Set([DEFAULT_CONTROL_KEY, token].filter(Boolean))];
+    const { localHubUrl } = await readCrxStorageHints();
+    const paired = await readCrxControlSession();
+    const session = String(paired?.token || "").trim();
+    const key = DEFAULT_CONTROL_KEY;
 
-    if (cachedEndpoint) {
+    if (!session) {
+        cachedEndpoint = null;
+        clearAuthGlobals();
+        return null;
+    }
+
+    if (cachedEndpoint?.session === session) {
         const hit = await endpointFetch(cachedEndpoint, "/service/config", { method: "GET" });
         if (hit?.ok) {
             publishAuthGlobals(cachedEndpoint);
@@ -222,34 +338,27 @@ export async function resolveNeutralinoControlAuth(): Promise<ControlEndpoint | 
         cachedEndpoint = null;
     }
 
-    for (const origin of localHubOrigins(localHubUrl)) {
-        for (const key of keys) {
-            const ep = await probeEndpoint(origin, key, "local-hub");
-            if (ep) {
-                cachedEndpoint = ep;
-                publishAuthGlobals(ep);
-                console.log(
-                    `[CRX settings] Control SoT live via Local hub ${ep.origin} (Extension Local hub URL)`
-                );
-                return ep;
-            }
+    // WHY: only touch paired host + canonical :29110 — no :8434 https / sidecar band spam.
+    const origins = [
+        ...(paired?.controlHost ? [String(paired.controlHost).trim()] : []),
+        "http://127.0.0.1:29110",
+        ...localHubOrigins(localHubUrl).filter((o) => o.startsWith("http://"))
+    ].filter(Boolean);
+
+    for (const origin of [...new Set(origins)]) {
+        const via: ControlEndpoint["via"] =
+            /:(2911\d|19875|18765)(\/|$)/.test(origin) ? "sidecar" : "local-hub";
+        const ep = await probeEndpoint(origin, key, via, session);
+        if (ep) {
+            cachedEndpoint = ep;
+            publishAuthGlobals(ep);
+            console.log(`[CRX settings] Control SoT live via session @ ${ep.origin}`);
+            return ep;
         }
     }
 
-    for (const origin of sidecarOrigins(localHubUrl)) {
-        for (const key of keys) {
-            const ep = await probeEndpoint(origin, key, "sidecar");
-            if (ep) {
-                cachedEndpoint = ep;
-                publishAuthGlobals(ep);
-                console.log(
-                    `[CRX settings] Control SoT live via Neutralino sidecar ${ep.origin}`
-                );
-                return ep;
-            }
-        }
-    }
-
+    cachedEndpoint = null;
+    clearAuthGlobals();
     return null;
 }
 
@@ -446,49 +555,83 @@ function expandCoreIntoPortable(patch: SettingsPatch): SettingsPatch {
     return expanded;
 }
 
-async function serviceConfig(
-    endpoint: ControlEndpoint,
-    init?: RequestInit
-): Promise<{
+type ServiceConfigBody = {
     settings?: SettingsBlob;
     portable?: SettingsBlob;
     snapshot?: SettingsBlob;
     defaults?: SettingsBlob;
-} | null> {
+};
+
+async function serviceConfig(
+    endpoint: ControlEndpoint,
+    init?: RequestInit
+): Promise<{ body: ServiceConfigBody | null; status: number; unauthorized: boolean }> {
     const res = await endpointFetch(endpoint, "/service/config", init);
-    if (!res?.ok) return null;
+    const status = res?.status ?? 0;
+    const unauthorized = status === 401 || status === 403;
+    if (!res?.ok) return { body: null, status, unauthorized };
     try {
-        return (await res.json()) as {
-            settings?: SettingsBlob;
-            portable?: SettingsBlob;
-            snapshot?: SettingsBlob;
-            defaults?: SettingsBlob;
+        return {
+            body: (await res.json()) as ServiceConfigBody,
+            status,
+            unauthorized: false
         };
     } catch {
-        return null;
+        return { body: null, status, unauthorized: false };
     }
 }
 
 /**
  * CRX settings:get/patch arm — Neutralino `/service/config` via Extension Local hub URL.
  * Falls back to empty get (chrome.storage remains local SoT for Extension wire identity).
+ * INVARIANT: patch requires persistent Control session; 401 opens pairing modal + retry.
  */
 export function createCrxNeutralinoSettingsArm(): SettingsSyncArm {
     return {
         get: async () => {
             const auth = await resolveNeutralinoControlAuth();
             if (!auth) return {};
-            const body = await serviceConfig(auth, { method: "GET" });
+            const { body } = await serviceConfig(auth, { method: "GET" });
             return normalizeServiceConfigToAppSettings(body);
         },
         patch: async (patch: SettingsPatch) => {
-            const auth = await resolveNeutralinoControlAuth();
-            if (!auth) return patch;
             const safe = expandCoreIntoPortable(stripCrxIdentityFromPatch(patch));
-            const body = await serviceConfig(auth, {
+            let auth: ControlEndpoint | null;
+            try {
+                auth = await ensureCrxControlAuthorized();
+            } catch (e) {
+                throw e instanceof Error
+                    ? e
+                    : new Error(String(e || "Control pairing failed"));
+            }
+            if (!auth) {
+                throw new Error(
+                    "Control pairing cancelled — open Pair Control… and paste token + code from Neutralino :29110"
+                );
+            }
+
+            let { body, unauthorized } = await serviceConfig(auth, {
                 method: "POST",
                 body: JSON.stringify(safe)
             });
+
+            if (unauthorized || !body) {
+                auth = await ensureCrxControlAuthorized({ forceModal: true });
+                if (!auth) {
+                    throw new Error("Control pairing cancelled — settings not pushed to Neutralino");
+                }
+                ({ body, unauthorized } = await serviceConfig(auth, {
+                    method: "POST",
+                    body: JSON.stringify(safe)
+                }));
+            }
+
+            if (unauthorized || !body) {
+                throw new Error(
+                    `Control rejected settings save (HTTP ${unauthorized ? "401/403" : "error"})`
+                );
+            }
+
             const endpointUrl = String(asRecord(safe.core).endpointUrl || "").trim();
             const token = String(
                 asRecord(safe.core).userKey || asRecord(safe.core).ecosystemToken || ""
@@ -518,16 +661,22 @@ export function createCrxNeutralinoSettingsArm(): SettingsSyncArm {
         defaults: async () => {
             const auth = await resolveNeutralinoControlAuth();
             if (!auth) return {};
-            const body = await serviceConfig(auth, { method: "GET" });
+            const { body } = await serviceConfig(auth, { method: "GET" });
             return body?.defaults ?? {};
         },
         snapshot: async () => {
             const auth = await resolveNeutralinoControlAuth();
             if (!auth) return {};
-            const body = await serviceConfig(auth, { method: "GET" });
+            const { body } = await serviceConfig(auth, { method: "GET" });
             return body?.snapshot ?? {};
         }
     };
+}
+
+/** Used by options page: 401 from saveSettings/webnativeControl → same modal. */
+export async function recoverCrxControlAuthFromUnauthorized(): Promise<boolean> {
+    const auth = await ensureCrxControlAuthorized({ forceModal: true });
+    return Boolean(auth);
 }
 
 /** Register CRX surface arm + mark bridge status on documentElement. */
