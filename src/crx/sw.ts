@@ -711,19 +711,43 @@ const CTX_ITEMS = [
 const CWSP_CTX_COPY_SHARE = "cwsp-copy-and-share";
 const CWSP_CTX_PASTE = "cwsp-paste";
 
+/**
+ * Chrome contextMenus treat a single `&` as a mnemonic accelerator (Windows-style),
+ * so "Copy & Share" renders as "Copy  Share". Use `&&` for a literal ampersand.
+ */
+const CTX_MENU_AMP = "&&";
+
 /** Idempotent — safe on SW wake (onInstalled alone misses already-installed updates). */
 const ensureCwspContextMenus = () => {
-    const create = (id: string, title: string, contexts: chrome.contextMenus.ContextType[]) => {
+    const upsert = (id: string, title: string, contexts: chrome.contextMenus.ContextType[]) => {
         try {
-            chrome.contextMenus.create({ id, title, contexts }, () => {
-                void chrome.runtime.lastError;
+            chrome.contextMenus.update(id, { title }, () => {
+                if (chrome.runtime.lastError) {
+                    try {
+                        chrome.contextMenus.create({ id, title, contexts }, () => {
+                            void chrome.runtime.lastError;
+                        });
+                    } catch {
+                        /* unavailable */
+                    }
+                }
             });
         } catch {
-            /* exists / unavailable */
+            try {
+                chrome.contextMenus.create({ id, title, contexts }, () => {
+                    void chrome.runtime.lastError;
+                });
+            } catch {
+                /* unavailable */
+            }
         }
     };
-    create(CWSP_CTX_COPY_SHARE, "Copy & Share by CWSP", ["selection"]);
-    create(CWSP_CTX_PASTE, "Paste by CWSP", ["editable", "page", "frame"]);
+    upsert(
+        CWSP_CTX_COPY_SHARE,
+        `Copy ${CTX_MENU_AMP} Share by CWSP`,
+        ["selection"]
+    );
+    upsert(CWSP_CTX_PASTE, "Paste by CWSP", ["editable", "page", "frame"]);
 };
 
 const CUSTOM_PREFIX = "CUSTOM_INSTRUCTION:";
@@ -765,7 +789,13 @@ chrome.runtime.onInstalled.addListener(() => {
 
     // CRX-Snip context menus
     try { chrome.contextMenus.create({ id: "crx-snip-text", title: "Process Text with CrossWord (CRX-Snip)", contexts: ["selection"] }); } catch { /* */ }
-    try { chrome.contextMenus.create({ id: "crx-snip-screen", title: "Capture & Process Screen Area (CRX-Snip)", contexts: ["page", "frame", "editable"] }); } catch { /* */ }
+    try {
+        chrome.contextMenus.create({
+            id: "crx-snip-screen",
+            title: `Capture ${CTX_MENU_AMP} Process Screen Area (CRX-Snip)`,
+            contexts: ["page", "frame", "editable"]
+        });
+    } catch { /* */ }
 
     ensureCwspContextMenus();
 
