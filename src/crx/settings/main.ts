@@ -72,7 +72,7 @@ registerSettingsContribution({
                 ["http", "http"]
             ]),
             settingsHint(
-                "Context menu: Copy & Share by CWSP / Paste by CWSP require Control pairing on the CWSP tab (persistent session). Relay, ecosystem token, and clipboard modes also live under CWSP."
+                "Context menu Copy & Share / Paste by CWSP use the CWSP hub (ecosystem token). Control pairing on the CWSP tab is only for Neutralino Settings sync."
             ),
             "Chrome",
             settingsCheckboxField("Enable New Tab Page (offline Basic)", "core.ntpEnabled"),

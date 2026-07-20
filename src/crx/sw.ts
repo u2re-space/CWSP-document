@@ -39,7 +39,6 @@ import {
     notifyCwspClipboard,
     pasteByCwsp,
 } from "./network/cwsp-clipboard-actions";
-import { hasValidCrxControlSession } from "com/config/settings/crx-control-session";
 
 // ---------------------------------------------------------------------------
 // Environment detection
@@ -718,54 +717,43 @@ const CWSP_CTX_PASTE = "cwsp-paste";
  */
 const CTX_MENU_AMP = "&&";
 
-/** Idempotent — safe on SW wake (onInstalled alone misses already-installed updates). */
+/**
+ * Idempotent — safe on SW wake (onInstalled alone misses already-installed updates).
+ * WHY: clipboard menus use hub WS + ecosystem token; Control pairing is Settings-only.
+ */
 const ensureCwspContextMenus = () => {
-    void (async () => {
-        const paired = await hasValidCrxControlSession();
-        const upsert = (
-            id: string,
-            title: string,
-            contexts: chrome.contextMenus.ContextType[],
-            enabled: boolean
-        ) => {
-            try {
-                chrome.contextMenus.update(id, { title, enabled }, () => {
-                    if (chrome.runtime.lastError) {
-                        try {
-                            chrome.contextMenus.create({ id, title, contexts, enabled }, () => {
+    const upsert = (
+        id: string,
+        title: string,
+        contexts: chrome.contextMenus.ContextType[]
+    ) => {
+        try {
+            chrome.contextMenus.update(id, { title, enabled: true }, () => {
+                if (chrome.runtime.lastError) {
+                    try {
+                        chrome.contextMenus.create(
+                            { id, title, contexts, enabled: true },
+                            () => {
                                 void chrome.runtime.lastError;
-                            });
-                        } catch {
-                            /* unavailable */
-                        }
+                            }
+                        );
+                    } catch {
+                        /* unavailable */
                     }
+                }
+            });
+        } catch {
+            try {
+                chrome.contextMenus.create({ id, title, contexts, enabled: true }, () => {
+                    void chrome.runtime.lastError;
                 });
             } catch {
-                try {
-                    chrome.contextMenus.create({ id, title, contexts, enabled }, () => {
-                        void chrome.runtime.lastError;
-                    });
-                } catch {
-                    /* unavailable */
-                }
+                /* unavailable */
             }
-        };
-        // WHY: menus stay visible but disabled until Control pairing (persistent session).
-        upsert(
-            CWSP_CTX_COPY_SHARE,
-            paired
-                ? `Copy ${CTX_MENU_AMP} Share by CWSP`
-                : `Copy ${CTX_MENU_AMP} Share by CWSP (pair Control)`,
-            ["selection"],
-            paired
-        );
-        upsert(
-            CWSP_CTX_PASTE,
-            paired ? "Paste by CWSP" : "Paste by CWSP (pair Control)",
-            ["editable", "page", "frame"],
-            paired
-        );
-    })();
+        }
+    };
+    upsert(CWSP_CTX_COPY_SHARE, `Copy ${CTX_MENU_AMP} Share by CWSP`, ["selection"]);
+    upsert(CWSP_CTX_PASTE, "Paste by CWSP", ["editable", "page", "frame"]);
 };
 
 const CUSTOM_PREFIX = "CUSTOM_INSTRUCTION:";
@@ -788,14 +776,6 @@ const updateCustomInstructionMenus = async () => {
 
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes["rs-settings"]) updateCustomInstructionMenus().catch(() => {});
-    // WHY: pair/unpair from CWSP tab toggles Copy & Share / Paste menus.
-    if (area === "local" && changes["cwsp-control-session-v1"]) ensureCwspContextMenus();
-});
-
-chrome.runtime.onMessage.addListener((message) => {
-    if (message && typeof message === "object" && (message as { type?: string }).type === "cwsp-control-session-changed") {
-        ensureCwspContextMenus();
-    }
 });
 
 // ============================================================================
