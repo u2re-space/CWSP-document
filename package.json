@@ -79,6 +79,7 @@
         "vite": "^8.0.7",
         "vite-bundle-analyzer": ">=0.10.6",
         "vite-plugin-bundle-prefetch": ">=0.0.4",
+        "vite-plugin-compression2": "^2.5.3",
         "vite-plugin-external": ">=6.2.2",
         "vite-plugin-jspm": ">=0.6.2",
         "vite-plugin-mcp": "^0.3.2",

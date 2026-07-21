@@ -18,6 +18,7 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { VitePWA } from 'vite-plugin-pwa'
 import { createLogger, searchForWorkspaceRoot } from "vite";
 import { ViteMcp } from 'vite-plugin-mcp'
+import { compression } from 'vite-plugin-compression2'
 
 const viteLogger = createLogger();
 
@@ -601,7 +602,21 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
                 type: "module",
                 enabled: pwaDevServiceWorkerEnabled,
             }
-        })
+        }),
+        // WHY: VDS Fastify serves these siblings via @fastify/static `preCompressed`
+        // (br then gzip). Keep originals so clients without encoding still work.
+        ...(isBuild && process.env.VITE_PRECOMPRESS !== "0"
+            ? [
+                  compression({
+                      algorithms: ["gzip", "brotliCompress"],
+                      threshold: 1024,
+                      skipIfLargerOrEqual: true,
+                      deleteOriginalAssets: false,
+                      // Exclude already-binary / tiny assets; SW precache ignores .gz/.br.
+                      exclude: [/\.(png|jpe?g|webp|gif|ico|woff2?|gz|br|map)$/i],
+                  }),
+              ]
+            : []),
     ];
 
     //
