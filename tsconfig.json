@@ -304,9 +304,6 @@
             "views/explorer": [
                 "../../modules/views/explorer-view/src"
             ],
-            "views/airpad": [
-                "../../modules/views/airpad-view/src"
-            ],
             "views/network": [
                 "../../modules/views/network-view/src"
             ],
@@ -330,9 +327,6 @@
             ],
             "views/explorer/*": [
                 "../../modules/views/explorer-view/src/*"
-            ],
-            "views/airpad/*": [
-                "../../modules/views/airpad-view/src/*"
             ],
             "views/network/*": [
                 "../../modules/views/network-view/src/*"

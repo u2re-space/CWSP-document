@@ -18,7 +18,7 @@ import {
     getClipboardShareDestinationNodes,
     getClipboardBroadcastTargetNodes,
     getAirPadClientId,
-} from "views/airpad/config/config";
+} from "cwsp-shared/remote-connection-runtime";
 import { getLastServerClipboard } from "shared/transport/websocket";
 import { getCrxNetworkCoordinator } from "./Coordinator";
 import {

@@ -403,8 +403,12 @@ const importFromTSConfig = (tsconfig, __dirname) => {
                 replacement: `${resolve(__dirname, replBase)}/$1`,
             });
         } else {
+            // WHY: Vite string `find` is a prefix match. Exact tsconfig keys that
+            // point at a file (e.g. `@fest-lib/cwsp-shared` → `index.ts`) would
+            // otherwise turn `@fest-lib/cwsp-shared/v2/foo.ts` into
+            // `index.ts/v2/foo.ts` (ENOTDIR). Anchor exact keys with `$`.
             alias.push({
-                find: key,
+                find: new RegExp(`^${escapeRegExpPrefix(key)}$`),
                 replacement: resolve(__dirname, target),
             });
         }

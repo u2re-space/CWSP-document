@@ -28,7 +28,7 @@ import {
     getRemoteHost,
     isMaintainHubSocketConnectionEnabled,
     isPreferNativeWebsocketEnabled,
-} from "views/airpad/config/config";
+} from "cwsp-shared/remote-connection-runtime";
 import { installAirpadHubLifecycleRecovery } from "shared/transport/hub-socket-boot";
 import {
     connectWS,
