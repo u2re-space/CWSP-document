@@ -1,7 +1,7 @@
 /**
- * CrossWord Frontend Module
+ * CWSP-document Frontend Module
  *
- * Unified entry point for the CrossWord frontend application.
+ * Unified entry point for the CWSP-document frontend application.
  *
  * Subsystems:
  * - shells/  : Layout containers (immersive, base alias, window, tabbed, minimal, environment, content)
@@ -110,7 +110,7 @@ export {
 /**
  * Main Boot Module
  *
- * Provides the shell/style initialization system for CrossWord.
+ * Provides the shell/style initialization system for CWSP-document.
  *
  * Exports:
  * - BootLoader: Main boot system for styles → shell → view → channels

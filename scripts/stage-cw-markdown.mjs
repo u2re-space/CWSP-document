@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
  * Filename: stage-cw-markdown.mjs
- * FullPath: apps/CrossWord/scripts/stage-cw-markdown.mjs
+ * FullPath: apps/CWSP-document/scripts/stage-cw-markdown.mjs
  * Change date and time: 13.25.00_20.07.2026
  * Reason for changes: Flatten nested pwa/pwa/manifest.json so md.u2re.space ./pwa/manifest.json resolves.
  */
@@ -59,7 +59,7 @@ fs.writeFileSync(
     JSON.stringify(
         {
             syncedAt: new Date().toISOString(),
-            source: "apps/CrossWord/build/cw-markdown",
+            source: "apps/CWSP-document/build/cw-markdown",
             host: "md.u2re.space",
             debugPath: "/markdown"
         },

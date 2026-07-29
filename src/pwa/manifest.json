@@ -46,14 +46,14 @@
             "sizes": "1280x720",
             "type": "image/png",
             "form_factor": "wide",
-            "label": "CrossWord (desktop)"
+            "label": "CWSP-document (desktop)"
         },
         {
             "src": "screenshots/mobile.png",
             "sizes": "540x960",
             "type": "image/png",
             "form_factor": "narrow",
-            "label": "CrossWord (mobile)"
+            "label": "CWSP-document (mobile)"
         }
     ],
     "file_handlers": [

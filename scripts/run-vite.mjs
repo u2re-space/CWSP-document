@@ -15,7 +15,7 @@ import { createRequire } from "node:module";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const crosswordRoot = resolve(__dirname, "..");
 
-/** Walk up from CrossWord (and monorepo root) so hoisted workspace deps resolve. */
+/** Walk up from CWSP-document (and monorepo root) so hoisted workspace deps resolve. */
 const findVitePkgRoot = () => {
     let dir = crosswordRoot;
     for (let i = 0; i < 16; i += 1) {
@@ -30,7 +30,7 @@ const findVitePkgRoot = () => {
         return dirname(require.resolve("vite/package.json"));
     } catch {
         throw new Error(
-            "Cannot find module 'vite/package.json'. Install CrossWord deps only:\n"
+            "Cannot find module 'vite/package.json'. Install CWSP-document deps only:\n"
                 + "  cd ~/U2RE.space && PUPPETEER_SKIP_DOWNLOAD=1 npm install -w crossword --include=dev\n"
                 + "Or skip PWA for APK: CWS_SKIP_PWA=1 npm run build"
         );

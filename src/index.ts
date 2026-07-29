@@ -1,5 +1,5 @@
 /**
- * CrossWord Main Entry Point
+ * CWSP-document Main Entry Point
  *
  * Canonical URL mode:
  * - pathname always `/`
@@ -206,7 +206,7 @@ export default async function index(mountElement: HTMLElement) {
     await loadAsAdopted(viewMod.default);
 
     //
-    console.log('[Index] Starting CrossWord frontend loader');
+    console.log('[Index] Starting CWSP-document frontend loader');
 
     // Initialize uniform channel manager
     console.log('[Index] Initializing uniform channels...');
@@ -214,7 +214,7 @@ export default async function index(mountElement: HTMLElement) {
     /* Hub CWSP socket: gated by Settings → shell.maintainHubSocketConnection (default off).
      * {@link BootLoader} calls applyHubSocketFromSettings after loadSettings — avoid duplicate preload here. */
 
-    setLoadingState(mountElement, 'Initializing CrossWord...');
+    setLoadingState(mountElement, 'Initializing CWSP-document...');
 
     try {
         const {

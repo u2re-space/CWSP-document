@@ -158,10 +158,10 @@ export function manualChunks(id) {
     if (p.includes("/src/core/time/")) return "com-service";
 
     // `modules/projects/object.ts/src/core/*` also contains the substring `/src/core/` but is **fest/object**
-    // (reactivity). Never treat it as CrossWord `src/core/`.
+    // (reactivity). Never treat it as CWSP-document `src/core/`.
     //
     // **CRX MV3**: Do not assign most of `src/core/*` to `com-app`. The service worker imports `com/service.js`;
-    // if that chunk static-imports `com/app.js` (lure/customElements), registration fails. Default CrossWord
+    // if that chunk static-imports `com/app.js` (lure/customElements), registration fails. Default CWSP-document
     // `src/core/` → `com-service`; only files that statically depend on `fest/lure` (same TDZ island as lur.e)
     // stay in `com-app`.
     if (p.includes("/src/core/") && !p.includes("/object.ts/src/core/")) {

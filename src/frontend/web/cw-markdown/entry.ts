@@ -1,12 +1,12 @@
 /*
  * Filename: entry.ts
- * FullPath: apps/CrossWord/src/frontend/web/cw-markdown/entry.ts
+ * FullPath: apps/CWSP-document/src/frontend/web/cw-markdown/entry.ts
  * Change date and time: 22.20.00_19.07.2026
  * Reason for changes: VDS md.u2re.space / /markdown/ SPA — viewer + workcenter shell.
  */
 
 /**
- * CrossWord Markdown host entry (Fastify apps/cw-markdown).
+ * CWSP-document Markdown host entry (Fastify apps/cw-markdown).
  * INVARIANT: history base auto-detects `/markdown` on IP mounts; md.u2re.space stays `/`.
  */
 
@@ -30,13 +30,13 @@ if (!mount) {
         .then(async (mod) => {
             const run = mod?.default;
             if (typeof run !== "function") {
-                throw new Error("CrossWord default export is not a boot function");
+                throw new Error("CWSP-document default export is not a boot function");
             }
             await run(mount);
         })
         .catch((error: unknown) => {
             console.error("[cw-markdown] boot failed", error);
             mount.textContent =
-                error instanceof Error ? error.message : "Failed to start CrossWord Markdown";
+                error instanceof Error ? error.message : "Failed to start CWSP-document Markdown";
         });
 }
