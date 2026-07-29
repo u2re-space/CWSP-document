@@ -13,8 +13,6 @@ import { initializeLayers } from "shared/routing/layer-manager";
 import { pickEnabledView } from "shared/routing/views";
 import { loadAsAdopted } from "fest/dom";
 import { ensureAppLayers } from "shared/routing/app-layers";
-
-// Import PWA handlers
 import {
     ensureAppCss,
     initServiceWorker,
@@ -24,7 +22,13 @@ import {
     checkPendingShareData
 } from "core/pwa/sw-handling";
 
-// Import uniform channel manager
+// WHY: settings contributions key off `data-cwsp-surface` — document PWA must not look like Control/CRX.
+try {
+    document.documentElement.dataset.cwspSurface ||= "cw-document";
+} catch {
+    /* ignore */
+}
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
