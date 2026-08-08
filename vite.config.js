@@ -150,6 +150,8 @@ const createMarkdownSpaConfig = async (mode) => {
                     { src: resolve(__dirname, "./src/pwa/manifest.json"), dest: "pwa" },
                     { src: resolve(__dirname, "./src/pwa/icons/*"), dest: "pwa/icons" },
                     { src: resolve(__dirname, "./src/pwa/screenshots/*"), dest: "pwa/screenshots" },
+                    { src: resolve(__dirname, "./assets/wallpaper.jpg"), dest: "assets" },
+                    { src: resolve(__dirname, "./assets/stock.jpg"), dest: "assets" },
                 ],
             }),
             VitePWA({
@@ -165,7 +167,7 @@ const createMarkdownSpaConfig = async (mode) => {
                     rollupFormat: "iife",
                     injectionPoint: "self.__WB_MANIFEST",
                     maximumFileSizeToCacheInBytes: 1024 * 1024 * 16,
-                    globPatterns: ["**/*.{js,css,html,png,svg,json}"],
+                    globPatterns: ["**/*.{js,css,html,png,svg,json,jpg,jpeg,webp}"],
                     globIgnores: ["**/node_modules/**/*", "**/*.map", "**/stats.html", "**/report.html"],
                 },
                 manifest: false,

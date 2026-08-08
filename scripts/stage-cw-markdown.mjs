@@ -54,6 +54,14 @@ if (fs.existsSync(nestedManifest) && !fs.existsSync(flatManifest)) {
     console.log("[stage-cw-markdown] normalized pwa/pwa/manifest.json → pwa/manifest.json");
 }
 
+// WHY: `/assets/wallpaper.jpg` is the default shell wallpaper; Vite host SPA omits app assets/.
+const assetsDest = path.join(dest, "assets");
+fs.mkdirSync(assetsDest, { recursive: true });
+for (const name of ["wallpaper.jpg", "stock.jpg"]) {
+    const from = path.join(root, "assets", name);
+    if (fs.existsSync(from)) fs.cpSync(from, path.join(assetsDest, name));
+}
+
 fs.writeFileSync(
     path.join(dest, ".sync-meta.json"),
     JSON.stringify(
