@@ -179,7 +179,10 @@ const createMarkdownSpaConfig = async (mode) => {
                         "**/com/app.js",
                         "**/com/service.js",
                         "**/fest/*.js",
-                        "**/shells/boot-index.js"
+                        "**/shells/boot-index.js",
+                        "**/pwa/screenshots/pwa/**",
+                        "**/pwa/icons/pwa/**",
+                        "**/pwa/pwa/**"
                     ],
                 },
                 manifest: false,

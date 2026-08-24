@@ -702,6 +702,9 @@ if (manifest && !isViteDevServiceWorker) {
         // icon.ico is non-critical and intermittently 408s in some deploys;
         // keep SW install resilient by excluding it from hard precache.
         if (/\/pwa\/icons\/icon\.ico(?:$|\?)/i.test(url)) return false;
+        // WHY: viteStaticCopy + nested Vite root emits `pwa/screenshots/pwa/screenshots/wide.png`
+        // (404 after flatten). Precache 404 aborts SW install → stale viewer.
+        if (/pwa\/(?:screenshots\/pwa\/|icons\/pwa\/|pwa\/)/i.test(url)) return false;
         // WHY: hashed `index-*.js` hits network; precached `com/app.js` stays old → `export named 'In'`.
         if (isUnhashedSharedBarrel(url)) return false;
         return true;
