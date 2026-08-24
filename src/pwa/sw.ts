@@ -690,12 +690,21 @@ const isViteDevServiceWorker = import.meta.env.DEV;
 // @ts-ignore
 const manifest = self.__WB_MANIFEST;
 cleanupOutdatedCaches();
+/** Unhashed Vite barrels — export names (`In` = preload) change per build; filename does not. */
+const isUnhashedSharedBarrel = (url: string): boolean =>
+    /(?:^|\/)com\/(?:app|service)\.js(?:$|\?)/i.test(url) ||
+    /(?:^|\/)fest\/[\w.-]+\.js(?:$|\?)/i.test(url) ||
+    /(?:^|\/)shells\/boot-index\.js(?:$|\?)/i.test(url);
+
 if (manifest && !isViteDevServiceWorker) {
     const filteredManifest = manifest.filter((entry: any) => {
         const url = typeof entry === "string" ? entry : String(entry?.url || "");
         // icon.ico is non-critical and intermittently 408s in some deploys;
         // keep SW install resilient by excluding it from hard precache.
-        return !/\/pwa\/icons\/icon\.ico(?:$|\?)/i.test(url);
+        if (/\/pwa\/icons\/icon\.ico(?:$|\?)/i.test(url)) return false;
+        // WHY: hashed `index-*.js` hits network; precached `com/app.js` stays old → `export named 'In'`.
+        if (isUnhashedSharedBarrel(url)) return false;
+        return true;
     });
     precacheAndRoute(filteredManifest);
 }
@@ -1407,6 +1416,17 @@ if (isViteDevServiceWorker) {
         })
     );
 }
+
+// INVARIANT: never serve stale `com/app.js` from precache / assets-cache (named-export desync).
+registerRoute(
+    ({ url }) => isUnhashedSharedBarrel(String(url?.pathname || url?.href || "")),
+    new NetworkOnly({
+        fetchOptions: {
+            credentials: "same-origin",
+            cache: "no-store",
+        },
+    })
+);
 
 // Assets (JS/CSS) — skip in dev so requests are not handled by NetworkFirst + workbox cache before the default handler.
 registerRoute(

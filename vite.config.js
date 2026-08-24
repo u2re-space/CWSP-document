@@ -170,7 +170,17 @@ const createMarkdownSpaConfig = async (mode) => {
                     injectionPoint: "self.__WB_MANIFEST",
                     maximumFileSizeToCacheInBytes: 1024 * 1024 * 16,
                     globPatterns: ["**/*.{js,css,html,png,svg,json,jpg,jpeg,webp}"],
-                    globIgnores: ["**/node_modules/**/*", "**/*.map", "**/stats.html", "**/report.html"],
+                    globIgnores: [
+                        "**/node_modules/**/*",
+                        "**/*.map",
+                        "**/stats.html",
+                        "**/report.html",
+                        // WHY: unhashed barrels + hashed index desync (`export named 'In'`).
+                        "**/com/app.js",
+                        "**/com/service.js",
+                        "**/fest/*.js",
+                        "**/shells/boot-index.js"
+                    ],
                 },
                 manifest: false,
                 devOptions: { enabled: false },

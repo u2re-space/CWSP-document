@@ -19,6 +19,30 @@
             min-block-size: 100dvb; font-family: system-ui, sans-serif; background: #121418; color: #e8e8e8;
         }
     </style>
+    <script>
+        // WHY: SW precache of unhashed com/app.js + new hashed index → missing export `In`.
+        addEventListener("error", function (e) {
+            var msg = String((e && e.message) || "");
+            if (!/export named ['"]In['"]/.test(msg)) return;
+            if (sessionStorage.getItem("cw-md-in-export-bust")) return;
+            sessionStorage.setItem("cw-md-in-export-bust", "1");
+            var done = function () { location.reload(); };
+            var sw = navigator.serviceWorker;
+            var unreg = sw && sw.getRegistrations
+                ? sw.getRegistrations().then(function (regs) {
+                    return Promise.all(regs.map(function (r) { return r.unregister(); }));
+                })
+                : Promise.resolve();
+            var bust = self.caches
+                ? caches.keys().then(function (keys) {
+                    return Promise.all(keys.filter(function (k) {
+                        return /workbox|precache|assets-cache/i.test(k);
+                    }).map(function (k) { return caches.delete(k); }));
+                })
+                : Promise.resolve();
+            Promise.all([unreg, bust]).then(done).catch(done);
+        });
+    </script>
 </head>
 <body>
     <div id="app">Loading CWSP-document Markdown…</div>

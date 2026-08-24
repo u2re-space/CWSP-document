@@ -16,8 +16,12 @@ try {
     document.documentElement.dataset.cwspSurface = "cw-markdown";
     document.documentElement.dataset.cwspEnabledViews = ENABLED.join(",");
     // WHY: keep PWA ingress — this host ships sw.js from the markdown SPA build.
-    const m = String(location.pathname || "").match(/^(\/markdown)(?:\/|$)/i);
-    if (m) document.documentElement.dataset.cwspRouterBase = m[1].toLowerCase();
+    const host = String(location.hostname || "").toLowerCase();
+    const dedicated = host === "md.u2re.space" || host === "www.md.u2re.space";
+    if (!dedicated) {
+        const m = String(location.pathname || "").match(/^(\/(?:markdown|document|viewer))(?:\/|$)/i);
+        if (m) document.documentElement.dataset.cwspRouterBase = m[1].toLowerCase();
+    }
 } catch {
     /* ignore */
 }

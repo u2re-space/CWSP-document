@@ -54,6 +54,28 @@ if (fs.existsSync(nestedManifest) && !fs.existsSync(flatManifest)) {
     console.log("[stage-cw-markdown] normalized pwa/pwa/manifest.json → pwa/manifest.json");
 }
 
+const flattenNestedPwaDir = (kind) => {
+    const nested = path.join(dest, "pwa", kind, "pwa", kind);
+    const flat = path.join(dest, "pwa", kind);
+    if (!fs.existsSync(nested)) return;
+    fs.mkdirSync(flat, { recursive: true });
+    for (const name of fs.readdirSync(nested)) {
+        const from = path.join(nested, name);
+        const to = path.join(flat, name);
+        if (fs.existsSync(to)) fs.rmSync(to, { recursive: true, force: true });
+        fs.renameSync(from, to);
+    }
+    const leftover = path.join(dest, "pwa", kind, "pwa");
+    try {
+        fs.rmSync(leftover, { recursive: true, force: true });
+    } catch {
+        /* ignore */
+    }
+    console.log(`[stage-cw-markdown] flattened pwa/${kind}/pwa/${kind} → pwa/${kind}`);
+};
+flattenNestedPwaDir("icons");
+flattenNestedPwaDir("screenshots");
+
 // WHY: `/assets/wallpaper.jpg` is the default shell wallpaper; Vite host SPA omits app assets/.
 const assetsDest = path.join(dest, "assets");
 fs.mkdirSync(assetsDest, { recursive: true });
