@@ -2,9 +2,12 @@
  * Filename: vite.config.js
  * FullPath: apps/CWSP-document/vite.config.js
  * Change date and time: 08.40.00_29.07.2026
- * Reason for changes: Drop CRX mode — Chrome extension builds live only in apps/CWSP-crx.
+ * FIND:sku
+ * Change date and time: 14.45.00_24.08.2026
+ * Reason for changes: Document Capacitor is this package; process APK builds in CWSP-process.
  */
 
+import { existsSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { loadEnv } from "vite";
@@ -131,7 +134,6 @@ const createMarkdownSpaConfig = async (mode) => {
 
     return {
         ...baseConfig,
-        // WHY: root at HTML dir so emitted file is `index.html` (not nested src/.../index.html).
         root: platformRoot,
         base: "./",
         // Keep CrossWord cache + public resolve from the app package.
@@ -211,6 +213,106 @@ const createMarkdownSpaConfig = async (mode) => {
     };
 };
 
+const CAPACITOR_SKU_VIEWS = {
+    document: ["minimal", "viewer", "editor", "print", "settings"],
+    explorer: ["minimal", "explorer", "settings"]
+};
+
+const CAPACITOR_SKU_DEFAULT_VIEW = {
+    document: "viewer",
+    explorer: "explorer"
+};
+
+/**
+ * Capacitor SKU host — same alias graph as the document PWA, slim views per APK.
+ * Explorer output lives in CWSP-explorer; process APK is a separate package.
+ */
+export const createCapacitorSkuConfig = async (sku = "document") => {
+    if (sku === "process") {
+        throw new Error("[CWSP-document] Process SKU is apps/CWSP-process — do not emit it from document vite.");
+    }
+    const siblingName = sku === "explorer" ? "CWSP-explorer" : null;
+    const siblingLink = siblingName ? resolve(__dirname, `../${siblingName}`) : null;
+    const siblingRoot = siblingLink && existsSync(siblingLink) ? realpathSync(siblingLink) : siblingLink;
+    const platformRoot = siblingRoot
+        ? resolve(siblingRoot, "src/frontend/web/capacitor")
+        : resolve(__dirname, "./src/frontend/web/capacitor");
+    const outDir = siblingRoot
+        ? resolve(siblingRoot, "build/capacitor/web")
+        : resolve(__dirname, "./build/capacitor/web");
+    const enabledViews = CAPACITOR_SKU_VIEWS[sku] || CAPACITOR_SKU_VIEWS.document;
+
+    const isPwaPlugin = (plugin) => {
+        const name = plugin?.name;
+        return typeof name === "string" && (name === "vite-plugin-pwa" || name.startsWith("vite-plugin-pwa:"));
+    };
+    const isStaticCopyPlugin = (plugin) => {
+        const name = plugin?.name;
+        return typeof name === "string" && name.startsWith("vite-plugin-static-copy:");
+    };
+    const isMcpPlugin = (plugin) => {
+        const name = plugin?.name;
+        return typeof name === "string" && name.toLowerCase().includes("mcp");
+    };
+    const basePlugins =
+        (baseConfig?.plugins || [])
+            .flat?.(Infinity)
+            ?.filter?.(
+                (plugin) =>
+                    plugin?.name !== "vite:singlefile" &&
+                    !isPwaPlugin(plugin) &&
+                    !isStaticCopyPlugin(plugin) &&
+                    !isMcpPlugin(plugin)
+            ) ?? [];
+    const baseRollup = baseConfig?.build?.rollupOptions ?? {};
+    const baseOutput = Array.isArray(baseRollup.output) ? baseRollup.output[0] : (baseRollup.output ?? {});
+
+    return {
+        ...baseConfig,
+        root: platformRoot,
+        base: "./",
+        cacheDir: resolve(__dirname, `node_modules/.vite-capacitor-${sku}`),
+        define: {
+            ...(baseConfig?.define ?? {}),
+            ...toViewDefineEntries(enabledViews),
+            __RS_DEFAULT_VIEW__: JSON.stringify(CAPACITOR_SKU_DEFAULT_VIEW[sku] || "viewer"),
+            "import.meta.env.VITE_ENABLED_VIEWS": JSON.stringify(enabledViews.join(","))
+        },
+        plugins: basePlugins,
+        build: {
+            ...(baseConfig?.build ?? {}),
+            lib: false,
+            outDir,
+            emptyOutDir: true,
+            minify: false,
+            cssMinify: false,
+            modulePreload: true,
+            rollupOptions: {
+                ...baseRollup,
+                input: resolve(platformRoot, "index.html"),
+                output: {
+                    ...baseOutput,
+                    dir: outDir,
+                    entryFileNames: "assets/[name]-[hash].js",
+                    chunkFileNames: distChunkFileNames,
+                    assetFileNames: distAssetFileNames(NAME)
+                }
+            },
+            rolldownOptions: {
+                ...(baseConfig?.build?.rolldownOptions ?? {}),
+                input: resolve(platformRoot, "index.html"),
+                output: {
+                    ...baseOutput,
+                    dir: outDir,
+                    entryFileNames: "assets/[name]-[hash].js",
+                    chunkFileNames: distChunkFileNames,
+                    assetFileNames: distAssetFileNames(NAME)
+                }
+            }
+        }
+    };
+};
+
 export default async ({ mode } = {}) => {
     // WHY: CRX builds moved exclusively to apps/CWSP-crx — refuse leftover --mode crx.
     if (mode === "crx") {
@@ -220,6 +322,17 @@ export default async ({ mode } = {}) => {
     }
     if (mode === "markdown" || mode === "cw-markdown") {
         return createMarkdownSpaConfig(mode);
+    }
+    if (mode === "capacitor" || mode === "capacitor-document") {
+        return createCapacitorSkuConfig("document");
+    }
+    if (mode === "capacitor-explorer") {
+        return createCapacitorSkuConfig("explorer");
+    }
+    if (mode === "capacitor-process") {
+        throw new Error(
+            "[CWSP-document] Process APK builds live in apps/CWSP-process (npm run build:capacitor)."
+        );
     }
 
     const config = {

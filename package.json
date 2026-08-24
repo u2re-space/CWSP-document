@@ -25,7 +25,11 @@
         "test:dev": "npm run dev",
         "test:test": "echo 'No tests configured for cwsp-document' && exit 0",
         "test:explorer": "npx --yes tsx --test ./src/frontend/views/explorer/inject.test.ts",
-        "sync:cw-markdown": "node ./scripts/stage-cw-markdown.mjs"
+        "sync:cw-markdown": "node ./scripts/stage-cw-markdown.mjs",
+        "build:capacitor:web": "node ./scripts/run-vite.mjs build --config vite.config.js --mode capacitor",
+        "build:capacitor": "node ./scripts/build-capacitor.mjs",
+        "sync:capacitor:icons": "node ./scripts/sync-capacitor-android-icons.mjs",
+        "install:capacitor:apk": "node ../CWSP-shell/scripts/adb-install-apks.mjs"
     },
     "browserslist": [
         "last 1 chrome version",

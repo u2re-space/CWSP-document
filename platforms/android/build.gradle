@@ -1,0 +1,119 @@
+/*
+ * Filename: build.gradle
+ * FullPath: platforms/android/build.gradle
+ * FIND:sku
+ * Change date and time: 14.05.00_24.08.2026
+ * Reason for changes: document APK — applicationId space.u2re.document, shared cwsp Java.
+ */
+plugins {
+    id 'com.android.application' version '8.13.0'
+}
+
+apply from: 'variables.gradle'
+
+def cwspVersionPropsFile = file("${rootProject.projectDir}/version.properties")
+def cwspVersionProps = new Properties()
+if (cwspVersionPropsFile.exists()) {
+    cwspVersionPropsFile.withInputStream { cwspVersionProps.load(it) }
+}
+def cwspVersionCode = (cwspVersionProps.getProperty('VERSION_CODE') ?: '1').toInteger()
+def cwspVersionName = cwspVersionProps.getProperty('VERSION_NAME') ?: '0.0.1'
+
+def cwspIdentityPropsFile = file("${rootProject.projectDir}/cwsp-app-identity.properties")
+def cwspIdentityProps = new Properties()
+def cwspApkStem = 'cwsp-document'
+if (cwspIdentityPropsFile.exists()) {
+    cwspIdentityPropsFile.withInputStream { cwspIdentityProps.load(it) }
+    cwspApkStem = cwspIdentityProps.getProperty('APK_STEM', cwspApkStem)
+}
+
+android {
+    namespace 'space.u2re.cwsp'
+    compileSdk rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        applicationId "space.u2re.document"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode cwspVersionCode
+        versionName cwspVersionName
+        manifestPlaceholders = [cwspAllowCleartext: 'false']
+        buildConfigField "boolean", "CWSP_LAUNCHER_SKU", "false"
+        buildConfigField "String", "CWSP_SKU", "\"document\""
+        aaptOptions {
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!*.gz:!*.br'
+        }
+        buildConfigField "int", "CWSP_VERSION_CODE", "${cwspVersionCode}"
+        buildConfigField "String", "CWSP_VERSION_NAME", "\"${cwspVersionName}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['../../../CWSP-shell/src/java/space']
+            assets.srcDirs = ['src/main/assets']
+            res.srcDirs = ['res']
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+    flatDir {
+        dirs 'capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation "androidx.core:core:$androidxCoreVersion"
+    implementation project(':capacitor-android')
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+def cwspApkPublishRoot = file("${rootProject.projectDir}/../../build/capacitor/apk")
+
+tasks.register('copyCwspApks') {
+    group = 'distribution'
+    doLast {
+        def outputsApk = file("${project.buildDir}/outputs/apk")
+        if (!outputsApk.exists()) return
+        outputsApk.eachDir { typeDir ->
+            def buildType = typeDir.name
+            typeDir.eachFileMatch(~/.*\.apk/) { apk ->
+                def typedDir = new File(cwspApkPublishRoot, buildType)
+                typedDir.mkdirs()
+                ant.copy(file: apk, tofile: new File(typedDir, "${cwspApkStem}-${cwspVersionName}.apk"), overwrite: true)
+                cwspApkPublishRoot.mkdirs()
+                ant.copy(file: apk, tofile: new File(cwspApkPublishRoot, "${cwspApkStem}-${cwspVersionName}.apk"), overwrite: true)
+            }
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name ==~ /assemble(Debug|Release)/) {
+        task.finalizedBy('copyCwspApks')
+    }
+}

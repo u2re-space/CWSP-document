@@ -1,0 +1,18 @@
+{
+  "appId": "space.u2re.document",
+  "appName": "CWSP Document",
+  "webDir": "public",
+  "android": {
+    "path": "../../../../platforms/android"
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "DARK",
+      "insetsHandling": "disable"
+    }
+  },
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false
+  }
+}
