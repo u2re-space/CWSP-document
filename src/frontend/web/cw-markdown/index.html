@@ -13,10 +13,25 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <style>
-        html, body { margin: 0; padding: 0; inline-size: 100%; block-size: 100%; overflow: hidden; }
-        #app {
-            display: grid; place-items: center; inline-size: 100%; block-size: 100%;
-            min-block-size: 100dvb; font-family: system-ui, sans-serif; background: #121418; color: #e8e8e8;
+        @media screen {
+            html, body { margin: 0; padding: 0; inline-size: 100%; block-size: 100%; overflow: hidden; }
+            #app {
+                display: grid; place-items: center; inline-size: 100%; block-size: 100%;
+                min-block-size: 100dvb; font-family: system-ui, sans-serif; background: #121418; color: #e8e8e8;
+            }
+        }
+        @media print {
+            html, body, #app {
+                overflow: visible !important;
+                contain: none !important;
+                position: static !important;
+                display: block !important;
+                inline-size: 100% !important;
+                block-size: auto !important;
+                min-block-size: 0 !important;
+                max-block-size: none !important;
+                height: auto !important;
+            }
         }
     </style>
     <script>

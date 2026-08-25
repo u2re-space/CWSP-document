@@ -332,13 +332,14 @@
 
             @media print {
                 :where(body) {
-                    min-block-size: max(100%, 100cqb) !important;
-                    block-size: max-content !important;
+                    min-block-size: 0 !important;
+                    block-size: auto !important;
                     min-inline-size: stretch !important;
                     inline-size: 100dvi !important;
                     max-inline-size: 100dvi !important;
                     max-block-size: none !important;
                     overflow: visible !important;
+                    contain: none !important;
                 }
 
                 :where(body, html) {
@@ -354,10 +355,11 @@
                     scrollbar-color: transparent transparent;
                     -webkit-overflow-scrolling: touch;
                     font-family: var(--print-font-family);
-                    min-block-size: max(100%, 100cqb) !important;
+                    min-block-size: 0 !important;
                     max-block-size: none !important;
-                    block-size: max-content !important;
+                    block-size: auto !important;
                     overflow: visible !important;
+                    contain: none !important;
 
                     min-inline-size: stretch !important;
                     inline-size: 100dvi !important;
@@ -368,10 +370,11 @@
                 :where(body, html, :root)>*:not([hidden], [aria-hidden="true"], [data-hidden]):not(markdown-viewer, #markdown-body, .view-markdown, #app, .app-shell, .app-shell__content, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, [data-viewer-content], [data-render-target], .markdown-body, .markdown-viewer-content, .result-content),
                 :where(body, html, :root) :where(#app, #raw-md),
                 :where(body, html, :root) :where(div, span, button, input, header, main, footer):not([hidden], [aria-hidden="true"], [data-hidden]):not(markdown-viewer, #markdown-body, .view-markdown, #app, .app-shell, .app-shell__content, .cw-view-viewer-shell, .cw-view-viewer__prose, [data-cw-viewer-prose], .view-viewer, .view-viewer__content, [data-viewer-content], [data-render-target], .markdown-body, .markdown-viewer-content, .result-content) {
-                    page-break-after: avoid !important;
-                    page-break-before: avoid !important;
-                    break-after: avoid !important;
-                    break-before: avoid !important;
+                    page-break-after: auto !important;
+                    page-break-before: auto !important;
+                    break-after: auto !important;
+                    break-before: auto !important;
+                    break-inside: auto !important;
                 }
 
                 .cw-view-viewer-shell,
@@ -381,10 +384,11 @@
                 .view-viewer__content,
                 [data-viewer-content] {
                     display: contents !important;
-                    page-break-after: avoid !important;
-                    page-break-before: avoid !important;
-                    break-after: avoid !important;
-                    break-before: avoid !important;
+                    page-break-after: auto !important;
+                    page-break-before: auto !important;
+                    break-after: auto !important;
+                    break-before: auto !important;
+                    break-inside: auto !important;
                 }
 
                 body,
@@ -394,14 +398,14 @@
                     color: initial;
                     padding: 0px !important;
                     margin: 0px !important;
-                    overflow-x: hidden !important;
-                    overflow-y: visible !important;
-                    container-type: inline-size !important;
+                    overflow: visible !important;
+                    contain: none !important;
+                    container-type: normal !important;
                     border: 0px none transparent !important;
                     outline: 0px none transparent !important;
                     max-block-size: none !important;
-                    min-block-size: max(100%, 100cqb) !important;
-                    block-size: max-content !important;
+                    min-block-size: 0 !important;
+                    block-size: auto !important;
                 }
 
                 :where(*) {
@@ -500,10 +504,11 @@
                     scrollbar-width: none !important;
                     scrollbar-color: transparent transparent !important;
                     -webkit-overflow-scrolling: touch !important;
-                    page-break-after: avoid !important;
-                    page-break-before: avoid !important;
-                    break-after: avoid !important;
-                    break-before: avoid !important;
+                    page-break-after: auto !important;
+                    page-break-before: auto !important;
+                    break-after: auto !important;
+                    break-before: auto !important;
+                    break-inside: auto !important;
                     contain: none !important;
                     container-type: normal !important;
                     content-visibility: visible !important;
@@ -513,10 +518,9 @@
                     user-select: auto !important;
                     touch-action: auto !important;
                     cursor: auto !important;
-                    opacity: 1 !important;
                     max-block-size: none !important;
-                    min-block-size: max(100%, 100cqb) !important;
-                    block-size: max-content !important;
+                    min-block-size: 0 !important;
+                    block-size: auto !important;
                 }
             }
         }
