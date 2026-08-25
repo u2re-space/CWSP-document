@@ -29,8 +29,8 @@ const baseConfig = await importConfig(
 );
 
 const ALL_VIEW_IDS = ["viewer", "editor", "workcenter", "explorer", "settings", "history", "home", "print", "airpad", "network"];
-/** Document PWA: no Network / AirPad (those belong to CWSP-transfer / Control). */
-const DOCUMENT_VIEWS = ["viewer", "workcenter", "editor", "explorer", "settings", "history", "home", "print"];
+/** Document PWA: print/read/edit only. Explorer + Work Center live on sibling hosts. */
+const DOCUMENT_VIEWS = ["viewer", "editor", "print", "settings", "history"];
 const DEFAULT_VIEWS_BY_MODE = {
     // VDS md.u2re.space / /markdown/ — markdown workspace (viewer + workcenter tools).
     markdown: DOCUMENT_VIEWS,
