@@ -228,7 +228,7 @@ const createMarkdownSpaConfig = async (mode) => {
 
 const CAPACITOR_SKU_VIEWS = {
     document: ["minimal", "viewer", "editor", "print", "settings"],
-    explorer: ["minimal", "explorer", "settings"]
+    explorer: ["minimal", "explorer", "settings", "history"]
 };
 
 const CAPACITOR_SKU_DEFAULT_VIEW = {

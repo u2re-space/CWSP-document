@@ -302,7 +302,7 @@
                 "../../modules/views/history-view/src"
             ],
             "views/explorer": [
-                "../../modules/views/explorer-view/src"
+                "../CWSP-explorer/src"
             ],
             "views/network": [
                 "../../modules/views/network-view/src"
@@ -326,7 +326,7 @@
                 "../../modules/views/history-view/src/*"
             ],
             "views/explorer/*": [
-                "../../modules/views/explorer-view/src/*"
+                "../CWSP-explorer/src/*"
             ],
             "views/network/*": [
                 "../../modules/views/network-view/src/*"

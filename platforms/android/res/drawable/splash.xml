@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Filename: splash.xml
+  FullPath: apps/CWSP-reborn/app/android/res/drawable/splash.xml
+  Change date and time: 22.55.00_22.08.2026
+  Reason for changes: Replace default Capacitor white+logo splash (was leaking as a top stripe).
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/colorPrimary" />
+</shape>
