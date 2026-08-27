@@ -5,8 +5,9 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=overlays-content" />
     <title>CWSP-document Markdown</title>
-    <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiBmaWxsPSIjMDA3YWNjIj4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjY0IiBmaWxsPSIjMDA3YWNjIi8+CiAgPHRleHQgeD0iMjU2IiB5PSIyODAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMDAiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Q1c8L3RleHQ+Cjwvc3ZnPg==" />
+    <link rel="icon" type="image/svg+xml" href="./pwa/icons/icon.svg" />
+    <link rel="icon" type="image/png" sizes="512x512" href="./pwa/icons/icon.png" />
+    <link rel="apple-touch-icon" href="./pwa/icons/apple-touch-icon.png" />
     <!-- WHY: relative so /markdown/ and md.u2re.space both resolve under Vite base "./". -->
     <link rel="manifest" href="./pwa/manifest.json" />
     <meta name="theme-color" content="#007acc" data-theme-color />
@@ -35,28 +36,37 @@
         }
     </style>
     <script>
-        // WHY: SW precache of unhashed com/app.js + new hashed index → missing export `In`.
-        addEventListener("error", function (e) {
-            var msg = String((e && e.message) || "");
-            if (!/export named ['"]In['"]/.test(msg)) return;
-            if (sessionStorage.getItem("cw-md-in-export-bust")) return;
-            sessionStorage.setItem("cw-md-in-export-bust", "1");
-            var done = function () { location.reload(); };
-            var sw = navigator.serviceWorker;
-            var unreg = sw && sw.getRegistrations
-                ? sw.getRegistrations().then(function (regs) {
-                    return Promise.all(regs.map(function (r) { return r.unregister(); }));
-                })
-                : Promise.resolve();
-            var bust = self.caches
-                ? caches.keys().then(function (keys) {
-                    return Promise.all(keys.filter(function (k) {
-                        return /workbox|precache|assets-cache/i.test(k);
-                    }).map(function (k) { return caches.delete(k); }));
-                })
-                : Promise.resolve();
-            Promise.all([unreg, bust]).then(done).catch(done);
-        });
+        // WHY: stale unhashed com/app.js binds `__vitePreload` (was `In`) to the wrong export.
+        (function () {
+            var KEY = "cw-md-preload-bust";
+            function stale(msg) {
+                return /export named ['"]In['"]|__vitePreload|catch is not a function/i.test(String(msg || ""));
+            }
+            function bust() {
+                if (sessionStorage.getItem(KEY)) return;
+                sessionStorage.setItem(KEY, "1");
+                var done = function () { location.reload(); };
+                var sw = navigator.serviceWorker;
+                var unreg = sw && sw.getRegistrations
+                    ? sw.getRegistrations().then(function (regs) {
+                        return Promise.all(regs.map(function (r) { return r.unregister(); }));
+                    })
+                    : Promise.resolve();
+                var clear = self.caches
+                    ? caches.keys().then(function (keys) {
+                        return Promise.all(keys.filter(function (k) {
+                            return /workbox|precache|assets-cache/i.test(k);
+                        }).map(function (k) { return caches.delete(k); }));
+                    })
+                    : Promise.resolve();
+                Promise.all([unreg, clear]).then(done).catch(done);
+            }
+            addEventListener("error", function (e) { if (stale(e && e.message)) bust(); });
+            addEventListener("unhandledrejection", function (e) {
+                var r = e && e.reason;
+                if (stale(r && r.message ? r.message : r)) bust();
+            });
+        })();
     </script>
 </head>
 <body>

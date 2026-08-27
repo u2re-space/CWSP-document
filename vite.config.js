@@ -12,7 +12,7 @@ import { dirname, resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { loadEnv } from "vite";
 
-import { assetFileNames as distAssetFileNames, chunkFileNames as distChunkFileNames } from "./shared/vite-chunk-placement.mjs";
+import { assetFileNames as distAssetFileNames, chunkFileNames as distChunkFileNames, rewriteVitePreloadPlugin } from "./shared/vite-chunk-placement.mjs";
 
 const importConfig = (url, ...args) => {
     return import(url)?.then?.((m) => m?.default?.(...args));
@@ -147,6 +147,7 @@ const createMarkdownSpaConfig = async (mode) => {
         },
         plugins: [
             ...basePlugins,
+            rewriteVitePreloadPlugin(),
             viteStaticCopy({
                 targets: [
                     { src: resolve(__dirname, "./src/pwa/manifest.json"), dest: "pwa" },
@@ -337,7 +338,7 @@ export const createCapacitorSkuConfig = async (sku = "document") => {
             __RS_DEFAULT_VIEW__: JSON.stringify(CAPACITOR_SKU_DEFAULT_VIEW[sku] || "viewer"),
             "import.meta.env.VITE_ENABLED_VIEWS": JSON.stringify(enabledViews.join(","))
         },
-        plugins: [...basePlugins, alignCapacitorHtmlPlugin(htmlFile, platformRoot)],
+        plugins: [...basePlugins, rewriteVitePreloadPlugin(), alignCapacitorHtmlPlugin(htmlFile, platformRoot)],
         resolve: {
             ...(baseConfig?.resolve ?? {}),
             alias: [

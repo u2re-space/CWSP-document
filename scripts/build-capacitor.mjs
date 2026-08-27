@@ -2,8 +2,9 @@
  * Filename: build-capacitor.mjs
  * FullPath: apps/CWSP-document/scripts/build-capacitor.mjs
  * FIND:sku
- * Change date and time: 15.40.00_27.08.2026
- * Reason for changes: Bump platforms/android/version.properties on each APK build.
+ * TAG:apk-update
+ * Change date and time: 19.10.00_27.08.2026
+ * Reason for changes: Stage latest-document.json after assemble so Check sees the new versionCode.
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -37,6 +38,10 @@ function resolveJavaHome() {
 run(process.execPath, [path.join(SHELL_SCRIPTS, "project-sibling-sku-android.mjs"), "document"]);
 const noBump =
     process.argv.includes("--no-bump") || String(process.env.CWSP_CAPACITOR_NO_BUMP || "").trim() === "1";
+const noPublish =
+    process.argv.includes("--no-publish") || String(process.env.CWSP_CAPACITOR_NO_PUBLISH || "").trim() === "1";
+const publishRemote =
+    process.argv.includes("--remote") || String(process.env.CWSP_CAPACITOR_PUBLISH_REMOTE || "").trim() === "1";
 if (noBump) {
     console.log("[build:capacitor] --no-bump — keeping platforms/android/version.properties");
 } else {
@@ -53,4 +58,11 @@ const env = {
 };
 if (javaHome) env.JAVA_HOME = javaHome;
 run("./gradlew", ["--no-daemon", "assembleDebug", "copyCwspApks"], ANDROID_ROOT, env);
+if (noPublish) {
+    console.log("[build:capacitor] --no-publish — skip staging latest-document.json");
+} else {
+    const pub = [path.join(SHELL_SCRIPTS, "publish-sibling-apk.mjs"), "document"];
+    if (publishRemote) pub.push("--remote");
+    run(process.execPath, pub);
+}
 console.log("[build:capacitor] document APK ready under build/capacitor/apk");

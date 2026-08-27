@@ -9,6 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { rewriteVitePreloadBinding } from "../shared/vite-chunk-placement.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const repoRoot = path.dirname(path.dirname(root));
@@ -34,6 +35,11 @@ if (fs.existsSync(dest)) {
 
 for (const name of fs.readdirSync(src)) {
     fs.cpSync(path.join(src, name), path.join(dest, name), { recursive: true });
+}
+
+{
+    const n = rewriteVitePreloadBinding(dest);
+    if (n) console.log(`[stage-cw-markdown] rewrote ${n} vite-preload binding(s)`);
 }
 
 // COMPAT: viteStaticCopy + chunk placement can nest manifest under pwa/pwa/.
@@ -75,6 +81,20 @@ const flattenNestedPwaDir = (kind) => {
 };
 flattenNestedPwaDir("icons");
 flattenNestedPwaDir("screenshots");
+
+// WHY: browsers request /favicon.svg|/favicon.png|/favicon.ico at host root.
+{
+    const icons = path.join(dest, "pwa", "icons");
+    const copyFav = (fromName, toName) => {
+        const from = path.join(icons, fromName);
+        if (!fs.existsSync(from)) return;
+        fs.cpSync(from, path.join(dest, toName));
+    };
+    copyFav("icon.svg", "favicon.svg");
+    copyFav("icon.png", "favicon.png");
+    copyFav("favicon.ico", "favicon.ico");
+    if (!fs.existsSync(path.join(dest, "favicon.ico"))) copyFav("icon.ico", "favicon.ico");
+}
 
 // WHY: `/assets/wallpaper.jpg` is the default shell wallpaper; Vite host SPA omits app assets/.
 const assetsDest = path.join(dest, "assets");

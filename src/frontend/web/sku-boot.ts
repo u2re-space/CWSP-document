@@ -6,7 +6,7 @@
  * Reason: One document SKU stamp for PWA, Capacitor, and CRX (viewer + editor).
  */
 
-import { applyCwspSku, stashSkuHandoff } from "com/config/ecosystem-skus";
+import { applyCwspSku } from "com/config/ecosystem-skus";
 
 export type DocumentHostKind = "capacitor" | "web" | "crx";
 
@@ -59,37 +59,12 @@ export const showDocumentBootFailure = (error: unknown, mount: HTMLElement = doc
     mount.textContent = `[CWSP-document] boot failed\n\n${message}`;
 };
 
-const looksLikeMarkdown = (name: string, text: string): boolean => {
-    if (/\.(?:md|markdown|mdown|mkd|mkdn|mdtxt|mdtext|txt)$/i.test(name)) return true;
-    const sample = String(text || "").slice(0, 400);
-    return /^#\s|^\s{0,3}[-*]\s|^\s{0,3}\d+\.\s|```/.test(sample);
-};
-
 /**
- * WHY: Capacitor share / PROCESS_TEXT should land in the viewer on this SKU,
- * not only fan out to the clipboard bus.
+ * WHY: Capacitor `cws:shareIntent` is ingested by `installCapacitorShareIntentBridge`
+ * (viewer for image / document / text / files). This stamp-only hook stays for callers.
  */
 export const installDocumentShareIngress = (): void => {
-    const g = globalThis as { __CWSP_DOC_SHARE__?: boolean };
-    if (g.__CWSP_DOC_SHARE__) return;
-    g.__CWSP_DOC_SHARE__ = true;
-    window.addEventListener("cws:shareIntent", (ev: Event) => {
-        const detail = (ev as CustomEvent<{ text?: string; asset?: { name?: string; data?: string } } | string>)
-            .detail;
-        let text = "";
-        let filename = "shared.md";
-        if (typeof detail === "string") text = detail;
-        else if (detail && typeof detail === "object") {
-            text = String(detail.text || detail.asset?.data || "");
-            filename = String(detail.asset?.name || filename);
-        }
-        text = text.trim();
-        if (!text || !looksLikeMarkdown(filename, text)) return;
-        stashSkuHandoff({ dest: "viewer", content: text, filename });
-        window.dispatchEvent(
-            new CustomEvent("cwsp:document-open", { detail: { content: text, filename } })
-        );
-    });
+    /* share pipeline lives in capacitor-share-intent + initIngressPWA */
 };
 
 export const bootDocumentSku = async (

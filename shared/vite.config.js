@@ -7,6 +7,7 @@ import {
     manualChunks as distManualChunks,
     relocateWorkerBundleAssetsPlugin,
     rolldownCodeSplittingGroups,
+    rewriteVitePreloadPlugin,
 } from "./vite-chunk-placement.mjs";
 
 //
@@ -470,7 +471,7 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             /* Dev server: ensure this id always resolves (tsconfig path is relative to app root; some setups mis-resolve). */
             { find: "@fest-lib/veela/runtime", replacement: veelaVariantRuntimeTs },
             /* WHY: barrel @fest-lib/lure re-export collided on pickMarkdownFile (Rolldown). */
-            { find: /^@fest-lib\/lure\/markdown-assets$/, replacement: resolve(workspaceRoot, "modules/projects/lur.e/src/utils/opfs/markdown-assets.ts") },
+            { find: /^@fest-lib\/lure\/markdown-assets$/, replacement: resolve(__dirname, "../../modules/projects/lur.e/src/utils/opfs/markdown-assets.ts") },
             /* Rolldown: bare tsconfig alias loses `?inline` imports on this key (viewer-view Markdown typography). */
             { find: /^markdown-view-typography(.*)$/, replacement: `${markdownTypographyScss}$1` },
             ...importFromTSConfig(tsconfig, __dirname),
@@ -531,6 +532,7 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
         // SPA fallback for PWA routes (share-target, etc.)
         spaFallbackPlugin(),
         relocateWorkerBundleAssetsPlugin(),
+        rewriteVitePreloadPlugin(),
         /*jspmPlugin({
             downloadDeps: true,
             inputMap: true
