@@ -79,6 +79,9 @@
             "@fest-lib/lure": [
                 "../../modules/projects/lur.e/src/index.ts"
             ],
+            "@fest-lib/lure/markdown-assets": [
+                "../../modules/projects/lur.e/src/utils/opfs/markdown-assets.ts"
+            ],
             "@fest-lib/object": [
                 "../../modules/projects/object.ts/src/index.ts"
             ],

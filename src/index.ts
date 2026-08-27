@@ -23,8 +23,12 @@ import {
 } from "core/pwa/sw-handling";
 
 // WHY: settings contributions key off `data-cwsp-surface` — document PWA must not look like Control/CRX.
+import { applyCwspSku } from "com/config/ecosystem-skus";
+
 try {
+    applyCwspSku("document");
     document.documentElement.dataset.cwspSurface ||= "cw-document";
+    document.documentElement.dataset.cwspDefaultView ||= "viewer";
 } catch {
     /* ignore */
 }

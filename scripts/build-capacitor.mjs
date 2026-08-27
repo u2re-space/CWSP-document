@@ -2,8 +2,8 @@
  * Filename: build-capacitor.mjs
  * FullPath: apps/CWSP-document/scripts/build-capacitor.mjs
  * FIND:sku
- * Change date and time: 14.08.00_24.08.2026
- * Reason for changes: Assemble document APK from projected launcher Gradle + books web bundle.
+ * Change date and time: 15.40.00_27.08.2026
+ * Reason for changes: Bump platforms/android/version.properties on each APK build.
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -35,6 +35,13 @@ function resolveJavaHome() {
 }
 
 run(process.execPath, [path.join(SHELL_SCRIPTS, "project-sibling-sku-android.mjs"), "document"]);
+const noBump =
+    process.argv.includes("--no-bump") || String(process.env.CWSP_CAPACITOR_NO_BUMP || "").trim() === "1";
+if (noBump) {
+    console.log("[build:capacitor] --no-bump — keeping platforms/android/version.properties");
+} else {
+    run(process.execPath, [path.join(SHELL_SCRIPTS, "bump-capacitor-version.mjs"), "--app", APP_ROOT]);
+}
 run(process.execPath, [path.join(APP_ROOT, "scripts/sync-capacitor-android-icons.mjs")]);
 run(process.execPath, [path.join(APP_ROOT, "scripts/run-vite.mjs"), "build", "--config", "vite.config.js", "--mode", "capacitor"]);
 run(process.execPath, [path.join(SHELL_SCRIPTS, "sync-sibling-sku-web.mjs"), "document"]);

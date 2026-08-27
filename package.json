@@ -29,7 +29,9 @@
         "build:capacitor:web": "node ./scripts/run-vite.mjs build --config vite.config.js --mode capacitor",
         "build:capacitor": "node ./scripts/build-capacitor.mjs",
         "sync:capacitor:icons": "node ./scripts/sync-capacitor-android-icons.mjs",
-        "install:capacitor:apk": "node ../CWSP-shell/scripts/adb-install-apks.mjs"
+        "install:capacitor:apk": "node ../CWSP-shell/scripts/adb-install-apks.mjs",
+        "publish:apk": "node ../CWSP-shell/scripts/publish-sibling-apk.mjs document",
+        "publish:apk:200": "node ../CWSP-shell/scripts/publish-sibling-apk.mjs document --remote"
     },
     "browserslist": [
         "last 1 chrome version",

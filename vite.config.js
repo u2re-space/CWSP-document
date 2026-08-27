@@ -3,12 +3,12 @@
  * FullPath: apps/CWSP-document/vite.config.js
  * Change date and time: 08.40.00_29.07.2026
  * FIND:sku
- * Change date and time: 14.45.00_24.08.2026
- * Reason for changes: Document Capacitor is this package; process APK builds in CWSP-process.
+ * Change date and time: 15.20.00_27.08.2026
+ * Reason for changes: Explorer Capacitor HTML must emit as index.html (Rolldown rejects ../web/capacitor).
  */
 
 import { existsSync, realpathSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { loadEnv } from "vite";
 
@@ -227,7 +227,7 @@ const createMarkdownSpaConfig = async (mode) => {
 };
 
 const CAPACITOR_SKU_VIEWS = {
-    document: ["minimal", "viewer", "editor", "print", "settings"],
+    document: ["minimal", "viewer", "editor", "print", "settings", "history"],
     explorer: ["minimal", "explorer", "settings", "history"]
 };
 
@@ -240,19 +240,65 @@ const CAPACITOR_SKU_DEFAULT_VIEW = {
  * Capacitor SKU host — same alias graph as the document PWA, slim views per APK.
  * Explorer output lives in CWSP-explorer; process APK is a separate package.
  */
+/** Physical Capacitor HTML — never `src/frontend/web/capacitor` (explorer symlink). */
+const resolveCapacitorHtml = (appRoot) => {
+    const candidates = [
+        resolve(appRoot, "src/frontend/capacitor/index.html"),
+        resolve(appRoot, "src/frontend/web/capacitor/index.html")
+    ];
+    for (const file of candidates) {
+        if (!existsSync(file)) continue;
+        const htmlFile = realpathSync(file);
+        return { htmlFile, platformRoot: dirname(htmlFile) };
+    }
+    const fallback = resolve(appRoot, "src/frontend/web/capacitor/index.html");
+    return { htmlFile: fallback, platformRoot: dirname(fallback) };
+};
+
+/**
+ * Vite realpaths `config.root` but may keep the HTML module id on a symlink.
+ * Then `path.relative(root, id)` is `../web/capacitor/index.html` and Rolldown throws.
+ */
+const alignCapacitorHtmlPlugin = (htmlFile, platformRoot) => ({
+    name: "cwsp-align-capacitor-html",
+    enforce: "pre",
+    config() {
+        return { root: platformRoot };
+    },
+    configResolved(config) {
+        config.build.rollupOptions.input = htmlFile;
+        if (config.build.rolldownOptions) config.build.rolldownOptions.input = htmlFile;
+        for (const env of Object.values(config.environments || {})) {
+            if (env?.build?.rollupOptions) env.build.rollupOptions.input = htmlFile;
+        }
+    },
+    resolveId(id) {
+        const clean = String(id || "")
+            .split("\0")
+            .pop()
+            .split("?")[0];
+        if (!clean.endsWith(".html")) return null;
+        try {
+            const abs = clean.startsWith("/") ? clean : resolve(platformRoot, clean);
+            if (existsSync(abs) && realpathSync(abs) === htmlFile) return htmlFile;
+        } catch {
+            /* ignore */
+        }
+        return null;
+    }
+});
+
 export const createCapacitorSkuConfig = async (sku = "document") => {
     if (sku === "process") {
         throw new Error("[CWSP-document] Process SKU is apps/CWSP-process — do not emit it from document vite.");
     }
+    const workspaceRoot = resolve(__dirname, "../..");
     const siblingName = sku === "explorer" ? "CWSP-explorer" : null;
     const siblingLink = siblingName ? resolve(__dirname, `../${siblingName}`) : null;
     const siblingRoot = siblingLink && existsSync(siblingLink) ? realpathSync(siblingLink) : siblingLink;
-    const platformRoot = siblingRoot
-        ? resolve(siblingRoot, "src/frontend/web/capacitor")
-        : resolve(__dirname, "./src/frontend/web/capacitor");
-    const outDir = siblingRoot
-        ? resolve(siblingRoot, "build/capacitor/web")
-        : resolve(__dirname, "./build/capacitor/web");
+    const appRoot = siblingRoot || __dirname;
+    const { htmlFile, platformRoot } = resolveCapacitorHtml(appRoot);
+    const outDir = resolve(appRoot, "build/capacitor/web");
     const enabledViews = CAPACITOR_SKU_VIEWS[sku] || CAPACITOR_SKU_VIEWS.document;
 
     const isPwaPlugin = (plugin) => {
@@ -291,7 +337,17 @@ export const createCapacitorSkuConfig = async (sku = "document") => {
             __RS_DEFAULT_VIEW__: JSON.stringify(CAPACITOR_SKU_DEFAULT_VIEW[sku] || "viewer"),
             "import.meta.env.VITE_ENABLED_VIEWS": JSON.stringify(enabledViews.join(","))
         },
-        plugins: basePlugins,
+        plugins: [...basePlugins, alignCapacitorHtmlPlugin(htmlFile, platformRoot)],
+        resolve: {
+            ...(baseConfig?.resolve ?? {}),
+            alias: [
+                ...(Array.isArray(baseConfig?.resolve?.alias) ? baseConfig.resolve.alias : []),
+                {
+                    find: /^@fest-lib\/lure\/markdown-assets$/,
+                    replacement: resolve(workspaceRoot, "modules/projects/lur.e/src/utils/opfs/markdown-assets.ts")
+                }
+            ]
+        },
         build: {
             ...(baseConfig?.build ?? {}),
             lib: false,
@@ -302,7 +358,7 @@ export const createCapacitorSkuConfig = async (sku = "document") => {
             modulePreload: true,
             rollupOptions: {
                 ...baseRollup,
-                input: resolve(platformRoot, "index.html"),
+                input: htmlFile,
                 output: {
                     ...baseOutput,
                     dir: outDir,
@@ -313,7 +369,7 @@ export const createCapacitorSkuConfig = async (sku = "document") => {
             },
             rolldownOptions: {
                 ...(baseConfig?.build?.rolldownOptions ?? {}),
-                input: resolve(platformRoot, "index.html"),
+                input: htmlFile,
                 output: {
                     ...baseOutput,
                     dir: outDir,

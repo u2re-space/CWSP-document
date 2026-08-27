@@ -10,18 +10,10 @@
  * INVARIANT: history base auto-detects `/markdown` on IP mounts; md.u2re.space stays `/`.
  */
 
-const ENABLED = ["viewer", "explorer", "workcenter", "editor", "settings", "history", "home", "print"] as const;
+import { stampDocumentSku } from "../sku-boot";
 
 try {
-    document.documentElement.dataset.cwspSurface = "cw-markdown";
-    document.documentElement.dataset.cwspEnabledViews = ENABLED.join(",");
-    // WHY: keep PWA ingress — this host ships sw.js from the markdown SPA build.
-    const host = String(location.hostname || "").toLowerCase();
-    const dedicated = host === "md.u2re.space" || host === "www.md.u2re.space";
-    if (!dedicated) {
-        const m = String(location.pathname || "").match(/^(\/(?:markdown|document|viewer))(?:\/|$)/i);
-        if (m) document.documentElement.dataset.cwspRouterBase = m[1].toLowerCase();
-    }
+    stampDocumentSku("web");
 } catch {
     /* ignore */
 }
