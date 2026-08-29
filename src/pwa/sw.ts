@@ -444,6 +444,19 @@ const toCacheRequestInfo = (requestLike: RequestInfo | URL | null | undefined): 
     return requestLike instanceof URL ? requestLike.toString() : requestLike;
 };
 
+/** Cache#match only accepts http(s) GET keys — blob:/data:/POST throw TypeError. */
+const isCacheApiKey = (request: RequestInfo): boolean => {
+    if (request instanceof Request && request.method !== "GET") return false;
+    const raw = typeof request === "string" ? request : request instanceof Request ? request.url : "";
+    if (!raw) return false;
+    try {
+        const url = new URL(raw, self.location.origin);
+        return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+        return false;
+    }
+};
+
 const safeCacheMatch = async (
     cache: Cache | null | undefined,
     requestLike: RequestInfo | URL | null | undefined
@@ -457,7 +470,7 @@ const safeCacheMatch = async (
             : request instanceof Request
               ? request
               : undefined;
-    if (!key) return undefined;
+    if (!key || !isCacheApiKey(key)) return undefined;
     try {
         return await cache?.match?.(key);
     } catch (error) {
@@ -468,7 +481,7 @@ const safeCacheMatch = async (
 
 const safeCachesMatch = async (requestLike: RequestInfo | URL | null | undefined): Promise<Response | undefined> => {
     const request = toCacheRequestInfo(requestLike);
-    if (!request) return undefined;
+    if (!request || !isCacheApiKey(request)) return undefined;
     try {
         return await caches?.match?.(request);
     } catch (error) {
@@ -707,6 +720,9 @@ if (manifest && !isViteDevServiceWorker) {
         if (/pwa\/(?:screenshots\/pwa\/|icons\/pwa\/|pwa\/)/i.test(url)) return false;
         // WHY: hashed `index-*.js` hits network; precached `com/app.js` stays old → `export named 'In'`.
         if (isUnhashedSharedBarrel(url)) return false;
+        // WHY: Workbox maps `/` → precached `index.html`; stale HTML keeps deleted `index-*.js`
+        // while unhashed `com/app.js` updates → missing named export (`Gn`, `In`, …).
+        if (/(^|\/)index\.html$/i.test(url)) return false;
         return true;
     });
     precacheAndRoute(filteredManifest);
@@ -1051,6 +1067,10 @@ async function handleAssetRequest(arg: any): Promise<Response> {
                            pathname.endsWith('.png') ||
                            pathname === '/sw.js';
 
+    if (isUnhashedSharedBarrel(request.url) || isUnhashedSharedBarrel(pathname)) {
+        return fetch(request, { cache: "no-store", credentials: "same-origin" });
+    }
+
     if (isCriticalAsset) {
         try {
             // Try to fetch fresh version first
@@ -1061,6 +1081,14 @@ async function handleAssetRequest(arg: any): Promise<Response> {
                     'Pragma': 'no-cache'
                 }
             });
+
+            // WHY: hashed Vite chunks are immutable; 404 means that revision is gone — do not
+            // serve the deleted `index-OJtu8YHJ.js` from assets-cache next to a new `com/app.js`.
+            if (!response.ok && /\/assets\/[^/]+-[A-Za-z0-9_-]{6,}\.(?:m?js|css)$/i.test(pathname)) {
+                const cache = await caches.open('crossword-assets-v1');
+                await cache.delete(request);
+                return response;
+            }
 
             if (response.ok) {
                 // Check if asset has changed
@@ -1400,24 +1428,32 @@ if (isViteDevServiceWorker) {
         })
     );
 } else {
-    setDefaultHandler(
-        new StaleWhileRevalidate({
-            cacheName: "default-cache",
-            fetchOptions: {
-                // Never force credentials=include for cross-origin requests (breaks many CDNs with ACAO="*").
-                // same-origin keeps cookies for same-origin only.
-                credentials: "same-origin",
-                priority: "auto",
-                cache: "force-cache",
-            },
-            plugins: [
-                new ExpirationPlugin({
-                    maxEntries: 120,
-                    maxAgeSeconds: 1800,
-                }),
-            ],
-        })
-    );
+    const defaultGet = new StaleWhileRevalidate({
+        cacheName: "default-cache",
+        fetchOptions: {
+            // Never force credentials=include for cross-origin requests (breaks many CDNs with ACAO="*").
+            // same-origin keeps cookies for same-origin only.
+            credentials: "same-origin",
+            priority: "auto",
+            cache: "force-cache",
+        },
+        plugins: [
+            new ExpirationPlugin({
+                maxEntries: 120,
+                maxAgeSeconds: 1800,
+            }),
+        ],
+    });
+    /* WHY: Workbox SWR calls Cache.match on every unmatched request; POST/blob throw TypeError. */
+    setDefaultHandler(async (args) => {
+        const request = args?.request;
+        const method = request?.method || "GET";
+        const url = String(request?.url || "");
+        if (method !== "GET" || url.startsWith("blob:") || url.startsWith("data:")) {
+            return fetch(request);
+        }
+        return defaultGet.handle(args);
+    });
 }
 
 // INVARIANT: never serve stale `com/app.js` from precache / assets-cache (named-export desync).
@@ -2018,6 +2054,16 @@ const resolveOfflineNavigationResponse = async (pathname = "/"): Promise<Respons
     return createOfflineDocumentResponse(pathname);
 };
 
+/** Runtime caches keep deleted hashed `index-*.js` / stale `index.html` across SW updates. */
+const dropRuntimeAssetCaches = async (): Promise<void> => {
+    const names = await caches.keys();
+    await Promise.all(
+        names
+            .filter((name) => /^(assets-cache|crossword-assets-v1|default-cache)$/i.test(name))
+            .map((name) => caches.delete(name))
+    );
+};
+
 const warmupOfflineNavigationCache = async (reason: "install" | "activate"): Promise<void> => {
     try {
         const cache = await caches.open("default-cache");
@@ -2106,12 +2152,16 @@ self.addEventListener?.('activate', (e: any) => {
     e?.waitUntil?.(
         Promise.all([
             (self as any).clients?.claim?.(),
-            (self as any).registration?.navigationPreload?.enable?.() ?? Promise.resolve(),
+            // WHY: Workbox default/SWR routes do not consume `preloadResponse` → Chrome cancels it.
+            (self as any).registration?.navigationPreload?.disable?.() ?? Promise.resolve(),
+            dropRuntimeAssetCaches(),
         ])
-            .then(() => notifyClients("sw-activated"))
+            .then(() => {
+                void warmupOfflineNavigationCache("activate");
+                notifyClients("sw-activated");
+            })
             .catch(() => notifyClients("sw-activated"))
     );
-    void warmupOfflineNavigationCache("activate");
 });
 
 // Handle messages from clients
@@ -2647,7 +2697,7 @@ registerRoute(
 registerRoute(
     ({ url }) => {
         const pathname = url?.pathname;
-        return pathname && !safeIsUserScopePath(pathname) && (
+        return pathname && !safeIsUserScopePath(pathname) && !isUnhashedSharedBarrel(pathname) && (
             pathname.endsWith('.js') ||
             pathname.endsWith('.css') ||
             pathname.endsWith('.svg') ||
@@ -2677,7 +2727,7 @@ registerRoute(
             }
 
             // Otherwise fall back to network
-            const networkResponse = await fetch(request);
+            const networkResponse = await fetch(request, { cache: "no-store" });
             return networkResponse;
         } catch (error) {
             console.warn('[SW] Navigation fetch failed:', error);

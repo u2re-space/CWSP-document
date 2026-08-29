@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { rewriteVitePreloadBinding } from "../shared/vite-chunk-placement.mjs";
+import { hoistSharedSlices } from "../../../runtime/fastify/apps/hoist-shared-slices.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const repoRoot = path.dirname(path.dirname(root));
@@ -118,4 +119,5 @@ fs.writeFileSync(
     ) + "\n"
 );
 
+hoistSharedSlices(dest, "stage-cw-markdown");
 console.log(`[stage-cw-markdown] ${src} → ${dest}`);

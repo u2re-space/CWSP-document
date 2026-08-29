@@ -36,11 +36,11 @@
         }
     </style>
     <script>
-        // WHY: stale unhashed com/app.js binds `__vitePreload` (was `In`) to the wrong export.
+        // WHY: stale hashed `index-*.js` + unhashed `com/app.js` → missing export (`Gn`, `In`, …).
         (function () {
             var KEY = "cw-md-preload-bust";
             function stale(msg) {
-                return /export named ['"]In['"]|__vitePreload|catch is not a function/i.test(String(msg || ""));
+                return /does not provide an export named|__vitePreload|catch is not a function/i.test(String(msg || ""));
             }
             function bust() {
                 if (sessionStorage.getItem(KEY)) return;

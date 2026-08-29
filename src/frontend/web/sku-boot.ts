@@ -87,4 +87,9 @@ export const bootDocumentSku = async (
 
     const { bootMinimal } = await import("boot/BootLoader");
     await bootMinimal(container, view);
+    try {
+        globalThis.dispatchEvent?.(new CustomEvent("cwsp:document-open", { detail: { source: "sku-boot" } }));
+    } catch {
+        /* viewer listens on show */
+    }
 };
