@@ -330,15 +330,37 @@ export function relocateWorkerBundleAssetsPlugin() {
 /**
  * @param {string} NAME — app slug for the main emitted CSS file
  */
-const PRELOAD_FROM_APP_RE =
-    /import\s*\{\s*[\w$]+\s+as\s+__vitePreload\s*\}\s*from\s*["'][^"']*com\/app\.js["'];?\r?\n?/g;
 const PRELOAD_SHIM =
     "const __vitePreload = (baseModule) => Promise.resolve().then(() => baseModule());\n";
 
 /**
- * WHY: Rolldown still emits `import { Un as __vitePreload } from "../com/app.js"` even after
- * splitting the modulepreload polyfill. A stale unhashed barrel then makes `.catch` throw.
+ * WHY: Rolldown emits `import { An as __vitePreload, … } from "../com/app.js"`.
+ * The old regex only matched a *solo* binding, so mixed imports kept the letter.
+ * A stale unhashed barrel then makes `__vitePreload(...).catch` throw.
  */
+const stripPreloadFromAppImports = (text) => {
+    let changed = false;
+    const next = text.replace(
+        /import\s*\{([^}]*)\}\s*from\s*(["'][^"']*com\/app\.js["'])\s*;?/g,
+        (full, spec, from) => {
+            if (!/\b__vitePreload\b/.test(spec)) return full;
+            changed = true;
+            const cleaned = String(spec)
+                .replace(/(?:,\s*)?[\w$]+\s+as\s+__vitePreload\b/g, "")
+                .replace(/(?:,\s*)?\b__vitePreload\b/g, "")
+                .replace(/,\s*,/g, ",")
+                .replace(/^\s*,\s*/, "")
+                .replace(/,\s*$/, "")
+                .trim();
+            if (!cleaned) return "";
+            return `import { ${cleaned} } from ${from};`;
+        },
+    );
+    if (!changed) return text;
+    if (!/const\s+__vitePreload\s*=/.test(next)) return PRELOAD_SHIM + next;
+    return next;
+};
+
 export function rewriteVitePreloadBinding(outDir) {
     if (!outDir || !existsSync(outDir)) return 0;
     let n = 0;
@@ -366,7 +388,7 @@ export function rewriteVitePreloadBinding(outDir) {
                 continue;
             }
             if (!text.includes("__vitePreload") || !text.includes("com/app.js")) continue;
-            const next = text.replace(PRELOAD_FROM_APP_RE, PRELOAD_SHIM);
+            const next = stripPreloadFromAppImports(text);
             if (next === text) continue;
             writeFileSync(abs, next);
             n += 1;
