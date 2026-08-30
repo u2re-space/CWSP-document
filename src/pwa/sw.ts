@@ -707,7 +707,8 @@ cleanupOutdatedCaches();
 const isUnhashedSharedBarrel = (url: string): boolean =>
     /(?:^|\/)com\/(?:app|service)\.js(?:$|\?)/i.test(url) ||
     /(?:^|\/)fest\/[\w.-]+\.js(?:$|\?)/i.test(url) ||
-    /(?:^|\/)shells\/boot-index\.js(?:$|\?)/i.test(url);
+    /(?:^|\/)shells\/boot-index\.js(?:$|\?)/i.test(url) ||
+    /(?:^|\/)chunks\/src\d*\.js(?:$|\?)/i.test(url);
 
 if (manifest && !isViteDevServiceWorker) {
     const filteredManifest = manifest.filter((entry: any) => {
