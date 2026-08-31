@@ -124,6 +124,9 @@
             "com/core/*": [
                 "../../modules/projects/subsystem/src/routing/channel/*"
             ],
+            "com/service/AI-ops/service/RecognizeData2": [
+                "./src/shared/service/service/RecognizeData.ts"
+            ],
             "com/service/*": [
                 "./src/shared/service/*"
             ],

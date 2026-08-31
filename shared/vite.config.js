@@ -476,6 +476,12 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             /* Rolldown: bare tsconfig alias loses `?inline` imports on this key (viewer-view Markdown typography). */
             { find: /^markdown-view-typography(.*)$/, replacement: `${markdownTypographyScss}$1` },
             ...importFromTSConfig(tsconfig, __dirname),
+            /* WHY: last — tsconfig `@fest-lib/veela/*` maps `scss/core` to a directory; `?inline` needs the file. */
+            { find: /^@fest-lib\/veela\/scss\/core$/, replacement: resolve(workspaceRoot, "modules/projects/veela.css/src/scss/core/index.scss") },
+            { find: /^@fest-lib\/veela\/scss\/basic$/, replacement: resolve(workspaceRoot, "modules/projects/veela.css/src/scss/basic/index.scss") },
+            { find: /^@fest-lib\/veela\/scss\/ui$/, replacement: resolve(workspaceRoot, "modules/projects/veela.css/src/scss/ui/index.scss") },
+            { find: /^@fest-lib\/veela\/scss$/, replacement: resolve(workspaceRoot, "modules/projects/veela.css/src/scss/index.scss") },
+            { find: /^@fest-lib\/veela\/scss\/(.*)$/, replacement: `${resolve(workspaceRoot, "modules/projects/veela.css/src/scss")}/$1` },
         ],
     };
 
