@@ -1,7 +1,7 @@
 {
-    "name": "cw.u2re.space",
-    "short_name": "CW-i1",
-    "description": "AI-and-control-toolset",
+    "name": "CWSP-document",
+    "short_name": "Document",
+    "description": "CWSP-document Markdown (md.u2re.space)",
     "start_url": "../",
     "scope": "../",
     "display": "standalone",

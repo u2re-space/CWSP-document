@@ -83,11 +83,22 @@ const flattenNestedPwaDir = (kind) => {
 flattenNestedPwaDir("icons");
 flattenNestedPwaDir("screenshots");
 
-// WHY: browsers request /favicon.svg|/favicon.png|/favicon.ico at host root.
+// INVARIANT: SKU src/pwa/icons wins over Vite-nested leftovers (old shared cross).
 {
-    const icons = path.join(dest, "pwa", "icons");
+    const srcIcons = path.join(root, "src", "pwa", "icons");
+    const destIcons = path.join(dest, "pwa", "icons");
+    if (fs.existsSync(srcIcons)) {
+        fs.mkdirSync(destIcons, { recursive: true });
+        fs.cpSync(srcIcons, destIcons, { recursive: true });
+    }
+    const srcManifest = path.join(root, "src", "pwa", "manifest.json");
+    const destManifest = path.join(dest, "pwa", "manifest.json");
+    if (fs.existsSync(srcManifest)) {
+        fs.mkdirSync(path.dirname(destManifest), { recursive: true });
+        fs.cpSync(srcManifest, destManifest);
+    }
     const copyFav = (fromName, toName) => {
-        const from = path.join(icons, fromName);
+        const from = path.join(destIcons, fromName);
         if (!fs.existsSync(from)) return;
         fs.cpSync(from, path.join(dest, toName));
     };
@@ -95,6 +106,12 @@ flattenNestedPwaDir("screenshots");
     copyFav("icon.png", "favicon.png");
     copyFav("favicon.ico", "favicon.ico");
     if (!fs.existsSync(path.join(dest, "favicon.ico"))) copyFav("icon.ico", "favicon.ico");
+    // COMPAT: SW / notifications request `/icons/icon.png` (not `/pwa/icons`).
+    const destAlias = path.join(dest, "icons");
+    if (fs.existsSync(destIcons)) {
+        fs.mkdirSync(destAlias, { recursive: true });
+        fs.cpSync(destIcons, destAlias, { recursive: true });
+    }
 }
 
 // WHY: `/assets/wallpaper.jpg` is the default shell wallpaper; Vite host SPA omits app assets/.

@@ -40,7 +40,7 @@
         (function () {
             var KEY = "cw-md-preload-bust";
             function stale(msg) {
-                return /does not provide an export named|__vitePreload|catch is not a function/i.test(String(msg || ""));
+                return /does not provide an export named|__vitePreload|catch is not a function|Calling `require` for/i.test(String(msg || ""));
             }
             function bust() {
                 if (sessionStorage.getItem(KEY)) return;
