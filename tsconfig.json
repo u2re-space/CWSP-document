@@ -109,8 +109,14 @@
             "@fest-lib/polyfill/*": [
                 "./shared/polyfill/*"
             ],
+            "com/config/Names": [
+                "../../modules/projects/subsystem/runtime/names.ts"
+            ],
             "com/config/*": [
                 "./src/shared/other/config/*"
+            ],
+            "com/core/LogSanitizer": [
+                "../../modules/projects/subsystem/runtime/log-sanitizer.ts"
             ],
             "com/other/*": [
                 "../../modules/projects/subsystem/src/other/*"
@@ -132,6 +138,12 @@
             ],
             "com/template/*": [
                 "../../modules/projects/subsystem/src/service/template/*"
+            ],
+            "com/routing/pwa/sw-cache": [
+                "../../modules/projects/subsystem/src/routing/pwa/sw-cache.ts"
+            ],
+            "com/routing/pwa/sw-result-wire": [
+                "../../modules/projects/subsystem/src/routing/pwa/sw-result-wire.ts"
             ],
             "com/routing/*": [
                 "./src/shared/routing/*"

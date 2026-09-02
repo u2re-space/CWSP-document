@@ -1,0 +1,39 @@
+{
+    "include": [
+        "./**/*.ts"
+    ],
+    "exclude": [
+        "node_modules/**",
+        "dist/**"
+    ],
+    "compilerOptions": {
+        "skipLibCheck": true,
+        "module": "ESNext",
+        "target": "ESNext",
+        "moduleResolution": "bundler",
+        "noEmit": true,
+        "strict": false,
+        "noImplicitAny": false,
+        "allowJs": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "lib": [
+            "ESNext",
+            "WebWorker"
+        ],
+        "paths": {
+            "com/config/Names": [
+                "../../../../modules/projects/subsystem/runtime/names.ts"
+            ],
+            "com/core/LogSanitizer": [
+                "../../../../modules/projects/subsystem/runtime/log-sanitizer.ts"
+            ],
+            "com/routing/pwa/sw-cache": [
+                "../../../../modules/projects/subsystem/src/routing/pwa/sw-cache.ts"
+            ],
+            "com/routing/pwa/sw-result-wire": [
+                "../../../../modules/projects/subsystem/src/routing/pwa/sw-result-wire.ts"
+            ]
+        }
+    }
+}
