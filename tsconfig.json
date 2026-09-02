@@ -145,6 +145,9 @@
             "com/routing/pwa/sw-result-wire": [
                 "../../modules/projects/subsystem/src/routing/pwa/sw-result-wire.ts"
             ],
+            "com/routing/pwa/sw-lifecycle": [
+                "../../modules/projects/subsystem/src/routing/pwa/sw-lifecycle.ts"
+            ],
             "com/routing/*": [
                 "./src/shared/routing/*"
             ],
