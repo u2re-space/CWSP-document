@@ -36,11 +36,12 @@
         }
     </style>
     <script>
-        // WHY: stale hashed `index-*.js` + unhashed `com/app.js` → missing export (`Gn`, `In`, …).
+        // WHY: stale hashed `index-*.js` + unhashed barrels (`boot-index`, `preview`, `sw-handling`)
+        // remaps `Ot`/`dt`/`ft` → missing export or `isEnabledView is not a function`.
         (function () {
             var KEY = "cw-md-preload-bust";
             function stale(msg) {
-                return /does not provide an export named|__vitePreload|catch is not a function|Calling `require` for/i.test(String(msg || ""));
+                return /does not provide an export named|__vitePreload|catch is not a function|Calling `require` for|isEnabledView is not a function|storeShareTargetPayloadToCache is not a function|consumeCachedShareTargetPayload is not a function|is not a function/i.test(String(msg || ""));
             }
             function bust() {
                 if (sessionStorage.getItem(KEY)) return;

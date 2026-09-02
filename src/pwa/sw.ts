@@ -665,14 +665,22 @@ const isViteDevServiceWorker = import.meta?.env?.DEV;
 // @ts-ignore
 const manifest = self.__WB_MANIFEST;
 cleanupOutdatedCaches();
-/** Unhashed Vite barrels — export names (`In` = preload, `r` = __exportAll) change per build; filename does not. */
-const isUnhashedSharedBarrel = (url: string): boolean =>
-    /(?:^|\/)com\/(?:app|service)\.js(?:$|\?)/i.test(url) ||
-    /(?:^|\/)fest\/[\w.-]+\.js(?:$|\?)/i.test(url) ||
-    /(?:^|\/)shells\/boot-index\.js(?:$|\?)/i.test(url) ||
-    /(?:^|\/)chunks\/src\d*\.js(?:$|\?)/i.test(url) ||
-    // WHY: stale `rolldown-runtime.js` binds `r` to `__require` → `Calling require for "[object Object]"`.
-    /(?:^|\/)chunks\/rolldown-runtime\.js(?:$|\?)/i.test(url);
+/** Vite hashed filenames (`index-DOJZ-vcx.js`). Unhashed barrels keep a stable path while export aliases move. */
+const VITE_HASHED_JS = /-[A-Za-z0-9_-]{8}\.m?js$/i;
+
+/**
+ * Unhashed Vite barrels — export names (`Ot` = isEnabledView, `dt`/`ft` = share-target)
+ * change per build; filename does not.
+ * WHY: `preview.js` / `sw-handling.js` were cached while `boot-index.js` was NetworkOnly
+ * → `isEnabledView is not a function` on md.u2re.space.
+ */
+const isUnhashedSharedBarrel = (url: string): boolean => {
+    const path = String(url || "").split("?")[0];
+    if (!/\.m?js$/i.test(path)) return false;
+    if (!/(?:^|\/)(?:com|fest|shells|views|chunks)\//i.test(path)) return false;
+    const base = path.slice(path.lastIndexOf("/") + 1);
+    return !VITE_HASHED_JS.test(base);
+};
 
 if (manifest && !isViteDevServiceWorker) {
     const filteredManifest = manifest.filter((entry: any) => {
@@ -1366,14 +1374,20 @@ registerRoute(
         );
         const isLocalHost = host === 'localhost' || host.endsWith('.local');
         const isSocketIoPath = pathname === '/socket.io' || pathname.startsWith('/socket.io/');
+        const isMountedFsPath = pathname === '/ssre/fs' || pathname.startsWith('/ssre/fs/');
         const isControlPath =
             pathname.startsWith('/api/') ||
             pathname === '/lna-probe' ||
-            isSocketIoPath;
+            isSocketIoPath ||
+            isMountedFsPath;
 
         // Socket.IO transport must bypass SW caching/proxy on all hosts (LAN + WAN),
         // otherwise polling/ws handshakes can fail with synthetic SW network errors.
         if (isSocketIoPath) return true;
+
+        // WHY: `/ssre/fs` + `/ssre/fs/ws` — Workbox GET handler breaks WS upgrade
+        // (`wss://md.u2re.space/ssre/fs/ws`) and the HTTPS fallback.
+        if (isMountedFsPath) return true;
 
         // LNA / PNA probe — same as socket.io: never let Workbox/cache touch it (any host).
         if (pathname === '/lna-probe') return true;
