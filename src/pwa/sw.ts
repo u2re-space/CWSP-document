@@ -821,7 +821,7 @@ const sendToast = (message: string, kind: 'info' | 'success' | 'warning' | 'erro
  */
 const notifyShareReceived = (data: unknown): void => {
     const row = data && typeof data === "object" ? (data as Record<string, unknown>) : { text: data };
-    publishSwShareReceived(row);
+    publishSwShareReceived(row, SHARE_LANDING_PATH);
 };
 
 /**
