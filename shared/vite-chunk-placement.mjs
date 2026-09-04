@@ -76,6 +76,12 @@ const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\
  * output stays structured. `lure` and `fl-ui` intentionally remain merged into
  * `com/app.js` to avoid circular-init / TDZ regressions.
  */
+/** Rolldown 1.2 `groups[].name` must be a string or a function that returns string|null. */
+export function rolldownChunkName(id) {
+    const name = manualChunks(id);
+    return typeof name === "string" ? name : null;
+}
+
 export const rolldownCodeSplittingGroups = [
     {
         name: "vite-preload",

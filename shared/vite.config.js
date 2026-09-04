@@ -15,9 +15,7 @@ import { join, resolve } from "node:path";
 import {
     assetFileNames as distAssetFileNames,
     chunkFileNames as distChunkFileNames,
-    manualChunks as distManualChunks,
     relocateWorkerBundleAssetsPlugin,
-    rolldownCodeSplittingGroups,
     rewriteVitePreloadPlugin,
 } from "./vite-chunk-placement.mjs";
 import { applyFestLibraryMode } from "../../../modules/shared/fest-web-libs.mjs";
@@ -490,6 +488,9 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             { find: /^@fest-lib\/lure\/remote-fs$/, replacement: resolve(workspaceRoot, "modules/projects/lur.e/src/utils/opfs/remote-fs.ts") },
             /* WHY: nested @fest-lib/lure@0.1.50 has no ./code-overlay; fest/fl-ui cannot relative-import lur.e. */
             { find: /^@fest-lib\/lure\/code-overlay$/, replacement: resolve(workspaceRoot, "modules/projects/lur.e/src/lure/misc/CodeOverlay.ts") },
+            /* WHY: viewer/workcenter copies cannot `../../../projects/fl.ui` from app src/. Do not use the fl-ui barrel. */
+            { find: /^@fest-lib\/fl-ui\/markdown\/highlight$/, replacement: resolve(workspaceRoot, "modules/projects/fl.ui/src/ui/markdown/highlight.ts") },
+            { find: /^@fest-lib\/fl-ui\/markdown\/render$/, replacement: resolve(workspaceRoot, "modules/projects/fl.ui/src/ui/markdown/render.ts") },
             /* Rolldown: bare tsconfig alias loses `?inline` imports on this key (viewer-view Markdown typography). */
             { find: /^markdown-view-typography(.*)$/, replacement: `${markdownTypographyScss}$1` },
             ...importFromTSConfig(tsconfig, __dirname),
@@ -556,29 +557,33 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
     })();
     /* WHY: Vite 8 still injects `@vite/client` when `hmr: false`. That client opens
      * `wss://LAN/?token=` → Invalid frame header → poll → reload. Serve a no-WS stub. */
+    const viteClientStubSource = readFileSync(resolve(import.meta.dirname, "vite-client-stub.js"), "utf8");
+    const isViteClientRequest = (url) => /(?:^|\/)@vite\/client$/.test(decodeURIComponent(String(url || "").split("?")[0]));
     const viteClientStubPlugin = !hmrEnabled
         ? {
               name: "cwsp-vite-client-stub",
+              enforce: "pre",
+              transform(code, id) {
+                  if (!code.includes("extends HTMLElement") || !/ErrorOverlay/.test(code)) return null;
+                  if (!/[\\/]@vite[\\/]client|[\\/]vite[\\/]dist[\\/]client/.test(id) && !id.endsWith("/client")) return null;
+                  /* WHY: Workers evaluate @vite/client; bare HTMLElement is not defined there. */
+                  return code.replace(
+                      /class\s+ErrorOverlay\s+extends\s+HTMLElement/g,
+                      "class ErrorOverlay extends (globalThis.HTMLElement || class {})"
+                  );
+              },
               configureServer(devServer) {
-                  devServer.middlewares.use((req, res, next) => {
-                      const path = String(req.url || "").split("?")[0];
-                      if (path !== "/@vite/client") return next();
+                  const serveStub = (req, res, next) => {
+                      if (!isViteClientRequest(req.url)) return next();
                       res.statusCode = 200;
                       res.setHeader("Content-Type", "text/javascript; charset=utf-8");
                       res.setHeader("Cache-Control", "no-store");
-                      res.end(
-                          `console.debug("[vite] HMR disabled");\n` +
-                              `const noop = () => {};\n` +
-                              `export const createHotContext = () => ({\n` +
-                              `  data: {}, accept: noop, dispose: noop, prune: noop,\n` +
-                              `  invalidate: noop, on: noop, off: noop, send: noop\n` +
-                              `});\n` +
-                              `export const updateStyle = noop;\n` +
-                              `export const removeStyle = noop;\n` +
-                              `export const injectQuery = (url) => url;\n` +
-                              `export class ErrorOverlay extends HTMLElement {}\n`
-                      );
-                  });
+                      res.end(viteClientStubSource);
+                  };
+                  devServer.middlewares.use(serveStub);
+                  const stack = devServer.middlewares.stack;
+                  const last = stack.pop();
+                  if (last) stack.unshift(last);
               },
           }
         : null;
@@ -733,7 +738,6 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             },
             chunkFileNames: distChunkFileNames,
             assetFileNames: distAssetFileNames(NAME),
-            manualChunks: distManualChunks,
         }
     };
 
@@ -893,7 +897,8 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
             "Content-Language": "*",
             "Service-Worker-Allowed": "/",
             "Permissions-Policy": "fullscreen=*, window-management=*",
-            "Cross-Origin-Embedder-Policy": "require-corp",
+            /* WHY: require-corp blocks README badges/images (badgen.net, GitHub SVG) with no CORP. */
+            "Cross-Origin-Embedder-Policy": "credentialless",
             "Cross-Origin-Opener-Policy": "same-origin",
             "Access-Control-Allow-Methods": "PROPFIND,HEAD,GET,POST,PUT,MOVE,DELETE,PATCH,OPTIONS",
             "Access-Control-Request-Headers": "*",
@@ -939,14 +944,11 @@ export const initiate = (NAME = "generic", tsconfig = {}, __dirname = resolve(".
                 if (isIgnorableRollupWarning(warning)) return;
                 defaultHandler(warning);
             },
-            // NOTE: Vite 8 uses Rolldown for production builds. Mirror output naming here so
-            // chunk placement rules (`views/`, `shells/`, `com/`, `core/`, `chunks/`, etc.)
-            // are applied consistently instead of collapsing scripts into the dist root.
+            // WHY: Rolldown 1.2 native `advancedChunks.name` rejects any name/test
+            // callback that is not a string (RegExp test / manualChunks / batchName
+            // array). Default splitting until groups are string-only and callback-free.
             output: {
                 ...rollupOptions.output,
-                codeSplitting: {
-                    groups: rolldownCodeSplittingGroups,
-                },
             },
         },
         terserOptions,
