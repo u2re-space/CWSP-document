@@ -39,10 +39,11 @@ const findVitePkgRoot = () => {
 
 const vitePkgRoot = findVitePkgRoot();
 const viteJs = resolve(vitePkgRoot, "bin", "vite.js");
+const forceHttps1 = resolve(__dirname, "force-https1.mjs");
 
 const heapMb = String(process.env.VITE_NODE_HEAP_MB || "24576").trim() || "24576";
 const forwarded = process.argv.slice(2);
-const args = [`--max-old-space-size=${heapMb}`, viteJs, ...forwarded];
+const args = [`--max-old-space-size=${heapMb}`, `--import`, forceHttps1, viteJs, ...forwarded];
 
 const r = spawnSync(process.execPath, args, { stdio: "inherit", shell: false });
 process.exit(r.status ?? 1);
