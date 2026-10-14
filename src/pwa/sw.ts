@@ -48,6 +48,7 @@ import {
     publishSwShareReceived,
     shareLandingPath
 } from "com/routing/pwa/sw-result-wire";
+import { installShareTargetStaticRoutes } from "com/routing/pwa/sw-lifecycle";
 import { attachSwLifecycle } from "com/routing/pwa/sw-lifecycle";
 
 attachSwLifecycle(self);
@@ -2128,6 +2129,7 @@ self.addEventListener?.('install', (e: any) => {
     // Only skipWaiting must block install; offline HTML warmup does network fetches and was
     // serializing 5+ document requests here — that delayed activation and first paint for minutes
     // on slow links while Workbox precache also ran in parallel.
+    installShareTargetStaticRoutes(e);
     const sw = (self as any)?.skipWaiting?.();
     e?.waitUntil?.(sw && typeof sw.then === "function" ? sw : Promise.resolve());
     void warmupOfflineNavigationCache("install");

@@ -60,11 +60,26 @@ export const showDocumentBootFailure = (error: unknown, mount: HTMLElement = doc
 };
 
 /**
- * WHY: Capacitor `cws:shareIntent` is ingested by `installCapacitorShareIntentBridge`
- * (viewer for image / document / text / files). This stamp-only hook stays for callers.
+ * WHY: install the share bridge before `bootMinimal` so cold-start SEND/VIEW
+ * is not dropped while BootLoader is still loading. PWA share-target and
+ * launch-queue stay on `initIngressPWA` plus `InstallEvent.addRoutes`.
  */
 export const installDocumentShareIngress = (): void => {
-    /* share pipeline lives in capacitor-share-intent + initIngressPWA */
+    try {
+        const g = globalThis as { Capacitor?: { isNativePlatform?: () => boolean } };
+        const native = typeof g.Capacitor?.isNativePlatform === "function" && g.Capacitor.isNativePlatform();
+        if (native) {
+            void import("boot/capacitor-share-intent")
+                .then((mod) => mod.installCapacitorShareIntentBridge())
+                .catch(() => undefined);
+            return;
+        }
+        void import("core/pwa/sw-handling")
+            .then((mod) => mod.initIngressPWA())
+            .catch(() => undefined);
+    } catch {
+        /* web / preview */
+    }
 };
 
 export const bootDocumentSku = async (
