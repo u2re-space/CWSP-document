@@ -2,8 +2,8 @@
  * Filename: sku-boot.ts
  * FullPath: apps/CWSP-document/src/frontend/web/sku-boot.ts
  * FIND:sku
- * Change date: 14.05.00_27.08.2026
- * Reason: One document SKU stamp for PWA, Capacitor, and CRX (viewer + editor).
+ * Change date: 12.00.00_21.10.2026
+ * Reason: Document SKU keeps the native Android nav bar visible (no SystemBars.hide).
  */
 
 import { applyCwspSku } from "com/config/ecosystem-skus";
@@ -90,15 +90,6 @@ export const bootDocumentSku = async (
     const host = detectHostKind(kind);
     stampDocumentSku(host);
     installDocumentShareIngress();
-
-    if (host === "capacitor") {
-        try {
-            const { SystemBarType, SystemBars } = await import("@capacitor/core");
-            await SystemBars.hide({ bar: SystemBarType.NavigationBar });
-        } catch {
-            /* web preview */
-        }
-    }
 
     const { bootMinimal } = await import("boot/BootLoader");
     await bootMinimal(container, view);
